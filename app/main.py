@@ -637,6 +637,43 @@ async def api_detect_token():
 
 
 # ===========================================================================
+# Character reuse API
+# ===========================================================================
+
+@app.get("/api/character_sources")
+async def api_character_sources():
+    """List available previous runs for character reuse."""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    sources = []
+    if output_dir.exists():
+        for d in sorted(output_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if not d.is_dir():
+                continue
+            script_path = d / "script.json"
+            if not script_path.exists():
+                continue
+            try:
+                script = json.loads(script_path.read_text(encoding="utf-8"))
+                # Check if character images exist
+                img_dir = d / "images"
+                has_chars = (img_dir / "char_scene.png").exists() or \
+                            (img_dir / "pose_char_a_0.png").exists()
+                if not has_chars:
+                    continue
+                sources.append({
+                    "name": d.name,
+                    "title": script.get("youtube_title", script.get("title", d.name)),
+                    "structure": script.get("structure", ""),
+                    "char_a": script.get("char_a_description", "")[:60],
+                    "char_b": script.get("char_b_description", "")[:60],
+                })
+            except (json.JSONDecodeError, OSError):
+                continue
+    return {"sources": sources}
+
+
+# ===========================================================================
 # Health check
 # ===========================================================================
 

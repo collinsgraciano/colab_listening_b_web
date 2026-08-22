@@ -30,6 +30,8 @@ PARAM_SPEC = {
                       "none": "None (静态)",
                       "landing": "Landing (降落变换)",
                       "stop_motion": "Stop Motion (定格动画)"}},
+    "character_source": {"default": "", "type": "text", "group": "content",
+                         "label": "复用角色来源", "help": "留空=生成新角色。填写之前运行文件夹名可复用角色"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",

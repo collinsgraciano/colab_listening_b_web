@@ -204,6 +204,94 @@ class PipelineService:
         if sys.platform == "win32" and "HF_ENDPOINT" not in os.environ:
             os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
+    # Character image file patterns per structure
+    _CHAR_FILES_ORIGINAL = ["char_scene.png", "char_a_ref.png", "char_b_ref.png"]
+    _CHAR_FILES_QUEST = ["host_bg.png"]
+
+    def _reuse_characters(self, source_run: str, work_dir: Path,
+                          script: dict, dirs: dict):
+        """Copy character images from a previous run and override descriptions.
+
+        Called after step0 (script generation) but before step2 (image gen).
+        The pipeline's image generation will skip files that already exist.
+        """
+        import shutil
+        output_dir = Path(self.config.get("output_dir", "./output"))
+        source_dir = output_dir / source_run
+        if not source_dir.exists():
+            self._on_log_line(f"  [Reuse] Source run not found: {source_run}")
+            return
+
+        source_script_path = source_dir / "script.json"
+        if not source_script_path.exists():
+            self._on_log_line(f"  [Reuse] No script.json in source run")
+            return
+
+        source_script = json.loads(source_script_path.read_text(encoding="utf-8"))
+        src_img_dir = source_dir / "images"
+        dst_img_dir = dirs["images"]
+
+        # Override character descriptions in the new script
+        char_fields = ["char_a_description", "char_b_description",
+                       "char_a_gender", "char_b_gender",
+                       "char_a_role", "char_b_role"]
+        if script.get("structure") == "quest" or self.config.get("structure") == "quest":
+            char_fields += ["char_c_description", "host_description",
+                            "char_c_gender", "host_gender"]
+        overridden = []
+        for field in char_fields:
+            src_val = source_script.get(field, "")
+            if src_val:
+                script[field] = src_val
+                overridden.append(field)
+
+        # Copy character image files
+        copied = []
+        structure = self.config.get("structure", "original")
+
+        if structure == "quest":
+            # Copy pose atlases: pose_char_a_0..7.png, pose_char_b_0..7.png, etc.
+            for f in src_img_dir.glob("pose_char_*_*.png"):
+                dst = dst_img_dir / f.name
+                if not dst.exists():
+                    shutil.copy2(str(f), str(dst))
+                    copied.append(f.name)
+            # Copy host_bg.png
+            host_bg = src_img_dir / "host_bg.png"
+            if host_bg.exists():
+                shutil.copy2(str(host_bg), str(dst_img_dir / "host_bg.png"))
+                copied.append("host_bg.png")
+        else:
+            # Copy char_scene.png, char_a_ref.png, char_b_ref.png
+            for fname in self._CHAR_FILES_ORIGINAL:
+                src = src_img_dir / fname
+                if src.exists():
+                    shutil.copy2(str(src), str(dst_img_dir / fname))
+                    copied.append(fname)
+            # Also copy pose files if stop_motion
+            for f in src_img_dir.glob("pose_atlas_*.png"):
+                dst = dst_img_dir / f.name
+                if not dst.exists():
+                    shutil.copy2(str(f), str(dst))
+                    copied.append(f.name)
+            for f in src_img_dir.glob("pose_*_*.png"):
+                if f.name.startswith("pose_atlas"):
+                    continue
+                dst = dst_img_dir / f.name
+                if not dst.exists():
+                    shutil.copy2(str(f), str(dst))
+                    copied.append(f.name)
+
+        # Save the updated script with overridden descriptions
+        script_path = work_dir / "script.json"
+        script_path.write_text(
+            json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        self._on_log_line(f"  [Reuse] Copied {len(copied)} character images from '{source_run}'")
+        self._on_log_line(f"  [Reuse] Overridden fields: {', '.join(overridden)}")
+        if copied:
+            self._on_log_line(f"  [Reuse] Files: {', '.join(copied[:10])}")
+
     def _build_args(self, config: dict) -> SimpleNamespace:
         """Convert config dict → SimpleNamespace matching pipeline.py args."""
         num_lines = config.get("num_lines", "")
@@ -326,6 +414,11 @@ class PipelineService:
             script, work_dir, dirs = _step0_script(
                 args, checkpoint, topic, parent_dir, used_topics_file)
             self.work_dir = str(work_dir)
+
+            # --- Character reuse: copy character images from a previous run ---
+            char_source = config.get("character_source", "")
+            if char_source and not resume:
+                self._reuse_characters(char_source, work_dir, script, dirs)
 
             if self._stop_flag.is_set():
                 self._set_stopped()

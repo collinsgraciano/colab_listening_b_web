@@ -51,6 +51,23 @@
             </div>
         </div>
 
+        <!-- Character reuse -->
+        <div class="mb-4">
+            <label class="block text-xs text-slate-400 mb-1">复用角色 (可选)</label>
+            <div class="flex gap-2">
+                <select id="char-source" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+                    onchange="onCharSourceChange()">
+                    <option value="">生成新角色</option>
+                </select>
+                <button onclick="loadCharSources()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300" title="刷新列表">
+                    🔄
+                </button>
+            </div>
+            <div id="char-source-info" class="hidden mt-2 text-xs text-slate-400 bg-slate-900/50 rounded-lg p-2">
+                <span id="char-source-detail"></span>
+            </div>
+        </div>
+
         <!-- Action buttons -->
         <div class="flex flex-wrap gap-3 items-center">
             <button id="btn-start" onclick="startPipeline(false)"
@@ -138,6 +155,59 @@ function updateQuickDefaults() {
     }
 }
 
+// --- Character reuse ---
+let _charSources = [];
+
+function loadCharSources() {
+    fetch('/api/character_sources')
+        .then(r => r.json())
+        .then(data => {
+            _charSources = data.sources || [];
+            const sel = document.getElementById('char-source');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">生成新角色</option>';
+            _charSources.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.title;
+                sel.appendChild(opt);
+            });
+            sel.value = current;
+        });
+}
+
+function onCharSourceChange() {
+    const sel = document.getElementById('char-source');
+    const info = document.getElementById('char-source-info');
+    const detail = document.getElementById('char-source-detail');
+    if (!sel.value) {
+        info.classList.add('hidden');
+        return;
+    }
+    const src = _charSources.find(s => s.name === sel.value);
+    if (src) {
+        detail.textContent = `A: ${src.char_a || '?'} | B: ${src.char_b || '?'} | ${src.structure}`;
+        info.classList.remove('hidden');
+    }
+}
+
+// Load character sources on page load
+window.addEventListener('load', function() {
+    loadCharSources();
+    // ... existing status check
+    fetch('/api/run/status')
+        .then(r => r.json())
+        .then(data => {
+            if (data.is_running) {
+                document.getElementById('btn-start').disabled = true;
+                document.getElementById('btn-resume').disabled = true;
+                document.getElementById('btn-stop').style.display = '';
+                document.getElementById('progress-section').style.display = '';
+                connectSSE();
+            }
+        });
+});
+
 function pickRandomTopic() {
     fetch('/api/topics/random')
         .then(r => r.json())
@@ -156,6 +226,7 @@ function startPipeline(resume) {
         topic: document.getElementById('quick-topic').value,
         cefr: document.getElementById('quick-cefr').value,
         structure: document.getElementById('quick-structure').value,
+        character_source: document.getElementById('char-source').value,
     };
     // Merge with saved config
     const config = {...CURRENT_CONFIG, ...overrides};
@@ -333,19 +404,5 @@ function updateProgress(data) {
     }
 }
 
-// Check if pipeline is running on page load
-window.addEventListener('load', function() {
-    fetch('/api/run/status')
-        .then(r => r.json())
-        .then(data => {
-            if (data.is_running) {
-                document.getElementById('btn-start').disabled = true;
-                document.getElementById('btn-resume').disabled = true;
-                document.getElementById('btn-stop').style.display = '';
-                document.getElementById('progress-section').style.display = '';
-                connectSSE();
-            }
-        });
-});
 </script>
 {% endblock %}
