@@ -14,8 +14,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-# Add pipeline source to path
-PIPELINE_DIR = Path(__file__).parent.parent.parent / "colab_listening_b"
+# Add pipeline source to path (local copy — fully independent)
+PIPELINE_DIR = Path(__file__).parent.parent / "pipeline"
 if str(PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(PIPELINE_DIR))
 
@@ -206,88 +206,219 @@ class PipelineService:
 
     # Character image file patterns per structure
     _CHAR_FILES_ORIGINAL = ["char_scene.png", "char_a_ref.png", "char_b_ref.png"]
-    _CHAR_FILES_QUEST = ["host_bg.png"]
+
+    def _build_character_overrides(self, config: dict) -> dict:
+        """Build character overrides dict for LLM prompt injection.
+
+        Merges character_reuse (from source run) and character_fixes (custom descriptions).
+        Returns dict: {"char_a": {"description": "...", "gender": "female", "role": "customer"}, ...}
+        """
+        source = config.get("character_source", "")
+        reuse_raw = config.get("character_reuse", "")
+        fixes_raw = config.get("character_fixes", "")
+
+        reuse_map: dict[str, bool] = {}
+        fixes_map: dict[str, str] = {}
+
+        if reuse_raw:
+            try:
+                reuse_map = json.loads(reuse_raw) if isinstance(reuse_raw, str) else reuse_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if fixes_raw:
+            try:
+                fixes_map = json.loads(fixes_raw) if isinstance(fixes_raw, str) else fixes_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        structure = config.get("structure", "original")
+        if structure == "quest":
+            all_keys = ["char_a", "char_b", "char_c", "host"]
+        else:
+            all_keys = ["char_a", "char_b"]
+
+        # Backward compat: if source set but no reuse_map, reuse all
+        if source and not reuse_map:
+            reuse_map = {k: True for k in all_keys}
+
+        overrides: dict[str, dict] = {}
+
+        # Load source script for reused characters
+        source_script: dict = {}
+        if source:
+            output_dir = Path(config.get("output_dir", "./output"))
+            source_script_path = output_dir / source / "script.json"
+            if source_script_path.exists():
+                try:
+                    source_script = json.loads(source_script_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    pass
+
+        for key in all_keys:
+            char_info: dict[str, str] = {}
+
+            # From reuse: get description, gender, role from source script
+            if reuse_map.get(key, False) and source_script:
+                for suffix in ["description", "gender", "role"]:
+                    val = source_script.get(f"{key}_{suffix}", "")
+                    if val:
+                        char_info[suffix] = val
+
+            # From fixes: override description (user's custom text wins)
+            fix_desc = (fixes_map.get(key, "") or "").strip()
+            if fix_desc:
+                char_info["description"] = fix_desc
+
+            if char_info:
+                overrides[key] = char_info
+
+        return overrides
 
     def _reuse_characters(self, source_run: str, work_dir: Path,
                           script: dict, dirs: dict):
-        """Copy character images from a previous run and override descriptions.
+        """Copy character images from a previous run and/or apply custom descriptions.
 
+        Supports selective reuse (per-character) and custom description overrides.
         Called after step0 (script generation) but before step2 (image gen).
         The pipeline's image generation will skip files that already exist.
         """
         import shutil
-        output_dir = Path(self.config.get("output_dir", "./output"))
-        source_dir = output_dir / source_run
-        if not source_dir.exists():
-            self._on_log_line(f"  [Reuse] Source run not found: {source_run}")
-            return
 
-        source_script_path = source_dir / "script.json"
-        if not source_script_path.exists():
-            self._on_log_line(f"  [Reuse] No script.json in source run")
-            return
+        # Parse character_reuse and character_fixes from config
+        reuse_raw = self.config.get("character_reuse", "")
+        fixes_raw = self.config.get("character_fixes", "")
 
-        source_script = json.loads(source_script_path.read_text(encoding="utf-8"))
-        src_img_dir = source_dir / "images"
-        dst_img_dir = dirs["images"]
+        reuse_map: dict[str, bool] = {}
+        fixes_map: dict[str, str] = {}
 
-        # Override character descriptions in the new script
-        char_fields = ["char_a_description", "char_b_description",
-                       "char_a_gender", "char_b_gender",
-                       "char_a_role", "char_b_role"]
-        if script.get("structure") == "quest" or self.config.get("structure") == "quest":
-            char_fields += ["char_c_description", "host_description",
-                            "char_c_gender", "host_gender"]
-        overridden = []
-        for field in char_fields:
-            src_val = source_script.get(field, "")
-            if src_val:
-                script[field] = src_val
-                overridden.append(field)
+        if reuse_raw:
+            try:
+                reuse_map = json.loads(reuse_raw) if isinstance(reuse_raw, str) else reuse_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
 
-        # Copy character image files
-        copied = []
+        if fixes_raw:
+            try:
+                fixes_map = json.loads(fixes_raw) if isinstance(fixes_raw, str) else fixes_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         structure = self.config.get("structure", "original")
-
         if structure == "quest":
-            # Copy pose atlases: pose_char_a_0..7.png, pose_char_b_0..7.png, etc.
-            for f in src_img_dir.glob("pose_char_*_*.png"):
-                dst = dst_img_dir / f.name
-                if not dst.exists():
-                    shutil.copy2(str(f), str(dst))
-                    copied.append(f.name)
-            # Copy host_bg.png
-            host_bg = src_img_dir / "host_bg.png"
-            if host_bg.exists():
-                shutil.copy2(str(host_bg), str(dst_img_dir / "host_bg.png"))
-                copied.append("host_bg.png")
+            all_char_keys = ["char_a", "char_b", "char_c", "host"]
         else:
-            # Copy char_scene.png, char_a_ref.png, char_b_ref.png
-            for fname in self._CHAR_FILES_ORIGINAL:
-                src = src_img_dir / fname
-                if src.exists():
-                    shutil.copy2(str(src), str(dst_img_dir / fname))
-                    copied.append(fname)
-            # Also copy pose files if stop_motion
-            for f in src_img_dir.glob("pose_atlas_*.png"):
-                dst = dst_img_dir / f.name
-                if not dst.exists():
-                    shutil.copy2(str(f), str(dst))
-                    copied.append(f.name)
-            for f in src_img_dir.glob("pose_*_*.png"):
-                if f.name.startswith("pose_atlas"):
-                    continue
-                dst = dst_img_dir / f.name
-                if not dst.exists():
-                    shutil.copy2(str(f), str(dst))
-                    copied.append(f.name)
+            all_char_keys = ["char_a", "char_b"]
 
-        # Save the updated script with overridden descriptions
+        # Backward compatibility: if source is set but no reuse_map, reuse all
+        if source_run and not reuse_map:
+            reuse_map = {k: True for k in all_char_keys}
+
+        overridden = []
+        copied = []
+
+        # --- Apply character reuse (copy images + descriptions from source) ---
+        if source_run:
+            output_dir = Path(self.config.get("output_dir", "./output"))
+            source_dir = output_dir / source_run
+            if not source_dir.exists():
+                self._on_log_line(f"  [Reuse] Source run not found: {source_run}")
+            else:
+                source_script_path = source_dir / "script.json"
+                if not source_script_path.exists():
+                    self._on_log_line(f"  [Reuse] No script.json in source run")
+                else:
+                    source_script = json.loads(source_script_path.read_text(encoding="utf-8"))
+                    src_img_dir = source_dir / "images"
+                    dst_img_dir = dirs["images"]
+
+                    for key in all_char_keys:
+                        if not reuse_map.get(key, False):
+                            continue
+                        # Override character description fields from source
+                        for suffix in ["description", "gender", "role"]:
+                            field = f"{key}_{suffix}"
+                            src_val = source_script.get(field, "")
+                            if src_val:
+                                script[field] = src_val
+                                overridden.append(field)
+                        # Copy character images
+                        if structure == "quest":
+                            for j in range(8):
+                                src = src_img_dir / f"pose_{key}_{j}.png"
+                                if src.exists():
+                                    dst = dst_img_dir / src.name
+                                    if not dst.exists():
+                                        shutil.copy2(str(src), str(dst))
+                                        copied.append(src.name)
+                            atlas = src_img_dir / f"pose_atlas_{key}.png"
+                            if atlas.exists():
+                                dst = dst_img_dir / atlas.name
+                                if not dst.exists():
+                                    shutil.copy2(str(atlas), str(dst))
+                                    copied.append(atlas.name)
+                            if key == "host":
+                                host_bg = src_img_dir / "host_bg.png"
+                                if host_bg.exists():
+                                    dst = dst_img_dir / "host_bg.png"
+                                    if not dst.exists():
+                                        shutil.copy2(str(host_bg), str(dst))
+                                        copied.append("host_bg.png")
+                        else:
+                            # Original/image: char_scene.png has both chars
+                            # Only copy if BOTH characters are reused
+                            if reuse_map.get("char_a", False) and reuse_map.get("char_b", False):
+                                for fname in self._CHAR_FILES_ORIGINAL:
+                                    src = src_img_dir / fname
+                                    if src.exists():
+                                        dst = dst_img_dir / fname
+                                        if not dst.exists():
+                                            shutil.copy2(str(src), str(dst))
+                                            copied.append(fname)
+                                for f in src_img_dir.glob("pose_atlas_*.png"):
+                                    dst = dst_img_dir / f.name
+                                    if not dst.exists():
+                                        shutil.copy2(str(f), str(dst))
+                                        copied.append(f.name)
+                                for f in src_img_dir.glob("pose_*_*.png"):
+                                    if f.name.startswith("pose_atlas"):
+                                        continue
+                                    dst = dst_img_dir / f.name
+                                    if not dst.exists():
+                                        shutil.copy2(str(f), str(dst))
+                                        copied.append(f.name)
+
+        # --- Apply character fixes (override descriptions with custom values) ---
+        for key in all_char_keys:
+            fix_desc = fixes_map.get(key, "").strip() if fixes_map else ""
+            if not fix_desc:
+                continue
+            old_desc = script.get(f"{key}_description", "")
+            script[f"{key}_description"] = fix_desc
+            overridden.append(f"{key}_description")
+
+            # If this character's images were NOT reused, update dialogue prompts
+            if not reuse_map.get(key, False):
+                if old_desc:
+                    for line in script.get("dialogue", []):
+                        if line.get("speaker") != key:
+                            continue
+                        for pf in ("image_prompt", "video_prompt"):
+                            old_val = line.get(pf, "")
+                            if old_desc in old_val:
+                                line[pf] = old_val.replace(old_desc, fix_desc)
+                        poses = line.get("poses", [])
+                        if poses:
+                            line["poses"] = [
+                                p.replace(old_desc, fix_desc) if old_desc in p else p
+                                for p in poses
+                            ]
+
+        # Save the updated script
         script_path = work_dir / "script.json"
         script_path.write_text(
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        self._on_log_line(f"  [Reuse] Copied {len(copied)} character images from '{source_run}'")
+        self._on_log_line(f"  [Reuse] Copied {len(copied)} character images from '{source_run or '(none)'}")
         self._on_log_line(f"  [Reuse] Overridden fields: {', '.join(overridden)}")
         if copied:
             self._on_log_line(f"  [Reuse] Files: {', '.join(copied[:10])}")
@@ -335,6 +466,7 @@ class PipelineService:
             mcp_tokens=mcp_tokens or None,
             mcp_token=None,
             clip_duration=int(config.get("clip_duration", 15)),
+            image_concurrency=int(config.get("image_concurrency", 4)),
             output=config.get("output_dir", "./output"),
             topics_file=config.get("topics_file", str(PIPELINE_DIR / "topics.json")),
             used_topics_file=config.get("used_topics_file", "") or None,
@@ -379,6 +511,15 @@ class PipelineService:
         # Set env vars
         self._set_env(config)
 
+        # Inject character overrides into env so LLM prompt includes them
+        overrides = self._build_character_overrides(config)
+        if overrides:
+            os.environ["CHARACTER_OVERRIDES"] = json.dumps(overrides, ensure_ascii=False)
+            self._on_log_line(f"  [CharOverride] {len(overrides)} characters pre-defined for LLM: "
+                              f"{', '.join(overrides.keys())}")
+        else:
+            os.environ.pop("CHARACTER_OVERRIDES", None)
+
         # Build args namespace
         args = self._build_args(config)
         args.resume = resume
@@ -417,7 +558,8 @@ class PipelineService:
 
             # --- Character reuse: copy character images from a previous run ---
             char_source = config.get("character_source", "")
-            if char_source and not resume:
+            char_fixes = config.get("character_fixes", "")
+            if (char_source or char_fixes) and not resume:
                 self._reuse_characters(char_source, work_dir, script, dirs)
 
             if self._stop_flag.is_set():
@@ -533,6 +675,7 @@ class PipelineService:
         finally:
             sys.stdout = old_stdout
             buf.flush()
+            os.environ.pop("CHARACTER_OVERRIDES", None)
             with self._lock:
                 if self.status == "running":
                     self.status = "done"

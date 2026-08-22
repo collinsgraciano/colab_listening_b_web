@@ -32,6 +32,10 @@ PARAM_SPEC = {
                       "stop_motion": "Stop Motion (定格动画)"}},
     "character_source": {"default": "", "type": "text", "group": "content",
                          "label": "复用角色来源", "help": "留空=生成新角色。填写之前运行文件夹名可复用角色"},
+    "character_reuse": {"default": "", "type": "text", "group": "content",
+                        "label": "复用角色选择", "help": "JSON: {char_a: true, char_b: false, ...}"},
+    "character_fixes": {"default": "", "type": "text", "group": "content",
+                        "label": "固定角色描述", "help": "JSON: {char_a: '描述', char_b: '描述'}"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -70,6 +74,8 @@ PARAM_SPEC = {
     # --- MCP / Image ---
     "mcp_tokens": {"default": "", "type": "textarea", "group": "mcp",
                    "label": "MCP Tokens", "help": "每行一个 token, 多 token 自动轮换"},
+    "image_concurrency": {"default": 4, "type": "number", "group": "mcp",
+                          "label": "图片并发数", "help": "1-4, 默认4"},
     "clip_duration": {"default": 15, "type": "number", "group": "mcp",
                       "label": "视频片段时长(秒)", "help": "4-15"},
     "output_dir": {"default": str(PIPELINE_DIR / "output"), "type": "text", "group": "mcp",
@@ -217,6 +223,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         if tokens:
             args += ["--mcp-tokens", ",".join(tokens)]
 
+    args += ["--image-concurrency", str(config.get("image_concurrency", 4))]
     args += ["--clip-duration", str(config.get("clip_duration", 15))]
     args += ["--output", str(config.get("output_dir", "./output"))]
     if config.get("topics_file"):

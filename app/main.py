@@ -31,7 +31,7 @@ from .config_manager import detect_local_mcp_token
 WEB_ROOT = Path(__file__).parent.parent.resolve()
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
-PIPELINE_DIR = WEB_ROOT.parent / "colab_listening_b"
+PIPELINE_DIR = WEB_ROOT / "pipeline"
 
 # FastAPI app
 app = FastAPI(title="Listening Video Generator")
@@ -642,7 +642,7 @@ async def api_detect_token():
 
 @app.get("/api/character_sources")
 async def api_character_sources():
-    """List available previous runs for character reuse."""
+    """List available previous runs for character reuse, with images and all characters."""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     sources = []
@@ -655,18 +655,49 @@ async def api_character_sources():
                 continue
             try:
                 script = json.loads(script_path.read_text(encoding="utf-8"))
-                # Check if character images exist
                 img_dir = d / "images"
-                has_chars = (img_dir / "char_scene.png").exists() or \
-                            (img_dir / "pose_char_a_0.png").exists()
+                structure = script.get("structure", "original")
+
+                # Build character list based on structure
+                if structure == "quest":
+                    char_keys = ["char_a", "char_b", "char_c", "host"]
+                    char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
+                    # Quest uses per-character pose images
+                    has_chars = (img_dir / "pose_char_a_0.png").exists()
+                else:
+                    char_keys = ["char_a", "char_b"]
+                    char_labels = {"char_a": "角色A", "char_b": "角色B"}
+                    has_chars = (img_dir / "char_scene.png").exists()
+
                 if not has_chars:
                     continue
+
+                characters = []
+                for key in char_keys:
+                    desc = script.get(f"{key}_description", "")
+                    gender = script.get(f"{key}_gender", "")
+                    role = script.get(f"{key}_role", "")
+                    if structure == "quest":
+                        img_name = f"pose_{key}_0.png"
+                        img_exists = (img_dir / img_name).exists()
+                    else:
+                        # Original/image: both share char_scene.png
+                        img_name = "char_scene.png"
+                        img_exists = (img_dir / img_name).exists()
+                    characters.append({
+                        "key": key,
+                        "label": char_labels.get(key, key),
+                        "description": desc,
+                        "gender": gender,
+                        "role": role,
+                        "image_url": f"/api/runs/{d.name}/images/{img_name}" if img_exists else "",
+                    })
+
                 sources.append({
                     "name": d.name,
                     "title": script.get("youtube_title", script.get("title", d.name)),
-                    "structure": script.get("structure", ""),
-                    "char_a": script.get("char_a_description", "")[:60],
-                    "char_b": script.get("char_b_description", "")[:60],
+                    "structure": structure,
+                    "characters": characters,
                 })
             except (json.JSONDecodeError, OSError):
                 continue

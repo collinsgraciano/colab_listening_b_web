@@ -63,8 +63,12 @@
                     🔄
                 </button>
             </div>
-            <div id="char-source-info" class="hidden mt-2 text-xs text-slate-400 bg-slate-900/50 rounded-lg p-2">
-                <span id="char-source-detail"></span>
+            <!-- Character cards (shown when source selected) -->
+            <div id="char-cards" class="hidden mt-3 grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+            <!-- Character description editor (always shown) -->
+            <div id="char-editor" class="mt-3 space-y-2">
+                <p class="text-xs text-slate-500">角色描述 — 勾选「复用」从源运行复制图片+描述；编辑描述=固定该角色外观 (留空=LLM自动生成)</p>
+                <div id="char-editor-fields"></div>
             </div>
         </div>
 
@@ -153,10 +157,30 @@ function updateQuickDefaults() {
     if (structure === 'quest') {
         if (numLinesInput && !numLinesInput.value) numLinesInput.value = '48';
     }
+    // Re-render character editor fields for the new structure
+    const sel = document.getElementById('char-source');
+    const src = _charSources.find(s => s.name === sel.value);
+    renderCharEditor(src || null);
 }
 
 // --- Character reuse ---
 let _charSources = [];
+
+function getCharKeys() {
+    const structure = document.getElementById('quick-structure').value;
+    if (structure === 'quest') {
+        return [
+            {key: 'char_a', label: '角色A'},
+            {key: 'char_b', label: '角色B'},
+            {key: 'char_c', label: '角色C'},
+            {key: 'host', label: '主持人'},
+        ];
+    }
+    return [
+        {key: 'char_a', label: '角色A'},
+        {key: 'char_b', label: '角色B'},
+    ];
+}
 
 function loadCharSources() {
     fetch('/api/character_sources')
@@ -173,26 +197,148 @@ function loadCharSources() {
                 sel.appendChild(opt);
             });
             sel.value = current;
+            if (current) onCharSourceChange();
         });
 }
 
 function onCharSourceChange() {
     const sel = document.getElementById('char-source');
-    const info = document.getElementById('char-source-info');
-    const detail = document.getElementById('char-source-detail');
-    if (!sel.value) {
-        info.classList.add('hidden');
+    const cardsContainer = document.getElementById('char-cards');
+    const src = _charSources.find(s => s.name === sel.value);
+
+    if (!sel.value || !src || !src.characters) {
+        cardsContainer.classList.add('hidden');
+        renderCharEditor(null);
         return;
     }
-    const src = _charSources.find(s => s.name === sel.value);
-    if (src) {
-        detail.textContent = `A: ${src.char_a || '?'} | B: ${src.char_b || '?'} | ${src.structure}`;
-        info.classList.remove('hidden');
+
+    cardsContainer.classList.remove('hidden');
+    cardsContainer.innerHTML = '';
+
+    src.characters.forEach(char => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/50 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+
+        // Character image
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'relative';
+        const img = document.createElement('img');
+        img.src = char.image_url || '';
+        img.alt = char.label;
+        img.className = 'w-16 h-16 rounded-lg object-cover bg-slate-800';
+        img.onerror = function() { this.style.opacity = '0.3'; };
+        imgWrap.appendChild(img);
+
+        // Label + meta
+        const label = document.createElement('div');
+        label.className = 'text-xs font-medium text-slate-300';
+        label.textContent = char.label;
+
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] text-slate-500 text-center';
+        meta.textContent = `${char.gender || '?'} · ${char.role || '?'}`;
+
+        // Reuse checkbox
+        const checkLabel = document.createElement('label');
+        checkLabel.className = 'flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.className = 'accent-indigo-500 w-3.5 h-3.5 char-reuse-cb';
+        checkbox.dataset.charKey = char.key;
+        checkLabel.appendChild(checkbox);
+        checkLabel.appendChild(document.createTextNode('复用'));
+
+        card.appendChild(imgWrap);
+        card.appendChild(label);
+        card.appendChild(meta);
+        card.appendChild(checkLabel);
+        cardsContainer.appendChild(card);
+    });
+
+    // Render editor fields pre-filled with source descriptions for reused chars
+    renderCharEditor(src);
+
+    // Sync reuse checkboxes with description textareas
+    syncReuseWithEditor();
+}
+
+function syncReuseWithEditor() {
+    document.querySelectorAll('.char-reuse-cb').forEach(cb => {
+        const ta = document.querySelector('[data-char-desc="' + cb.dataset.charKey + '"]');
+        if (!ta) return;
+        var updateState = function() {
+            ta.readOnly = cb.checked;
+            ta.style.opacity = cb.checked ? '0.55' : '1';
+            ta.style.cursor = cb.checked ? 'not-allowed' : '';
+        };
+        updateState();
+        cb.addEventListener('change', updateState);
+    });
+}
+
+function renderCharEditor(src) {
+    const container = document.getElementById('char-editor-fields');
+    const charKeys = getCharKeys();
+    container.innerHTML = '';
+
+    charKeys.forEach(c => {
+        let desc = '';
+        let checked = false;
+        if (src) {
+            const charData = src.characters.find(ch => ch.key === c.key);
+            if (charData) {
+                desc = charData.description || '';
+                checked = true; // default: reuse from source
+            }
+        }
+
+        const div = document.createElement('div');
+        div.className = 'flex items-start gap-2';
+        div.innerHTML = `
+            <span class="text-xs text-slate-400 w-14 shrink-0 pt-1.5">${c.label}</span>
+            <textarea data-char-desc="${c.key}" rows="1"
+                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none resize-y min-h-[36px]"
+                placeholder="留空=自动生成">${desc}</textarea>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function collectCharacterConfig() {
+    const sel = document.getElementById('char-source');
+    const source = sel.value;
+    const reuseMap = {};
+    const fixesMap = {};
+
+    // Collect reuse checkboxes (only when source is selected)
+    if (source) {
+        document.querySelectorAll('.char-reuse-cb').forEach(cb => {
+            reuseMap[cb.dataset.charKey] = cb.checked;
+        });
     }
+
+    // Collect description fields
+    document.querySelectorAll('[data-char-desc]').forEach(ta => {
+        const val = ta.value.trim();
+        if (val) {
+            // If not reused from source, this is a "fix"
+            if (!reuseMap[ta.dataset.charDesc]) {
+                fixesMap[ta.dataset.charDesc] = val;
+            }
+        }
+    });
+
+    return {
+        character_source: source,
+        character_reuse: Object.keys(reuseMap).length ? JSON.stringify(reuseMap) : '',
+        character_fixes: Object.keys(fixesMap).length ? JSON.stringify(fixesMap) : '',
+    };
 }
 
 // Load character sources on page load
 window.addEventListener('load', function() {
+    renderCharEditor(null);
     loadCharSources();
     // ... existing status check
     fetch('/api/run/status')
@@ -226,7 +372,7 @@ function startPipeline(resume) {
         topic: document.getElementById('quick-topic').value,
         cefr: document.getElementById('quick-cefr').value,
         structure: document.getElementById('quick-structure').value,
-        character_source: document.getElementById('char-source').value,
+        ...collectCharacterConfig(),
     };
     // Merge with saved config
     const config = {...CURRENT_CONFIG, ...overrides};
