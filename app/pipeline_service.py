@@ -284,7 +284,7 @@ class PipelineService:
                 if lib_meta_path.exists():
                     try:
                         lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
-                        for suffix in ["description", "gender"]:
+                        for suffix in ["description", "gender", "qwen_speaker"]:
                             val = lib_meta.get(suffix, "")
                             if val:
                                 char_info[suffix] = val
@@ -370,7 +370,7 @@ class PipelineService:
                     # --- Mode "image": copy images + override desc + gender (NOT role) ---
                     image_keys = [k for k in all_char_keys if reuse_map.get(k) == "image"]
                     for key in image_keys:
-                        for suffix in ["description", "gender"]:
+                        for suffix in ["description", "gender", "qwen_speaker"]:
                             field = f"{key}_{suffix}"
                             val = source_script.get(field, "")
                             if val:
@@ -423,7 +423,7 @@ class PipelineService:
                     for key in all_char_keys:
                         if reuse_map.get(key) != "desc":
                             continue
-                        for suffix in ["description", "gender"]:
+                        for suffix in ["description", "gender", "qwen_speaker"]:
                             val = source_script.get(f"{key}_{suffix}", "")
                             if val:
                                 script[f"{key}_{suffix}"] = val
@@ -450,7 +450,7 @@ class PipelineService:
                     continue
                 lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
                 # Override description + gender
-                for suffix in ["description", "gender"]:
+                for suffix in ["description", "gender", "qwen_speaker"]:
                     val = lib_meta.get(suffix, "")
                     if val:
                         script[f"{key}_{suffix}"] = val
@@ -568,6 +568,7 @@ class PipelineService:
             mcp_token=None,
             clip_duration=int(config.get("clip_duration", 15)),
             image_concurrency=int(config.get("image_concurrency", 4)),
+            clip_concurrency=int(config.get("clip_concurrency", 4)),
             output=config.get("output_dir", "./output"),
             topics_file=config.get("topics_file", str(PIPELINE_DIR / "topics.json")),
             used_topics_file=config.get("used_topics_file", "") or None,
@@ -695,7 +696,8 @@ class PipelineService:
                 return
 
             # Step 2: Images + TTS
-            ctx = _step2_images_tts(args, checkpoint, script, work_dir, dirs)
+            ctx = _step2_images_tts(args, checkpoint, script, work_dir, dirs,
+                                    stop_check=self._stop_flag.is_set)
 
             if self._stop_flag.is_set():
                 self._set_stopped()
@@ -707,7 +709,8 @@ class PipelineService:
 
             # Step 3: Video clips
             clip_paths, group_info, line_to_group = _step3_clips(
-                args, checkpoint, work_dir, dirs, script, ctx)
+                args, checkpoint, work_dir, dirs, script, ctx,
+                stop_check=self._stop_flag.is_set)
 
             if self._stop_flag.is_set():
                 self._set_stopped()

@@ -49,11 +49,13 @@ def build_group_clip_tasks(scene: str, char_scene_url: str, groups: list[dict],
     return tasks
 
 
-def create_and_poll_clip(task, clips_dir, idx, total):
+def create_and_poll_clip(task, clips_dir, idx, total, stop_check=None):
     """Create a single video task, poll it, and download the result.
 
     Returns the local path on success, or None on failure.
     """
+    if stop_check and stop_check():
+        return None
     print(f"  [Video] Creating task {idx+1}/{total}: {task['filename']}...")
     try:
         result = call_tool("generate_video", {
@@ -77,8 +79,14 @@ def create_and_poll_clip(task, clips_dir, idx, total):
         print(f"    [Video] ERROR creating task: {e}")
         return None
 
+    if stop_check and stop_check():
+        print(f"  [Video] Stop requested, skipping poll for {task['filename']}")
+        return None
     print(f"  [Video] Polling: {task['filename']}...")
-    data = poll_task(task_id, interval=40)
+    data = poll_task(task_id, interval=40, stop_check=stop_check)
+    if data.get("status") == "stopped":
+        print(f"  [Video] Stopped during poll: {task['filename']}")
+        return None
     url = data.get("url", "")
     if url:
         dest = str(clips_dir / task["filename"])
@@ -106,13 +114,15 @@ def create_and_poll_clip(task, clips_dir, idx, total):
         return None
 
 
-def retry_clip(task, clips_dir, idx, max_retries=5):
+def retry_clip(task, clips_dir, idx, max_retries=5, stop_check=None):
     """Retry a single failed clip by creating brand-new video tasks.
 
     Each retry creates a completely new generate_video request (not re-querying
     the old task_id). Returns the local path on success, or None after exhausting retries.
     """
     for attempt in range(1, max_retries + 1):
+        if stop_check and stop_check():
+            return None
         print(f"  [Video] Retrying clip {idx+1} ({task['filename']}) attempt {attempt}/{max_retries}...")
         try:
             result = call_tool("generate_video", {
@@ -134,7 +144,10 @@ def retry_clip(task, clips_dir, idx, max_retries=5):
                     print(f"    [Video] Full API response: {json.dumps(result, ensure_ascii=False)[:1500]}")
                 time.sleep(10)
                 continue
-            data = poll_task(task_id, interval=40)
+            data = poll_task(task_id, interval=40, stop_check=stop_check)
+            if data.get("status") == "stopped":
+                print(f"  [Video] Stopped during retry poll: {task['filename']}")
+                return None
             url = data.get("url", "")
             if not url:
                 print(f"    [Video] FAILED: task {task_id[:16]}... returned no URL. Status={data.get('status')}")
@@ -169,32 +182,60 @@ def retry_clip(task, clips_dir, idx, max_retries=5):
     return None
 
 
-def generate_video_clips(video_tasks, clips_dir, clip_paths, offset=0):
-    """Generate video clips in batches. Runs in a thread.
+def generate_video_clips(video_tasks, clips_dir, clip_paths, offset=0,
+                         stop_check=None, max_concurrency=4):
+    """Generate video clips with concurrent task creation and polling. Runs in a thread.
 
     Each task has its own 'duration' (dynamic per-group, not fixed).
     clip_paths[offset + i] corresponds to video_tasks[i]; entries already set
     (per-clip resume) are skipped so no credits are re-spent.
     """
-    batch_size = 12
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     total = len(video_tasks)
 
-    for batch_start in range(0, total, batch_size):
-        batch = video_tasks[batch_start:batch_start + batch_size]
-        for j, task in enumerate(batch):
-            idx = offset + batch_start + j
-            if clip_paths[idx] is not None:
-                continue
-            dest = create_and_poll_clip(task, clips_dir, idx, total)
-            if dest:
-                clip_paths[idx] = dest
-            if j < len(batch) - 1:
-                time.sleep(5)
+    # Collect pending indices (skip already-existing clips)
+    pending = []
+    for i in range(total):
+        idx = offset + i
+        if clip_paths[idx] is not None:
+            continue
+        pending.append(idx)
 
+    if pending:
+        print(f"  [Video] Generating {len(pending)} clips with {max_concurrency} concurrent tasks...")
+        with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
+            futures = {}
+            for idx in pending:
+                if stop_check and stop_check():
+                    break
+                task = video_tasks[idx - offset]
+                future = pool.submit(create_and_poll_clip, task, clips_dir, idx, total, stop_check)
+                futures[future] = idx
+                # Small delay between submissions to avoid MCP API rate limiting
+                time.sleep(3)
+
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    dest = future.result()
+                    if dest:
+                        clip_paths[idx] = dest
+                except Exception as e:
+                    print(f"  [Video] ERROR for clip {idx+1}: {e}")
+
+    if stop_check and stop_check():
+        ok_count = sum(1 for p in clip_paths[offset:offset + total] if p is not None)
+        print(f"  [Video] Stopped. Clips for this batch: {ok_count}/{total}")
+        return
+
+    # Retry failed clips (sequential, one by one)
     failed = [offset + i for i in range(total) if clip_paths[offset + i] is None]
     for idx in failed:
+        if stop_check and stop_check():
+            break
         task = video_tasks[idx - offset]
-        dest = retry_clip(task, clips_dir, idx)
+        dest = retry_clip(task, clips_dir, idx, stop_check=stop_check)
         if dest:
             clip_paths[idx] = dest
 

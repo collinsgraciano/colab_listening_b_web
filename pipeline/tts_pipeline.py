@@ -2,6 +2,12 @@
 import os
 
 from tts_engine import TTSEngine, build_voice_map, get_zh_voice
+from media_utils import get_duration
+
+
+def _audio_exists(path: str) -> bool:
+    """Check if audio file exists and is non-empty (>100 bytes)."""
+    return bool(path) and os.path.exists(path) and os.path.getsize(path) > 100
 
 
 def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=None,
@@ -44,6 +50,15 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
             raise RuntimeError("VoxCPM Worker health check failed. Check VOXCPM_WORKER_URL.")
         narration_voice = voice_map.get("host", voice_map.get("narrator", "Warm narrator voice, clear, moderate pace."))
         voice_label = "voxcpm"
+    elif tts_engine == "qwen":
+        from qwen_tts_engine import QwenTTSEngine, build_qwen_voice_map
+
+        model_path = os.environ.get("QWEN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
+        device = os.environ.get("QWEN_DEVICE", "cuda:0")
+        tts = QwenTTSEngine(model_path, device)
+        voice_map = build_qwen_voice_map(script)
+        narration_voice = voice_map.get("host", "Serena")
+        voice_label = "qwen"
     else:
         tts = TTSEngine()
         voice_map = build_voice_map(script)
@@ -60,6 +75,11 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
                                  ("outro", outro_text, "-10%")]:
             if text:
                 path = str(audio_dir / f"{name}.mp3")
+                if _audio_exists(path):
+                    dur = get_duration(path)
+                    narration[name] = path
+                    print(f"  [TTS] {name}: {dur:.1f}s (cached)")
+                    continue
                 dur = tts.synth_english(text, narration_voice, path, rate=rate)
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
@@ -71,6 +91,11 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         for name, text in [("intro", intro_text), ("outro", outro_text), ("practice_intro", practice_intro_text)]:
             if text:
                 path = str(audio_dir / f"{name}.mp3")
+                if _audio_exists(path):
+                    dur = get_duration(path)
+                    narration[name] = path
+                    print(f"  [TTS] {name}: {dur:.1f}s (cached)")
+                    continue
                 dur = tts.synth_english(text, narration_voice, path, rate="+0%")
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
@@ -84,6 +109,12 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         speaker = line.get("speaker", "char_a")
         voice = voice_map.get(speaker, voice_map.get("char_a", "af_sarah"))
         path = str(audio_dir / f"dialogue_{i}.mp3")
+        if _audio_exists(path):
+            dur = get_duration(path)
+            normal_paths.append(path)
+            dialogue_durations.append(dur)
+            print(f"  [TTS] dialogue_{i}: {dur:.1f}s (cached)")
+            continue
         dur = tts.synth_english(text, voice, path, rate=dialogue_rate)
         normal_paths.append(path)
         dialogue_durations.append(dur)
@@ -98,8 +129,16 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
                 zh_paths.append("")
                 continue
             speaker = line.get("speaker", "char_a")
-            voice = get_zh_voice(speaker, script)
+            if tts_engine == "qwen":
+                voice = voice_map.get(speaker, voice_map.get("char_a", "Vivian"))
+            else:
+                voice = get_zh_voice(speaker, script)
             path = str(audio_dir / f"zh_{i}.mp3")
+            if _audio_exists(path):
+                dur = get_duration(path)
+                zh_paths.append(path)
+                print(f"  [TTS] zh_{i}: {dur:.1f}s (cached)")
+                continue
             dur = tts.synth_chinese(text, voice, path, rate="-10%")
             zh_paths.append(path)
             print(f"  [TTS] zh_{i}: {dur:.1f}s")

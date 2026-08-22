@@ -31,11 +31,13 @@ PARAM_SPEC = {
                       "landing": "Landing (降落变换)",
                       "stop_motion": "Stop Motion (定格动画)"}},
     "character_source": {"default": "", "type": "text", "group": "content",
-                         "label": "复用角色来源", "help": "留空=生成新角色。填写之前运行文件夹名可复用角色"},
+                         "label": "复用角色来源", "help": "留空=全部新生成。选择之前运行可复用其角色"},
     "character_reuse": {"default": "", "type": "text", "group": "content",
-                        "label": "复用角色选择", "help": "JSON: {char_a: true, char_b: false, ...}"},
+                        "label": "复用角色选择", "help": "选择哪些角色从来源复用 (JSON)"},
     "character_fixes": {"default": "", "type": "text", "group": "content",
-                        "label": "固定角色描述", "help": "JSON: {char_a: '描述', char_b: '描述'}"},
+                        "label": "固定角色描述", "help": "手动指定角色外观描述 (JSON)"},
+    "character_library": {"default": "", "type": "text", "group": "content",
+                           "label": "素材库分配", "help": "JSON: {char_a: 'lib_id', char_b: 'lib_id'}"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -63,13 +65,19 @@ PARAM_SPEC = {
     "tts_engine": {"default": "kokoro", "type": "select", "group": "tts",
                    "label": "TTS 引擎", "options": {
                        "kokoro": "Kokoro (本地)",
-                       "voxcpm": "VoxCPM (Cloudflare Worker)"}},
+                       "voxcpm": "VoxCPM (Cloudflare Worker)",
+                       "qwen": "Qwen3-TTS (本地 GPU)"}},
     "tts_rate": {"default": "", "type": "text", "group": "tts",
                  "label": "TTS 语速", "help": "如 -15%, 0% (留空=模式默认)"},
     "voxcpm_worker_url": {"default": "https://curly-grass-9b8c.caimeifeng3.workers.dev",
                           "type": "text", "group": "tts", "label": "VoxCPM Worker URL"},
     "voxcpm_api_key": {"default": "", "type": "password", "group": "tts",
                        "label": "VoxCPM API Key"},
+    "qwen_model_path": {"default": r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
+                        "type": "text", "group": "tts",
+                        "label": "Qwen3-TTS 模型路径"},
+    "qwen_device": {"default": "cuda:0", "type": "text", "group": "tts",
+                    "label": "Qwen3-TTS 设备", "help": "如 cuda:0, cpu"},
 
     # --- MCP / Image ---
     "mcp_tokens": {"default": "", "type": "textarea", "group": "mcp",
@@ -78,6 +86,8 @@ PARAM_SPEC = {
                           "label": "图片并发数", "help": "1-4, 默认4"},
     "clip_duration": {"default": 15, "type": "number", "group": "mcp",
                       "label": "视频片段时长(秒)", "help": "4-15"},
+    "clip_concurrency": {"default": 4, "type": "number", "group": "mcp",
+                          "label": "视频并发数", "help": "1-5, 默认4 (MCP最大并发5)"},
     "output_dir": {"default": str(PIPELINE_DIR / "output"), "type": "text", "group": "mcp",
                    "label": "输出目录"},
     "topics_file": {"default": str(PIPELINE_DIR / "topics.json"), "type": "text", "group": "mcp",
@@ -215,6 +225,10 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--voxcpm-worker-url", config["voxcpm_worker_url"]]
     if config.get("voxcpm_api_key"):
         args += ["--voxcpm-api-key", config["voxcpm_api_key"]]
+    if config.get("qwen_model_path"):
+        args += ["--qwen-model-path", config["qwen_model_path"]]
+    if config.get("qwen_device"):
+        args += ["--qwen-device", config["qwen_device"]]
 
     # MCP
     tokens_raw = config.get("mcp_tokens", "").strip()
@@ -225,6 +239,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
 
     args += ["--image-concurrency", str(config.get("image_concurrency", 4))]
     args += ["--clip-duration", str(config.get("clip_duration", 15))]
+    args += ["--clip-concurrency", str(config.get("clip_concurrency", 4))]
     args += ["--output", str(config.get("output_dir", "./output"))]
     if config.get("topics_file"):
         args += ["--topics-file", config["topics_file"]]

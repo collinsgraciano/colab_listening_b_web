@@ -159,6 +159,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default="./output", help="Output directory")
     parser.add_argument("--clip-duration", type=int, default=15, help="Video clip duration in seconds")
     parser.add_argument("--image-concurrency", type=int, default=4, help="Max concurrent image generation tasks (1-4, default 4)")
+    parser.add_argument("--clip-concurrency", type=int, default=4, help="Max concurrent video clip tasks (1-5, default 4)")
     parser.add_argument("--practice-duration", type=float, default=3.0, help="Silence duration in Ch3")
     parser.add_argument("--pad", type=float, default=None, help="Audio pad between segments (default 0.4; quest mode 5.0 — long thinking pauses for beginners)")
     parser.add_argument("--render-fps", type=int, default=8, help="Quest stop-motion render framerate (default 8; lower=faster but choppier)")
@@ -419,7 +420,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             scene_clip_thread = threading.Thread(
                 target=_generate_video_clips,
                 args=([scene_clip_task], clips_dir, clip_paths),
-                kwargs={"stop_check": stop_check},
+                kwargs={"stop_check": stop_check, "max_concurrency": 1},
                 daemon=True,
             )
             scene_clip_thread.start()
@@ -508,16 +509,21 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
         video_thread = threading.Thread(
             target=_generate_video_clips,
             args=(group_tasks, clips_dir, clip_paths, 1),
+            kwargs={"stop_check": stop_check, "max_concurrency": args.clip_concurrency},
             daemon=True,
         )
         video_thread.start()
         print("  Waiting for group video clips to complete...")
         video_thread.join()
         print("  >> Video clips done.")
-        _save_checkpoint(work_dir, "step3_video")
+        if not (stop_check and stop_check()):
+            _save_checkpoint(work_dir, "step3_video")
 
     ok_count = sum(1 for p in clip_paths if p is not None)
     print(f"  Clips: {ok_count}/{n_total_clips}, TTS: {len(normal_paths)} EN + {sum(1 for p in zh_paths if p)} ZH")
+
+    if stop_check and stop_check():
+        return clip_paths, [], {}
 
     group_info, line_to_group = _build_group_info(
         groups, normal_paths, dialogue_durations, audio_dir, clip_paths, args.pad)
@@ -548,7 +554,7 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
     if args.structure == "quest":
         from quest.timeline_quest import build_quest_timeline, build_srt_from_timeline_quest
         timeline = build_quest_timeline(script, dialogue_durations, pad=args.pad)
-        _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration)
+        _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration, output_fps=25)
         srt = build_srt_from_timeline_quest(timeline, gap=0.0)
     else:
         timeline = build_listening_timeline(
