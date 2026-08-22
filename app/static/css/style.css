@@ -1,0 +1,51 @@
+/* Custom styles for colab_listening_b_web */
+
+/* Step indicators */
+.step-dot {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    padding: 4px 2px;
+    background: #1e293b;
+    color: #64748b;
+    border-radius: 4px;
+    transition: all 0.3s;
+}
+.step-dot.active {
+    background: #4f46e5;
+    color: #fff;
+    animation: pulse 1.5s infinite;
+}
+.step-dot.done {
+    background: #059669;
+    color: #fff;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Section toggle animation */
+.section-content {
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Toggle switch transition */
+input:checked + div {
+    transition: background-color 0.2s;
+}
+input:not(:checked) + div > div {
+    transition: transform 0.2s;
+}

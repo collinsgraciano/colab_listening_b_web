@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">控制台</h2>
+            <p class="text-sm text-slate-400 mt-1">一键生成英语听力练习视频</p>
+        </div>
+        <div id="run-status-badge" class="px-4 py-2 rounded-lg text-sm font-medium
+            {% if runner.status == 'running' %}bg-green-600 text-white{% elif runner.status == 'done' %}bg-blue-600 text-white{% elif runner.status == 'error' %}bg-red-600 text-white{% else %}bg-slate-700 text-slate-300{% endif %}">
+            <span id="status-text">就绪</span>
+        </div>
+    </div>
+
+    <!-- Quick start card -->
+    <div class="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
+        <h3 class="text-lg font-semibold text-white mb-4">快捷启动</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <!-- Topic -->
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">主题</label>
+                <div class="flex gap-2">
+                    <input type="text" id="quick-topic" value="{{ config.topic }}"
+                        class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                        placeholder="留空=随机选择">
+                    <button onclick="pickRandomTopic()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300" title="随机选择">
+                        🎲
+                    </button>
+                </div>
+            </div>
+            <!-- CEFR + Structure -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">CEFR</label>
+                    <select id="quick-cefr" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        {% for level in ['A1','A2','B1','B2','C1','C2'] %}
+                        <option value="{{ level }}" {% if config.cefr == level %}selected{% endif %}>{{ level }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">结构</label>
+                    <select id="quick-structure" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+                        onchange="updateQuickDefaults()">
+                        {% for s in ['original','image','quest'] %}
+                        <option value="{{ s }}" {% if config.structure == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex gap-3">
+            <button id="btn-start" onclick="startPipeline(false)"
+                class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                ▶ 开始生成
+            </button>
+            <button id="btn-resume" onclick="startPipeline(true)"
+                class="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                ⏵ 继续上次
+            </button>
+            <button id="btn-stop" onclick="stopPipeline()" style="display:none"
+                class="px-6 py-2.5 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium text-sm flex items-center gap-2">
+                ⏹ 停止
+            </button>
+            <a href="/config" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 font-medium text-sm flex items-center gap-2">
+                ⚙ 完整配置
+            </a>
+        </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div id="progress-section" class="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700" style="display:none">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-white">运行进度</h3>
+            <span id="elapsed-time" class="text-xs text-slate-400 font-mono"></span>
+        </div>
+        <div class="w-full bg-slate-700 rounded-full h-3 mb-2 overflow-hidden">
+            <div id="progress-bar" class="bg-indigo-500 h-3 rounded-full transition-all duration-500" style="width:0%"></div>
+        </div>
+        <div class="flex justify-between items-center">
+            <span id="step-label" class="text-xs text-slate-400"></span>
+            <span id="progress-pct" class="text-xs text-slate-400 font-mono">0%</span>
+        </div>
+        <!-- Step indicators -->
+        <div class="flex gap-1 mt-3" id="step-indicators">
+            <div class="step-dot" data-step="step0_script">脚本</div>
+            <div class="step-dot" data-step="step1_mcp">MCP</div>
+            <div class="step-dot" data-step="step2_images_tts">图片TTS</div>
+            <div class="step-dot" data-step="step3_video">片段</div>
+            <div class="step-dot" data-step="step4_timeline">时间轴</div>
+            <div class="step-dot" data-step="step45_thumbnail">缩略图</div>
+            <div class="step-dot" data-step="step5_compose">合成</div>
+            <div class="step-dot" data-step="step6_4k">4K</div>
+        </div>
+    </div>
+
+    <!-- Log output -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+            <h3 class="text-sm font-semibold text-white">实时日志</h3>
+            <div class="flex gap-2">
+                <button onclick="clearLogs()" class="text-xs text-slate-400 hover:text-slate-200">清空</button>
+                <label class="flex items-center gap-1 text-xs text-slate-400">
+                    <input type="checkbox" id="autoscroll" checked class="accent-indigo-500"> 自动滚动
+                </label>
+            </div>
+        </div>
+        <div id="log-container" class="font-mono text-xs p-4 h-96 overflow-y-auto bg-slate-950 text-slate-300 whitespace-pre-wrap break-all">
+            <span class="text-slate-500">等待启动...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Store current config for quick start
+const CURRENT_CONFIG = {{ config | tojson }};
+
+function updateQuickDefaults() {
+    const structure = document.getElementById('quick-structure').value;
+    const numLinesInput = document.querySelector('[data-field="num_lines"]');
+    if (structure === 'quest') {
+        if (numLinesInput && !numLinesInput.value) numLinesInput.value = '48';
+    }
+}
+
+function pickRandomTopic() {
+    fetch('/api/topics/random')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                document.getElementById('quick-topic').value = data.topic;
+            } else {
+                alert(data.error || '没有可用主题');
+            }
+        });
+}
+
+function startPipeline(resume) {
+    // Gather quick config overrides
+    const overrides = {
+        topic: document.getElementById('quick-topic').value,
+        cefr: document.getElementById('quick-cefr').value,
+        structure: document.getElementById('quick-structure').value,
+    };
+    // Merge with saved config
+    const config = {...CURRENT_CONFIG, ...overrides};
+
+    fetch('/api/run/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({config, resume})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-resume').disabled = true;
+            document.getElementById('btn-stop').style.display = '';
+            document.getElementById('progress-section').style.display = '';
+            connectSSE();
+        } else {
+            alert('启动失败');
+        }
+    });
+}
+
+function stopPipeline() {
+    fetch('/api/run/stop', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-resume').disabled = false;
+            document.getElementById('btn-stop').style.display = 'none';
+        });
+}
+
+function clearLogs() {
+    document.getElementById('log-container').innerHTML = '';
+}
+
+let evtSource = null;
+let startTime = 0;
+
+function connectSSE() {
+    if (evtSource) evtSource.close();
+    const logEl = document.getElementById('log-container');
+    logEl.innerHTML = '';
+    startTime = Date.now();
+
+    evtSource = new EventSource('/api/run/logs');
+
+    evtSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'log') {
+            const line = document.createElement('div');
+            // Color code based on content
+            if (data.line.includes('FATAL') || data.line.includes('ERROR') || data.line.includes('❌')) {
+                line.className = 'text-red-400';
+            } else if (data.line.includes('WARNING') || data.line.includes('⚠')) {
+                line.className = 'text-amber-400';
+            } else if (data.line.includes('DONE') || data.line.includes('✅')) {
+                line.className = 'text-green-400';
+            } else if (data.line.startsWith('Step') || data.line.startsWith('  [Resume]')) {
+                line.className = 'text-indigo-400';
+            } else if (data.line.startsWith('  [Topic]')) {
+                line.className = 'text-cyan-400';
+            } else if (data.line.startsWith('$')) {
+                line.className = 'text-slate-500';
+            } else {
+                line.className = 'text-slate-300';
+            }
+            line.textContent = data.line;
+            logEl.appendChild(line);
+
+            if (document.getElementById('autoscroll').checked) {
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        }
+
+        if (data.type === 'status' || data.type === 'done') {
+            updateProgress(data);
+            if (data.status === 'done' || data.status === 'error' || data.status === 'stopped') {
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-resume').disabled = false;
+                document.getElementById('btn-stop').style.display = 'none';
+                if (data.status === 'done') {
+                    setTimeout(() => { if (confirm('✅ 视频生成完成! 查看运行历史?')) location.href = '/runs'; }, 500);
+                }
+                if (data.type === 'done') evtSource.close();
+            }
+        }
+    };
+
+    evtSource.onerror = function() {
+        evtSource.close();
+    };
+}
+
+function updateProgress(data) {
+    const pct = data.progress || 0;
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('step-label').textContent = data.current_step_label || (data.status === 'done' ? '完成' : '等待...');
+
+    // Update step indicators
+    document.querySelectorAll('.step-dot').forEach(el => {
+        el.classList.remove('active', 'done');
+    });
+    if (data.current_step) {
+        const currentIdx = ['step0_script','step1_mcp','step2_images_tts','step3_video','step4_timeline','step45_thumbnail','step5_compose','step6_4k'].indexOf(data.current_step);
+        document.querySelectorAll('.step-dot').forEach((el, i) => {
+            if (i < currentIdx) el.classList.add('done');
+            if (i === currentIdx) el.classList.add('active');
+        });
+    }
+    if (data.status === 'done') {
+        document.querySelectorAll('.step-dot').forEach(el => el.classList.add('done'));
+    }
+
+    // Elapsed time
+    if (data.elapsed) {
+        const mins = Math.floor(data.elapsed / 60);
+        const secs = data.elapsed % 60;
+        document.getElementById('elapsed-time').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+    }
+
+    // Status badge
+    const badge = document.getElementById('run-status-badge');
+    const text = document.getElementById('status-text');
+    if (data.status === 'running') {
+        badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white';
+        text.textContent = '运行中';
+    } else if (data.status === 'done') {
+        badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white';
+        text.textContent = '已完成';
+    } else if (data.status === 'error') {
+        badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white';
+        text.textContent = '失败';
+    } else if (data.status === 'stopped') {
+        badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 text-white';
+        text.textContent = '已停止';
+    } else {
+        badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300';
+        text.textContent = '就绪';
+    }
+}
+
+// Check if pipeline is running on page load
+window.addEventListener('load', function() {
+    fetch('/api/run/status')
+        .then(r => r.json())
+        .then(data => {
+            if (data.is_running) {
+                document.getElementById('btn-start').disabled = true;
+                document.getElementById('btn-resume').disabled = true;
+                document.getElementById('btn-stop').style.display = '';
+                document.getElementById('progress-section').style.display = '';
+                connectSSE();
+            }
+        });
+});
+</script>
+{% endblock %}

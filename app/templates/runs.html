@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">运行历史</h2>
+            <p class="text-sm text-slate-400 mt-1">{{ runs | length }} 个视频</p>
+        </div>
+    </div>
+
+    {% if not runs %}
+    <div class="bg-slate-800 rounded-xl p-12 border border-slate-700 text-center">
+        <p class="text-slate-400 text-lg">还没有生成过视频</p>
+        <a href="/" class="inline-block mt-4 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm font-medium">
+            去生成第一个
+        </a>
+    </div>
+    {% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for run in runs %}
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition">
+            <!-- Thumbnail -->
+            {% if run.has_thumbnail %}
+            <div class="aspect-video bg-slate-900 cursor-pointer" onclick="showVideo('{{ run.name }}', '{{ run.videos[0].name if run.videos else '' }}')">
+                <img src="{{ run.thumbnail_url }}" alt="{{ run.title }}" class="w-full h-full object-cover">
+            </div>
+            {% else %}
+            <div class="aspect-video bg-slate-900 flex items-center justify-center">
+                <span class="text-slate-600 text-4xl">🎬</span>
+            </div>
+            {% endif %}
+
+            <!-- Info -->
+            <div class="p-4">
+                <h3 class="text-sm font-semibold text-white truncate" title="{{ run.title }}">{{ run.title }}</h3>
+                {% if run.title_en %}
+                <p class="text-xs text-slate-500 truncate">{{ run.title_en }}</p>
+                {% endif %}
+                <div class="flex items-center gap-2 mt-2">
+                    {% if run.cefr %}<span class="text-xs px-2 py-0.5 bg-indigo-600/30 text-indigo-300 rounded">{{ run.cefr }}</span>{% endif %}
+                    {% if run.videos %}
+                    {% for v in run.videos %}
+                    <span class="text-xs text-slate-400">{{ v.size_mb }}MB</span>
+                    {% endfor %}
+                    {% endif %}
+                    <span class="text-xs text-slate-500 ml-auto">{{ run.created | datestr }}</span>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex gap-2 mt-3">
+                    {% if run.videos %}
+                    <button onclick="showVideo('{{ run.name }}', '{{ run.videos[0].name }}')"
+                        class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs text-white">播放</button>
+                    {% endif %}
+                    {% if run.has_script %}
+                    <button onclick="viewScript('{{ run.name }}')"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">脚本</button>
+                    {% endif %}
+                    <button onclick="deleteRun('{{ run.name }}')"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded-lg text-xs text-slate-300 hover:text-white">删除</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Video player modal -->
+    <div id="video-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8" onclick="closeVideoModal(event)">
+        <div class="bg-slate-800 rounded-xl p-4 max-w-4xl w-full" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-3">
+                <h3 id="video-modal-title" class="text-sm font-semibold text-white"></h3>
+                <button onclick="closeVideoModal()" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <video id="video-player" controls class="w-full rounded-lg bg-black" style="max-height: 70vh"></video>
+        </div>
+    </div>
+
+    <!-- Script viewer modal -->
+    <div id="script-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8" onclick="closeScriptModal(event)">
+        <div class="bg-slate-800 rounded-xl p-4 max-w-3xl w-full max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-semibold text-white">脚本预览</h3>
+                <button onclick="closeScriptModal()" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <pre id="script-content" class="overflow-y-auto text-xs text-slate-300 font-mono bg-slate-950 p-4 rounded-lg flex-1"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showVideo(runName, videoName) {
+    if (!videoName) return;
+    const url = `/api/runs/${runName}/video/${videoName}`;
+    document.getElementById('video-player').src = url;
+    document.getElementById('video-modal-title').textContent = videoName;
+    document.getElementById('video-modal').classList.remove('hidden');
+}
+
+function closeVideoModal(e) {
+    if (e && e.target !== document.getElementById('video-modal')) return;
+    const player = document.getElementById('video-player');
+    player.pause();
+    player.src = '';
+    document.getElementById('video-modal').classList.add('hidden');
+}
+
+function viewScript(runName) {
+    fetch(`/api/runs/${runName}/script`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('script-content').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('script-modal').classList.remove('hidden');
+        });
+}
+
+function closeScriptModal(e) {
+    if (e && e.target !== document.getElementById('script-modal')) return;
+    document.getElementById('script-modal').classList.add('hidden');
+}
+
+function deleteRun(runName) {
+    if (!confirm('删除运行 "' + runName + '"? 所有文件将被永久删除.')) return;
+    fetch(`/api/runs/${runName}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) location.reload(); });
+}
+</script>
+{% endblock %}

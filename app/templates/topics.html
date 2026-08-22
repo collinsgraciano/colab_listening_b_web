@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">主题管理</h2>
+            <p class="text-sm text-slate-400 mt-1">主题库: {{ topics_file }}</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="showAddTopic()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">+ 添加主题</button>
+            <button onclick="showAddCategory()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">+ 新分类</button>
+        </div>
+    </div>
+
+    <!-- Add topic form (hidden by default) -->
+    <div id="add-topic-form" class="hidden bg-slate-800 rounded-xl p-5 mb-4 border border-slate-700">
+        <h3 class="text-sm font-semibold text-white mb-3">添加主题</h3>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+            <select id="add-topic-category" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                {% for cat in topics_data.keys() %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" id="add-topic-name" placeholder="主题名称 (English)"
+                class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div class="flex gap-2">
+            <button onclick="addTopic()" class="px-4 py-2 bg-indigo-600 rounded-lg text-sm text-white">添加</button>
+            <button onclick="hideAddTopic()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm text-slate-300">取消</button>
+        </div>
+    </div>
+
+    <!-- Add category form -->
+    <div id="add-cat-form" class="hidden bg-slate-800 rounded-xl p-5 mb-4 border border-slate-700">
+        <h3 class="text-sm font-semibold text-white mb-3">新建分类</h3>
+        <input type="text" id="add-cat-name" placeholder="分类名称 (如: 餐厅 Restaurant)"
+            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3">
+        <div class="flex gap-2">
+            <button onclick="addCategory()" class="px-4 py-2 bg-indigo-600 rounded-lg text-sm text-white">创建</button>
+            <button onclick="hideAddCategory()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm text-slate-300">取消</button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-2xl font-bold text-white">{{ topics_data.values() | sum(attribute='__len__', start=0) if false else '' }}</p>
+            {% set total = topics_data.values() | map('length') | list | sum() %}
+            <p class="text-2xl font-bold text-indigo-400">{{ total }}</p>
+            <p class="text-xs text-slate-400 mt-1">总主题数</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-2xl font-bold text-amber-400">{{ used_topics | length }}</p>
+            <p class="text-xs text-slate-400 mt-1">已使用</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-2xl font-bold text-green-400">{{ total - (used_topics | length) }}</p>
+            <p class="text-xs text-slate-400 mt-1">可用</p>
+        </div>
+    </div>
+
+    <!-- Topics by category -->
+    <div class="space-y-4">
+        {% for category, topics in topics_data.items() %}
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-white">{{ category }}</h3>
+                <span class="text-xs text-slate-400">{{ topics | length }} 个主题</span>
+            </div>
+            <div class="p-3 flex flex-wrap gap-2">
+                {% for topic in topics %}
+                <div class="flex items-center gap-2 bg-slate-900 rounded-lg px-3 py-1.5 group">
+                    <span class="text-sm text-slate-300 {% if topic in used_topics %}line-through opacity-50{% endif %}">{{ topic }}</span>
+                    <button onclick="deleteTopic('{{ category }}', {{ loop.index0 }})"
+                        class="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">✕</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Reset used -->
+    {% if used_topics %}
+    <div class="mt-6 flex justify-center">
+        <button onclick="resetUsedTopics()" class="px-4 py-2 bg-slate-700 hover:bg-red-600 rounded-lg text-sm text-slate-300 hover:text-white transition">
+            重置已用主题 ({{ used_topics | length }} 个)
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddTopic() {
+    document.getElementById('add-topic-form').classList.remove('hidden');
+    document.getElementById('add-cat-form').classList.add('hidden');
+    document.getElementById('add-topic-name').focus();
+}
+function hideAddTopic() { document.getElementById('add-topic-form').classList.add('hidden'); }
+function showAddCategory() {
+    document.getElementById('add-cat-form').classList.remove('hidden');
+    document.getElementById('add-topic-form').classList.add('hidden');
+    document.getElementById('add-cat-name').focus();
+}
+function hideAddCategory() { document.getElementById('add-cat-form').classList.add('hidden'); }
+
+function addTopic() {
+    const category = document.getElementById('add-topic-category').value;
+    const topic = document.getElementById('add-topic-name').value.trim();
+    if (!topic) return;
+    fetch('/api/topics/add', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({category, topic})
+    }).then(r => r.json()).then(data => { if (data.ok) location.reload(); });
+}
+
+function addCategory() {
+    const category = document.getElementById('add-cat-name').value.trim();
+    if (!category) return;
+    fetch('/api/topics/add_category', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({category})
+    }).then(r => r.json()).then(data => { if (data.ok) location.reload(); });
+}
+
+function deleteTopic(category, index) {
+    fetch('/api/topics/' + encodeURIComponent(category) + '/' + index, {method: 'DELETE'})
+        .then(r => r.json()).then(data => { if (data.ok) location.reload(); });
+}
+
+function resetUsedTopics() {
+    if (!confirm('重置所有已用主题标记?')) return;
+    fetch('/api/topics/used/reset', {method: 'POST'})
+        .then(r => r.json()).then(data => { if (data.ok) location.reload(); });
+}
+</script>
+{% endblock %}
