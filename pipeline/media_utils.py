@@ -452,8 +452,16 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
     filter_complex = ";".join(filter_parts)
     final_label = prev_label
 
+    # Write filter_complex to a script file to avoid Windows command-line
+    # length limit (WinError 206) when there are many subtitle entries.
+    # -filter_complex_script reads the filter graph from a file instead of
+    # the command line, bypassing the ~32767 char CreateProcess limit.
+    fc_script_path = str((tmp_dir / "filter_complex.txt").resolve())
+    with open(fc_script_path, "w", encoding="utf-8") as f:
+        f.write(filter_complex)
+
     cmd = ["ffmpeg", "-y"] + input_args + [
-        "-filter_complex", filter_complex,
+        "-filter_complex_script", fc_script_path,
         "-map", f"[{final_label}]",
         "-map", "0:a:0",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
