@@ -20,7 +20,8 @@ from .config_manager import (
     list_presets, save_preset, load_preset, delete_preset,
     build_cli_args, detect_local_mcp_token,
 )
-from .pipeline_runner import get_runner, STEP_ORDER, STEP_LABELS
+from .pipeline_service import get_service, STEP_ORDER
+from .config_manager import detect_local_mcp_token
 
 # Paths
 WEB_ROOT = Path(__file__).parent.parent.resolve()
@@ -64,12 +65,12 @@ templates.env.filters["datestr"] = _datestr
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    runner = get_runner()
+    service = get_service()
     config = load_config()
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "config": config,
-        "runner": runner,
+        "runner": service,
         "active_page": "dashboard",
     })
 
@@ -126,6 +127,39 @@ async def topics_page(request: Request):
         "used_topics": used_topics,
         "topics_file": topics_file,
         "active_page": "topics",
+    })
+
+
+@app.get("/runs/{name}/gallery", response_class=HTMLResponse)
+async def gallery_page(request: Request, name: str):
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = output_dir / name
+    script_path = run_dir / "script.json"
+    script = {}
+    if script_path.exists():
+        try:
+            script = json.loads(script_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    images_dir = run_dir / "images"
+    images = sorted([f.name for f in images_dir.glob("*.png")]) if images_dir.exists() else []
+    clips_dir = run_dir / "clips"
+    clips = sorted([f.name for f in clips_dir.glob("*.mp4")]) if clips_dir.exists() else []
+    audio_dir = run_dir / "audio"
+    audio = sorted([f.name for f in audio_dir.glob("*.mp3")]) if audio_dir.exists() else []
+    videos_dir = run_dir / "videos"
+    videos = sorted([f.name for f in videos_dir.glob("*.mp4")]) if videos_dir.exists() else []
+
+    return templates.TemplateResponse("gallery.html", {
+        "request": request,
+        "run_name": name,
+        "script": script,
+        "images": images,
+        "clips": clips,
+        "audio": audio,
+        "videos": videos,
+        "active_page": "runs",
     })
 
 
@@ -246,48 +280,46 @@ async def api_list_presets():
 
 @app.post("/api/run/start")
 async def api_run_start(request: Request):
-    runner = get_runner()
+    service = get_service()
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     config = data.get("config") or load_config()
     resume = data.get("resume", False)
-    ok = runner.start(config, resume=resume)
-    return {"ok": ok, "status": runner.status}
+    ok = service.start(config, resume=resume)
+    return {"ok": ok, "status": service.status}
 
 
 @app.post("/api/run/stop")
 async def api_run_stop():
-    runner = get_runner()
-    runner.stop()
-    return {"ok": True, "status": runner.status}
+    service = get_service()
+    service.stop()
+    return {"ok": True, "status": service.status}
 
 
 @app.get("/api/run/status")
 async def api_run_status():
-    runner = get_runner()
-    return runner.get_progress()
+    service = get_service()
+    return service.get_progress()
 
 
 @app.get("/api/run/logs")
 async def api_run_logs():
     """SSE endpoint for streaming logs."""
-    runner = get_runner()
+    service = get_service()
 
     async def event_stream():
         last_idx = 0
         # Send existing logs first
-        with runner.log_lock:
-            existing = runner.log_lines[last_idx:]
-            last_idx = len(runner.log_lines)
+        existing = service.get_logs_since(last_idx)
+        last_idx = len(service.log_lines)
         for line in existing:
             yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
 
         # Stream new logs
         while True:
-            status = runner.get_progress()
+            status = service.get_progress()
             # Send new logs
-            with runner.log_lock:
-                new_logs = runner.log_lines[last_idx:]
-                last_idx = len(runner.log_lines)
+            new_logs = service.get_logs_since(last_idx)
+            last_idx = len(service.log_lines)
             for line in new_logs:
                 yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
 
@@ -299,7 +331,7 @@ async def api_run_logs():
             await asyncio.sleep(0.5)
 
         # Final status
-        status = runner.get_progress()
+        status = service.get_progress()
         yield f"data: {json.dumps({'type': 'done', **status})}\n\n"
 
     return StreamingResponse(
@@ -316,11 +348,10 @@ async def api_run_logs():
 @app.get("/api/run/logs/since/{since}")
 async def api_run_logs_since(since: int):
     """Get logs since a given index (for non-SSE polling)."""
-    runner = get_runner()
-    with runner.log_lock:
-        logs = runner.log_lines[since:]
-        total = len(runner.log_lines)
-    return {"logs": logs, "total": total, "status": runner.get_progress()}
+    service = get_service()
+    logs = service.get_logs_since(since)
+    total = len(service.log_lines)
+    return {"logs": logs, "total": total, "status": service.get_progress()}
 
 
 # ===========================================================================
@@ -582,6 +613,74 @@ async def api_detect_token():
 async def health():
     return {"ok": True, "pipeline_dir": str(PIPELINE_DIR),
             "pipeline_exists": PIPELINE_DIR.exists()}
+
+
+# ===========================================================================
+# Script editor API
+# ===========================================================================
+
+@app.get("/api/runs/{name}/script/edit")
+async def api_get_script_edit(name: str):
+    """Get script for editing (returns full JSON)."""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    script_path = output_dir / name / "script.json"
+    if not script_path.exists():
+        return JSONResponse({"error": "Script not found"}, status_code=404)
+    return json.loads(script_path.read_text(encoding="utf-8"))
+
+
+@app.post("/api/runs/{name}/script/save")
+async def api_save_script(name: str, request: Request):
+    """Save edited script JSON."""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    script_path = output_dir / name / "script.json"
+    if not script_path.exists():
+        return JSONResponse({"error": "Script not found"}, status_code=404)
+    data = await request.json()
+    script_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True}
+
+
+# ===========================================================================
+# Image gallery API
+# ===========================================================================
+
+@app.get("/api/runs/{name}/gallery")
+async def api_gallery(name: str):
+    """List all images for a run, grouped by type."""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    images_dir = output_dir / name / "images"
+    if not images_dir.exists():
+        return {"images": [], "clips": []}
+    
+    images = sorted([f.name for f in images_dir.glob("*.png")])
+    clips_dir = output_dir / name / "clips"
+    clips = sorted([f.name for f in clips_dir.glob("*.mp4")]) if clips_dir.exists() else []
+    audio_dir = output_dir / name / "audio"
+    audio = sorted([f.name for f in audio_dir.glob("*.mp3")]) if audio_dir.exists() else []
+    
+    return {
+        "images": images,
+        "clips": clips,
+        "audio": audio,
+        "image_urls": {f: f"/api/runs/{name}/images/{f}" for f in images},
+        "clip_urls": {f: f"/api/runs/{name}/video/{f}" for f in clips},
+        "audio_urls": {f: f"/api/runs/{name}/audio/{f}" for f in audio},
+    }
+
+
+@app.get("/api/runs/{name}/audio/{audio_name}")
+async def api_get_audio(name: str, audio_name: str):
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    audio_path = output_dir / name / "audio" / audio_name
+    if not audio_path.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(audio_path), media_type="audio/mpeg")
 
 
 # ===========================================================================

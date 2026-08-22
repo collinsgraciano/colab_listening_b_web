@@ -230,7 +230,19 @@ function connectSSE() {
                 document.getElementById('btn-resume').disabled = false;
                 document.getElementById('btn-stop').style.display = 'none';
                 if (data.status === 'done') {
-                    setTimeout(() => { if (confirm('✅ 视频生成完成! 查看运行历史?')) location.href = '/runs'; }, 500);
+                    let msg = '✅ 视频生成完成!';
+                    if (data.final_path) msg += '\n视频: ' + data.final_path;
+                    if (data.work_dir) msg += '\n\n查看图片画廊和脚本?';
+                    setTimeout(() => {
+                        if (confirm(msg)) {
+                            const runName = data.work_dir ? data.work_dir.split(/[\\/]/).pop() : '';
+                            if (runName) location.href = '/runs/' + runName + '/gallery';
+                            else location.href = '/runs';
+                        }
+                    }, 500);
+                }
+                if (data.status === 'error' && data.error) {
+                    alert('❌ 错误: ' + data.error);
                 }
                 if (data.type === 'done') evtSource.close();
             }

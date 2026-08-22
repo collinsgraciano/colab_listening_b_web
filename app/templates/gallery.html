@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">{{ script.title or run_name }}</h2>
+            <p class="text-sm text-slate-400 mt-1">{{ run_name }}</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/runs" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">← 返回列表</a>
+            {% if script %}
+            <a href="/api/runs/{{ run_name }}/script/edit" target="_blank"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">查看脚本</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-1 mb-6 border-b border-slate-700">
+        <button onclick="switchTab('images')" id="tab-images" class="tab-btn active">📷 图片 ({{ images | length }})</button>
+        <button onclick="switchTab('clips')" id="tab-clips" class="tab-btn">🎬 视频片段 ({{ clips | length }})</button>
+        <button onclick="switchTab('audio')" id="tab-audio" class="tab-btn">🎵 音频 ({{ audio | length }})</button>
+        <button onclick="switchTab('videos')" id="tab-videos" class="tab-btn">📹 最终视频 ({{ videos | length }})</button>
+        <button onclick="switchTab('script')" id="tab-script" class="tab-btn">📄 脚本</button>
+    </div>
+
+    <!-- Images tab -->
+    <div id="content-images" class="tab-content">
+        {% if images %}
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {% for img in images %}
+            <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden group cursor-pointer"
+                 onclick="openImage('{{ img }}')">
+                <div class="aspect-video bg-slate-900">
+                    <img src="/api/runs/{{ run_name }}/images/{{ img }}" alt="{{ img }}"
+                         class="w-full h-full object-contain" loading="lazy">
+                </div>
+                <div class="px-2 py-1.5">
+                    <p class="text-xs text-slate-400 truncate">{{ img }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-center py-12">没有图片</p>
+        {% endif %}
+    </div>
+
+    <!-- Clips tab -->
+    <div id="content-clips" class="tab-content hidden">
+        {% if clips %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for clip in clips %}
+            <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                <video controls class="w-full" preload="metadata">
+                    <source src="/api/runs/{{ run_name }}/video/{{ clip }}" type="video/mp4">
+                </video>
+                <div class="px-3 py-2">
+                    <p class="text-xs text-slate-400">{{ clip }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-center py-12">没有视频片段</p>
+        {% endif %}
+    </div>
+
+    <!-- Audio tab -->
+    <div id="content-audio" class="tab-content hidden">
+        {% if audio %}
+        <div class="space-y-2">
+            {% for a in audio %}
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 flex items-center gap-4">
+                <audio controls preload="metadata" class="flex-1">
+                    <source src="/api/runs/{{ run_name }}/audio/{{ a }}" type="audio/mpeg">
+                </audio>
+                <span class="text-xs text-slate-400 w-48 truncate">{{ a }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-center py-12">没有音频</p>
+        {% endif %}
+    </div>
+
+    <!-- Videos tab -->
+    <div id="content-videos" class="tab-content hidden">
+        {% if videos %}
+        <div class="space-y-4">
+            {% for v in videos %}
+            <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                <video controls class="w-full" preload="metadata">
+                    <source src="/api/runs/{{ run_name }}/video/{{ v }}" type="video/mp4">
+                </video>
+                <div class="px-3 py-2 flex items-center justify-between">
+                    <p class="text-xs text-slate-400">{{ v }}</p>
+                    <a href="/api/runs/{{ run_name }}/video/{{ v }}" download
+                       class="text-xs text-indigo-400 hover:text-indigo-300">下载</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-center py-12">没有最终视频</p>
+        {% endif %}
+    </div>
+
+    <!-- Script tab -->
+    <div id="content-script" class="tab-content hidden">
+        {% if script %}
+        <div class="bg-slate-950 rounded-lg p-4 overflow-x-auto">
+            <pre class="text-xs text-slate-300 font-mono whitespace-pre-wrap">{{ script | tojson(indent=2) }}</pre>
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-center py-12">没有脚本</p>
+        {% endif %}
+    </div>
+
+    <!-- Image viewer modal -->
+    <div id="image-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-8"
+         onclick="closeImageModal(event)">
+        <div class="max-w-5xl max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-2">
+                <span id="image-modal-title" class="text-sm text-slate-300"></span>
+                <button onclick="closeImageModal()" class="text-slate-400 hover:text-white text-xl">✕</button>
+            </div>
+            <img id="image-modal-img" src="" alt="" class="max-w-full max-h-[80vh] rounded-lg">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('content-' + tab).classList.remove('hidden');
+    document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function openImage(name) {
+    document.getElementById('image-modal-img').src = `/api/runs/{{ run_name }}/images/${name}`;
+    document.getElementById('image-modal-title').textContent = name;
+    document.getElementById('image-modal').classList.remove('hidden');
+}
+
+function closeImageModal(e) {
+    if (e && e.target !== document.getElementById('image-modal')) return;
+    document.getElementById('image-modal').classList.add('hidden');
+}
+</script>
+<style>
+.tab-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #94a3b8;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.tab-btn:hover { color: #e2e8f0; }
+.tab-btn.active { color: #fff; border-bottom-color: #6366f1; }
+</style>
+{% endblock %}
