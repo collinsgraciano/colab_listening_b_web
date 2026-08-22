@@ -453,6 +453,10 @@ def build_voice_map(script: dict) -> dict:
     host_gender = script.get("host_gender", "").lower()
     if host_gender:
         voice_map["host"] = "am_adam" if host_gender == "male" else "af_sky"
+    else:
+        print("  [TTS] WARNING: host_gender not set, defaulting to af_sky (female). "
+              "Check CHARACTER_OVERRIDES or script.json host_gender.")
+        voice_map["host"] = "af_sky"
     return voice_map
 
 

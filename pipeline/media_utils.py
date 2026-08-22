@@ -204,7 +204,10 @@ def concat_segments(segment_paths: list[str], output_path: str,
 
     result = subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
-        "-c", "copy", output_path,
+        "-c", "copy",
+        "-fflags", "+genpts",
+        "-avoid_negative_ts", "make_zero",
+        output_path,
     ], capture_output=True)
 
     if result.returncode != 0:

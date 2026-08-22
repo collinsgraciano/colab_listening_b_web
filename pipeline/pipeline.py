@@ -187,10 +187,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
     parser.add_argument("--subtitle-font-size", type=int, default=60, help="English subtitle font size in pixels (default 60). ZH subtitle is auto-scaled to 85%% of EN size.")
     parser.add_argument("--tts-rate", default=None, help="Override dialogue English TTS rate (e.g. '-15%%', '0%%'). Default: mode-dependent (quest '0%%', others '-15%%')")
-    parser.add_argument("--tts-engine", default="kokoro", choices=["kokoro", "voxcpm"],
-                        help="TTS engine: 'kokoro' (default, local) or 'voxcpm' (VoxCPM via Cloudflare Worker, LLM-designed voices)")
+    parser.add_argument("--tts-engine", default="kokoro", choices=["kokoro", "voxcpm", "qwen"],
+                        help="TTS engine: 'kokoro' (default, local) or 'voxcpm' (VoxCPM via Cloudflare Worker, LLM-designed voices) or 'qwen' (Qwen3-TTS local GPU)")
     parser.add_argument("--voxcpm-worker-url", default=None, help="VoxCPM Cloudflare Worker URL (or set VOXCPM_WORKER_URL env var)")
     parser.add_argument("--voxcpm-api-key", default=None, help="VoxCPM Worker API key (optional, or set VOXCPM_API_KEY env var)")
+    parser.add_argument("--qwen-model-path", default=r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
+                        help="Qwen3-TTS model path (local directory)")
+    parser.add_argument("--qwen-device", default="cuda:0",
+                        help="Device for Qwen3-TTS (e.g. cuda:0, cpu)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
     return parser.parse_args()
 
@@ -309,7 +313,8 @@ def _step1_mcp(args):
     print("  MCP connected.")
 
 
-def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs: dict) -> dict:
+def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs: dict,
+                      stop_check=None) -> dict:
     """Step 2: concurrent image generation + TTS audio, then launch clip_0."""
     print("\n" + "=" * 60)
     print("Step 2: Concurrent generation — images + TTS audio...")
@@ -414,6 +419,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             scene_clip_thread = threading.Thread(
                 target=_generate_video_clips,
                 args=([scene_clip_task], clips_dir, clip_paths),
+                kwargs={"stop_check": stop_check},
                 daemon=True,
             )
             scene_clip_thread.start()
@@ -457,7 +463,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
 
 
 def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dict,
-                 ctx: dict) -> tuple[list[str], list[dict], dict]:
+                 ctx: dict, stop_check=None) -> tuple[list[str], list[dict], dict]:
     """Step 3: generate group video clips (skipped entirely in image/quest mode)."""
     print("\n" + "=" * 60)
     dialogue = script.get("dialogue", [])
@@ -685,7 +691,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             host_poses=host_poses,
             host_bg=host_bg,
             scene_bg_list=scene_bg_list,
-            render_fps=getattr(args, "render_fps", 8),
+            render_fps=getattr(args, "render_fps", 12),
             workers=getattr(args, "workers", 1),
             timeline=timeline,
             script=script,
@@ -816,6 +822,10 @@ def main():
         os.environ["VOXCPM_WORKER_URL"] = args.voxcpm_worker_url
     if args.voxcpm_api_key:
         os.environ["VOXCPM_API_KEY"] = args.voxcpm_api_key
+    if args.qwen_model_path:
+        os.environ["QWEN_MODEL_PATH"] = args.qwen_model_path
+    if args.qwen_device:
+        os.environ["QWEN_DEVICE"] = args.qwen_device
 
     if args.llm_provider == "openai":
         os.environ["LLM_PROVIDER"] = "openai"

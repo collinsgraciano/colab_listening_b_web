@@ -1,13 +1,13 @@
 """Quest LLM client — multi-round generation for high-quality quest scripts.
 
-4-round pipeline:
+3-round pipeline:
   Round 1: Story outline (characters, question, key_words, phase summaries)
-  Round 2: Per-phase dialogue (buildup→core→reveal→review, each independent)
+  Round 2: Per-phase dialogue (buildup→core→reveal→review, with on_screen + zh)
   Round 3: Narration + metadata (hook_intro, outro, youtube_*)
-  Round 4: Per-line enhancement (phonetic, zh, on_screen, image_prompt)
 
-Each round produces small JSON output (2-5K tokens) for higher quality.
+Each round produces small JSON output (2-8K tokens) for higher quality.
 Previous rounds' output feeds into subsequent rounds for continuity.
+on_screen and zh are generated directly in Round 2 (no separate enhancement round).
 
 Reuses _chat, _extract_json, _load_used_listening_summaries from parent llm_client.
 """
@@ -20,23 +20,23 @@ _PARENT = str(Path(__file__).parent.parent.resolve())
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
-from llm_client import _chat, _extract_json, _load_used_listening_summaries, _build_character_override_prompt
+from llm_client import _chat, _extract_json, _load_used_listening_summaries, _build_character_override_prompt, _get_character_overrides
 
 
 def split_phase_lines(num_lines: int) -> tuple[int, int, int, int]:
-    """Split total lines into (buildup, core, reveal, review) by reference ratio ~10/54/15/21.
+    """Split total lines into (buildup, core, reveal, review) by reference ratio ~30/48/10/12.
 
-    Mirrors the bubble-tea reference video: short buildup where the listening
-    question arises naturally, long core with mixed speakers (education +
-    transactions), a reveal phase where the answer is exposed, and a review
-    where the answer is confirmed.
+    Mirrors the bubble-tea reference video (~18min, 213 lines): long buildup
+    where the listening question arises naturally with character development,
+    longest core with mixed speakers (education + transactions), a short reveal
+    where the answer is exposed, and a review where the answer is confirmed.
 
-    48 -> (5, 26, 7, 10). Each phase is at least 1; excess/deficit is
-    absorbed by core (the largest phase).
+    48 -> (14, 23, 5, 6).  250 -> (75, 120, 25, 30).
+    Each phase is at least 1; excess/deficit is absorbed by core.
     """
-    n_buildup = round(num_lines * 0.10)
-    n_core = round(num_lines * 0.54)
-    n_reveal = round(num_lines * 0.15)
+    n_buildup = round(num_lines * 0.30)
+    n_core = round(num_lines * 0.48)
+    n_reveal = round(num_lines * 0.10)
     n_review = num_lines - n_buildup - n_core - n_reveal
 
     n = [n_buildup, n_core, n_reveal, n_review]
@@ -70,9 +70,8 @@ def generate_quest_script(topic: str, cefr: str = "A1",
     """Generate a quest lesson script via multi-round LLM calls.
 
     Round 1: Story outline (characters, question, key_words, phase summaries)
-    Round 2: Per-phase dialogue generation (buildup→core→reveal→review)
+    Round 2: Per-phase dialogue generation (buildup→core→reveal→review, with on_screen + zh)
     Round 3: Narration + metadata (hook_intro, outro, youtube_*)
-    Round 4: Per-line enhancement (phonetic, zh, on_screen, image_prompt)
 
     Returns assembled script dict with all fields.
     """
@@ -100,8 +99,8 @@ def generate_quest_script(topic: str, cefr: str = "A1",
     all_dialogue.extend(buildup_lines)
     print(f"    buildup: {len(buildup_lines)} lines")
 
-    # 2b: Core (may split into 2 batches if >15 lines)
-    core_batch_size = 15
+    # 2b: Core (split into batches of 60 to keep response manageable)
+    core_batch_size = 60
     core_generated = []
     prev = buildup_lines[-3:] if len(buildup_lines) >= 3 else buildup_lines
     remaining = n_core
@@ -133,6 +132,11 @@ def generate_quest_script(topic: str, cefr: str = "A1",
     # ── Quick quality check ─────────────────────────────────────────────
     _quality_check(all_dialogue, outline)
 
+    # ── Ensure on_screen defaults (Round 2 generates them, but fallback) ─
+    for line in all_dialogue:
+        if not line.get("on_screen"):
+            line["on_screen"] = [line.get("speaker", "char_a")]
+
     # ── Round 3: Narration + metadata ───────────────────────────────────
     print("  [LLM] Round 3: Narration + metadata...")
     meta_prompt = _build_metadata_prompt(topic, cefr, outline, all_dialogue)
@@ -140,44 +144,6 @@ def generate_quest_script(topic: str, cefr: str = "A1",
         meta_prompt, temperature=0.6, max_tokens=8192, reasoning_effort="low",
         label="metadata",
         system="You are a YouTube content strategist for ESL learning videos. Output valid JSON only.")
-
-    # ── Round 4: Per-line enhancement (batched to avoid 524 timeouts) ──
-    print("  [LLM] Round 4: Per-line enhancement...")
-    enh_batch_size = 16  # process 16 lines at a time to keep response small
-    all_enhanced = []
-    for batch_start in range(0, len(all_dialogue), enh_batch_size):
-        batch = all_dialogue[batch_start:batch_start + enh_batch_size]
-        # Re-index batch to 0-based for the LLM, then map back
-        batch_reindexed = [
-            {"i": j, "s": d.get("speaker", ""), "t": d.get("text", ""), "p": d.get("phase", "")}
-            for j, d in enumerate(batch)
-        ]
-        batch_prompt = _build_enhance_prompt_from_reindexed(batch_reindexed, outline)
-        try:
-            batch_result = _chat_and_parse(
-                batch_prompt, temperature=0.3, max_tokens=4096, reasoning_effort="low",
-                label=f"enhance_{batch_start}",
-                system="You are a video director assistant. Decide which characters appear on screen for each dialogue line. Output valid JSON array only.")
-            if isinstance(batch_result, list):
-                for enh in batch_result:
-                    if isinstance(enh, dict):
-                        j = enh.get("i", -1)
-                        if 0 <= j < len(batch):
-                            all_enhanced.append((batch_start + j, enh))
-        except RuntimeError as e:
-            print(f"  [LLM] Round 4 batch {batch_start} failed ({e}), skipping")
-
-    # Merge enhanced fields into dialogue (only on_screen — used by video_compose_quest)
-    enh_by_idx = {abs_idx: enh for abs_idx, enh in all_enhanced}
-    for i, line in enumerate(all_dialogue):
-        enh = enh_by_idx.get(i)
-        if not enh:
-            continue
-        on_screen = enh.get("on_screen")
-        if on_screen is not None:
-            if isinstance(on_screen, list) and len(on_screen) == 0:
-                on_screen = [line.get("speaker", "char_a")]
-            line["on_screen"] = on_screen
 
     # ── Fallback: fill any still-empty zh via a small targeted call ─────
     empty_zh = [(i, d.get("text", "")) for i, d in enumerate(all_dialogue)
@@ -220,7 +186,7 @@ def generate_quest_script(topic: str, cefr: str = "A1",
         "char_a_personality": outline.get("char_a_personality", "curious and energetic"),
         "char_b_personality": outline.get("char_b_personality", "calm and knowledgeable"),
         "host_description": outline.get("host_description", ""),
-        "host_gender": outline.get("host_gender", "female"),
+        "host_gender": outline.get("host_gender", ""),
         "host_bg_prompt": meta.get("host_bg_prompt", "a bright modern TV studio set, 3D cartoon style, no people"),
         "youtube_title": meta.get("youtube_title", ""),
         "youtube_title_en": meta.get("youtube_title_en", ""),
@@ -239,9 +205,7 @@ def generate_quest_script(topic: str, cefr: str = "A1",
 
     # Ensure per-line defaults
     for i, line in enumerate(script["dialogue"]):
-        line.setdefault("phonetic", "")
         line.setdefault("zh", "")
-        line.setdefault("image_prompt", "")
         line.setdefault("on_screen", [line.get("speaker", "char_a")])
         if not line.get("on_screen"):
             line["on_screen"] = [line.get("speaker", "char_a")]
@@ -254,6 +218,17 @@ def generate_quest_script(topic: str, cefr: str = "A1",
                 line["phase"] = "reveal"
             else:
                 line["phase"] = "review"
+
+    # Force-override character genders from CHARACTER_OVERRIDES (set by
+    # pipeline_service when using character reuse / library / fixes).
+    # LLM may not reliably follow the override prompt, so we enforce it here.
+    overrides = _get_character_overrides()
+    for key in ("char_a", "char_b", "char_c", "host"):
+        if key in overrides:
+            gender = overrides[key].get("gender", "")
+            if gender:
+                script[f"{key}_gender"] = gender
+                print(f"  [LLM] Override {key}_gender = {gender}")
 
     return script
 
@@ -437,10 +412,51 @@ _PHASE_RULES = {
     ),
 }
 
+
+_DIALOGUE_QUALITY_RULES = """\
+NATURAL DIALOGUE QUALITY RULES (MANDATORY — the #1 priority):
+
+1. SENTENCE LENGTH VARIETY: Mix short reactions (3-5 words) with medium (6-10) and longer (11-18). NEVER write 3 consecutive lines that are all 4-6 words — it sounds robotic.
+
+2. FILLER WORDS (at least 1 per 3-4 lines): "well", "you know", "hmm", "actually", "oh", "I mean", "let me think", "you see", "sort of", "kind of"
+
+3. BACK-CHANNELING (every 5-8 lines): "Oh really?", "That makes sense", "Hmm, interesting", "Wow", "I see", "Right", "Exactly", "Nice"
+
+4. SAME SPEAKER CAN SPEAK CONSECUTIVELY (2-3 lines): Sometimes a character explains something across 2 lines without interruption. Do this naturally ~15-20 times across the whole dialogue.
+
+5. EMOTIONAL VARIETY: Express curiosity, excitement, nervousness, surprise, satisfaction, humor. Characters are NOT flat.
+
+6. NATURAL FLOW: Avoid the Q&A pattern (ask→answer→ask→answer). Characters can change topic, remember something, express doubt, make a joke, share personal experience.
+
+7. CHARACTER PERSONALITY: char_a is curious/energetic (asks follow-ups, gets excited), char_b is calm/knowledgeable (explains patiently, teases playfully), char_c is helpful/friendly.
+
+8. AVOID REPETITIVE PATTERNS: Don't start consecutive lines with "Yes," or "No,". Don't repeat the same sentence structure.
+
+GOOD dialogue (from reference video — natural, varied):
+  char_a: "Mina, do you want to try something fun after class today?"   (10 words)
+  char_b: "Sure. What is it?"                                            (3 words, short reaction)
+  char_a: "Bubble tea. There is a new shop close to the campus."         (10 words)
+  char_b: "Bubble tea? I have never had that before."                    (7 words, surprised)
+  char_a: "Really? You are going to love it."                            (6 words, enthusiastic)
+  char_b: "What is it exactly?"                                         (4 words, curious follow-up)
+  char_a: "It is a cold tea drink. You mix it with milk, sugar, and other things."  (14 words, explanatory)
+  char_b: "And what about the bubble part? Are there real bubbles in it?"            (11 words, questioning)
+  char_a: "That's a good question. Let me ask you first. Why do you think it's called bubble tea?"  (17 words, playfully deflects)
+
+BAD dialogue (DO NOT write like this — too robotic):
+  char_a: "Hi, Sarah. How are you?"     (boring greeting, textbook-style)
+  char_b: "I am good. You?"             (too short, no personality)
+  char_a: "I am very thirsty."          (robotic statement)
+  char_b: "Let's get a drink then."     (textbook transition)
+"""
+
 def _generate_phase_dialogue(phase: str, outline: dict, n_lines: int,
                               prev_lines: list[dict] | None, cefr: str,
                               temperature: float) -> list[dict]:
-    """Generate dialogue for one phase."""
+    """Generate dialogue for one phase with natural dialogue quality rules.
+
+    Output includes on_screen field so Round 4 enhancement is not needed.
+    """
     import json
 
     prev_hint = ""
@@ -456,11 +472,28 @@ def _generate_phase_dialogue(phase: str, outline: dict, n_lines: int,
     key_words = ", ".join(w.get("en", "") for w in outline.get("key_words", []))
     char_a_personality = outline.get("char_a_personality", "curious and energetic")
     char_b_personality = outline.get("char_b_personality", "calm and knowledgeable")
+    char_a_desc = outline.get("char_a_description", "")
+    char_b_desc = outline.get("char_b_description", "")
+    char_c_desc = outline.get("char_c_description", "")
+    scene = outline.get("scene", "")
 
     if phase == "reveal":
         extra = f"\nThe ANSWER to reveal: {answer}\nCommon misconception: {misconception}"
     else:
         extra = ""
+
+    # on_screen rules vary by phase
+    if phase == "core":
+        on_screen_rules = (
+            '- buildup/review: mostly ["char_a","char_b"]\n'
+            '- core: mix of ["char_a","char_c"], ["char_b","char_c"], ["char_a","char_b"]\n'
+            '- Use [] (empty) for 1-2 lines per batch (environment/menu/object shots)'
+        )
+    else:
+        on_screen_rules = (
+            '- mostly ["char_a","char_b"]\n'
+            '- Use [] (empty) for at most 1 line (environment shot)'
+        )
 
     prompt = f"""You are an ESL dialogue writer. Write {n_lines} lines of natural English dialogue for the "{phase}" phase.
 
@@ -471,24 +504,35 @@ Key words to use: {key_words}
 Phase summary: {phase_summary}
 
 {prev_hint}
-RULES:
+{_DIALOGUE_QUALITY_RULES}
+
+PHASE-SPECIFIC RULES:
 - CEFR {cefr} level. Each line 5-15 words, vary the length naturally.
-- Natural conversational English with filler words ("well", "you know", "hmm", "actually", "oh").
-- Vary sentence length — mix short reactions (3-5 words) with longer explanations (10-15 words).
 - Characters have personality — char_a is {char_a_personality}, char_b is {char_b_personality}.
 - {rules}
 
+CHARACTERS (for on_screen assignment):
+- char_a={char_a_desc}
+- char_b={char_b_desc}
+- char_c={char_c_desc}
+Scene: {scene}
+
+on_screen rules:
+{on_screen_rules}
+
 Example output (for reference format only):
-[{{"speaker":"char_a","text":"Hey, I've been wanting to try this place! What's good here?","phase":"{phase}","zh":"嘿，我一直想來這裡試試！有什麼好喝的？"}}]
+[{{"speaker":"char_a","text":"Mina, do you want to try something fun after class today?","phase":"{phase}","zh":"Mina，你今天下課後想做點有趣的事嗎？","on_screen":["char_a","char_b"]}}]
 
 Output: JSON array of exactly {n_lines} objects:
-[{{"speaker":"char_a","text":"English sentence","phase":"{phase}","zh":"繁體中文翻譯"}}]
+[{{"speaker":"char_a","text":"English sentence","phase":"{phase}","zh":"繁體中文翻譯","on_screen":["char_a","char_b"]}}]
 
-Every line MUST include "zh": a Traditional Chinese (繁體中文) translation of the English text.
+Every line MUST include:
+- "zh": Traditional Chinese (繁體中文) translation
+- "on_screen": array of character keys visible on screen (e.g. ["char_a","char_b"], or [] for environment shots)
 NO markdown, NO explanation. JSON array ONLY."""
 
     result = _chat_and_parse(
-        prompt, temperature=temperature, max_tokens=4096,
+        prompt, temperature=temperature, max_tokens=8192,
         reasoning_effort="medium", label=f"dialogue_{phase}",
         system="You are an ESL dialogue writer. Write natural conversational English. Output valid JSON array only.")
     if isinstance(result, list):
@@ -545,6 +589,8 @@ Generate JSON with these fields:
   "thumbnail_icons": [{{"en":"word","zh":"繁中"}}],
   "scene_images": [{{"prompt":"specific 3D cartoon scene description with details (counter, menu board, equipment, decor), 16:9, no people","label":"short English label"}}]
 }}
+
+IMPORTANT: Generate at least 8 scene_images covering different angles and details of the scene (e.g. exterior, counter, menu board, equipment, seating area, product close-up, kitchen, decoration).
 
 JSON ONLY, no markdown."""
 

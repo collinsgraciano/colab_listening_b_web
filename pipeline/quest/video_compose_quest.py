@@ -342,14 +342,27 @@ def _render_sm_segment(
         positions = []
     elif n_chars == 1:
         positions = [1280 * 0.5]
-    else:
-        # 2+ characters: speaker left, listener(s) right
+    elif n_chars == 2:
+        # 2 characters: speaker left, listener right
         positions = []
-        for i, layer in enumerate(processed_layers):
+        for layer in processed_layers:
             if layer["is_speaker"]:
                 positions.append(1280 * 0.35)
             else:
                 positions.append(1280 * 0.65)
+    else:
+        # 3+ characters: speaker at left, listeners spread across center-right
+        positions = []
+        listener_idx = 0
+        n_listeners = sum(1 for l in processed_layers if not l["is_speaker"])
+        for layer in processed_layers:
+            if layer["is_speaker"]:
+                positions.append(1280 * 0.28)
+            else:
+                # Distribute listeners from 0.50 to 0.85
+                t = (listener_idx + 1) / (n_listeners + 1)
+                positions.append(1280 * (0.50 + t * 0.35))
+                listener_idx += 1
 
     # Build pose schedule for each character layer
     total_frames = max(1, round(duration * render_fps))
@@ -479,7 +492,9 @@ def _render_sm_segment(
 
         frame.save(str(frames_dir / f"frame-{fidx:04d}.png"), compress_level=2)
 
-    # Encode frames to mp4
+    # Encode frames to mp4 — output at 25fps to minimize duration quantization
+    # error (ceil(duration*25)/25 max drift = 0.04s vs 0.125s at 8fps).
+    # Input framerate stays at render_fps for natural stop-motion timing.
     frame_pattern = str(frames_dir / "frame-%04d.png")
 
     if audio_file and os.path.exists(audio_file):
@@ -487,7 +502,7 @@ def _render_sm_segment(
                "-framerate", str(render_fps), "-i", frame_pattern,
                "-i", audio_file,
                "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(render_fps),
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
                out_path]
@@ -496,7 +511,7 @@ def _render_sm_segment(
                "-framerate", str(render_fps), "-i", frame_pattern,
                "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(render_fps),
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                out_path]
 
@@ -524,7 +539,7 @@ def _run_fallback(cmd, out_path, scene_img, duration, render_fps):
     if r is None or r.returncode != 0 or not os.path.exists(out_path) or os.path.getsize(out_path) < 1000:
         fallback_cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
                         "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                        "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps={render_fps}",
+                        "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps=25",
                         "-map", "0:v:0", "-map", "1:a:0",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p",
                         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -582,7 +597,7 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
         if not success:
             cmd = ["ffmpeg", "-y", "-loop", "1", "-i", host_bg_path,
                    "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                   "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps={render_fps}",
+                   "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps=25",
                    "-map", "0:v:0", "-map", "1:a:0",
                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -627,7 +642,7 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
         if not success:
             cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
                    "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                   "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps={render_fps}",
+                   "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps=25",
                    "-map", "0:v:0", "-map", "1:a:0",
                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -637,7 +652,7 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
     else:
         cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
                "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-               "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps={render_fps}",
+               "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps=25",
                "-map", "0:v:0", "-map", "1:a:0",
                "-c:v", "libx264", "-pix_fmt", "yuv420p",
                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
