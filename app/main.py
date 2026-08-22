@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import (
     HTMLResponse, JSONResponse, StreamingResponse,
-    FileResponse, RedirectResponse,
+    FileResponse, RedirectResponse, PlainTextResponse,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -71,8 +71,7 @@ templates.env.filters["datestr"] = _datestr
 async def dashboard(request: Request):
     service = get_service()
     config = load_config()
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "config": config,
         "runner": service,
         "active_page": "dashboard",
@@ -92,8 +91,7 @@ async def config_page(request: Request):
         grouped[g].append((key, spec, config.get(key, spec["default"])))
     # Sort groups by order
     sorted_groups = sorted(grouped.items(), key=lambda x: GROUP_META.get(x[0], {}).get("order", 99))
-    return templates.TemplateResponse("config.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "config.html", {
         "config": config,
         "params": PARAM_SPEC,
         "grouped": sorted_groups,
@@ -125,8 +123,7 @@ async def topics_page(request: Request):
         except (json.JSONDecodeError, OSError):
             pass
 
-    return templates.TemplateResponse("topics.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "topics.html", {
         "topics_data": topics_data,
         "used_topics": used_topics,
         "topics_file": topics_file,
@@ -167,8 +164,7 @@ async def gallery_page(request: Request, name: str):
             if v.name not in videos and not v.name.startswith("final_no_sub") and not v.name.startswith("final_video_norm"):
                 videos.append(v.name)
 
-    return templates.TemplateResponse("gallery.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "gallery.html", {
         "run_name": name,
         "script": script,
         "images": images,
@@ -225,8 +221,7 @@ async def runs_page(request: Request):
                 run_info["title"] = d.name
             runs.append(run_info)
 
-    return templates.TemplateResponse("runs.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "runs.html", {
         "runs": runs,
         "active_page": "runs",
     })
@@ -579,8 +574,10 @@ async def api_get_thumbnail(name: str):
 async def api_get_video(name: str, video_name: str):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    # Final videos are in work_dir root; clips are in videos/ subdir
+    # Final videos are in work_dir root; clips are in clips/ subdir
     video_path = output_dir / name / video_name
+    if not video_path.exists():
+        video_path = output_dir / name / "clips" / video_name
     if not video_path.exists():
         video_path = output_dir / name / "videos" / video_name
     if not video_path.exists():
@@ -656,34 +653,33 @@ async def api_character_sources():
             try:
                 script = json.loads(script_path.read_text(encoding="utf-8"))
                 img_dir = d / "images"
-                structure = script.get("structure", "original")
 
-                # Build character list based on structure
+                # Auto-detect structure by checking which image files exist
+                # (script.json does not store structure — it's a CLI arg)
+                if (img_dir / "pose_char_a_0.png").exists():
+                    structure = "quest"
+                elif (img_dir / "char_scene.png").exists():
+                    structure = "original"
+                else:
+                    continue  # no character images
+
+                # Build character list based on detected structure
                 if structure == "quest":
                     char_keys = ["char_a", "char_b", "char_c", "host"]
                     char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
-                    # Quest uses per-character pose images
-                    has_chars = (img_dir / "pose_char_a_0.png").exists()
+                    img_name_for = lambda key: f"pose_{key}_0.png"
                 else:
                     char_keys = ["char_a", "char_b"]
                     char_labels = {"char_a": "角色A", "char_b": "角色B"}
-                    has_chars = (img_dir / "char_scene.png").exists()
-
-                if not has_chars:
-                    continue
+                    img_name_for = lambda key: "char_scene.png"
 
                 characters = []
                 for key in char_keys:
                     desc = script.get(f"{key}_description", "")
                     gender = script.get(f"{key}_gender", "")
                     role = script.get(f"{key}_role", "")
-                    if structure == "quest":
-                        img_name = f"pose_{key}_0.png"
-                        img_exists = (img_dir / img_name).exists()
-                    else:
-                        # Original/image: both share char_scene.png
-                        img_name = "char_scene.png"
-                        img_exists = (img_dir / img_name).exists()
+                    img_name = img_name_for(key)
+                    img_exists = (img_dir / img_name).exists()
                     characters.append({
                         "key": key,
                         "label": char_labels.get(key, key),
@@ -762,13 +758,24 @@ async def api_gallery(name: str):
     audio_dir = output_dir / name / "audio"
     audio = sorted([f.name for f in audio_dir.glob("*.mp3")]) if audio_dir.exists() else []
     
+    # Final videos in work_dir root (excluding intermediate files)
+    run_dir = output_dir / name
+    final_videos = []
+    if run_dir.exists():
+        for v in sorted(run_dir.glob("*.mp4")):
+            if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
+                continue
+            final_videos.append(v.name)
+
     return {
         "images": images,
         "clips": clips,
         "audio": audio,
+        "final_videos": final_videos,
         "image_urls": {f: f"/api/runs/{name}/images/{f}" for f in images},
         "clip_urls": {f: f"/api/runs/{name}/video/{f}" for f in clips},
         "audio_urls": {f: f"/api/runs/{name}/audio/{f}" for f in audio},
+        "final_video_urls": {f: f"/api/runs/{name}/video/{f}" for f in final_videos},
     }
 
 
@@ -782,6 +789,334 @@ async def api_get_audio(name: str, audio_name: str):
     return FileResponse(str(audio_path), media_type="audio/mpeg")
 
 
+@app.get("/api/runs/{name}/srt")
+async def api_get_srt(name: str):
+    """Serve the SRT subtitle file for step-mode review."""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    srt_path = output_dir / name / "subtitles" / "output.srt"
+    if not srt_path.exists():
+        return JSONResponse({"error": "SRT not found"}, status_code=404)
+    return PlainTextResponse(srt_path.read_text(encoding="utf-8"), media_type="text/plain")
+
+
+# ===========================================================================
+# Character Library API
+# ===========================================================================
+
+LIBRARY_DIR = WEB_ROOT / "configs" / "character_library"
+
+
+@app.get("/api/character_library")
+async def api_library_list():
+    """List all saved characters in the library."""
+    if not LIBRARY_DIR.exists():
+        return {"characters": []}
+    chars = []
+    for d in sorted(LIBRARY_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        meta_path = d / "meta.json"
+        if not meta_path.exists():
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            thumb = d / "thumb.png"
+            meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
+            chars.append(meta)
+        except (json.JSONDecodeError, OSError):
+            continue
+    return {"characters": chars}
+
+
+@app.post("/api/character_library/save")
+async def api_library_save(request: Request):
+    """Save a character from a run into the library."""
+    import shutil
+    data = await request.json()
+    run_name = data.get("run_name", "")
+    char_key = data.get("char_key", "")
+    custom_name = data.get("name", "").strip()
+    structure = data.get("structure", "quest")
+
+    if not run_name or not char_key:
+        return JSONResponse({"ok": False, "error": "缺少参数"}, status_code=400)
+
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = output_dir / run_name
+    script_path = run_dir / "script.json"
+    if not script_path.exists():
+        return JSONResponse({"ok": False, "error": "运行不存在"}, status_code=404)
+
+    script = json.loads(script_path.read_text(encoding="utf-8"))
+    desc = script.get(f"{char_key}_description", "")
+    gender = script.get(f"{char_key}_gender", "")
+    role = script.get(f"{char_key}_role", "")
+    if not desc:
+        return JSONResponse({"ok": False, "error": "角色描述为空"}, status_code=400)
+
+    # Generate ID
+    lib_id = f"char_{int(time.time())}_{char_key}"
+    lib_dir = LIBRARY_DIR / lib_id
+    lib_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy images
+    src_img_dir = run_dir / "images"
+    copied_files = []
+    if structure == "quest":
+        for j in range(8):
+            src = src_img_dir / f"pose_{char_key}_{j}.png"
+            if src.exists():
+                shutil.copy2(str(src), str(lib_dir / src.name))
+                copied_files.append(src.name)
+        atlas = src_img_dir / f"pose_atlas_{char_key}.png"
+        if atlas.exists():
+            shutil.copy2(str(atlas), str(lib_dir / atlas.name))
+        if char_key == "host":
+            hb = src_img_dir / "host_bg.png"
+            if hb.exists():
+                shutil.copy2(str(hb), str(lib_dir / "host_bg.png"))
+    else:
+        cs = src_img_dir / "char_scene.png"
+        if cs.exists():
+            shutil.copy2(str(cs), str(lib_dir / "char_scene.png"))
+
+    # Copy thumbnail (pose_0 or char_scene)
+    thumb_src = src_img_dir / f"pose_{char_key}_0.png" if structure == "quest" else src_img_dir / "char_scene.png"
+    if thumb_src.exists():
+        shutil.copy2(str(thumb_src), str(lib_dir / "thumb.png"))
+
+    # Save metadata
+    meta = {
+        "id": lib_id,
+        "name": custom_name or f"{char_key} ({role})",
+        "description": desc,
+        "gender": gender,
+        "structure": structure,
+        "source_run": run_name,
+        "source_key": char_key,
+        "created": time.time(),
+    }
+    (lib_dir / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {"ok": True, "id": lib_id, "meta": meta}
+
+
+@app.delete("/api/character_library/{lib_id}")
+async def api_library_delete(lib_id: str):
+    import shutil
+    lib_dir = LIBRARY_DIR / lib_id
+    if lib_dir.exists() and lib_dir.is_dir():
+        if str(lib_dir.resolve()).startswith(str(LIBRARY_DIR.resolve())):
+            shutil.rmtree(str(lib_dir))
+            return {"ok": True}
+    return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+
+
+@app.get("/api/character_library/{lib_id}/image")
+async def api_library_image(lib_id: str):
+    thumb = LIBRARY_DIR / lib_id / "thumb.png"
+    if not thumb.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(thumb), media_type="image/png")
+
+
+# ===========================================================================
+# QwenTTS Voice Management
+# ===========================================================================
+
+QWEN_VOICE_CONFIG_PATH = WEB_ROOT / "configs" / "qwen_voice_config.json"
+CUSTOM_VOICES_DIR = WEB_ROOT / "configs" / "custom_voices"
+
+
+def _load_qwen_voice_config() -> dict:
+    """Load qwen_voice_config.json with defaults."""
+    defaults = {
+        "default_male": "Ryan",
+        "default_female": "Vivian",
+        "default_host_female": "Serena",
+        "custom_voices": [],
+    }
+    if QWEN_VOICE_CONFIG_PATH.exists():
+        try:
+            saved = json.loads(QWEN_VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
+            for k in defaults:
+                if k in saved:
+                    defaults[k] = saved[k]
+        except (json.JSONDecodeError, OSError):
+            pass
+    return defaults
+
+
+def _save_qwen_voice_config(config: dict) -> None:
+    QWEN_VOICE_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    QWEN_VOICE_CONFIG_PATH.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.get("/voices", response_class=HTMLResponse)
+async def voices_page(request: Request):
+    """QwenTTS voice management page."""
+    config = load_config()
+    # Fetch library characters
+    library_chars = []
+    if LIBRARY_DIR.exists():
+        for d in sorted(LIBRARY_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            meta_path = d / "meta.json"
+            if not meta_path.exists():
+                continue
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                thumb = d / "thumb.png"
+                meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
+                library_chars.append(meta)
+            except (json.JSONDecodeError, OSError):
+                continue
+    return templates.TemplateResponse(request, "voices.html", {
+        "config": config,
+        "library_chars": library_chars,
+        "active_page": "voices",
+    })
+
+
+@app.get("/api/qwen_voices/speakers")
+async def api_qwen_speakers():
+    """List all available voices (preset + custom)."""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+    from qwen_tts_engine import QWEN_SPEAKERS, get_all_voices
+    return {"speakers": get_all_voices(), "presets": QWEN_SPEAKERS}
+
+
+@app.put("/api/character_library/{lib_id}/voice")
+async def api_library_set_voice(lib_id: str, request: Request):
+    """Set Qwen TTS speaker for a library character."""
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    meta_path = lib_dir / "meta.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+    data = await request.json()
+    speaker = data.get("qwen_speaker", "")
+    meta["qwen_speaker"] = speaker
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "meta": meta}
+
+
+@app.post("/api/qwen_voices/preview")
+async def api_qwen_preview(request: Request):
+    """Preview a voice by generating a short sample audio."""
+    import sys as _sys
+    import tempfile
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    data = await request.json()
+    speaker = data.get("speaker", "Vivian")
+    language = data.get("language", "english")
+    text = data.get("text", "Hello, this is a voice test.")
+
+    config = load_config()
+    model_path = config.get("qwen_model_path", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
+    device = config.get("qwen_device", "cuda:0")
+
+    try:
+        from qwen_tts_engine import QwenTTSEngine
+        engine = QwenTTSEngine(model_path, device)
+        # Use a temp file for the preview
+        tmp_dir = Path(tempfile.mkdtemp())
+        out_path = str(tmp_dir / "preview.mp3")
+        if language == "chinese":
+            engine.synth_chinese(text, speaker, out_path, rate="+0%")
+        else:
+            engine.synth_english(text, speaker, out_path, rate="+0%")
+        return FileResponse(out_path, media_type="audio/mpeg",
+                            filename="preview.mp3",
+                            headers={"Content-Disposition": "attachment; filename=preview.mp3"})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/qwen_voices/defaults")
+async def api_qwen_defaults_get():
+    """Get default voice configuration."""
+    return _load_qwen_voice_config()
+
+
+@app.put("/api/qwen_voices/defaults")
+async def api_qwen_defaults_put(request: Request):
+    """Update default voice configuration."""
+    data = await request.json()
+    config = _load_qwen_voice_config()
+    for key in ["default_male", "default_female", "default_host_female"]:
+        if key in data:
+            config[key] = data[key]
+    _save_qwen_voice_config(config)
+    return {"ok": True, "config": config}
+
+
+@app.post("/api/qwen_voices/custom")
+async def api_qwen_custom_create(
+    name: str = "",
+    gender: str = "",
+    language: str = "english",
+    ref_text: str = "",
+    ref_audio: UploadFile = File(...),
+):
+    """Create a custom cloned voice from reference audio."""
+    if not name or not ref_text:
+        return JSONResponse({"ok": False, "error": "缺少名称或参考文字"}, status_code=400)
+
+    # Safe filename
+    safe_name = "".join(c for c in name if c.isalnum() or c in "-_") or "custom"
+    CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+    audio_path = CUSTOM_VOICES_DIR / f"{safe_name}.wav"
+    content = await ref_audio.read()
+    audio_path.write_bytes(content)
+
+    config = _load_qwen_voice_config()
+    # Remove existing entry with same name
+    config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
+    config["custom_voices"].append({
+        "name": name,
+        "description": f"自定义克隆音色 ({gender})",
+        "gender": gender,
+        "language": language,
+        "ref_audio": str(audio_path),
+        "ref_text": ref_text,
+        "created": time.time(),
+    })
+    _save_qwen_voice_config(config)
+    return {"ok": True, "name": name}
+
+
+@app.delete("/api/qwen_voices/custom/{name}")
+async def api_qwen_custom_delete(name: str):
+    """Delete a custom voice."""
+    config = _load_qwen_voice_config()
+    target = None
+    for v in config["custom_voices"]:
+        if v["name"] == name:
+            target = v
+            break
+    if not target:
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    # Delete audio file
+    audio_path = Path(target.get("ref_audio", ""))
+    if audio_path.exists():
+        audio_path.unlink()
+    # Remove from config
+    config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
+    _save_qwen_voice_config(config)
+    return {"ok": True}
+
+
 # ===========================================================================
 # Startup
 # ===========================================================================
@@ -790,6 +1125,7 @@ async def api_get_audio(name: str, audio_name: str):
 async def startup():
     # Ensure configs dir exists
     (WEB_ROOT / "configs").mkdir(parents=True, exist_ok=True)
+    (WEB_ROOT / "configs" / "character_library").mkdir(parents=True, exist_ok=True)
     # Create default config if missing
     if not (WEB_ROOT / "configs" / "default.json").exists():
         save_config(get_default_config())
