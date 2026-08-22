@@ -52,7 +52,7 @@
         </div>
 
         <!-- Action buttons -->
-        <div class="flex gap-3">
+        <div class="flex flex-wrap gap-3 items-center">
             <button id="btn-start" onclick="startPipeline(false)"
                 class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 ▶ 开始生成
@@ -60,6 +60,16 @@
             <button id="btn-resume" onclick="startPipeline(true)"
                 class="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 ⏵ 继续上次
+            </button>
+            <!-- Step mode toggle -->
+            <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input type="checkbox" id="step-mode-toggle" class="accent-indigo-500 w-4 h-4">
+                分步模式
+            </label>
+            <!-- Continue button (step mode only) -->
+            <button id="btn-continue" onclick="continueStep()" style="display:none"
+                class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium text-sm flex items-center gap-2">
+                ⏭ 继续下一步
             </button>
             <button id="btn-stop" onclick="stopPipeline()" style="display:none"
                 class="px-6 py-2.5 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium text-sm flex items-center gap-2">
@@ -149,11 +159,12 @@ function startPipeline(resume) {
     };
     // Merge with saved config
     const config = {...CURRENT_CONFIG, ...overrides};
+    const stepMode = document.getElementById('step-mode-toggle').checked;
 
     fetch('/api/run/start', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({config, resume})
+        body: JSON.stringify({config, resume, step_mode: stepMode})
     })
     .then(r => r.json())
     .then(data => {
@@ -176,6 +187,15 @@ function stopPipeline() {
             document.getElementById('btn-start').disabled = false;
             document.getElementById('btn-resume').disabled = false;
             document.getElementById('btn-stop').style.display = 'none';
+            document.getElementById('btn-continue').style.display = 'none';
+        });
+}
+
+function continueStep() {
+    fetch('/api/run/continue', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('btn-continue').style.display = 'none';
         });
 }
 
@@ -229,6 +249,7 @@ function connectSSE() {
                 document.getElementById('btn-start').disabled = false;
                 document.getElementById('btn-resume').disabled = false;
                 document.getElementById('btn-stop').style.display = 'none';
+                document.getElementById('btn-continue').style.display = 'none';
                 if (data.status === 'done') {
                     let msg = '✅ 视频生成完成!';
                     if (data.final_path) msg += '\n视频: ' + data.final_path;
@@ -245,6 +266,12 @@ function connectSSE() {
                     alert('❌ 错误: ' + data.error);
                 }
                 if (data.type === 'done') evtSource.close();
+            }
+            // Handle paused state (step mode)
+            if (data.status === 'paused') {
+                document.getElementById('btn-continue').style.display = '';
+            } else if (data.status === 'running') {
+                document.getElementById('btn-continue').style.display = 'none';
             }
         }
     };
@@ -294,6 +321,9 @@ function updateProgress(data) {
     } else if (data.status === 'error') {
         badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white';
         text.textContent = '失败';
+    } else if (data.status === 'paused') {
+        badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white';
+        text.textContent = '已暂停 (分步模式)';
     } else if (data.status === 'stopped') {
         badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 text-white';
         text.textContent = '已停止';

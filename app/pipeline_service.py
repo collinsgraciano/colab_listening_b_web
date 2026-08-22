@@ -86,17 +86,25 @@ class PipelineService:
         self.error: str = ""
         self.work_dir: str = ""
         self.final_path: str = ""
+        self._step_mode: bool = False
+        self._paused_after_step: str = ""
 
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
-    def start(self, config: dict[str, Any], resume: bool = False) -> bool:
+    @property
+    def is_paused(self) -> bool:
+        return self._step_mode and self.status == "paused"
+
+    def start(self, config: dict[str, Any], resume: bool = False, step_mode: bool = False) -> bool:
         if self.is_running:
             return False
 
         self.config = config
         self._stop_flag.clear()
+        self._step_mode = step_mode
+        self._paused_after_step = ""
         with self._lock:
             self.log_lines = []
             self.status = "running"
@@ -112,6 +120,60 @@ class PipelineService:
             target=self._run, args=(config, resume), daemon=True)
         self._thread.start()
         return True
+
+    def _wait_for_step_approval(self, step_name: str):
+        """In step mode, pause after each step and wait for user to continue."""
+        if not self._step_mode:
+            return
+        self._paused_after_step = step_name
+        with self._lock:
+            self.status = "paused"
+        self._on_log_line(f"\n⏸ [Step Mode] Paused after {step_name}. Review the output, then click 'Continue' to proceed.")
+
+        # Wait until continue or stop
+        while self._paused_after_step and not self._stop_flag.is_set():
+            time.sleep(0.5)
+
+        if self._stop_flag.is_set():
+            return
+        with self._lock:
+            self.status = "running"
+        self._on_log_line(f"▶ [Step Mode] Continuing after {step_name}...")
+
+    def continue_step(self):
+        """Resume from a step-mode pause."""
+        self._paused_after_step = ""
+
+    def get_progress(self) -> dict:
+        with self._lock:
+            if self.current_step:
+                try:
+                    idx = STEP_ORDER.index(self.current_step)
+                    progress = int((idx + 1) / len(STEP_ORDER) * 100)
+                except ValueError:
+                    progress = 0
+            else:
+                progress = 0
+
+            elapsed = 0
+            if self.started_at:
+                end = self.finished_at if self.finished_at else time.time()
+                elapsed = int(end - self.started_at)
+
+            return {
+                "status": self.status,
+                "current_step": self.current_step,
+                "current_step_label": self.current_step_label,
+                "progress": progress,
+                "elapsed": elapsed,
+                "log_count": len(self.log_lines),
+                "is_running": self.is_running,
+                "error": self.error,
+                "work_dir": self.work_dir,
+                "final_path": self.final_path,
+                "step_mode": self._step_mode,
+                "paused_after_step": self._paused_after_step,
+            }
 
     def _set_env(self, config: dict) -> None:
         """Set env vars from config dict before importing pipeline modules."""
@@ -268,6 +330,10 @@ class PipelineService:
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
+            self._wait_for_step_approval("step0_script")
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
 
             # Step 1: MCP init
             raw_tokens = args.mcp_tokens or ""
@@ -280,10 +346,18 @@ class PipelineService:
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
+            self._wait_for_step_approval("step1_mcp")
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
 
             # Step 2: Images + TTS
             ctx = _step2_images_tts(args, checkpoint, script, work_dir, dirs)
 
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
+            self._wait_for_step_approval("step2_images_tts")
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
@@ -295,6 +369,10 @@ class PipelineService:
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
+            self._wait_for_step_approval("step3_video")
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
 
             # Step 4: Timeline
             timeline, narration, normal_paths, zh_paths = _step4_timeline(
@@ -303,10 +381,18 @@ class PipelineService:
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
+            self._wait_for_step_approval("step4_timeline")
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
 
             # Step 4.5: Thumbnail
             _step45_thumbnail(args, checkpoint, script, work_dir, dirs, timeline, ctx)
 
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
+            self._wait_for_step_approval("step45_thumbnail")
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
@@ -318,6 +404,10 @@ class PipelineService:
                 group_info, line_to_group)
             self.final_path = final_path
 
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
+            self._wait_for_step_approval("step5_compose")
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
@@ -370,35 +460,6 @@ class PipelineService:
 
     def stop(self):
         self._stop_flag.set()
-
-    def get_progress(self) -> dict:
-        with self._lock:
-            if self.current_step:
-                try:
-                    idx = STEP_ORDER.index(self.current_step)
-                    progress = int((idx + 1) / len(STEP_ORDER) * 100)
-                except ValueError:
-                    progress = 0
-            else:
-                progress = 0
-
-            elapsed = 0
-            if self.started_at:
-                end = self.finished_at if self.finished_at else time.time()
-                elapsed = int(end - self.started_at)
-
-            return {
-                "status": self.status,
-                "current_step": self.current_step,
-                "current_step_label": self.current_step_label,
-                "progress": progress,
-                "elapsed": elapsed,
-                "log_count": len(self.log_lines),
-                "is_running": self.is_running,
-                "error": self.error,
-                "work_dir": self.work_dir,
-                "final_path": self.final_path,
-            }
 
     def get_logs_since(self, since: int = 0) -> list[str]:
         with self._lock:

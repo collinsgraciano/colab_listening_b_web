@@ -1,6 +1,7 @@
 """FastAPI main application — all routes and API endpoints."""
 import asyncio
 import json
+import logging
 import os
 import sys
 import time
@@ -13,6 +14,9 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+# Suppress noisy Windows ConnectionResetError on video stream disconnect
+logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 
 from .config_manager import (
     PARAM_SPEC, GROUP_META, get_default_config,
@@ -148,8 +152,20 @@ async def gallery_page(request: Request, name: str):
     clips = sorted([f.name for f in clips_dir.glob("*.mp4")]) if clips_dir.exists() else []
     audio_dir = run_dir / "audio"
     audio = sorted([f.name for f in audio_dir.glob("*.mp3")]) if audio_dir.exists() else []
-    videos_dir = run_dir / "videos"
-    videos = sorted([f.name for f in videos_dir.glob("*.mp4")]) if videos_dir.exists() else []
+
+    # Final videos are in work_dir root (not videos/ subdir which has intermediates)
+    videos = []
+    for v in sorted(run_dir.glob("*.mp4")):
+        # Skip intermediate files
+        if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
+            continue
+        videos.append(v.name)
+    # Also check videos/ dir for any extras
+    videos_subdir = run_dir / "videos"
+    if videos_subdir.exists():
+        for v in sorted(videos_subdir.glob("*.mp4")):
+            if v.name not in videos and not v.name.startswith("final_no_sub") and not v.name.startswith("final_video_norm"):
+                videos.append(v.name)
 
     return templates.TemplateResponse("gallery.html", {
         "request": request,
@@ -183,15 +199,17 @@ async def runs_page(request: Request):
                 "has_thumbnail": thumbnail.exists(),
                 "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
             }
-            # Find video files
+            # Find video files — final videos are in work_dir root, not videos/
             video_files = []
-            if videos_dir.exists():
-                for v in videos_dir.glob("*.mp4"):
-                    video_files.append({
-                        "name": v.name,
-                        "size_mb": round(v.stat().st_size / (1024*1024), 1),
-                        "url": f"/api/runs/{d.name}/video/{v.name}",
-                    })
+            for v in d.glob("*.mp4"):
+                if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
+                    continue
+                video_files.append({
+                    "name": v.name,
+                    "size_mb": round(v.stat().st_size / (1024*1024), 1),
+                    "url": f"/api/runs/{d.name}/video/{v.name}",
+                })
+            # Also check videos/ subdir for intermediates (but don't show them as main)
             run_info["videos"] = video_files
             # Load script metadata
             if script_path.exists():
@@ -284,8 +302,17 @@ async def api_run_start(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     config = data.get("config") or load_config()
     resume = data.get("resume", False)
-    ok = service.start(config, resume=resume)
+    step_mode = data.get("step_mode", False)
+    ok = service.start(config, resume=resume, step_mode=step_mode)
     return {"ok": ok, "status": service.status}
+
+
+@app.post("/api/run/continue")
+async def api_run_continue():
+    """Continue to next step in step mode."""
+    service = get_service()
+    service.continue_step()
+    return {"ok": True, "status": service.status}
 
 
 @app.post("/api/run/stop")
@@ -326,7 +353,7 @@ async def api_run_logs():
             # Send status update
             yield f"data: {json.dumps({'type': 'status', **status})}\n\n"
 
-            if status["status"] not in ("running",):
+            if status["status"] not in ("running", "paused"):
                 break
             await asyncio.sleep(0.5)
 
@@ -517,12 +544,13 @@ async def api_list_runs():
             else:
                 run_info["title"] = d.name
             run_info["videos"] = []
-            if videos_dir.exists():
-                for v in videos_dir.glob("*.mp4"):
-                    run_info["videos"].append({
-                        "name": v.name,
-                        "size_mb": round(v.stat().st_size / (1024*1024), 1),
-                    })
+            for v in d.glob("*.mp4"):
+                if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
+                    continue
+                run_info["videos"].append({
+                    "name": v.name,
+                    "size_mb": round(v.stat().st_size / (1024*1024), 1),
+                })
             runs.append(run_info)
     return {"runs": runs}
 
@@ -551,7 +579,10 @@ async def api_get_thumbnail(name: str):
 async def api_get_video(name: str, video_name: str):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    video_path = output_dir / name / "videos" / video_name
+    # Final videos are in work_dir root; clips are in videos/ subdir
+    video_path = output_dir / name / video_name
+    if not video_path.exists():
+        video_path = output_dir / name / "videos" / video_name
     if not video_path.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(video_path), media_type="video/mp4")
