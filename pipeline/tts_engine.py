@@ -236,6 +236,58 @@ class TTSEngine:
         except Exception:
             pass
 
+    @staticmethod
+    def _kokoro_synth_chunk(pipeline, text: str, voice: str,
+                            speed: float) -> list:
+        """Try synthesizing text with Kokoro, progressively splitting on failure.
+
+        Kokoro's misaki phonemizer can crash with NoneType+str on certain
+        words or phrases. When that happens, split the text into smaller
+        chunks (by comma, then by word groups) so problematic segments are
+        isolated rather than losing the entire sentence.
+        """
+        def _try(chunk: str) -> list:
+            chunk = chunk.strip()
+            if not chunk:
+                return []
+            try:
+                parts = []
+                for _gs, _ps, audio in pipeline(chunk, voice=voice, speed=speed):
+                    if audio is not None and len(audio) > 0:
+                        parts.append(audio)
+                return parts
+            except Exception:
+                return []
+
+        # Attempt 1: full text
+        audio = _try(text)
+        if audio:
+            return audio
+
+        # Attempt 2: split by comma
+        comma_parts = [p.strip() for p in text.split(',') if p.strip()]
+        if len(comma_parts) > 1:
+            audio = []
+            for part in comma_parts:
+                audio.extend(_try(part))
+            if audio:
+                print(f"    [Kokoro] Recovered via comma-split: {text[:50]}")
+                return audio
+
+        # Attempt 3: word groups of 3
+        words = text.split()
+        if len(words) > 1:
+            audio = []
+            for i in range(0, len(words), 3):
+                chunk = ' '.join(words[i:i + 3])
+                audio.extend(_try(chunk))
+            if audio:
+                print(f"    [Kokoro] Recovered via word-split: {text[:50]}")
+                return audio
+
+        print(f"    [Kokoro skip] Could not synthesize: {text[:60]}")
+        return []
+
     def synth_english(self, text: str, voice: str, out_path: str,
                       rate: str = "+0%") -> float:
         """Synthesize English text with Kokoro TTS. Returns duration in seconds.
@@ -261,12 +313,9 @@ class TTSEngine:
             # Apply phonetic fixes FIRST (before cleaning removes hyphens)
             fixed = _apply_phonetic_fixes(sentence)
             cleaned = _clean_text_for_kokoro(fixed)
-            try:
-                for gs, ps, audio in pipeline(cleaned, voice=voice, speed=speed):
-                    if audio is not None and len(audio) > 0:
-                        all_audio.append(audio)
-            except Exception as e:
-                print(f"    [Kokoro skip] {cleaned[:40]}: {e}")
+            all_audio.extend(
+                self._kokoro_synth_chunk(pipeline, cleaned, voice, speed)
+            )
 
         if not all_audio:
             raise RuntimeError(f"Kokoro produced no audio for: {text[:50]}")
