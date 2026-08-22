@@ -25,6 +25,13 @@ if "HF_ENDPOINT" not in os.environ:
     else:
         os.environ['HF_ENDPOINT'] = 'https://huggingface.co'
 
+# If Kokoro model is already cached, use offline mode to avoid slow/failed
+# network HEAD requests (hf-mirror.com can be unreachable).
+_kokoro_cache = Path(os.path.expanduser(
+    "~/.cache/huggingface/hub/models--hexgrad--Kokoro-82M/snapshots"))
+if _kokoro_cache.exists() and any(_kokoro_cache.rglob("kokoro-v1_0.pth")):
+    os.environ["HF_HUB_OFFLINE"] = "1"
+
 
 @dataclass
 class TTSResult:
