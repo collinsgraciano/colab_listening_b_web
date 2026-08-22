@@ -14,6 +14,7 @@ use each speaker's pose atlas with multi-character support via on_screen.
 """
 import os
 import sys
+import math
 import subprocess
 import shutil
 import tempfile
@@ -365,7 +366,8 @@ def _render_sm_segment(
                 listener_idx += 1
 
     # Build pose schedule for each character layer
-    total_frames = max(1, round(duration * render_fps))
+    # Use ceil to ensure enough input frames to fill the (frame-aligned) duration
+    total_frames = max(1, math.ceil(duration * render_fps))
     rng = random.Random(seed)
     schedules = []
     for i, layer in enumerate(processed_layers):
@@ -463,7 +465,6 @@ def _render_sm_segment(
                     rot = landing["rotation"]
             else:
                 # Listener: subtle breathing motion (sine wave, ~3.3s period)
-                import math
                 breath_y = 2.0 * math.sin(t * 2 * math.pi / 3.3)
                 # Occasional blink: replace with "surprised" pose briefly every 4-6s
                 blink_cycle = 5.0 + (seed % 100) / 50.0  # 5.0-7.0s period

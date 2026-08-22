@@ -1,5 +1,19 @@
 """Timeline enrichment: fill audio_dur and duration for all segment types."""
 import os
+import math
+
+
+def _snap_to_frame(duration: float, fps: int) -> float:
+    """Snap duration up to the nearest frame boundary (1/fps seconds).
+
+    This ensures FFmpeg produces an exact integer number of frames,
+    eliminating per-segment quantization drift that accumulates over
+    hundreds of concat'd segments.
+    """
+    if fps <= 0:
+        return duration
+    frame_dur = 1.0 / fps
+    return math.ceil(duration / frame_dur) * frame_dur
 
 
 def enrich_timeline(timeline: list[dict], tts, pad: float,
@@ -7,11 +21,18 @@ def enrich_timeline(timeline: list[dict], tts, pad: float,
                      narration: dict,
                      vocab_durations: list[float] | None = None,
                      quiz_durations: list[float] | None = None,
-                     slow_durations: list[float] | None = None) -> None:
+                     slow_durations: list[float] | None = None,
+                     output_fps: int | None = None) -> None:
     """Fill seg['audio_dur'] and pad-inclusive seg['duration'] for all segment types.
 
     Shared by original/static and quest structures.
     Mutates the timeline in place.
+
+    Args:
+        output_fps: If set, snap seg['duration'] up to the nearest 1/fps
+                    boundary so FFmpeg produces an exact frame count per
+                    segment. Pass 25 for quest mode (25fps output), 24 for
+                    original mode, or None to skip quantization.
     """
     def _safe_index(durs, idx, default):
         return durs[idx] if durs and idx < len(durs) else default
@@ -55,4 +76,5 @@ def enrich_timeline(timeline: list[dict], tts, pad: float,
             continue
 
         seg["audio_dur"] = ad
-        seg["duration"] = ad + pad
+        raw_dur = ad + pad
+        seg["duration"] = _snap_to_frame(raw_dur, output_fps) if output_fps else raw_dur
