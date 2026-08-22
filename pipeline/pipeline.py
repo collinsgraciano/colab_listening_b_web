@@ -616,7 +616,8 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
 def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: dict,
                    clip_paths: list[str], timeline: list[dict], narration: dict,
                    normal_paths: list[str], zh_paths: list[str], tts_results: dict,
-                   group_info: list[dict], line_to_group: dict) -> tuple[str, str]:
+                   group_info: list[dict], line_to_group: dict,
+                   stop_check=None) -> tuple[str, str]:
     """Step 5: compose the final video."""
     print("\n" + "=" * 60)
     print("Step 5: Composing final video...")
@@ -696,6 +697,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             show_zh=not getattr(args, "no_zh_subtitle", False),
             subtitle_font_size=args.subtitle_font_size,
             progress_cb=progress_cb,
+            stop_check=stop_check,
         )
     elif args.structure == "image":
         from video_compose import compose_image
@@ -746,6 +748,9 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             line_to_group=line_to_group,
             subtitle_font_size=args.subtitle_font_size,
         )
+    if not final_path:
+        print("  [Compose] Interrupted or no output, skipping checkpoint save.")
+        return "", safe_vid_name
     _save_checkpoint(work_dir, "step5_compose")
     return final_path, safe_vid_name
 

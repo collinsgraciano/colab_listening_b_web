@@ -548,6 +548,11 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
     audio_idx = seg.get("audio_index", 0)
     out_path = str(tmp_dir / f"seg_{seg_idx:03d}.mp4")
 
+    # Skip if already rendered (resume support)
+    if os.path.exists(out_path) and os.path.getsize(out_path) >= 1000:
+        print(f"  Segment {seg_idx + 1} cached, skipping...", flush=True)
+        return out_path, seg_type
+
     audio_file = None
     audio_dur = seg.get("audio_dur", duration - pad)
 
@@ -663,6 +668,7 @@ def compose_quest(
     workers: int = 1,
     subtitle_font_size: int = 60,
     progress_cb=None,
+    stop_check=None,
 ) -> str:
     """Compose the final quest video — stop-motion with multi-character + multi-scene.
 
@@ -739,6 +745,9 @@ def compose_quest(
     if workers <= 1:
         # --- Single-thread (original behavior) ---
         for seg_idx, seg in enumerate(timeline):
+            if stop_check and stop_check():
+                print("  [Quest] Stop requested, aborting segment rendering...")
+                break
             out_path, seg_type = _prepare_segment(
                 seg_idx, seg, timeline, dialogue, narration,
                 normal_paths, host_poses, host_bg_path, scene_bgs,
@@ -775,9 +784,19 @@ def compose_quest(
                 print(f"  Segment {done_count}/{total_segs} ({seg_type}) done")
                 _cb(int(done_count / total_segs * 80),
                     f"  Segment {done_count}/{total_segs} ({seg_type}) done")
+                if stop_check and stop_check():
+                    print("  [Quest] Stop requested, cancelling remaining segments...")
+                    for f in futs:
+                        f.cancel()
+                    break
 
     # Filter out None segments (failed + skipped)
     segments = [s for s in segments if s is not None]
+
+    # If stopped, skip concat/subtitles/loudnorm — segments are preserved for resume
+    if stop_check and stop_check():
+        print("  [Quest] Compose interrupted, segments saved for resume.")
+        return ""
 
     # --- Concat all segments ---
     _cb(80, "Concatenating segments...")
