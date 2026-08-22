@@ -433,50 +433,76 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
         bg.save(overlay_path, "PNG")
         entry["overlay_path"] = overlay_path
 
-    # Build FFmpeg overlay filter chain
-    filter_parts = []
-    prev_label = "0:v"
-    for i, entry in enumerate(subtitle_entries):
-        overlay_path = entry["overlay_path"].replace("\\", "/").replace(":", "\\:")
-        start = entry["start"]
-        end = entry["end"]
-        filter_parts.append(
-            f"[{prev_label}][{i+1}:v]overlay=0:0:enable='between(t,{start:.3f},{end:.3f})'[v{i}]"
-        )
-        prev_label = f"v{i}"
+    # Burn subtitles in batches to avoid Windows command-line length limit
+    # (WinError 206, ~32767 chars for CreateProcess). Each batch applies a
+    # subset of overlay PNGs in a separate FFmpeg pass; the video output
+    # chains from one pass to the next.  Audio is copied through untouched.
+    BATCH_SIZE = 40
+    total_batches = (len(subtitle_entries) + BATCH_SIZE - 1) // BATCH_SIZE
+    current_input = no_sub_path
+    temp_files: list[str] = []
 
-    input_args = ["-i", no_sub_path]
-    for entry in subtitle_entries:
-        input_args.extend(["-i", entry["overlay_path"]])
+    for batch_idx in range(total_batches):
+        batch_start = batch_idx * BATCH_SIZE
+        batch_end = min(batch_start + BATCH_SIZE, len(subtitle_entries))
+        batch = subtitle_entries[batch_start:batch_end]
+        is_last = (batch_idx == total_batches - 1)
 
-    filter_complex = ";".join(filter_parts)
-    final_label = prev_label
+        if is_last:
+            out_path = final_path
+        else:
+            out_path = str(tmp_dir / f"sub_batch_{batch_idx:03d}.mp4")
+            temp_files.append(out_path)
 
-    # Write filter_complex to a script file to avoid Windows command-line
-    # length limit (WinError 206) when there are many subtitle entries.
-    # -filter_complex_script reads the filter graph from a file instead of
-    # the command line, bypassing the ~32767 char CreateProcess limit.
-    fc_script_path = str((tmp_dir / "filter_complex.txt").resolve())
-    with open(fc_script_path, "w", encoding="utf-8") as f:
-        f.write(filter_complex)
+        # Build filter chain for this batch only (labels restart from 0)
+        filter_parts = []
+        prev_label = "0:v"
+        for j, entry in enumerate(batch):
+            start = entry["start"]
+            end = entry["end"]
+            filter_parts.append(
+                f"[{prev_label}][{j+1}:v]overlay=0:0:enable='between(t,{start:.3f},{end:.3f})'[v{j}]"
+            )
+            prev_label = f"v{j}"
 
-    cmd = ["ffmpeg", "-y"] + input_args + [
-        "-filter_complex_script", fc_script_path,
-        "-map", f"[{final_label}]",
-        "-map", "0:a:0",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-        final_path,
-    ]
-    try:
-        subprocess.run(cmd, check=True, capture_output=True,
-                        cwd=str(srt_dir), timeout=1800)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("Subtitle overlay burn timed out after 1800s")
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            f"Subtitle overlay burn failed: "
-            f"{e.stderr.decode(errors='replace')[-500:] if e.stderr else e}")
+        filter_complex = ";".join(filter_parts)
+        final_label = prev_label
+
+        input_args = ["-i", current_input]
+        for entry in batch:
+            input_args.extend(["-i", entry["overlay_path"]])
+
+        cmd = ["ffmpeg", "-y"] + input_args + [
+            "-filter_complex", filter_complex,
+            "-map", f"[{final_label}]",
+            "-map", "0:a:0",
+            "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "24",
+            "-c:a", "copy",
+            out_path,
+        ]
+
+        if progress_cb:
+            pct = 90 + int((batch_idx / max(total_batches, 1)) * 5)
+            progress_cb(pct, f"Burning subtitles batch {batch_idx + 1}/{total_batches}")
+
+        try:
+            subprocess.run(cmd, check=True, capture_output=True,
+                            cwd=str(srt_dir), timeout=1800)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Subtitle overlay burn timed out after 1800s")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Subtitle overlay burn failed (batch {batch_idx + 1}/{total_batches}): "
+                f"{e.stderr.decode(errors='replace')[-500:] if e.stderr else e}")
+
+        current_input = out_path
+
+    # Clean up intermediate temp files
+    for tf in temp_files:
+        try:
+            os.remove(tf)
+        except OSError:
+            pass
 
     return final_path
 
