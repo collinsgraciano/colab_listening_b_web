@@ -67,8 +67,19 @@
             <div id="char-cards" class="hidden mt-3 grid grid-cols-2 md:grid-cols-4 gap-3"></div>
             <!-- Character description editor (always shown) -->
             <div id="char-editor" class="mt-3 space-y-2">
-                <p class="text-xs text-slate-500">角色描述 — 勾选「复用」从源运行复制图片+描述；编辑描述=固定该角色外观 (留空=LLM自动生成)</p>
+                <p class="text-xs text-slate-500">「图片+性别」复用源角色图片+描述+性别；「描述+性别」只复用描述+性别(重新生成图片)；不选=LLM自动生成。角色名(role)永远由LLM按主题生成。可绑定 Qwen 音色（需 TTS 引擎选 Qwen）。<span class="text-indigo-400">在下方「人物素材库」点 分配→ 即可把素材库角色绑定到 角色A/B/C/主持（复用图片+描述+性别，优先级最高）</span></p>
                 <div id="char-editor-fields"></div>
+            </div>
+        </div>
+
+        <!-- Character Library -->
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs text-slate-400">人物素材库 <span class="text-slate-500">—「分配」绑定到上方角色位（复用图片+描述+性别，一个角色位一个角色）</span></label>
+                <button onclick="loadLibrary()" class="text-xs text-slate-400 hover:text-slate-200">🔄 刷新</button>
+            </div>
+            <div id="library-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <p class="text-xs text-slate-500 col-span-full">加载中...</p>
             </div>
         </div>
 
@@ -128,6 +139,33 @@
         </div>
     </div>
 
+    <!-- Step Review Panel (shown when paused in step mode) -->
+    <div id="step-review-section" class="bg-slate-800 rounded-xl p-6 mb-6 border border-emerald-600/50" style="display:none">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                <span class="text-emerald-400">⏸</span>
+                <span id="review-step-title">分步审查</span>
+            </h3>
+            <div class="flex gap-2">
+                <button id="btn-save-script" onclick="saveScriptEdit()" style="display:none"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-sm font-medium">
+                    💾 保存脚本
+                </button>
+                <button id="btn-save-continue" onclick="saveAndContinue()" style="display:none"
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm font-medium">
+                    💾 保存并继续
+                </button>
+                <button onclick="continueStep()"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm font-medium">
+                    ⏭ 继续下一步
+                </button>
+            </div>
+        </div>
+        <div id="review-content" class="min-h-[100px]">
+            <p class="text-slate-500 text-sm">加载中...</p>
+        </div>
+    </div>
+
     <!-- Log output -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
@@ -161,6 +199,26 @@ function updateQuickDefaults() {
     const sel = document.getElementById('char-source');
     const src = _charSources.find(s => s.name === sel.value);
     renderCharEditor(src || null);
+    renderLibrary();
+}
+
+// --- Qwen voices (for voice binding dropdowns) ---
+let _qwenVoiceOptions = '';
+
+function loadQwenVoices() {
+    fetch('/api/qwen_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            const voices = data.speakers || [];
+            _qwenVoiceOptions = voices.map(v =>
+                `<option value="${v.name}">${v.name}${v.custom ? ' (克隆)' : ''} · ${v.desc || ''}</option>`
+            ).join('');
+            // Re-render cards if already shown
+            const sel = document.getElementById('char-source');
+            if (sel && sel.value) onCharSourceChange();
+            renderLibrary();
+        })
+        .catch(() => {});
 }
 
 // --- Character reuse ---
@@ -219,17 +277,12 @@ function onCharSourceChange() {
         const card = document.createElement('div');
         card.className = 'bg-slate-900/50 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
 
-        // Character image
-        const imgWrap = document.createElement('div');
-        imgWrap.className = 'relative';
         const img = document.createElement('img');
         img.src = char.image_url || '';
         img.alt = char.label;
         img.className = 'w-16 h-16 rounded-lg object-cover bg-slate-800';
         img.onerror = function() { this.style.opacity = '0.3'; };
-        imgWrap.appendChild(img);
 
-        // Label + meta
         const label = document.createElement('div');
         label.className = 'text-xs font-medium text-slate-300';
         label.textContent = char.label;
@@ -238,42 +291,65 @@ function onCharSourceChange() {
         meta.className = 'text-[10px] text-slate-500 text-center';
         meta.textContent = `${char.gender || '?'} · ${char.role || '?'}`;
 
-        // Reuse checkbox
-        const checkLabel = document.createElement('label');
-        checkLabel.className = 'flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = true;
-        checkbox.className = 'accent-indigo-500 w-3.5 h-3.5 char-reuse-cb';
-        checkbox.dataset.charKey = char.key;
-        checkLabel.appendChild(checkbox);
-        checkLabel.appendChild(document.createTextNode('复用'));
+        // Reuse mode dropdown
+        const modeSelect = document.createElement('select');
+        modeSelect.className = 'char-reuse-mode w-full bg-slate-900 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-white';
+        modeSelect.dataset.charKey = char.key;
+        modeSelect.innerHTML = `
+            <option value="">不复用</option>
+            <option value="image" selected>图片+性别</option>
+            <option value="desc" selected>描述+性别</option>
+        `;
 
-        card.appendChild(imgWrap);
+        // Qwen voice binding dropdown
+        const voiceSelect = document.createElement('select');
+        voiceSelect.className = 'char-voice w-full bg-slate-900 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-white';
+        voiceSelect.dataset.charKey = char.key;
+        voiceSelect.innerHTML = '<option value="">🎤 Qwen音色→</option>' + _qwenVoiceOptions;
+        if (char.qwen_speaker) voiceSelect.value = char.qwen_speaker;
+
+        // Save to library button
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'text-[10px] text-indigo-400 hover:text-indigo-300';
+        saveBtn.textContent = '💾 收藏';
+        saveBtn.onclick = function() { saveToLibrary(char); };
+
+        card.appendChild(img);
         card.appendChild(label);
         card.appendChild(meta);
-        card.appendChild(checkLabel);
+        card.appendChild(modeSelect);
+        card.appendChild(voiceSelect);
+        card.appendChild(saveBtn);
         cardsContainer.appendChild(card);
     });
 
-    // Render editor fields pre-filled with source descriptions for reused chars
     renderCharEditor(src);
-
-    // Sync reuse checkboxes with description textareas
     syncReuseWithEditor();
 }
 
 function syncReuseWithEditor() {
-    document.querySelectorAll('.char-reuse-cb').forEach(cb => {
-        const ta = document.querySelector('[data-char-desc="' + cb.dataset.charKey + '"]');
+    document.querySelectorAll('.char-reuse-mode').forEach(sel => {
+        const ta = document.querySelector('[data-char-desc="' + sel.dataset.charKey + '"]');
         if (!ta) return;
         var updateState = function() {
-            ta.readOnly = cb.checked;
-            ta.style.opacity = cb.checked ? '0.55' : '1';
-            ta.style.cursor = cb.checked ? 'not-allowed' : '';
+            var mode = sel.value;
+            if (mode === 'image') {
+                ta.readOnly = true;
+                ta.style.opacity = '0.5';
+                ta.style.cursor = 'not-allowed';
+            } else if (mode === 'desc') {
+                ta.readOnly = false;
+                ta.style.opacity = '1';
+                ta.style.cursor = '';
+            } else {
+                ta.readOnly = false;
+                ta.style.opacity = '1';
+                ta.style.cursor = '';
+                ta.value = '';
+            }
         };
         updateState();
-        cb.addEventListener('change', updateState);
+        sel.addEventListener('change', updateState);
     });
 }
 
@@ -297,11 +373,35 @@ function renderCharEditor(src) {
         div.className = 'flex items-start gap-2';
         div.innerHTML = `
             <span class="text-xs text-slate-400 w-14 shrink-0 pt-1.5">${c.label}</span>
-            <textarea data-char-desc="${c.key}" rows="1"
-                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none resize-y min-h-[36px]"
-                placeholder="留空=自动生成">${desc}</textarea>
+            <div class="flex-1 space-y-1">
+                <div data-role-badge="${c.key}"></div>
+                <textarea data-char-desc="${c.key}" rows="1"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none resize-y min-h-[36px]"
+                    placeholder="留空=自动生成">${desc}</textarea>
+            </div>
         `;
         container.appendChild(div);
+    });
+
+    renderRoleBadges();
+}
+
+// --- 素材库绑定徽章：显示在角色A/B/C/主持编辑行 ---
+function renderRoleBadges() {
+    document.querySelectorAll('[data-role-badge]').forEach(el => {
+        const key = el.dataset.roleBadge;
+        const bound = _libraryChars.find(ch => ch.id === _libAssignments[key]);
+        const ta = document.querySelector(`[data-char-desc="${key}"]`);
+        if (ta) ta.placeholder = bound ? '已绑定素材库角色 · 留空=用其描述，填写=覆盖描述' : '留空=自动生成';
+        if (!bound) { el.innerHTML = ''; return; }
+        el.innerHTML = `
+            <div class="flex items-center gap-1.5 bg-indigo-900/40 border border-indigo-700 rounded-lg px-2 py-1 w-fit">
+                <img src="${bound.image_url || ''}" class="w-5 h-5 rounded object-cover bg-slate-800"
+                    onerror="this.style.opacity=0.3">
+                <span class="text-[11px] text-indigo-200 truncate max-w-[200px]">素材库 · ${escapeHtml(bound.name || bound.id)}</span>
+                <span class="text-[10px] text-slate-500">${escapeHtml(bound.gender || '')}${bound.qwen_speaker ? ' · 🎤' + escapeHtml(bound.qwen_speaker) : ''}</span>
+                <button onclick="unbindLibChar('${key}')" class="text-red-400 hover:text-red-300 text-xs px-0.5" title="解除绑定">✕</button>
+            </div>`;
     });
 }
 
@@ -311,20 +411,27 @@ function collectCharacterConfig() {
     const reuseMap = {};
     const fixesMap = {};
 
-    // Collect reuse checkboxes (only when source is selected)
+    // Collect reuse modes from dropdowns
     if (source) {
-        document.querySelectorAll('.char-reuse-cb').forEach(cb => {
-            reuseMap[cb.dataset.charKey] = cb.checked;
+        document.querySelectorAll('.char-reuse-mode').forEach(dd => {
+            const mode = dd.value;
+            if (mode) {
+                reuseMap[dd.dataset.charKey] = mode;
+            }
         });
     }
 
     // Collect description fields
     document.querySelectorAll('[data-char-desc]').forEach(ta => {
         const val = ta.value.trim();
+        const key = ta.dataset.charDesc;
+        const mode = reuseMap[key];
         if (val) {
-            // If not reused from source, this is a "fix"
-            if (!reuseMap[ta.dataset.charDesc]) {
-                fixesMap[ta.dataset.charDesc] = val;
+            // If mode is "image", description comes from source (not a fix)
+            // If mode is "desc", description comes from source (not a fix)
+            // If no mode or source, it's a custom fix
+            if (!mode) {
+                fixesMap[key] = val;
             }
         }
     });
@@ -333,13 +440,213 @@ function collectCharacterConfig() {
         character_source: source,
         character_reuse: Object.keys(reuseMap).length ? JSON.stringify(reuseMap) : '',
         character_fixes: Object.keys(fixesMap).length ? JSON.stringify(fixesMap) : '',
+        character_library: collectLibraryAssignments(),
+        character_voices: collectVoiceBindings(),
     };
+}
+
+function collectVoiceBindings() {
+    const map = {};
+    // From reuse cards (keyed by char key)
+    document.querySelectorAll('.char-voice').forEach(sel => {
+        if (sel.value) {
+            map[sel.dataset.charKey] = sel.value;
+        }
+    });
+    // From library cards (keyed by assigned role)
+    document.querySelectorAll('.lib-assign').forEach(assignSel => {
+        if (assignSel.value) {
+            const libId = assignSel.dataset.libId;
+            const voiceSel = document.querySelector('.lib-voice[data-lib-id="' + libId + '"]');
+            if (voiceSel && voiceSel.value) {
+                map[assignSel.value] = voiceSel.value;
+            }
+        }
+    });
+    return Object.keys(map).length ? JSON.stringify(map) : '';
+}
+
+// --- Character Library ---
+let _libraryChars = [];
+// 角色位 → 素材库角色绑定 {char_a: "lib_id", ...}，持久化到 config.character_library
+let _libAssignments = {};
+
+function parseLibAssignments() {
+    _libAssignments = {};
+    try {
+        const raw = CURRENT_CONFIG.character_library;
+        if (raw) _libAssignments = JSON.parse(raw) || {};
+    } catch (e) { _libAssignments = {}; }
+}
+
+// 保存绑定（立即写回配置，刷新不丢失）
+function saveLibAssignments() {
+    const map = {};
+    getCharKeys().forEach(c => {
+        const id = _libAssignments[c.key];
+        if (id) map[c.key] = id;
+    });
+    _libAssignments = map;
+    const payload = Object.keys(map).length ? JSON.stringify(map) : '';
+    CURRENT_CONFIG.character_library = payload;
+    fetch('/api/config/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({character_library: payload})
+    }).catch(() => {});
+}
+
+function onAssignLibChar(libId, role) {
+    // 同一素材库角色只占一个角色位；同一角色位只绑一个角色
+    for (const k of Object.keys(_libAssignments)) {
+        if (_libAssignments[k] === libId) delete _libAssignments[k];
+    }
+    if (role) _libAssignments[role] = libId;
+    saveLibAssignments();
+    renderLibrary();
+    renderRoleBadges();
+}
+
+function unbindLibChar(role) {
+    delete _libAssignments[role];
+    saveLibAssignments();
+    renderLibrary();
+    renderRoleBadges();
+}
+
+function loadLibrary() {
+    fetch('/api/character_library')
+        .then(r => r.json())
+        .then(data => {
+            _libraryChars = data.characters || [];
+            // 清理指向已删除角色的绑定
+            const ids = new Set(_libraryChars.map(c => c.id));
+            let changed = false;
+            for (const k of Object.keys(_libAssignments)) {
+                if (!ids.has(_libAssignments[k])) { delete _libAssignments[k]; changed = true; }
+            }
+            if (changed) saveLibAssignments();
+            renderLibrary();
+        });
+}
+
+function renderLibrary() {
+    const grid = document.getElementById('library-grid');
+    grid.innerHTML = '';
+
+    if (!_libraryChars.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">素材库为空。从上方角色卡片点击「💾 收藏」保存角色</p>';
+        return;
+    }
+
+    const charKeys = getCharKeys();
+    _libraryChars.forEach(char => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/50 border border-slate-700 rounded-lg p-2 flex flex-col items-center gap-1.5';
+
+        const img = document.createElement('img');
+        img.src = char.image_url || '';
+        img.className = 'w-14 h-14 rounded-lg object-cover bg-slate-800';
+        img.onerror = function() { this.style.opacity = '0.3'; };
+
+        const name = document.createElement('div');
+        name.className = 'text-[11px] font-medium text-slate-300 text-center truncate w-full';
+        name.textContent = char.name || char.id;
+        name.title = char.description || '';
+
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] text-slate-500';
+        meta.textContent = `${char.gender || '?'} · ${char.structure || '?'}`;
+
+        // Assign dropdown (绑定状态持久化，回显当前绑定)
+        const assignDiv = document.createElement('div');
+        assignDiv.className = 'flex gap-1 w-full';
+        const assignSel = document.createElement('select');
+        assignSel.className = 'lib-assign flex-1 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white';
+        assignSel.dataset.libId = char.id;
+        assignSel.innerHTML = '<option value="">分配→</option>';
+        charKeys.forEach(c => {
+            assignSel.innerHTML += `<option value="${c.key}">${c.label}</option>`;
+        });
+        const boundRole = charKeys.find(c => _libAssignments[c.key] === char.id);
+        if (boundRole) assignSel.value = boundRole.key;
+        assignSel.onchange = function() { onAssignLibChar(char.id, this.value); };
+        assignDiv.appendChild(assignSel);
+
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'text-[10px] text-red-400 hover:text-red-300 px-1';
+        delBtn.textContent = '✕';
+        delBtn.onclick = function() { deleteLibraryChar(char.id); };
+        assignDiv.appendChild(delBtn);
+
+        // Qwen voice binding dropdown
+        const voiceSel = document.createElement('select');
+        voiceSel.className = 'lib-voice w-full bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white';
+        voiceSel.dataset.libId = char.id;
+        voiceSel.innerHTML = '<option value="">🎤 音色→</option>' + _qwenVoiceOptions;
+        if (char.qwen_speaker) voiceSel.value = char.qwen_speaker;
+
+        card.appendChild(img);
+        card.appendChild(name);
+        card.appendChild(meta);
+        card.appendChild(assignDiv);
+        card.appendChild(voiceSel);
+        grid.appendChild(card);
+    });
+
+    renderRoleBadges();
+}
+
+function saveToLibrary(char) {
+    const name = prompt('给这个角色起个名字:', `${char.label} (${char.role || ''})`);
+    if (name === null) return;
+    const structure = document.getElementById('quick-structure').value;
+    const sourceRun = document.getElementById('char-source').value;
+    fetch('/api/character_library/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            run_name: sourceRun,
+            char_key: char.key,
+            name: name,
+            structure: structure,
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            alert('已收藏: ' + (name || char.label));
+            loadLibrary();
+        } else {
+            alert('收藏失败: ' + (data.error || ''));
+        }
+    });
+}
+
+function deleteLibraryChar(libId) {
+    if (!confirm('删除这个角色?')) return;
+    fetch('/api/character_library/' + libId, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) loadLibrary(); });
+}
+
+function collectLibraryAssignments() {
+    const map = {};
+    getCharKeys().forEach(c => {
+        const id = _libAssignments[c.key];
+        if (id) map[c.key] = id;
+    });
+    return Object.keys(map).length ? JSON.stringify(map) : '';
 }
 
 // Load character sources on page load
 window.addEventListener('load', function() {
+    parseLibAssignments();
     renderCharEditor(null);
+    loadQwenVoices();
     loadCharSources();
+    loadLibrary();
     // ... existing status check
     fetch('/api/run/status')
         .then(r => r.json())
@@ -548,6 +855,406 @@ function updateProgress(data) {
         badge.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300';
         text.textContent = '就绪';
     }
+
+    showStepReview(data);
+}
+
+// =========================================================================
+// Step Review Panel (分步审查)
+// =========================================================================
+let _currentReviewStep = null;
+let _currentRunName = null;
+let _currentScriptData = null;
+
+const STEP_LABELS = {
+    'step0_script': '脚本生成完成 — 可查看并编辑对话内容',
+    'step1_mcp': 'MCP 初始化完成',
+    'step2_images_tts': '图片 + TTS 生成完成 — 可查看图片和音频',
+    'step3_video': '视频片段生成完成 — 可预览片段',
+    'step4_timeline': '时间轴 + SRT 构建完成 — 可查看字幕',
+    'step45_thumbnail': '缩略图 + 元数据生成完成',
+    'step5_compose': '视频合成完成 — 可预览最终视频',
+};
+
+function showStepReview(data) {
+    const panel = document.getElementById('step-review-section');
+    const saveBtn = document.getElementById('btn-save-script');
+    const saveContBtn = document.getElementById('btn-save-continue');
+    const titleEl = document.getElementById('review-step-title');
+    const content = document.getElementById('review-content');
+
+    if (data.status !== 'paused' || !data.run_name) {
+        panel.style.display = 'none';
+        _currentReviewStep = null;
+        return;
+    }
+
+    const step = data.paused_after_step;
+    if (!step) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    // Skip reload if already showing this step for this run
+    if (step === _currentReviewStep && data.run_name === _currentRunName) return;
+
+    _currentReviewStep = step;
+    _currentRunName = data.run_name;
+    panel.style.display = '';
+    titleEl.textContent = STEP_LABELS[step] || step;
+
+    // Show save buttons only for script step
+    const isScriptStep = (step === 'step0_script');
+    saveBtn.style.display = isScriptStep ? '' : 'none';
+    saveContBtn.style.display = isScriptStep ? '' : 'none';
+
+    content.innerHTML = '<p class="text-slate-500 text-sm">加载中...</p>';
+
+    if (isScriptStep) {
+        loadScriptEditor(data.run_name);
+    } else if (step === 'step2_images_tts' || step === 'step3_video') {
+        loadGalleryView(data.run_name);
+    } else if (step === 'step4_timeline') {
+        loadSrtView(data.run_name);
+    } else if (step === 'step45_thumbnail') {
+        loadThumbnailView(data.run_name);
+    } else if (step === 'step5_compose') {
+        loadVideoPreview(data.run_name);
+    } else {
+        content.innerHTML = '<p class="text-slate-400 text-sm">此步骤无需审查的内容，点击"继续下一步"即可。</p>';
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight) + 'px';
+}
+
+// --- Script Editor (step0) ---
+
+function loadScriptEditor(runName) {
+    fetch(`/api/runs/${runName}/script/edit`)
+        .then(r => r.json())
+        .then(script => {
+            _currentScriptData = script;
+            renderScriptEditor(script);
+        })
+        .catch(() => {
+            document.getElementById('review-content').innerHTML =
+                '<p class="text-red-400 text-sm">加载脚本失败</p>';
+        });
+}
+
+function getCharacterKeys(script) {
+    const keys = [];
+    for (const k of ['char_a', 'char_b', 'char_c', 'host']) {
+        if (script[k + '_description'] !== undefined) keys.push(k);
+    }
+    return keys;
+}
+
+function getSpeakerOptions(script) {
+    if (script.char_c_description || script.host_description) {
+        return ['char_a', 'char_b', 'char_c', 'host'];
+    }
+    return ['char_a', 'char_b'];
+}
+
+const CHAR_LABELS = {
+    'char_a': '角色 A', 'char_b': '角色 B',
+    'char_c': '角色 C', 'host': '主持人',
+};
+
+function renderScriptEditor(script) {
+    const content = document.getElementById('review-content');
+    const dialogue = script.dialogue || [];
+    const charKeys = getCharacterKeys(script);
+    const speakerOpts = getSpeakerOptions(script);
+
+    let html = '<div class="space-y-4">';
+
+    // --- Metadata ---
+    html += `
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">标题</label>
+                <input type="text" data-field="title" value="${escapeHtml(script.title || '')}"
+                    class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">YouTube 标题</label>
+                <input type="text" data-field="youtube_title" value="${escapeHtml(script.youtube_title || '')}"
+                    class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">场景</label>
+                <input type="text" data-field="scene" value="${escapeHtml(script.scene || '')}"
+                    class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white">
+            </div>
+        </div>`;
+
+    // --- Character info ---
+    html += '<div class="grid grid-cols-2 gap-3">';
+    for (const ck of charKeys) {
+        html += `
+            <div class="bg-slate-900/50 rounded-lg p-3">
+                <p class="text-xs text-indigo-400 font-medium mb-2">${CHAR_LABELS[ck] || ck}</p>
+                <div class="space-y-1.5">
+                    <input type="text" data-field="${ck}_description" value="${escapeHtml(script[ck + '_description'] || '')}"
+                        class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white" placeholder="角色描述">
+                    <div class="flex gap-2">
+                        <input type="text" data-field="${ck}_gender" value="${escapeHtml(script[ck + '_gender'] || '')}"
+                            class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white" placeholder="性别">
+                        <input type="text" data-field="${ck}_role" value="${escapeHtml(script[ck + '_role'] || '')}"
+                            class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white" placeholder="身份">
+                    </div>
+                </div>
+            </div>`;
+    }
+    html += '</div>';
+
+    // --- Dialogue lines ---
+    html += `<div>
+        <p class="text-xs text-slate-400 mb-2">对话内容 (${dialogue.length} 行) — 可直接编辑</p>
+        <div class="space-y-2 max-h-[480px] overflow-y-auto pr-1">`;
+
+    dialogue.forEach((line, i) => {
+        const speaker = line.speaker || 'char_a';
+        const phase = line.phase ? `<span class="text-[9px] text-purple-400 ml-1">${line.phase}</span>` : '';
+        let optsHtml = '';
+        for (const sp of speakerOpts) {
+            optsHtml += `<option value="${sp}" ${speaker === sp ? 'selected' : ''}>${sp}</option>`;
+        }
+        html += `
+            <div class="bg-slate-900/50 rounded-lg p-2.5 grid grid-cols-12 gap-2 items-start">
+                <div class="col-span-1 pt-1">
+                    <span class="text-xs text-slate-500 font-mono">#${i + 1}</span>${phase}
+                </div>
+                <div class="col-span-2">
+                    <select data-line="${i}" data-field="speaker"
+                        class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1.5 text-xs text-white">
+                        ${optsHtml}
+                    </select>
+                </div>
+                <div class="col-span-9 space-y-1">
+                    <textarea data-line="${i}" data-field="text" rows="1" oninput="autoResize(this)"
+                        class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white resize-y min-h-[28px]"
+                        placeholder="English">${escapeHtml(line.text || '')}</textarea>
+                    <textarea data-line="${i}" data-field="zh" rows="1" oninput="autoResize(this)"
+                        class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-amber-300/90 resize-y min-h-[28px]"
+                        placeholder="中文翻译">${escapeHtml(line.zh || '')}</textarea>
+                    <input type="text" data-line="${i}" data-field="phonetic"
+                        value="${escapeHtml(line.phonetic || '')}"
+                        class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-400"
+                        placeholder="音标">
+                </div>
+            </div>`;
+    });
+
+    html += '</div></div></div>';
+    content.innerHTML = html;
+
+    // Auto-resize textareas after render
+    content.querySelectorAll('textarea').forEach(el => autoResize(el));
+}
+
+function collectScriptEdits() {
+    if (!_currentScriptData) return;
+
+    // Top-level fields (no data-line)
+    document.querySelectorAll('#review-content [data-field]:not([data-line])').forEach(el => {
+        _currentScriptData[el.dataset.field] = el.value;
+    });
+
+    // Dialogue line fields
+    document.querySelectorAll('#review-content [data-line]').forEach(el => {
+        const idx = parseInt(el.dataset.line);
+        const field = el.dataset.field;
+        if (_currentScriptData.dialogue && _currentScriptData.dialogue[idx]) {
+            _currentScriptData.dialogue[idx][field] = el.value;
+        }
+    });
+}
+
+function saveScriptEdit(onSuccess) {
+    if (!_currentScriptData || !_currentRunName) return;
+    collectScriptEdits();
+
+    const btn = document.getElementById('btn-save-script');
+    const origText = btn ? btn.textContent : '';
+
+    fetch(`/api/runs/${_currentRunName}/script/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_currentScriptData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            if (btn) {
+                btn.textContent = '✅ 已保存';
+                btn.classList.remove('bg-blue-600');
+                btn.classList.add('bg-green-600');
+                setTimeout(() => {
+                    btn.textContent = origText;
+                    btn.classList.remove('bg-green-600');
+                    btn.classList.add('bg-blue-600');
+                }, 2000);
+            }
+            if (onSuccess) onSuccess();
+        } else {
+            alert('保存失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(() => alert('保存失败: 网络错误'));
+}
+
+function saveAndContinue() {
+    saveScriptEdit(() => continueStep());
+}
+
+// --- Gallery View (step2/step3) ---
+
+function loadGalleryView(runName) {
+    fetch(`/api/runs/${runName}/gallery`)
+        .then(r => r.json())
+        .then(data => {
+            const content = document.getElementById('review-content');
+            let html = '<div class="space-y-4">';
+
+            // Images
+            if (data.images && data.images.length > 0) {
+                html += '<div><p class="text-xs text-slate-400 mb-2">📷 生成的图片</p>';
+                html += '<div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">';
+                data.images.forEach(img => {
+                    html += `<div class="group relative">
+                        <img src="/api/runs/${runName}/images/${img}"
+                            class="w-full aspect-video object-cover rounded-lg bg-slate-900 cursor-pointer hover:ring-2 hover:ring-indigo-500"
+                            loading="lazy" onclick="window.open('/api/runs/${runName}/images/${img}','_blank')"
+                            title="${escapeHtml(img)}" onerror="this.style.opacity=0.3">
+                        <p class="text-[9px] text-slate-500 truncate mt-0.5">${escapeHtml(img)}</p>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
+            // Audio
+            if (data.audio && data.audio.length > 0) {
+                html += `<div><p class="text-xs text-slate-400 mb-2">🔊 TTS 音频 (${data.audio.length} 个文件)</p>`;
+                html += '<div class="space-y-1 max-h-64 overflow-y-auto">';
+                data.audio.forEach(aud => {
+                    html += `<div class="flex items-center gap-2 bg-slate-900/50 rounded px-2 py-1">
+                        <span class="text-[10px] text-slate-400 w-48 truncate font-mono">${escapeHtml(aud)}</span>
+                        <audio controls preload="none" class="h-7 flex-1" src="/api/runs/${runName}/audio/${escapeHtml(aud)}"></audio>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
+            // Clips
+            if (data.clips && data.clips.length > 0) {
+                html += `<div><p class="text-xs text-slate-400 mb-2">🎬 视频片段 (${data.clips.length} 个)</p>`;
+                html += '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">';
+                data.clips.forEach(clip => {
+                    html += `<div class="bg-slate-900/50 rounded-lg overflow-hidden">
+                        <video controls preload="none" class="w-full aspect-video" src="/api/runs/${runName}/video/${escapeHtml(clip)}"></video>
+                        <p class="text-[9px] text-slate-500 px-2 py-1 truncate font-mono">${escapeHtml(clip)}</p>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
+            if (!data.images?.length && !data.audio?.length && !data.clips?.length) {
+                html += '<p class="text-slate-400 text-sm">暂无生成内容。</p>';
+            }
+
+            html += '</div>';
+            content.innerHTML = html;
+        })
+        .catch(() => {
+            document.getElementById('review-content').innerHTML =
+                '<p class="text-red-400 text-sm">加载失败</p>';
+        });
+}
+
+// --- SRT View (step4) ---
+
+function loadSrtView(runName) {
+    fetch(`/api/runs/${runName}/srt`)
+        .then(r => {
+            if (!r.ok) throw new Error('SRT not found');
+            return r.text();
+        })
+        .then(srt => {
+            const content = document.getElementById('review-content');
+            content.innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex items-center gap-3">
+                        <p class="text-xs text-slate-400">📝 SRT 字幕已生成</p>
+                        <a href="/runs/${escapeHtml(runName)}/gallery" class="text-xs text-indigo-400 hover:text-indigo-300">→ 查看完整画廊</a>
+                    </div>
+                    <pre class="bg-slate-900/50 rounded-lg p-3 text-xs text-slate-300 max-h-[480px] overflow-y-auto whitespace-pre-wrap">${escapeHtml(srt)}</pre>
+                </div>`;
+        })
+        .catch(() => {
+            document.getElementById('review-content').innerHTML =
+                '<p class="text-slate-400 text-sm">SRT 文件尚未生成。</p>';
+        });
+}
+
+// --- Thumbnail View (step4.5) ---
+
+function loadThumbnailView(runName) {
+    const content = document.getElementById('review-content');
+    content.innerHTML = `
+        <div class="space-y-3">
+            <p class="text-xs text-slate-400">🖼️ 缩略图 + YouTube 元数据已生成</p>
+            <div class="flex gap-4">
+                <img src="/api/runs/${escapeHtml(runName)}/thumbnail"
+                    class="rounded-lg max-h-48 object-cover border border-slate-600"
+                    onerror="this.style.display='none'" alt="thumbnail">
+                <a href="/runs/${escapeHtml(runName)}/gallery" class="text-xs text-indigo-400 hover:text-indigo-300 self-end">→ 查看完整画廊</a>
+            </div>
+        </div>`;
+}
+
+// --- Video Preview (step5) ---
+
+function loadVideoPreview(runName) {
+    fetch(`/api/runs/${runName}/gallery`)
+        .then(r => r.json())
+        .then(data => {
+            const content = document.getElementById('review-content');
+            const videos = data.final_videos || [];
+            if (!videos.length) {
+                content.innerHTML = '<p class="text-slate-400 text-sm">最终视频未找到。</p>';
+                return;
+            }
+            let html = '<div class="space-y-3">';
+            videos.forEach(v => {
+                html += `<div class="bg-slate-900/50 rounded-lg overflow-hidden">
+                    <video controls class="w-full max-h-[480px]" src="/api/runs/${escapeHtml(runName)}/video/${escapeHtml(v)}"></video>
+                    <div class="flex items-center justify-between px-3 py-2">
+                        <p class="text-xs text-slate-400 truncate">${escapeHtml(v)}</p>
+                        <a href="/api/runs/${escapeHtml(runName)}/video/${escapeHtml(v)}" download
+                            class="text-xs text-indigo-400 hover:text-indigo-300">⬇ 下载</a>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+        })
+        .catch(() => {
+            document.getElementById('review-content').innerHTML =
+                '<p class="text-red-400 text-sm">加载失败</p>';
+        });
 }
 
 </script>

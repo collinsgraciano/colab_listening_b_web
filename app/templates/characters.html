@@ -1,0 +1,635 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">👥 人物素材库</h2>
+            <p class="text-sm text-slate-400 mt-1">管理角色素材 · 新建角色 · AI 生成姿势图集 · 绑定音色</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/voices" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">
+                🎤 音色管理
+            </a>
+            <button onclick="document.getElementById('create-form').scrollIntoView({behavior:'smooth'})"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">
+                ＋ 新建角色
+            </button>
+        </div>
+    </div>
+
+    <!-- Section A: Character Grid -->
+    <section class="mb-8">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                <span>🎴</span> 角色列表
+                <span id="char-count" class="text-xs text-slate-500"></span>
+            </h3>
+            <button onclick="loadLibrary()" class="text-xs text-slate-400 hover:text-slate-200">🔄 刷新</button>
+        </div>
+        <div id="char-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <p class="text-xs text-slate-500 col-span-full">加载中...</p>
+        </div>
+    </section>
+
+    <!-- Section B: Create New Character -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>✨</span> 新建角色
+        </h3>
+        <div id="create-form" class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">名称 *</label>
+                    <input type="text" id="new-name" placeholder="如：咖啡馆店员 Sarah"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">性别 *</label>
+                    <select id="new-gender" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="female">女声 Female</option>
+                        <option value="male">男声 Male</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">结构</label>
+                    <select id="new-structure" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="quest">Quest (8 姿势图集)</option>
+                        <option value="original">Original (单张场景图)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs text-slate-400 mb-1">外观描述 (英文) *</label>
+                <textarea id="new-description" rows="3"
+                    placeholder="a young woman with long brown hair, wearing a red dress and carrying a handbag"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none resize-y"></textarea>
+                <p class="text-[10px] text-slate-500 mt-1">
+                    描述将用于 LLM 脚本生成和 AI 图片生成 prompt，请用英文填写角色外观特征（发型、服装、配饰等）
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Qwen 音色 (可选)</label>
+                    <select id="new-voice" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="">不绑定 (按性别默认)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">参考图片 (可选)</label>
+                    <input type="file" id="new-image" accept="image/*"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="createCharacter()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium text-sm">
+                    ✨ 创建角色
+                </button>
+                <button onclick="createAndGenerate()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium text-sm">
+                    🚀 创建并生成图片
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section C: Import from Run History -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2 cursor-pointer" onclick="toggleImport()">
+            <span id="import-arrow" class="inline-block transition-transform">▶</span>
+            <span>📥 从运行历史导入</span>
+        </h3>
+        <div id="import-section" class="hidden bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="flex gap-2 mb-4">
+                <select id="import-source" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+                    onchange="onImportSourceChange()">
+                    <option value="">选择运行历史...</option>
+                </select>
+                <button onclick="loadCharSources()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🔄</button>
+            </div>
+            <div id="import-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ALL_VOICES = [];
+let _libraryChars = [];
+let _charSources = [];
+let _editingId = null;
+
+// --- Init ---
+window.addEventListener('load', function() {
+    loadQwenVoices();
+    loadLibrary();
+    loadCharSources();
+});
+
+// --- Load Qwen voices for dropdowns ---
+function loadQwenVoices() {
+    fetch('/api/qwen_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            ALL_VOICES = data.speakers || [];
+            const opts = ALL_VOICES.map(v =>
+                `<option value="${v.name}">${v.name}${v.custom ? ' (克隆)' : ''} · ${v.desc || ''}</option>`
+            ).join('');
+            document.getElementById('new-voice').innerHTML =
+                '<option value="">不绑定 (按性别默认)</option>' + opts;
+        })
+        .catch(() => {});
+}
+
+// --- Load library characters ---
+function loadLibrary() {
+    fetch('/api/character_library')
+        .then(r => r.json())
+        .then(data => {
+            _libraryChars = data.characters || [];
+            renderCharGrid();
+            // Check for any in-progress generations
+            _libraryChars.forEach(c => {
+                if (c.id && _genPolling.has(c.id) === false) {
+                    checkGenStatus(c.id, false);
+                }
+            });
+        });
+}
+
+function renderCharGrid() {
+    const grid = document.getElementById('char-grid');
+    document.getElementById('char-count').textContent = `(${_libraryChars.length})`;
+
+    if (!_libraryChars.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">素材库为空。在下方新建角色或从运行历史导入。</p>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    _libraryChars.forEach(char => {
+        const card = createCharCard(char);
+        grid.appendChild(card);
+    });
+}
+
+function createCharCard(char) {
+    const div = document.createElement('div');
+    div.id = `card-${char.id}`;
+    div.className = 'bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col gap-3';
+
+    // Header row: image + info
+    const header = document.createElement('div');
+    header.className = 'flex gap-3';
+
+    const img = document.createElement('img');
+    img.src = char.image_url || '';
+    img.className = 'w-20 h-20 rounded-lg object-cover bg-slate-700 shrink-0';
+    img.onerror = function() { this.style.opacity = '0.3'; this.alt = '👤'; };
+
+    const info = document.createElement('div');
+    info.className = 'flex-1 min-w-0';
+
+    const name = document.createElement('div');
+    name.className = 'text-sm font-medium text-white truncate';
+    name.textContent = char.name || char.id;
+    name.title = char.name || '';
+
+    const badges = document.createElement('div');
+    badges.className = 'flex flex-wrap gap-1 mt-1';
+    const genderColor = char.gender === 'female' ? 'bg-pink-900/50 text-pink-300' : 'bg-blue-900/50 text-blue-300';
+    badges.innerHTML = `
+        <span class="text-[10px] px-2 py-0.5 rounded-full ${genderColor}">${char.gender || '?'}</span>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">${char.structure || '?'}</span>
+        ${char.qwen_speaker ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">🎤 ${char.qwen_speaker}</span>` : ''}
+        ${char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
+    `;
+
+    const desc = document.createElement('div');
+    desc.className = 'text-xs text-slate-400 mt-1 line-clamp-2';
+    desc.textContent = char.description || '';
+    desc.title = char.description || '';
+
+    info.appendChild(name);
+    info.appendChild(badges);
+    info.appendChild(desc);
+    header.appendChild(img);
+    header.appendChild(info);
+    div.appendChild(header);
+
+    // Pose preview (if exists)
+    const poseDiv = document.createElement('div');
+    poseDiv.id = `poses-${char.id}`;
+    poseDiv.className = 'hidden';
+    div.appendChild(poseDiv);
+
+    // Gen status area
+    const genArea = document.createElement('div');
+    genArea.id = `gen-${char.id}`;
+    genArea.className = 'hidden';
+    div.appendChild(genArea);
+
+    // Edit form (hidden by default)
+    const editForm = document.createElement('div');
+    editForm.id = `edit-${char.id}`;
+    editForm.className = 'hidden space-y-2 border-t border-slate-700 pt-3';
+    editForm.innerHTML = `
+        <input type="text" id="edit-name-${char.id}" placeholder="名称"
+            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white"
+            value="${char.name || ''}">
+        <div class="flex gap-2">
+            <select id="edit-gender-${char.id}" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                <option value="female" ${char.gender === 'female' ? 'selected' : ''}>女声</option>
+                <option value="male" ${char.gender === 'male' ? 'selected' : ''}>男声</option>
+            </select>
+            <select id="edit-structure-${char.id}" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                <option value="quest" ${char.structure === 'quest' ? 'selected' : ''}>Quest</option>
+                <option value="original" ${char.structure === 'original' ? 'selected' : ''}>Original</option>
+            </select>
+        </div>
+        <textarea id="edit-desc-${char.id}" rows="3" placeholder="英文外观描述"
+            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white resize-y">${char.description || ''}</textarea>
+        <select id="edit-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+            <option value="">不绑定音色</option>
+        </select>
+        <div class="flex gap-2">
+            <input type="file" id="edit-image-${char.id}" accept="image/*"
+                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-[10px] text-white">
+            <button onclick="saveEdit('${char.id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-xs text-white">保存</button>
+            <button onclick="cancelEdit('${char.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white">取消</button>
+        </div>
+    `;
+    div.appendChild(editForm);
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'flex flex-wrap gap-2 mt-auto';
+    actions.innerHTML = `
+        <button onclick="toggleEdit('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">✏️ 编辑</button>
+        <button onclick="generateImages('${char.id}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">🎨 生成图片</button>
+        <button onclick="deleteCharacter('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-[11px] text-red-300">🗑 删除</button>
+    `;
+
+    // Assign to role
+    const assignDiv = document.createElement('div');
+    assignDiv.className = 'flex gap-2';
+    const assignSel = document.createElement('select');
+    assignSel.className = 'flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-[11px] text-white';
+    assignSel.id = `assign-${char.id}`;
+    assignSel.innerHTML = '<option value="">分配到角色 →</option>' +
+        getCharKeys().map(c => `<option value="${c.key}">${c.label}</option>`).join('');
+    assignSel.onchange = function() { assignToRole(char.id, this.value); };
+    assignDiv.appendChild(assignSel);
+
+    div.appendChild(actions);
+    div.appendChild(assignDiv);
+
+    // Load pose images if they exist
+    if (char.pose_count > 0) {
+        loadPoses(char.id);
+    }
+
+    return div;
+}
+
+function getCharKeys() {
+    return [
+        {key: 'char_a', label: '角色A'},
+        {key: 'char_b', label: '角色B'},
+        {key: 'char_c', label: '角色C'},
+        {key: 'host', label: '主持人'},
+    ];
+}
+
+// --- Edit mode ---
+function toggleEdit(libId) {
+    const view = document.querySelector(`#card-${libId} > div:first-child`);
+    const editForm = document.getElementById(`edit-${libId}`);
+    if (editForm.classList.contains('hidden')) {
+        editForm.classList.remove('hidden');
+        view.style.opacity = '0.5';
+        // Populate voice dropdown
+        const voiceSel = document.getElementById(`edit-voice-${libId}`);
+        voiceSel.innerHTML = '<option value="">不绑定音色</option>' +
+            ALL_VOICES.map(v => `<option value="${v.name}">${v.name}${v.custom ? ' (克隆)' : ''} · ${v.desc || ''}</option>`).join('');
+        // Set current voice
+        const char = _libraryChars.find(c => c.id === libId);
+        if (char && char.qwen_speaker) voiceSel.value = char.qwen_speaker;
+    } else {
+        cancelEdit(libId);
+    }
+}
+
+function cancelEdit(libId) {
+    document.getElementById(`edit-${libId}`).classList.add('hidden');
+    document.querySelector(`#card-${libId} > div:first-child`).style.opacity = '1';
+}
+
+function saveEdit(libId) {
+    const data = {
+        name: document.getElementById(`edit-name-${libId}`).value.trim(),
+        gender: document.getElementById(`edit-gender-${libId}`).value,
+        structure: document.getElementById(`edit-structure-${libId}`).value,
+        description: document.getElementById(`edit-desc-${libId}`).value.trim(),
+        qwen_speaker: document.getElementById(`edit-voice-${libId}`).value,
+    };
+    fetch(`/api/character_library/${libId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            // Check if image uploaded
+            const imgInput = document.getElementById(`edit-image-${libId}`);
+            if (imgInput.files[0]) {
+                const formData = new FormData();
+                formData.append('image', imgInput.files[0]);
+                return fetch(`/api/character_library/${libId}/image`, {
+                    method: 'POST', body: formData
+                }).then(() => loadLibrary());
+            }
+            loadLibrary();
+        } else {
+            alert('保存失败: ' + (d.error || ''));
+        }
+    });
+}
+
+// --- Create character ---
+function createCharacter(autoGenerate) {
+    const name = document.getElementById('new-name').value.trim();
+    const description = document.getElementById('new-description').value.trim();
+    const gender = document.getElementById('new-gender').value;
+    const structure = document.getElementById('new-structure').value;
+    const qwen_speaker = document.getElementById('new-voice').value;
+    const imageInput = document.getElementById('new-image');
+
+    if (!name) { alert('请填写名称'); return; }
+    if (!description) { alert('请填写外观描述'); return; }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('description', description);
+    formData.append('gender', gender);
+    formData.append('structure', structure);
+    formData.append('qwen_speaker', qwen_speaker);
+    if (imageInput.files[0]) {
+        formData.append('image', imageInput.files[0]);
+    }
+
+    fetch('/api/character_library/create', {method: 'POST', body: formData})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                // Clear form
+                document.getElementById('new-name').value = '';
+                document.getElementById('new-description').value = '';
+                document.getElementById('new-image').value = '';
+                loadLibrary();
+                if (autoGenerate) {
+                    setTimeout(() => generateImages(data.id), 500);
+                }
+            } else {
+                alert('创建失败: ' + (data.error || ''));
+            }
+        });
+}
+
+function createAndGenerate() {
+    createCharacter(true);
+}
+
+// --- Delete ---
+function deleteCharacter(libId) {
+    const char = _libraryChars.find(c => c.id === libId);
+    if (!confirm(`删除角色「${char ? char.name : libId}」?`)) return;
+    fetch(`/api/character_library/${libId}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(d => { if (d.ok) loadLibrary(); });
+}
+
+// --- Generate images ---
+const _genPolling = new Set();
+
+function generateImages(libId) {
+    fetch(`/api/character_library/${libId}/generate_images`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                showGenProgress(libId, 'generating', '');
+                startPolling(libId);
+            } else {
+                alert('生成失败: ' + (data.error || ''));
+            }
+        });
+}
+
+function showGenProgress(libId, status, error) {
+    const area = document.getElementById(`gen-${libId}`);
+    if (!area) return;
+
+    if (status === 'generating') {
+        area.classList.remove('hidden');
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-indigo-700 rounded-lg p-3 flex items-center gap-3">
+                <div class="animate-spin text-xl">⚙️</div>
+                <div class="text-xs text-indigo-300">AI 正在生成姿势图集...</div>
+            </div>`;
+    } else if (status === 'done') {
+        area.classList.remove('hidden');
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-emerald-700 rounded-lg p-3 flex items-center justify-between gap-3">
+                <div class="text-xs text-emerald-300">✅ 图片生成完成!</div>
+                <button onclick="generateImages('${libId}')" class="text-[11px] text-emerald-400 hover:text-emerald-300">🔄 重新生成</button>
+            </div>`;
+    } else if (status === 'error') {
+        area.classList.remove('hidden');
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-red-700 rounded-lg p-3 flex items-center justify-between gap-3">
+                <div class="text-xs text-red-300">❌ 生成失败: ${error || '未知错误'}</div>
+                <button onclick="generateImages('${libId}')" class="text-[11px] text-indigo-400 hover:text-indigo-300">🔄 重试</button>
+            </div>`;
+    }
+}
+
+function startPolling(libId) {
+    _genPolling.add(libId);
+    pollGenStatus(libId);
+}
+
+function pollGenStatus(libId) {
+    if (!_genPolling.has(libId)) return;
+    fetch(`/api/character_library/${libId}/generation_status`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'done') {
+                _genPolling.delete(libId);
+                showGenProgress(libId, 'done', '');
+                loadPoses(libId);
+                loadLibrary();  // Refresh to update thumb + pose_count
+            } else if (data.status === 'error') {
+                _genPolling.delete(libId);
+                showGenProgress(libId, 'error', data.error);
+            } else if (data.status === 'generating') {
+                showGenProgress(libId, 'generating', '');
+                setTimeout(() => pollGenStatus(libId), 3000);
+            }
+        })
+        .catch(() => setTimeout(() => pollGenStatus(libId), 5000));
+}
+
+function checkGenStatus(libId, startPoll) {
+    fetch(`/api/character_library/${libId}/generation_status`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'generating') {
+                showGenProgress(libId, 'generating', '');
+                startPolling(libId);
+            }
+        })
+        .catch(() => {});
+}
+
+// --- Load poses ---
+function loadPoses(libId) {
+    fetch(`/api/character_library/${libId}/poses`)
+        .then(r => r.json())
+        .then(data => {
+            const div = document.getElementById(`poses-${libId}`);
+            if (!div) return;
+            const poses = data.poses || [];
+            if (!poses.length) { div.classList.add('hidden'); return; }
+            div.classList.remove('hidden');
+            div.className = 'grid grid-cols-4 gap-1';
+            div.innerHTML = poses.map(p =>
+                `<img src="${p.url}" class="w-full aspect-square object-cover rounded bg-slate-700" onerror="this.style.opacity='0.3'">`
+            ).join('') + `<div class="col-span-4 text-[10px] text-slate-500 mt-1">${poses.length} 张姿势图 · <a href="#" onclick="generateImages('${libId}');return false;" class="text-emerald-400 hover:text-emerald-300">重新生成</a></div>`;
+        });
+}
+
+// --- Assign to role ---
+function assignToRole(libId, role) {
+    if (!role) return;
+    // Load current config, update character_library field
+    fetch('/api/config')
+        .then(r => r.json())
+        .then(config => {
+            let libMap = {};
+            try { libMap = JSON.parse(config.character_library || '{}'); } catch(e) {}
+            // Remove any existing assignment for this lib_id
+            for (const k of Object.keys(libMap)) {
+                if (libMap[k] === libId) delete libMap[k];
+            }
+            libMap[role] = libId;
+            // 局部保存，只写 character_library 字段（避免覆盖其它配置）
+            fetch('/api/config/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({character_library: JSON.stringify(libMap)})
+            }).then(r => r.json()).then(d => {
+                if (d.ok) {
+                    const char = _libraryChars.find(c => c.id === libId);
+                    alert(`已分配「${char ? char.name : libId}」到 ${getCharKeys().find(c=>c.key===role)?.label || role}\n\n控制台「开始生成」时生效，也可在控制台角色位看到绑定徽章`);
+                }
+            });
+        });
+}
+
+// --- Import from run history ---
+function toggleImport() {
+    const section = document.getElementById('import-section');
+    const arrow = document.getElementById('import-arrow');
+    if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        arrow.textContent = '▼';
+    } else {
+        section.classList.add('hidden');
+        arrow.textContent = '▶';
+    }
+}
+
+function loadCharSources() {
+    fetch('/api/character_sources')
+        .then(r => r.json())
+        .then(data => {
+            _charSources = data.sources || [];
+            const sel = document.getElementById('import-source');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">选择运行历史...</option>';
+            _charSources.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.title;
+                sel.appendChild(opt);
+            });
+            sel.value = current;
+            if (current) onImportSourceChange();
+        });
+}
+
+function onImportSourceChange() {
+    const sel = document.getElementById('import-source');
+    const container = document.getElementById('import-cards');
+    const src = _charSources.find(s => s.name === sel.value);
+
+    if (!sel.value || !src || !src.characters) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = '';
+    src.characters.forEach(char => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/50 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+
+        const img = document.createElement('img');
+        img.src = char.image_url || '';
+        img.className = 'w-16 h-16 rounded-lg object-cover bg-slate-800';
+        img.onerror = function() { this.style.opacity = '0.3'; };
+
+        const label = document.createElement('div');
+        label.className = 'text-xs font-medium text-slate-300';
+        label.textContent = char.label;
+
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] text-slate-500 text-center';
+        meta.textContent = `${char.gender || '?'} · ${char.role || '?'}`;
+
+        const btn = document.createElement('button');
+        btn.className = 'px-3 py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-xs text-white';
+        btn.textContent = '💾 收藏';
+        btn.onclick = function() { importFromRun(sel.value, char); };
+
+        card.appendChild(img);
+        card.appendChild(label);
+        card.appendChild(meta);
+        card.appendChild(btn);
+        container.appendChild(card);
+    });
+}
+
+function importFromRun(runName, char) {
+    const name = prompt('给这个角色起个名字:', `${char.label} (${char.role || ''})`);
+    if (name === null) return;
+    fetch('/api/character_library/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            run_name: runName,
+            char_key: char.key,
+            name: name,
+            structure: char.structure || 'quest',
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            alert('已收藏: ' + name);
+            loadLibrary();
+        } else {
+            alert('收藏失败: ' + (data.error || ''));
+        }
+    });
+}
+</script>
+{% endblock %}
