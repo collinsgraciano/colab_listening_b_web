@@ -233,7 +233,7 @@ function onProviderChange() {
     if (provider === 'sensenova') {
         models = SENSENOVA_MODELS;
     } else if (provider.startsWith('custom:')) {
-        const pid = provider.split(':', 1)[1];
+        const pid = provider.split(':')[1];
         const cp = CUSTOM_PROVIDERS.find(p => p.id === pid);
         models = cp ? cp.models : [];
     } else {
@@ -245,7 +245,7 @@ function onProviderChange() {
 
     // Auto-fill API key for custom providers
     if (provider.startsWith('custom:')) {
-        const pid = provider.split(':', 1)[1];
+        const pid = provider.split(':')[1];
         const cp = CUSTOM_PROVIDERS.find(p => p.id === pid);
         if (cp && cp.api_key) {
             document.getElementById('st-api-key').value = cp.api_key;
