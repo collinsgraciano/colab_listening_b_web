@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from .config_manager import (
 )
 from .pipeline_service import get_service, STEP_ORDER
 from .config_manager import detect_local_mcp_token
+from . import topics_ai
 
 # Paths
 WEB_ROOT = Path(__file__).parent.parent.resolve()
@@ -531,6 +533,165 @@ async def api_reset_used():
     if Path(used_file).exists():
         Path(used_file).unlink()
     return {"ok": True}
+
+
+# ===========================================================================
+# Topics AI — generation & review
+# ===========================================================================
+
+def _load_topics_data(config: dict) -> dict:
+    """Load topics.json → {category: [topics]} (empty dict on missing/broken)."""
+    topics_file = config.get("topics_file", "")
+    if topics_file and Path(topics_file).exists():
+        try:
+            return json.loads(Path(topics_file).read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _load_used_topic_names(config: dict) -> list[str]:
+    """Load used_topics.json → list of topic names."""
+    used_file = config.get("used_topics_file", "")
+    if not used_file:
+        output_dir = config.get("output_dir", "./output")
+        used_file = str(Path(output_dir) / "used_topics.json")
+    if Path(used_file).exists():
+        try:
+            return list(json.loads(Path(used_file).read_text(encoding="utf-8")).keys())
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
+
+@app.post("/api/topics/ai/generate")
+async def api_topics_ai_generate(request: Request):
+    """SSE: AI-generate new topics for a category (or suggest a new category)."""
+    data = await request.json()
+    mode = data.get("mode", "category")
+    category = str(data.get("category", "")).strip()
+    try:
+        count = max(1, min(int(data.get("count", 10) or 10), 30))
+    except (TypeError, ValueError):
+        count = 10
+    hint = str(data.get("hint", "")).strip()[:500]
+
+    config = load_config()
+    topics_data = _load_topics_data(config)
+    used = _load_used_topic_names(config)
+
+    async def event_stream():
+        try:
+            yield _sse({"type": "progress", "message": "正在调用 AI 生成话题，请稍候..."})
+            if mode == "new_category":
+                result = await asyncio.to_thread(
+                    topics_ai.suggest_category, count, topics_data, hint)
+            else:
+                if not category or category not in topics_data:
+                    yield _sse({"type": "error", "error": f"分类不存在: {category}"})
+                    return
+                result = await asyncio.to_thread(
+                    topics_ai.generate_topics, category, count, topics_data, used, hint)
+            if not result.get("topics"):
+                yield _sse({"type": "error",
+                            "error": "AI 未返回有效话题（可能与现有话题重复），请重试或在补充要求中调整方向"})
+                return
+            yield _sse({"type": "result", "data": result})
+        except Exception as e:
+            yield _sse({"type": "error", "error": str(e)[:300]})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@app.post("/api/topics/ai/review")
+async def api_topics_ai_review():
+    """SSE: full-library audit — local duplicate check + AI batched review."""
+    config = load_config()
+    topics_data = _load_topics_data(config)
+    if not topics_data:
+        return JSONResponse({"error": "topics.json 不存在或为空"}, status_code=400)
+
+    import queue as _queue
+    q: _queue.Queue = _queue.Queue()
+
+    def run():
+        try:
+            def cb(i, n):
+                q.put(("progress", f"正在审查批次 {i}/{n}（AI 语义分析）..."))
+            result = topics_ai.review_topics(topics_data, progress_cb=cb)
+            q.put(("result", result))
+        except Exception as e:
+            q.put(("error", str(e)[:300]))
+        finally:
+            q.put(None)
+
+    threading.Thread(target=run, daemon=True).start()
+
+    async def event_stream():
+        yield _sse({"type": "progress", "message": "开始审查主题库（先做本地去重检查）..."})
+        while True:
+            item = await asyncio.to_thread(q.get, True, None)
+            if item is None:
+                break
+            kind, payload = item
+            if kind == "progress":
+                yield _sse({"type": "progress", "message": payload})
+            elif kind == "result":
+                yield _sse({"type": "result", "data": payload})
+                break
+            else:
+                yield _sse({"type": "error", "error": payload})
+                break
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@app.post("/api/topics/ai/apply")
+async def api_topics_ai_apply(request: Request):
+    """Apply review suggestions: [{"action": remove|rename, "category", "topic", "new_topic"?}]."""
+    data = await request.json()
+    actions = data.get("actions", [])
+    if not isinstance(actions, list) or not actions:
+        return JSONResponse({"error": "actions 不能为空"}, status_code=400)
+    config = load_config()
+    topics_file = config.get("topics_file", "")
+    if not topics_file or not Path(topics_file).exists():
+        return JSONResponse({"error": "topics.json 不存在"}, status_code=400)
+    result = await asyncio.to_thread(topics_ai.apply_suggestions, topics_file, actions)
+    return {"ok": True, **result}
+
+
+@app.post("/api/topics/update")
+async def api_topics_update(request: Request):
+    """Rename a single topic in place (category + exact topic string match)."""
+    data = await request.json()
+    category = data.get("category", "")
+    topic = data.get("topic", "")
+    new_topic = str(data.get("new_topic", "")).strip()
+    if not category or not topic or not new_topic:
+        return JSONResponse({"error": "缺少参数"}, status_code=400)
+    config = load_config()
+    topics_file = config.get("topics_file", "")
+    if not topics_file or not Path(topics_file).exists():
+        return JSONResponse({"error": "topics.json 不存在"}, status_code=400)
+    result = await asyncio.to_thread(
+        topics_ai.apply_suggestions, topics_file,
+        [{"action": "rename", "category": category, "topic": topic, "new_topic": new_topic}])
+    if result["applied"] > 0:
+        return {"ok": True, "topics": result["topics"]}
+    reason = result["skipped"][0] if result["skipped"] else "未知错误"
+    return JSONResponse({"error": f"重命名失败: {reason}"}, status_code=400)
 
 
 # ===========================================================================

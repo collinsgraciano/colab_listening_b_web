@@ -9,6 +9,8 @@
         <div class="flex gap-3">
             <button onclick="showAddTopic()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">+ 添加主题</button>
             <button onclick="showAddCategory()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">+ 新分类</button>
+            <button onclick="showAiGen()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">✨ AI 生成</button>
+            <button onclick="showAiReview()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white">🔍 AI 审查</button>
         </div>
     </div>
 
@@ -39,6 +41,67 @@
             <button onclick="addCategory()" class="px-4 py-2 bg-indigo-600 rounded-lg text-sm text-white">创建</button>
             <button onclick="hideAddCategory()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm text-slate-300">取消</button>
         </div>
+    </div>
+
+    <!-- AI generate panel -->
+    <div id="ai-gen-form" class="hidden bg-slate-800 rounded-xl p-5 mb-4 border border-indigo-700/60">
+        <h3 class="text-sm font-semibold text-white mb-3">✨ AI 生成话题</h3>
+        <div class="flex gap-5 mb-3 text-sm">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="ai-gen-mode" value="category" checked onchange="toggleGenMode()" class="accent-indigo-500">
+                <span class="text-slate-300">现有分类补充</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="ai-gen-mode" value="new_category" onchange="toggleGenMode()" class="accent-indigo-500">
+                <span class="text-slate-300">AI 推荐新分类</span>
+            </label>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+            <select id="ai-gen-category" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                {% for cat in topics_data.keys() %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select id="ai-gen-count" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <option value="5">生成 5 个</option>
+                <option value="10" selected>生成 10 个</option>
+                <option value="20">生成 20 个</option>
+            </select>
+        </div>
+        <textarea id="ai-gen-hint" rows="2" placeholder="补充要求（可选，如：侧重搬家/交通罚单方向；难度偏 B1；加入节日话题）"
+            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3"></textarea>
+        <div class="flex gap-2">
+            <button onclick="aiGenerate()" id="ai-gen-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">开始生成</button>
+            <button onclick="hideAiGen()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm text-slate-300">关闭</button>
+        </div>
+        <div id="ai-gen-status" class="hidden mt-3 text-sm text-indigo-300"></div>
+        <div id="ai-gen-result" class="hidden mt-3 border-t border-slate-700 pt-3">
+            <div id="ai-gen-catinfo" class="hidden mb-3 text-sm">
+                <p class="text-slate-400 mb-1" id="ai-gen-reason"></p>
+                <label class="text-slate-400 text-xs block mb-1">新分类名称（可修改）</label>
+                <input type="text" id="ai-gen-newcat" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-slate-400">勾选要加入的话题：</span>
+                <button onclick="aiGenToggleAll()" id="ai-gen-toggleall" class="text-xs text-indigo-400 hover:text-indigo-300">全不选</button>
+            </div>
+            <div id="ai-gen-topic-list" class="flex flex-col gap-1.5 mb-3 max-h-72 overflow-y-auto pr-1"></div>
+            <button onclick="aiGenApply()" id="ai-gen-apply" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">添加所选</button>
+        </div>
+    </div>
+
+    <!-- AI review panel -->
+    <div id="ai-review-panel" class="hidden bg-slate-800 rounded-xl p-5 mb-4 border border-amber-700/60">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-white">🔍 AI 审查主题库</h3>
+            <div class="flex gap-2">
+                <button onclick="aiReview()" id="ai-review-btn" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white">开始审查</button>
+                <button onclick="hideAiReview()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm text-slate-300">关闭</button>
+            </div>
+        </div>
+        <p class="text-xs text-slate-400 mb-3">本地精确去重（秒出）+ AI 语义审查：重复/高度相似、语法拼写、过于宽泛、不适合海外华人场景。全库约 1-2 分钟，进度实时显示。</p>
+        <div id="ai-review-status" class="hidden text-sm text-amber-300 mb-3"></div>
+        <div id="ai-review-report" class="hidden"></div>
     </div>
 
     <!-- Stats -->
@@ -93,15 +156,16 @@
 
 {% block scripts %}
 <script>
+// ================= Original manual management =================
 function showAddTopic() {
+    hideAllPanels();
     document.getElementById('add-topic-form').classList.remove('hidden');
-    document.getElementById('add-cat-form').classList.add('hidden');
     document.getElementById('add-topic-name').focus();
 }
 function hideAddTopic() { document.getElementById('add-topic-form').classList.add('hidden'); }
 function showAddCategory() {
+    hideAllPanels();
     document.getElementById('add-cat-form').classList.remove('hidden');
-    document.getElementById('add-topic-form').classList.add('hidden');
     document.getElementById('add-cat-name').focus();
 }
 function hideAddCategory() { document.getElementById('add-cat-form').classList.add('hidden'); }
@@ -134,6 +198,317 @@ function resetUsedTopics() {
     if (!confirm('重置所有已用主题标记?')) return;
     fetch('/api/topics/used/reset', {method: 'POST'})
         .then(r => r.json()).then(data => { if (data.ok) location.reload(); });
+}
+
+// ================= Shared helpers =================
+function hideAllPanels() {
+    ['add-topic-form', 'add-cat-form', 'ai-gen-form', 'ai-review-panel']
+        .forEach(id => document.getElementById(id).classList.add('hidden'));
+}
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g,
+        c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// POST-based SSE consume (fetch + ReadableStream)
+async function consumeSSE(url, body, handlers) {
+    const resp = await fetch(url, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body || {})
+    });
+    if (!resp.ok) {
+        let err = 'HTTP ' + resp.status;
+        try { const j = await resp.json(); err = j.error || err; } catch (e) {}
+        handlers.error && handlers.error(err);
+        return;
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, {stream: true});
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) >= 0) {
+            const chunk = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            const line = chunk.split('\n').find(l => l.startsWith('data: '));
+            if (!line) continue;
+            try {
+                const evt = JSON.parse(line.slice(6));
+                if (evt.type === 'progress') handlers.progress && handlers.progress(evt.message);
+                else if (evt.type === 'result') { handlers.result && handlers.result(evt.data); return; }
+                else if (evt.type === 'error') { handlers.error && handlers.error(evt.error); return; }
+            } catch (e) {}
+        }
+    }
+}
+
+// ================= AI generate =================
+let aiGenResult = null;  // {mode, category, topics: [...]}
+
+function showAiGen() {
+    hideAllPanels();
+    document.getElementById('ai-gen-form').classList.remove('hidden');
+}
+function hideAiGen() { document.getElementById('ai-gen-form').classList.add('hidden'); }
+function toggleGenMode() {
+    const mode = document.querySelector('input[name="ai-gen-mode"]:checked').value;
+    const catSel = document.getElementById('ai-gen-category');
+    catSel.disabled = (mode === 'new_category');
+    catSel.classList.toggle('opacity-40', mode === 'new_category');
+}
+
+async function aiGenerate() {
+    const mode = document.querySelector('input[name="ai-gen-mode"]:checked').value;
+    const category = document.getElementById('ai-gen-category').value;
+    const count = parseInt(document.getElementById('ai-gen-count').value, 10);
+    const hint = document.getElementById('ai-gen-hint').value.trim();
+    const btn = document.getElementById('ai-gen-btn');
+    const status = document.getElementById('ai-gen-status');
+    btn.disabled = true; btn.textContent = '生成中...';
+    status.classList.remove('hidden');
+    status.className = 'mt-3 text-sm text-indigo-300';
+    document.getElementById('ai-gen-result').classList.add('hidden');
+    await consumeSSE('/api/topics/ai/generate', {mode, category, count, hint}, {
+        progress: m => { status.textContent = m; },
+        result: data => renderGenResult(mode, category, data),
+        error: e => { status.className = 'mt-3 text-sm text-red-400'; status.textContent = '❌ ' + e; }
+    });
+    btn.disabled = false; btn.textContent = '开始生成';
+}
+
+function renderGenResult(mode, fallbackCategory, data) {
+    aiGenResult = {
+        mode,
+        category: (mode === 'new_category') ? (data.category || '') : fallbackCategory,
+        topics: data.topics || []
+    };
+    document.getElementById('ai-gen-status').classList.add('hidden');
+    const catinfo = document.getElementById('ai-gen-catinfo');
+    if (mode === 'new_category') {
+        catinfo.classList.remove('hidden');
+        document.getElementById('ai-gen-reason').textContent = 'AI 理由：' + (data.reason || '（无）');
+        document.getElementById('ai-gen-newcat').value = data.category || '';
+    } else {
+        catinfo.classList.add('hidden');
+    }
+    const list = document.getElementById('ai-gen-topic-list');
+    list.innerHTML = aiGenResult.topics.map(t =>
+        `<label class="flex items-center gap-2 bg-slate-900 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-slate-700 transition">
+            <input type="checkbox" value="${esc(t)}" checked class="accent-indigo-500">
+            <span class="text-sm text-slate-300">${esc(t)}</span>
+        </label>`).join('');
+    document.getElementById('ai-gen-toggleall').textContent = '全不选';
+    document.getElementById('ai-gen-result').classList.remove('hidden');
+}
+
+function aiGenToggleAll() {
+    const boxes = [...document.querySelectorAll('#ai-gen-topic-list input[type=checkbox]')];
+    const target = !boxes.every(b => b.checked);
+    boxes.forEach(b => b.checked = target);
+    document.getElementById('ai-gen-toggleall').textContent = target ? '全不选' : '全选';
+}
+
+async function aiGenApply() {
+    if (!aiGenResult) return;
+    const checked = [...document.querySelectorAll('#ai-gen-topic-list input[type=checkbox]:checked')]
+        .map(b => b.value);
+    if (!checked.length) return;
+    let category = aiGenResult.category;
+    if (aiGenResult.mode === 'new_category') {
+        category = document.getElementById('ai-gen-newcat').value.trim() || category;
+        if (!category) { alert('请填写新分类名称'); return; }
+        const r = await fetch('/api/topics/add_category', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({category})
+        }).then(r => r.json());
+        if (!r.ok) { alert('创建分类失败'); return; }
+    }
+    for (const t of checked) {
+        await fetch('/api/topics/add', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({category, topic: t})
+        }).then(r => r.json());
+    }
+    location.reload();
+}
+
+// ================= AI review =================
+let aiReviewData = null;  // last report
+
+const TYPE_LABELS = {duplicate: '重复', similar: '高度相似', grammar: '语法拼写',
+                     too_vague: '过于宽泛', unsuitable: '不适合', other: '其他'};
+const TYPE_STYLES = {duplicate: 'bg-red-900/60 text-red-300', similar: 'bg-orange-900/60 text-orange-300',
+                     grammar: 'bg-yellow-900/60 text-yellow-300', too_vague: 'bg-blue-900/60 text-blue-300',
+                     unsuitable: 'bg-purple-900/60 text-purple-300', other: 'bg-slate-700 text-slate-300'};
+const SEV_STYLES = {high: 'bg-red-600 text-white', medium: 'bg-amber-600 text-white', low: 'bg-slate-600 text-slate-200'};
+const SEV_LABELS = {high: '高', medium: '中', low: '低'};
+
+function showAiReview() {
+    hideAllPanels();
+    document.getElementById('ai-review-panel').classList.remove('hidden');
+}
+function hideAiReview() { document.getElementById('ai-review-panel').classList.add('hidden'); }
+
+async function aiReview() {
+    const btn = document.getElementById('ai-review-btn');
+    const status = document.getElementById('ai-review-status');
+    btn.disabled = true; btn.textContent = '审查中...';
+    status.classList.remove('hidden');
+    status.className = 'text-sm text-amber-300 mb-3';
+    document.getElementById('ai-review-report').classList.add('hidden');
+    await consumeSSE('/api/topics/ai/review', {}, {
+        progress: m => { status.textContent = m; },
+        result: data => { aiReviewData = data; renderReviewReport(data); },
+        error: e => { status.className = 'text-sm text-red-400 mb-3'; status.textContent = '❌ ' + e; }
+    });
+    btn.disabled = false; btn.textContent = '开始审查';
+}
+
+function renderReviewReport(data) {
+    document.getElementById('ai-review-status').classList.add('hidden');
+    const s = data.summary || {};
+    let html = `
+    <div class="grid grid-cols-4 gap-3 mb-4">
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-700">
+            <p class="text-xl font-bold text-indigo-400">${s.total ?? 0}</p>
+            <p class="text-xs text-slate-400">总话题数（${s.batches ?? 0} 批）</p>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-700">
+            <p class="text-xl font-bold text-amber-400">${(data.local_duplicates || []).length}</p>
+            <p class="text-xs text-slate-400">本地重复组</p>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-700">
+            <p class="text-xl font-bold text-red-400">${s.issues ?? 0}</p>
+            <p class="text-xs text-slate-400">AI 发现问题（高 ${s.high ?? 0} / 中 ${s.medium ?? 0} / 低 ${s.low ?? 0}）</p>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-700">
+            <p class="text-xl font-bold text-green-400">${s.total - (s.issues ?? 0) - ((data.local_duplicates || []).length)}</p>
+            <p class="text-xs text-slate-400">干净话题（估）</p>
+        </div>
+    </div>`;
+
+    // Local duplicates
+    if ((data.local_duplicates || []).length) {
+        html += `<h4 class="text-sm font-semibold text-amber-300 mb-2">① 本地重复（精确/大小写归一化）</h4>
+        <div class="space-y-2 mb-5">`;
+        data.local_duplicates.forEach((d, i) => {
+            const occ = d.occurrences.map(o => `${esc(o.category)} #${o.index}`).join('、');
+            html += `
+            <div id="dup-group-${i}" class="bg-slate-900 rounded-lg p-3 border border-amber-800/50 flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-sm text-white font-medium">${esc(d.topic)}</p>
+                    <p class="text-xs text-slate-400 mt-0.5">出现于：${occ}</p>
+                </div>
+                <button onclick="applyDedup(${i})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-xs text-white whitespace-nowrap">去重（保留首个）</button>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    // AI issues
+    if ((data.issues || []).length) {
+        html += `<h4 class="text-sm font-semibold text-red-300 mb-2">② AI 语义审查发现的问题</h4>
+        <div class="space-y-2 mb-4">`;
+        data.issues.forEach((it, i) => {
+            const renameBlock = it.action === 'rename' && it.suggestion
+                ? `<p class="text-xs text-slate-400 mt-1">建议改为：<span class="text-green-400 font-medium">${esc(it.suggestion)}</span></p>` : '';
+            html += `
+            <div id="issue-card-${i}" class="bg-slate-900 rounded-lg p-3 border border-slate-700">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm text-white font-medium">${esc(it.topic)}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">${esc(it.category)}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded ${TYPE_STYLES[it.type] || TYPE_STYLES.other}">${TYPE_LABELS[it.type] || it.type}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded ${SEV_STYLES[it.severity] || SEV_STYLES.low}">${SEV_LABELS[it.severity] || it.severity}</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">${esc(it.reason)}</p>
+                        ${renameBlock}
+                    </div>
+                    <div class="flex flex-col gap-1.5 shrink-0">
+                        ${it.action === 'rename'
+                            ? `<button onclick="applyIssue(${i}, 'rename')" class="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-xs text-white whitespace-nowrap">✓ 改名</button>`
+                            : `<button onclick="applyIssue(${i}, 'remove')" class="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-xs text-white whitespace-nowrap">✕ 删除</button>`}
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += `</div>
+        <div class="flex gap-2 items-center">
+            <button onclick="applyAllSuggestions()" class="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm text-white">一键应用全部建议（去重 + ${data.issues.length} 条问题）</button>
+            <button onclick="location.reload()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">刷新页面</button>
+            <span id="ai-apply-status" class="text-xs text-slate-400"></span>
+        </div>`;
+    } else if (!(data.local_duplicates || []).length) {
+        html += `<div class="bg-green-900/30 border border-green-700/50 rounded-lg p-4 text-sm text-green-300">
+            ✅ 主题库很干净：未发现重复或明显问题。
+        </div>`;
+    } else {
+        html += `<div class="flex gap-2 items-center">
+            <button onclick="applyAllSuggestions()" class="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm text-white">一键应用全部去重建议</button>
+            <button onclick="location.reload()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">刷新页面</button>
+            <span id="ai-apply-status" class="text-xs text-slate-400"></span>
+        </div>`;
+    }
+
+    document.getElementById('ai-review-report').innerHTML = html;
+    document.getElementById('ai-review-report').classList.remove('hidden');
+}
+
+async function postApply(actions) {
+    return fetch('/api/topics/ai/apply', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({actions})
+    }).then(r => r.json());
+}
+
+function markCardApplied(id, okCount) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('opacity-40');
+    el.querySelectorAll('button').forEach(b => b.disabled = true);
+    const span = document.createElement('span');
+    span.className = 'text-xs text-green-400 ml-2 self-center';
+    span.textContent = `已应用 ${okCount} 条`;
+    el.appendChild(span);
+}
+
+async function applyDedup(i) {
+    const d = aiReviewData.local_duplicates[i];
+    const actions = d.occurrences.slice(1)
+        .map(o => ({action: 'remove', category: o.category, topic: o.topic}));
+    const r = await postApply(actions);
+    markCardApplied('dup-group-' + i, r.applied || 0);
+}
+
+async function applyIssue(i, action) {
+    const it = aiReviewData.issues[i];
+    const a = {action, category: it.category, topic: it.topic};
+    if (action === 'rename') a.new_topic = it.suggestion;
+    const r = await postApply([a]);
+    markCardApplied('issue-card-' + i, r.applied || 0);
+}
+
+async function applyAllSuggestions() {
+    if (!aiReviewData) return;
+    const actions = [];
+    (aiReviewData.local_duplicates || []).forEach(d =>
+        d.occurrences.slice(1).forEach(o => actions.push({action: 'remove', category: o.category, topic: o.topic})));
+    (aiReviewData.issues || []).forEach(it => {
+        const a = {action: it.action, category: it.category, topic: it.topic};
+        if (it.action === 'rename') a.new_topic = it.suggestion;
+        actions.push(a);
+    });
+    if (!actions.length) return;
+    if (!confirm(`确定应用全部 ${actions.length} 条建议？\n（删除 ${actions.filter(a => a.action === 'remove').length} 条，改名 ${actions.filter(a => a.action === 'rename').length} 条）`)) return;
+    const status = document.getElementById('ai-apply-status');
+    status.textContent = '应用中...';
+    const r = await postApply(actions);
+    status.textContent = `已应用 ${r.applied || 0} 条` + ((r.skipped || []).length ? `，跳过 ${r.skipped.length} 条` : '');
+    setTimeout(() => location.reload(), 1200);
 }
 </script>
 {% endblock %}
