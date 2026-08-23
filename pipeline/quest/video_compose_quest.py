@@ -33,7 +33,7 @@ from PIL import Image
 from media_utils import (
     FONT_EN, FONT_ZH, VF_NORM,
     concat_segments, burn_subtitles, apply_final_loudnorm,
-    make_silent_fallback_cmd,
+    make_silent_fallback_cmd, write_sync_report,
 )
 
 
@@ -806,13 +806,35 @@ def compose_quest(
                         f.cancel()
                     break
 
-    # Filter out None segments (failed + skipped)
-    segments = [s for s in segments if s is not None]
-
     # If stopped, skip concat/subtitles/loudnorm — segments are preserved for resume
     if stop_check and stop_check():
         print("  [Quest] Compose interrupted, segments saved for resume.")
         return ""
+
+    # 渲染失败的段插入静音占位段（精确时长，fps=25），保住时间轴完整性。
+    # 丢弃该段会让之后所有字幕整体错位数秒；占位段用 ph_ 前缀命名，
+    # 不会污染 _prepare_segment 的断点续传缓存（重跑时会重新渲染真实段）。
+    missing = [i for i, s in enumerate(segments) if s is None]
+    for i in missing:
+        seg = timeline[i]
+        ph_path = str(tmp_dir / f"ph_{i:03d}.mp4")
+        ph_cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                  "-f", "lavfi", "-i", "anullsrc=stereo:44100",
+                  "-t", f"{seg['duration']:.3f}", "-vf", f"{VF_NORM},fps=25",
+                  "-map", "0:v:0", "-map", "1:a:0",
+                  "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                  "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                  ph_path]
+        print(f"  [Quest] WARNING: segment {i + 1} ({seg['type']}) failed — "
+              f"inserting silent placeholder ({seg['duration']:.2f}s)")
+        _run_fallback(ph_cmd, ph_path, scene_img, seg["duration"], render_fps)
+        if os.path.exists(ph_path) and os.path.getsize(ph_path) >= 1000:
+            segments[i] = ph_path
+    if missing:
+        print(f"  [Quest] {len(missing)} failed segment(s) handled with placeholders to preserve sync")
+
+    # Filter out remaining None segments (placeholder also failed)
+    segments = [s for s in segments if s is not None]
 
     # --- Concat all segments ---
     _cb(80, "Concatenating segments...")
@@ -821,13 +843,24 @@ def compose_quest(
 
     # --- Burn subtitles via Pillow overlay (dialogue entries only) ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85))
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), out_fps=25)
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # --- Final loudnorm pass ---
     _cb(95, "Final loudnorm pass (normalize volume)...")
     apply_final_loudnorm(final_path, str(vid_dir))
+
+    # --- Sync QA report (planned timeline vs detected audio pauses) ---
+    try:
+        _cb(97, "Writing sync QA report...")
+        report = write_sync_report(final_path, timeline, str(work), pad)
+        print(f"  [Quest] Sync QA: {report.get('status')} "
+              f"duration_drift={report.get('duration_drift_ms', '?')}ms "
+              f"max_boundary_dev={report.get('max_boundary_dev_ms', '?')}ms "
+              f"({report.get('boundaries_matched', 0)}/{report.get('voiced_segments', 0)} boundaries)")
+    except Exception as e:
+        print(f"  [Quest] Sync QA report failed (non-fatal): {e}")
 
     size_mb = os.path.getsize(final_path) / (1024 * 1024)
     _cb(100, f"Quest video done: {final_path} ({size_mb:.1f}MB)")

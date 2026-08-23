@@ -107,6 +107,105 @@ def has_audio(video_path: str) -> bool:
         return False
 
 
+def detect_speech_pauses(media_path: str, noise_db: float = -40,
+                         min_d: float = 0.20,
+                         timeout: int = 600) -> list[tuple[float, float]]:
+    """Detect silence intervals via ffmpeg silencedetect.
+
+    Returns a list of (silence_start, silence_end) tuples in seconds.
+    Trailing silence without an end point (runs to EOF) is dropped.
+    Used to align per-sentence subtitle timing with actual TTS pauses.
+    Returns [] on any failure (caller falls back to proportional timing).
+    """
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-i", str(media_path), "-map", "0:a:0",
+             "-af", f"silencedetect=noise={noise_db}dB:d={min_d}",
+             "-f", "null", "-"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout)
+    except Exception:
+        return []
+    pauses: list[tuple[float, float]] = []
+    open_start: float | None = None
+    for line in r.stderr.splitlines():
+        m = re.search(r"silence_start: ([\d.]+)", line)
+        if m:
+            open_start = float(m.group(1))
+            continue
+        m = re.search(r"silence_end: ([\d.]+)", line)
+        if m and open_start is not None:
+            pauses.append((open_start, float(m.group(1))))
+            open_start = None
+    return pauses
+
+
+def _align_entries_to_pauses(entries: list[dict], pauses: list[float],
+                             tolerance: float = 1.5) -> None:
+    """Snap interior subtitle boundaries to measured speech-pause onsets.
+
+    Boundaries are entries[i].end == entries[i+1].start. pauses must be a
+    monotonically increasing list of candidate onsets (silence_end values).
+    DP picks a strictly increasing onset subset closest to the proportional
+    estimates; an onset beyond `tolerance` is forbidden, and boundaries with
+    no usable onset keep their proportional estimate.
+    """
+    n = len(entries)
+    if n < 2 or not pauses:
+        return
+    bounds = [entries[i]["end"] for i in range(n - 1)]
+    m = len(pauses)
+    # 未分配边界的中等奖惩：保证容差内的对齐优于不分配
+    unassigned_cost = tolerance * 0.75
+    NEG = -1
+
+    # dp[i][j] = (cost, prev_j)：前 i+1 个边界处理完、第 i 个边界用 onset j
+    # （j == NEG 表示该边界保持比例估计）
+    dp: list[dict[int, tuple[float, int | None]]] = [dict() for _ in range(n - 1)]
+    for i in range(n - 1):
+        for j in range(NEG, m):
+            if j == NEG:
+                cost_here = unassigned_cost
+            else:
+                cost_here = abs(bounds[i] - pauses[j])
+                if cost_here > tolerance:
+                    continue
+            if i == 0:
+                dp[i][j] = (cost_here, None)
+            else:
+                best: tuple[float, int | None] | None = None
+                for pj, (pcost, _) in dp[i - 1].items():
+                    if pj >= j:
+                        continue  # onset 序必须严格递增
+                    total = pcost + cost_here
+                    if best is None or total < best[0]:
+                        best = (total, pj)
+                if best is not None:
+                    dp[i][j] = best
+    if not dp[n - 2]:
+        return
+
+    # 回溯得到每个边界的 onset 选择
+    final_j = min(dp[n - 2], key=lambda j: dp[n - 2][j][0])
+    chosen: list[int] = [final_j]
+    for i in range(n - 2, 0, -1):
+        prev = dp[i][chosen[0]][1]
+        if prev is None:
+            break  # i == 0 到顶了
+        chosen.insert(0, prev)
+
+    for i, j in enumerate(chosen):
+        if j == NEG:
+            continue
+        onset = pauses[j]
+        # 安全夹紧：不越过相邻条目的首尾
+        onset = max(onset, entries[i]["start"] + 0.05)
+        onset = min(onset, entries[i + 1]["end"] - 0.05)
+        if entries[i]["start"] < onset < entries[i + 1]["end"]:
+            entries[i]["end"] = onset
+            entries[i + 1]["start"] = onset
+
+
 # ---------------------------------------------------------------------------
 # Filename helpers
 # ---------------------------------------------------------------------------
@@ -225,13 +324,23 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
                    work_dir: str, srt_dir: str, pad: float = 0.4,
                    progress_cb=None, show_zh: bool = True,
                    subtitle_seg_types: tuple[str, ...] = ("dialogue", "welcome", "hook_intro", "outro"),
-                   en_font_size: int = 60, zh_font_size: int = 50) -> str:
+                   en_font_size: int = 60, zh_font_size: int = 50,
+                   pause_hints: list[tuple[float, float]] | None = None,
+                   out_fps: int = 24) -> str:
     """Render dialogue subtitles via Pillow and burn them onto the video.
 
     Extracts subtitle entries from timeline segments whose type is in
     subtitle_seg_types, renders transparent PNG overlays sized to match the
     actual video canvas, and applies them via FFmpeg filter_complex overlay
     with timed enable.
+
+    Args:
+        pause_hints: silence intervals (silence_start, silence_end) detected
+            from the video's audio. When None, they are detected automatically
+            via silencedetect; interior sentence boundaries are then snapped
+            to the measured speech onsets (precise sync). Pass [] to disable.
+        out_fps: output fps for the re-encode pass. Should match the
+            concatenated video's fps (25 for quest, 24 for original).
 
     Returns the final video path with subtitles burned in.
     """
@@ -247,11 +356,14 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
     # Extract subtitle entries from timeline
     import re as _re
 
-    def _split_subtitles(en: str, zh: str, audio_d: float, t_start: float):
+    def _split_subtitles(en: str, zh: str, audio_d: float, t_start: float,
+                         pauses: list[float] | None = None):
         """Split long narration into per-sentence subtitle entries.
 
         First splits by sentence-ending punctuation, then further splits
         very long sentences by commas/semicolons so text doesn't cram.
+        Interior boundaries are snapped to measured speech onsets (pauses)
+        when available — precise sync with actual TTS timing.
         Returns list of subtitle entry dicts.
         """
         EN_MAX_CHARS = 80
@@ -306,7 +418,17 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
                 "zh": sent_zh,
             })
             cursor += sent_dur
+        if pauses and len(entries) >= 2:
+            _align_entries_to_pauses(entries, pauses)
         return entries
+
+    # 静音对齐：自动检测或使用调用方提供的停顿提示
+    all_pauses: list[tuple[float, float]] = []
+    if pause_hints is None:
+        _cb(90, "Detecting speech pauses for subtitle alignment...")
+        all_pauses = detect_speech_pauses(no_sub_path)
+    else:
+        all_pauses = pause_hints
 
     subtitle_entries = []
     t_cursor = 0.0
@@ -318,8 +440,14 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
             zh = seg.get("subtitle_zh", "")
             audio_d = seg.get("audio_dur", dur - pad)
             if en or zh:
+                # 段内候选语音起点：静音终点落在语音窗口内（避开首尾 fade）
+                seg_pauses = [
+                    se for (_, se) in all_pauses
+                    if t_cursor + 0.15 < se < t_cursor + audio_d - 0.15
+                ]
                 subtitle_entries.extend(
-                    _split_subtitles(en, zh, audio_d, t_cursor)
+                    _split_subtitles(en, zh, audio_d, t_cursor,
+                                     pauses=seg_pauses)
                 )
         t_cursor += dur
 
@@ -338,7 +466,7 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
 
     w, h = probe_resolution(no_sub_path)
     sub_overlay_dir = tmp_dir / "subtitles"
-    sub_overlay_dir.mkdir(exist_ok=True)
+    sub_overlay_dir.mkdir(parents=True, exist_ok=True)
 
     BOTTOM_MARGIN = 36  # clear of frame edge + YouTube player UI
     EN_SIZE = en_font_size
@@ -479,7 +607,7 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
             "-filter_complex", filter_complex,
             "-map", f"[{final_label}]",
             "-map", "0:a:0",
-            "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "24",
+            "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(out_fps),
             "-c:a", "copy",
             out_path,
         ]
@@ -562,6 +690,80 @@ def apply_final_loudnorm(video_path: str, vid_dir: str,
         pass  # Keep original if both fail
 
     return video_path
+
+
+# ---------------------------------------------------------------------------
+# Sync QA report
+# ---------------------------------------------------------------------------
+
+def write_sync_report(video_path: str, timeline: list[dict], work_dir: str,
+                      pad: float = 0.4) -> dict:
+    """QA: compare planned speech boundaries with detected audio pauses.
+
+    For every voiced segment, its tail pad should appear as a detected
+    silence starting near planned (seg_start + audio_dur). Deviations reveal
+    drift between the planned timeline and the actual audio.
+    Writes work_dir/sync_report.json and returns the summary dict.
+    Non-fatal: detection failure yields status='no_pauses_detected'.
+    """
+    import json as _json
+
+    pauses = detect_speech_pauses(video_path)
+    actual_dur = get_duration(video_path)
+    planned_total = sum(s["duration"] for s in timeline)
+    report: dict = {
+        "video": str(video_path),
+        "status": "ok",
+        "planned_total_s": round(planned_total, 3),
+        "actual_duration_s": round(actual_dur, 3),
+        "duration_drift_ms": round((actual_dur - planned_total) * 1000, 1),
+        "silences_detected": len(pauses),
+    }
+
+    devs: list[float] = []
+    unmatched: list[dict] = []
+    voiced = 0
+    t = 0.0
+    for i, seg in enumerate(timeline):
+        d = seg["duration"]
+        ad = seg.get("audio_dur", 0)
+        if ad and ad > 0.3:
+            voiced += 1
+            expect = t + ad  # 段尾 pad 静音的理论起点
+            # TTS 音频末尾常自带 0.2-0.5s 句尾留白 → 实际静音起点普遍早于
+            # 理论点；左界放宽到 -1.0s 容纳留白，右界 0.6s 容许轻微滞后
+            cands = [ss for (ss, _) in pauses
+                     if expect - 1.0 <= ss <= expect + 0.6]
+            if cands:
+                devs.append(min(cands) - expect)
+            else:
+                unmatched.append({"index": i, "type": seg.get("type", ""),
+                                  "planned_silence_at": round(expect, 3)})
+        t += d
+
+    if devs:
+        report.update({
+            "voiced_segments": voiced,
+            "boundaries_matched": len(devs),
+            "mean_boundary_dev_ms": round(
+                sum(abs(x) for x in devs) / len(devs) * 1000, 1),
+            "max_boundary_dev_ms": round(
+                max(abs(x) for x in devs) * 1000, 1),
+            "unmatched_boundaries": unmatched[:20],
+        })
+    elif pauses:
+        report["status"] = "no_boundary_match"
+        report["unmatched_boundaries"] = unmatched[:20]
+    else:
+        report["status"] = "no_pauses_detected"
+
+    try:
+        out = Path(work_dir) / "sync_report.json"
+        out.write_text(_json.dumps(report, ensure_ascii=False, indent=2),
+                       encoding="utf-8")
+    except OSError:
+        pass
+    return report
 
 
 # ---------------------------------------------------------------------------

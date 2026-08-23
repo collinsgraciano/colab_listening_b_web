@@ -13,7 +13,8 @@ def _snap_to_frame(duration: float, fps: int) -> float:
     if fps <= 0:
         return duration
     frame_dur = 1.0 / fps
-    return math.ceil(duration / frame_dur) * frame_dur
+    # round 规避浮点伪影（如 4.52/0.04=112.9999…7 被 ceil 成 113 后再多加 1 帧）
+    return math.ceil(round(duration / frame_dur, 6)) * frame_dur
 
 
 def enrich_timeline(timeline: list[dict], tts, pad: float,
