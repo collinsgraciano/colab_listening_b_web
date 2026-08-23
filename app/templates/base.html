@@ -36,6 +36,18 @@
                 {% if active_page == 'runs' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
                 <span class="text-lg">📁</span> 运行历史
             </a>
+            <a href="/characters" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                {% if active_page == 'characters' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
+                <span class="text-lg">👥</span> 人物素材库
+            </a>
+            <a href="/voices" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                {% if active_page == 'voices' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
+                <span class="text-lg">🎤</span> QwenTTS 音色
+            </a>
+            <a href="/ai_test" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                {% if active_page == 'ai_test' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
+                <span class="text-lg">🧪</span> AI 对话测试
+            </a>
         </nav>
         <div class="p-3 border-t border-slate-700">
             <a href="/api/health" target="_blank" class="block text-xs text-slate-500 hover:text-slate-300">

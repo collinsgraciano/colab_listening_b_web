@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex h-screen">
+    <!-- Settings Sidebar -->
+    <aside class="w-72 bg-slate-800 border-r border-slate-700 flex flex-col overflow-y-auto shrink-0">
+        <div class="p-4 border-b border-slate-700">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <span>🧪</span> AI 对话测试
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">大模型对话 Playground</p>
+        </div>
+
+        <div class="p-4 space-y-4 flex-1">
+            <!-- Provider -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">LLM Provider</label>
+                <select id="st-provider" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="sensenova">SenseNova</option>
+                    <option value="openai">OpenAI Compatible</option>
+                </select>
+            </div>
+
+            <!-- Model -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">模型</label>
+                <div class="flex gap-2">
+                    <select id="st-model" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <input type="text" id="st-model-custom" placeholder="或手动输入模型名" class="w-full mt-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white hidden">
+            </div>
+
+            <!-- Temperature -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">Temperature: <span id="st-temp-val" class="text-indigo-400">0.8</span></label>
+                <input type="range" id="st-temperature" min="0" max="2" step="0.1" value="0.8" class="w-full accent-indigo-500">
+            </div>
+
+            <!-- Max Tokens -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">Max Tokens</label>
+                <input type="number" id="st-max-tokens" value="8192" min="1" max="32768"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+
+            <!-- Reasoning Effort (SenseNova only) -->
+            <div id="st-reasoning-wrap">
+                <label class="text-xs text-slate-400 block mb-1">Reasoning Effort</label>
+                <select id="st-reasoning" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+
+            <!-- API Key Override -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">API Key <span class="text-slate-500">(留空用配置)</span></label>
+                <input type="password" id="st-api-key" placeholder="覆盖配置中的 Key"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+
+            <!-- System Prompt -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">System Prompt</label>
+                <textarea id="st-system-prompt" rows="5" placeholder="You are a helpful assistant..."
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white resize-none"></textarea>
+            </div>
+
+            <!-- Quick Prompts -->
+            <div>
+                <label class="text-xs text-slate-400 block mb-2">快捷提示词</label>
+                <div class="space-y-1.5">
+                    <button onclick="quickPrompt('翻译', 'You are a professional translator. Translate the following text to English. Provide only the translation, no explanation.')" class="w-full text-left px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">🌐 翻译助手</button>
+                    <button onclick="quickPrompt('语法检查', 'You are an English grammar expert. Check the following text for grammar errors. List each error with correction. Respond in Traditional Chinese (繁體中文).')" class="w-full text-left px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">✏️ 语法检查</button>
+                    <button onclick="quickPrompt('ESL 教师', 'You are an ESL teacher for overseas Chinese learners. Explain the following English phrase or sentence. Provide: meaning, usage examples, and Traditional Chinese translation.')" class="w-full text-left px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">📚 ESL 讲解</button>
+                    <button onclick="quickPrompt('JSON 生成', 'Output valid JSON only. No markdown, no explanation. Follow the schema described in the user message.')" class="w-full text-left px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">🔧 JSON 生成</button>
+                    <button onclick="quickPrompt('', '')" class="w-full text-left px-3 py-1.5 bg-slate-700 hover:bg-red-700 rounded text-xs text-red-300 transition">🗑️ 清空 System Prompt</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Token Stats -->
+        <div class="p-4 border-t border-slate-700 text-xs text-slate-500 space-y-1">
+            <div>总请求: <span id="stat-requests" class="text-slate-300">0</span></div>
+            <div>总 Tokens: <span id="stat-tokens" class="text-slate-300">0</span></div>
+            <div>总耗时: <span id="stat-time" class="text-slate-300">0s</span></div>
+        </div>
+    </aside>
+
+    <!-- Chat Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+        <!-- Toolbar -->
+        <div class="px-6 py-3 border-b border-slate-700 bg-slate-800 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <span id="chat-model-badge" class="px-3 py-1 bg-indigo-900/50 text-indigo-300 rounded-full text-xs font-medium">deepseek-v4-flash</span>
+                <span id="chat-status" class="text-xs text-slate-500">就绪</span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleCustomModel()" id="btn-custom-model" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">自定义模型</button>
+                <button onclick="clearChat()" class="px-3 py-1.5 bg-slate-700 hover:bg-red-700 rounded text-xs text-slate-300 transition">🗑️ 清空对话</button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div class="text-center text-slate-500 text-sm py-12">
+                <div class="text-4xl mb-3">🧪</div>
+                <p>开始与大模型对话</p>
+                <p class="text-xs mt-1">选择左侧参数，在下方输入消息</p>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="px-6 py-4 border-t border-slate-700 bg-slate-800 shrink-0">
+            <div class="flex gap-3 items-end">
+                <textarea id="chat-input" rows="2" placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+                    class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-sm text-white resize-none focus:outline-none focus:border-indigo-500"
+                    onkeydown="handleKeydown(event)"></textarea>
+                <button onclick="sendMessage()" id="btn-send"
+                    class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white font-medium transition shrink-0">
+                    发送
+                </button>
+                <button onclick="stopGeneration()" id="btn-stop"
+                    class="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg text-sm text-white font-medium transition shrink-0 hidden">
+                    停止
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+let conversation = [];       // [{role, content, model?, elapsed?, usage?}]
+let isGenerating = false;
+let abortController = null;
+let stats = { requests: 0, tokens: 0, time: 0 };
+
+const SENSENOVA_MODELS = ['deepseek-v4-flash', 'glm-5.2'];
+const OPENAI_MODELS = ['grok-4.6', 'grok-4.5', 'gemini-3.1-pro-preview', 'gemini-3.7-flash', 'claude-sonnet-5', 'gemini-2.5-pro-1m'];
+
+// --- Init ---
+window.addEventListener('load', () => {
+    loadConfig();
+    document.getElementById('st-provider').addEventListener('change', onProviderChange);
+    document.getElementById('st-temperature').addEventListener('input', e => {
+        document.getElementById('st-temp-val').textContent = parseFloat(e.target.value).toFixed(1);
+    });
+});
+
+// --- Load config from backend ---
+function loadConfig() {
+    fetch('/api/ai_test/config')
+        .then(r => r.json())
+        .then(cfg => {
+            document.getElementById('st-provider').value = cfg.llm_provider || 'sensenova';
+            document.getElementById('st-system-prompt').value = cfg.system_prompt || '';
+            if (cfg.llm_provider === 'openai' && cfg.openai_base_url) {
+                // keep base url from config
+            }
+            onProviderChange();
+            if (cfg.sensenova_model) {
+                const sel = document.getElementById('st-model');
+                if (![...sel.options].some(o => o.value === cfg.sensenova_model)) {
+                    addModelOption(cfg.sensenova_model);
+                }
+                sel.value = cfg.sensenova_model;
+            }
+            updateModelBadge();
+        });
+}
+
+// --- Provider change ---
+function onProviderChange() {
+    const provider = document.getElementById('st-provider').value;
+    const sel = document.getElementById('st-model');
+    const models = provider === 'sensenova' ? SENSENOVA_MODELS : OPENAI_MODELS;
+    sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+    document.getElementById('st-reasoning-wrap').style.display = provider === 'sensenova' ? '' : 'none';
+    updateModelBadge();
+}
+
+// --- Custom model ---
+function toggleCustomModel() {
+    const input = document.getElementById('st-model-custom');
+    input.classList.toggle('hidden');
+    if (!input.classList.contains('hidden')) {
+        input.focus();
+    }
+}
+
+function getSelectedModel() {
+    const custom = document.getElementById('st-model-custom');
+    if (!custom.classList.contains('hidden') && custom.value.trim()) {
+        return custom.value.trim();
+    }
+    return document.getElementById('st-model').value;
+}
+
+function addModelOption(name) {
+    const sel = document.getElementById('st-model');
+    if (![...sel.options].some(o => o.value === name)) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+    }
+}
+
+function updateModelBadge() {
+    document.getElementById('chat-model-badge').textContent = getSelectedModel();
+}
+
+// --- Quick prompts ---
+function quickPrompt(label, text) {
+    document.getElementById('st-system-prompt').value = text;
+}
+
+// --- Send message ---
+function handleKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text || isGenerating) return;
+
+    input.value = '';
+    isGenerating = true;
+    setGeneratingUI(true);
+
+    // Add user message
+    conversation.push({ role: 'user', content: text });
+    renderMessage('user', text);
+
+    // Create assistant placeholder
+    const assistantEl = renderMessage('assistant', '');
+    const contentEl = assistantEl.querySelector('.msg-content');
+
+    const params = collectParams();
+    updateModelBadge();
+
+    const startTime = Date.now();
+    let fullResponse = '';
+
+    try {
+        const resp = await fetch('/api/ai_test/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: conversation.filter(m => m.role === 'user' || m.role === 'assistant')
+                    .map(m => ({ role: m.role, content: m.content })),
+                system_prompt: params.system_prompt,
+                provider: params.provider,
+                model: params.model,
+                temperature: params.temperature,
+                max_tokens: params.max_tokens,
+                reasoning_effort: params.reasoning_effort,
+                api_key: params.api_key,
+            }),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+            throw new Error(err.error || `HTTP ${resp.status}`);
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let usage = null;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (!data) continue;
+                try {
+                    const evt = JSON.parse(data);
+                    if (evt.type === 'token') {
+                        fullResponse += evt.content;
+                        contentEl.innerHTML = marked.parse(fullResponse);
+                        scrollToBottom();
+                    } else if (evt.type === 'done') {
+                        usage = evt.usage || null;
+                        const elapsed = Date.now() - startTime;
+                        addMessageMeta(assistantEl, params.model, elapsed, usage);
+                        stats.requests++;
+                        stats.time += elapsed;
+                        if (usage && usage.total_tokens) {
+                            stats.tokens += usage.total_tokens;
+                        }
+                        updateStats();
+                    } else if (evt.type === 'error') {
+                        throw new Error(evt.error);
+                    }
+                } catch (e) {
+                    if (e.message) console.error('Parse error:', e);
+                }
+            }
+        }
+
+        conversation.push({ role: 'assistant', content: fullResponse, model: params.model });
+
+    } catch (err) {
+        contentEl.innerHTML = `<span class="text-red-400">❌ ${err.message}</span>`;
+        // Remove the user message from conversation if it was the last one
+        if (conversation.length > 0 && conversation[conversation.length - 1].role === 'user') {
+            conversation.pop();
+        }
+    } finally {
+        isGenerating = false;
+        setGeneratingUI(false);
+        document.getElementById('chat-input').focus();
+    }
+}
+
+function stopGeneration() {
+    if (abortController) {
+        abortController.abort();
+    }
+    isGenerating = false;
+    setGeneratingUI(false);
+}
+
+// --- Collect params ---
+function collectParams() {
+    return {
+        provider: document.getElementById('st-provider').value,
+        model: getSelectedModel(),
+        temperature: parseFloat(document.getElementById('st-temperature').value),
+        max_tokens: parseInt(document.getElementById('st-max-tokens').value) || 8192,
+        reasoning_effort: document.getElementById('st-reasoning').value,
+        system_prompt: document.getElementById('st-system-prompt').value.trim(),
+        api_key: document.getElementById('st-api-key').value.trim(),
+    };
+}
+
+// --- UI helpers ---
+function renderMessage(role, content) {
+    const container = document.getElementById('chat-messages');
+    // Remove placeholder
+    const placeholder = container.querySelector('.text-center');
+    if (placeholder) placeholder.remove();
+
+    const wrapper = document.createElement('div');
+    wrapper.className = role === 'user'
+        ? 'flex justify-end'
+        : 'flex justify-start';
+
+    const bubble = document.createElement('div');
+    bubble.className = role === 'user'
+        ? 'max-w-[75%] bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-3 text-sm'
+        : 'max-w-[75%] bg-slate-700 text-slate-100 rounded-2xl rounded-bl-md px-4 py-3 text-sm';
+
+    if (role === 'user') {
+        bubble.textContent = content;
+    } else {
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'msg-content';
+        contentDiv.innerHTML = content ? marked.parse(content) : '<span class="text-slate-400 animate-pulse">思考中...</span>';
+        bubble.appendChild(contentDiv);
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'msg-meta mt-2 pt-2 border-t border-slate-600 text-xs text-slate-400 flex items-center gap-3';
+        metaDiv.style.display = 'none';
+        bubble.appendChild(metaDiv);
+    }
+
+    wrapper.appendChild(bubble);
+    container.appendChild(wrapper);
+    scrollToBottom();
+    return wrapper.querySelector('div'); // return the bubble div
+}
+
+function addMessageMeta(el, model, elapsedMs, usage) {
+    const meta = el.querySelector('.msg-meta');
+    if (!meta) return;
+    meta.style.display = 'flex';
+    const secs = (elapsedMs / 1000).toFixed(1);
+    let html = `<span>🤖 ${model}</span><span>⏱️ ${secs}s</span>`;
+    if (usage) {
+        html += `<span>📊 ${usage.total_tokens || '?'} tokens`;
+        if (usage.prompt_tokens) html += ` (in:${usage.prompt_tokens}`;
+        if (usage.completion_tokens) html += ` / out:${usage.completion_tokens}`;
+        html += ')</span>';
+    }
+    // Add copy button
+    html += `<button onclick="copyMessage(this)" class="ml-auto text-slate-500 hover:text-slate-300 transition">📋 复制</button>`;
+    meta.innerHTML = html;
+    meta.dataset.raw = el.querySelector('.msg-content').textContent;
+}
+
+function copyMessage(btn) {
+    const raw = btn.closest('.msg-meta').dataset.raw;
+    navigator.clipboard.writeText(raw).then(() => {
+        btn.textContent = '✓ 已复制';
+        setTimeout(() => { btn.textContent = '📋 复制'; }, 2000);
+    });
+}
+
+function clearChat() {
+    if (conversation.length > 0 && !confirm('清空所有对话？')) return;
+    conversation = [];
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = `
+        <div class="text-center text-slate-500 text-sm py-12">
+            <div class="text-4xl mb-3">🧪</div>
+            <p>开始与大模型对话</p>
+            <p class="text-xs mt-1">选择左侧参数，在下方输入消息</p>
+        </div>`;
+}
+
+function setGeneratingUI(generating) {
+    document.getElementById('btn-send').classList.toggle('hidden', generating);
+    document.getElementById('btn-stop').classList.toggle('hidden', !generating);
+    document.getElementById('chat-input').disabled = generating;
+    document.getElementById('chat-status').textContent = generating ? '生成中...' : '就绪';
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('chat-messages');
+    container.scrollTop = container.scrollHeight;
+}
+
+function updateStats() {
+    document.getElementById('stat-requests').textContent = stats.requests;
+    document.getElementById('stat-tokens').textContent = stats.tokens;
+    document.getElementById('stat-time').textContent = (stats.time / 1000).toFixed(1) + 's';
+}
+
+// Save system prompt to config when it changes
+let saveTimer = null;
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('st-system-prompt').addEventListener('input', () => {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            fetch('/api/ai_test/config', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ system_prompt: document.getElementById('st-system-prompt').value }),
+            });
+        }, 1000);
+    });
+});
+</script>
+{% endblock %}

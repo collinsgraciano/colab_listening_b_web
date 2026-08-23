@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import (
     HTMLResponse, JSONResponse, StreamingResponse,
     FileResponse, RedirectResponse, PlainTextResponse,
@@ -678,6 +678,7 @@ async def api_character_sources():
                     desc = script.get(f"{key}_description", "")
                     gender = script.get(f"{key}_gender", "")
                     role = script.get(f"{key}_role", "")
+                    qwen_speaker = script.get(f"{key}_qwen_speaker", "")
                     img_name = img_name_for(key)
                     img_exists = (img_dir / img_name).exists()
                     characters.append({
@@ -686,6 +687,7 @@ async def api_character_sources():
                         "description": desc,
                         "gender": gender,
                         "role": role,
+                        "qwen_speaker": qwen_speaker,
                         "image_url": f"/api/runs/{d.name}/images/{img_name}" if img_exists else "",
                     })
 
@@ -1024,11 +1026,12 @@ async def api_qwen_preview(request: Request):
 
     config = load_config()
     model_path = config.get("qwen_model_path", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
+    base_model_path = config.get("qwen_base_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
     device = config.get("qwen_device", "cuda:0")
 
     try:
         from qwen_tts_engine import QwenTTSEngine
-        engine = QwenTTSEngine(model_path, device)
+        engine = QwenTTSEngine(model_path, device, base_model_path)
         # Use a temp file for the preview
         tmp_dir = Path(tempfile.mkdtemp())
         out_path = str(tmp_dir / "preview.mp3")
@@ -1063,10 +1066,10 @@ async def api_qwen_defaults_put(request: Request):
 
 @app.post("/api/qwen_voices/custom")
 async def api_qwen_custom_create(
-    name: str = "",
-    gender: str = "",
-    language: str = "english",
-    ref_text: str = "",
+    name: str = Form(""),
+    gender: str = Form(""),
+    language: str = Form("english"),
+    ref_text: str = Form(""),
     ref_audio: UploadFile = File(...),
 ):
     """Create a custom cloned voice from reference audio."""
@@ -1115,6 +1118,513 @@ async def api_qwen_custom_delete(name: str):
     config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
     _save_qwen_voice_config(config)
     return {"ok": True}
+
+
+# ===========================================================================
+# AI Test — LLM Playground
+# ===========================================================================
+
+AI_TEST_CONFIG_PATH = WEB_ROOT / "configs" / "ai_test_config.json"
+
+
+def _load_ai_test_config() -> dict:
+    defaults = {"system_prompt": ""}
+    if AI_TEST_CONFIG_PATH.exists():
+        try:
+            saved = json.loads(AI_TEST_CONFIG_PATH.read_text(encoding="utf-8"))
+            for k in defaults:
+                if k in saved:
+                    defaults[k] = saved[k]
+        except (json.JSONDecodeError, OSError):
+            pass
+    return defaults
+
+
+def _save_ai_test_config(cfg: dict) -> None:
+    AI_TEST_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    AI_TEST_CONFIG_PATH.write_text(
+        json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.get("/ai_test", response_class=HTMLResponse)
+async def ai_test_page(request: Request):
+    config = load_config()
+    ai_cfg = _load_ai_test_config()
+    return templates.TemplateResponse(request, "ai_test.html", {
+        "config": config,
+        "active_page": "ai_test",
+        "system_prompt": ai_cfg.get("system_prompt", ""),
+    })
+
+
+@app.get("/api/ai_test/config")
+async def api_ai_test_config_get():
+    config = load_config()
+    ai_cfg = _load_ai_test_config()
+    return {
+        "llm_provider": config.get("llm_provider", "sensenova"),
+        "sensenova_model": config.get("sensenova_model", "deepseek-v4-flash"),
+        "openai_model": config.get("openai_model", "grok-4.6"),
+        "openai_base_url": config.get("openai_base_url", ""),
+        "system_prompt": ai_cfg.get("system_prompt", ""),
+    }
+
+
+@app.put("/api/ai_test/config")
+async def api_ai_test_config_put(request: Request):
+    data = await request.json()
+    ai_cfg = _load_ai_test_config()
+    if "system_prompt" in data:
+        ai_cfg["system_prompt"] = data["system_prompt"]
+    _save_ai_test_config(ai_cfg)
+    return {"ok": True}
+
+
+@app.post("/api/ai_test/chat")
+async def api_ai_test_chat(request: Request):
+    """SSE streaming chat completion endpoint.
+
+    Reads config for API keys, supports SenseNova and OpenAI-compatible providers.
+    Returns text/event-stream with token-level streaming.
+    """
+    import urllib.request
+    import urllib.error
+
+    data = await request.json()
+    messages = data.get("messages", [])
+    system_prompt = data.get("system_prompt", "")
+    provider = data.get("provider", "sensenova")
+    model = data.get("model", "")
+    temperature = float(data.get("temperature", 0.8))
+    max_tokens = int(data.get("max_tokens", 8192))
+    reasoning_effort = data.get("reasoning_effort", "low")
+    api_key_override = data.get("api_key", "").strip()
+
+    config = load_config()
+
+    # Resolve API key and base URL from config or override
+    if provider == "sensenova":
+        api_key = api_key_override or config.get("sensenova_api_key", "")
+        base_url = "https://token.sensenova.cn/v1"
+        if not model:
+            model = config.get("sensenova_model", "deepseek-v4-flash")
+    else:
+        api_key = api_key_override or config.get("openai_api_key", "")
+        base_url = config.get("openai_base_url", "https://x666.me/v1")
+        if not model:
+            model = config.get("openai_model", "grok-4.6")
+
+    if not api_key:
+        return JSONResponse(
+            {"error": f"未配置 {provider} 的 API Key，请在参数配置页面或左侧设置中填写"},
+            status_code=400)
+
+    # Build messages with system prompt
+    full_messages = []
+    if system_prompt:
+        full_messages.append({"role": "system", "content": system_prompt})
+    full_messages.extend(messages)
+
+    body = {
+        "model": model,
+        "messages": full_messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    if provider != "openai":
+        body["reasoning_effort"] = reasoning_effort
+
+    body_bytes = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base_url}/chat/completions",
+        data=body_bytes,
+        method="POST",
+    )
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("User-Agent", "CodelyLLM/1.0")
+
+    async def event_stream():
+        try:
+            import time as _time
+            t0 = _time.time()
+            usage_data = None
+            resp = urllib.request.urlopen(req, timeout=180)
+            for raw_line in resp:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                if not line.startswith("data: "):
+                    continue
+                payload = line[6:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                # Extract token
+                choices = chunk.get("choices", [])
+                if choices:
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+                # Extract usage (some APIs send it in the last chunk)
+                if chunk.get("usage"):
+                    usage_data = chunk["usage"]
+
+            elapsed = _time.time() - t0
+            yield f"data: {json.dumps({'type': 'done', 'elapsed': round(elapsed, 2), 'usage': usage_data})}\n\n"
+
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="replace")[:500]
+            yield f"data: {json.dumps({'type': 'error', 'error': f'HTTP {e.code}: {err}'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)[:300]})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ===========================================================================
+# Character Library Management Page
+# ===========================================================================
+
+# Background image generation status tracking
+_gen_status: dict[str, dict] = {}  # lib_id → {status, poses, error, started_at}
+
+
+def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tokens: str):
+    """Background thread: generate pose atlas via MCP, download, split into poses."""
+    import shutil
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        _gen_status[lib_id] = {"status": "error", "error": "角色目录不存在", "poses": []}
+        return
+
+    _gen_status[lib_id] = {"status": "generating", "error": "", "poses": [], "started_at": time.time()}
+
+    try:
+        # Add pipeline to sys.path for MCP imports
+        _pipeline = str(PIPELINE_DIR)
+        if _pipeline not in sys.path:
+            sys.path.insert(0, _pipeline)
+        from mcp_client import reinitialize as mcp_reinit, call_tool, parse_task_id, poll_task, download_file
+        from PIL import Image as PILImage
+
+        # Initialize MCP with configured tokens
+        if mcp_tokens:
+            tokens = [t.strip() for t in mcp_tokens.split("\n") if t.strip()]
+            tokens_str = ",".join(tokens)
+            mcp_reinit(tokens=tokens)
+        else:
+            mcp_reinit()
+
+        _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
+                  "cel-shaded with thin clean black outline, "
+                  "vibrant saturated colors, smooth surfaces")
+
+        # Use "char_a" as source_key for all manually created characters
+        src_key = "char_a"
+
+        # Delete old pose images (for regeneration)
+        for old in lib_dir.glob(f"pose_{src_key}_*.png"):
+            old.unlink()
+        old_atlas = lib_dir / f"pose_atlas_{src_key}.png"
+        if old_atlas.exists():
+            old_atlas.unlink()
+
+        if structure == "quest":
+            # 4×2 grid atlas (8 poses)
+            atlas_prompt = (
+                f"4x2 grid character pose sheet, eight poses of the same character, "
+                f"{description}, "
+                f"top row left to right: speaking with mouth open, listening with slight smile, "
+                f"thinking with hand on chin, surprised with raised eyebrows, "
+                f"bottom row left to right: nodding in agreement, waving right hand, "
+                f"pointing forward, laughing with eyes closed, "
+                f"half-body close-up, waist up, all eight poses same character same outfit, "
+                f"plain white background, {_STYLE}, "
+                f"no props, no objects, no scene, no text"
+            )
+            gen_params = {
+                "prompt": atlas_prompt,
+                "provider": "seedream",
+                "image_size": "4992x3328",
+                "output_format": "png",
+                "is_segmentation": True,
+            }
+        else:
+            # Original structure: single character scene image
+            atlas_prompt = (
+                f"{description}, standing pose, half-body close-up, waist up, "
+                f"plain white background, {_STYLE}, "
+                f"no props, no objects, no scene, no text"
+            )
+            gen_params = {
+                "prompt": atlas_prompt,
+                "provider": "seedream",
+                "image_size": "landscape_16_9",
+                "output_format": "png",
+            }
+
+        print(f"  [CharGen] Generating atlas for {lib_id}...")
+        result = call_tool("generate_image", gen_params)
+        task_id = parse_task_id(result)
+        if not task_id:
+            _gen_status[lib_id] = {"status": "error", "error": "MCP 返回无 task_id", "poses": []}
+            return
+
+        data = poll_task(task_id, interval=10, max_wait=600)
+        url = data.get("url", "")
+        if not url:
+            _gen_status[lib_id] = {"status": "error", "error": "MCP 生成失败：无图片 URL", "poses": []}
+            return
+
+        if structure == "quest":
+            # Download atlas, split into 8 poses
+            atlas_path = str(lib_dir / f"pose_atlas_{src_key}.png")
+            download_file(url, atlas_path)
+            print(f"  [CharGen] Downloaded atlas for {lib_id}")
+
+            atlas = PILImage.open(atlas_path).convert("RGBA")
+            w, h = atlas.size
+            grid_w, grid_h = 4, 2
+            cw, ch = w // grid_w, h // grid_h
+            pose_files = []
+            idx = 0
+            for row in range(grid_h):
+                for col in range(grid_w):
+                    cell = atlas.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch))
+                    out_path = str(lib_dir / f"pose_{src_key}_{idx}.png")
+                    cell.save(out_path)
+                    pose_files.append(f"pose_{src_key}_{idx}.png")
+                    idx += 1
+            print(f"  [CharGen] Split into {len(pose_files)} poses for {lib_id}")
+        else:
+            # Original: save as char_scene.png
+            atlas_path = str(lib_dir / "char_scene.png")
+            download_file(url, atlas_path)
+            pose_files = ["char_scene.png"]
+            print(f"  [CharGen] Saved char_scene.png for {lib_id}")
+
+        # Update thumbnail
+        if structure == "quest":
+            thumb_src = lib_dir / f"pose_{src_key}_0.png"
+        else:
+            thumb_src = lib_dir / "char_scene.png"
+        if thumb_src.exists():
+            thumb_dst = lib_dir / "thumb.png"
+            if thumb_dst.exists():
+                thumb_dst.unlink()
+            shutil.copy2(str(thumb_src), str(thumb_dst))
+
+        pose_urls = [
+            {"name": f, "url": f"/api/character_library/{lib_id}/poses/{f}"}
+            for f in pose_files
+        ]
+        _gen_status[lib_id] = {
+            "status": "done",
+            "error": "",
+            "poses": pose_urls,
+            "thumb_url": f"/api/character_library/{lib_id}/image",
+        }
+        print(f"  [CharGen] Done for {lib_id}: {len(pose_files)} poses")
+
+    except Exception as e:
+        _gen_status[lib_id] = {"status": "error", "error": str(e)[:200], "poses": []}
+        print(f"  [CharGen] ERROR for {lib_id}: {e}")
+
+
+@app.get("/characters", response_class=HTMLResponse)
+async def characters_page(request: Request):
+    """Character library management page."""
+    config = load_config()
+    library_chars = []
+    if LIBRARY_DIR.exists():
+        for d in sorted(LIBRARY_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            meta_path = d / "meta.json"
+            if not meta_path.exists():
+                continue
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                thumb = d / "thumb.png"
+                meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
+                # Count pose images
+                if meta.get("structure") == "quest":
+                    meta["pose_count"] = sum(1 for p in d.glob("pose_char_a_*.png"))
+                else:
+                    meta["pose_count"] = 1 if (d / "char_scene.png").exists() else 0
+                library_chars.append(meta)
+            except (json.JSONDecodeError, OSError):
+                continue
+    return templates.TemplateResponse(request, "characters.html", {
+        "config": config,
+        "library_chars": library_chars,
+        "active_page": "characters",
+    })
+
+
+@app.post("/api/character_library/create")
+async def api_library_create(
+    name: str = Form(""),
+    description: str = Form(""),
+    gender: str = Form(""),
+    structure: str = Form("quest"),
+    qwen_speaker: str = Form(""),
+    image: UploadFile | None = File(None),
+):
+    """Manually create a new character in the library."""
+    if not name.strip():
+        return JSONResponse({"ok": False, "error": "名称不能为空"}, status_code=400)
+    if not description.strip():
+        return JSONResponse({"ok": False, "error": "描述不能为空"}, status_code=400)
+
+    lib_id = f"char_{int(time.time())}_{gender or 'custom'}"
+    lib_dir = LIBRARY_DIR / lib_id
+    lib_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save uploaded image as thumb if provided
+    if image and image.filename:
+        content = await image.read()
+        (lib_dir / "thumb.png").write_bytes(content)
+
+    meta = {
+        "id": lib_id,
+        "name": name.strip(),
+        "description": description.strip(),
+        "gender": gender.strip(),
+        "structure": structure,
+        "qwen_speaker": qwen_speaker.strip(),
+        "source_run": "",
+        "source_key": "char_a",
+        "created": time.time(),
+    }
+    (lib_dir / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {"ok": True, "id": lib_id, "meta": meta}
+
+
+@app.put("/api/character_library/{lib_id}")
+async def api_library_update(lib_id: str, request: Request):
+    """Update character metadata (name, description, gender, structure, qwen_speaker)."""
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    meta_path = lib_dir / "meta.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+
+    data = await request.json()
+    for key in ("name", "description", "gender", "structure", "qwen_speaker"):
+        if key in data:
+            meta[key] = data[key]
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "meta": meta}
+
+
+@app.post("/api/character_library/{lib_id}/image")
+async def api_library_upload_image(lib_id: str, image: UploadFile = File(...)):
+    """Upload or replace character thumbnail image."""
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    content = await image.read()
+    (lib_dir / "thumb.png").write_bytes(content)
+    return {"ok": True, "image_url": f"/api/character_library/{lib_id}/image"}
+
+
+@app.post("/api/character_library/{lib_id}/generate_images")
+async def api_library_generate_images(lib_id: str):
+    """Start AI pose atlas generation in background thread."""
+    import threading
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    meta_path = lib_dir / "meta.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+
+    description = meta.get("description", "")
+    if not description:
+        return JSONResponse({"ok": False, "error": "角色描述为空，无法生成图片"}, status_code=400)
+
+    structure = meta.get("structure", "quest")
+    config = load_config()
+    mcp_tokens = config.get("mcp_tokens", "").strip()
+
+    # Start background thread
+    thread = threading.Thread(
+        target=_generate_char_images,
+        args=(lib_id, description, structure, mcp_tokens),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"ok": True, "message": "图片生成中..."}
+
+
+@app.get("/api/character_library/{lib_id}/generation_status")
+async def api_library_gen_status(lib_id: str):
+    """Poll image generation status."""
+    status = _gen_status.get(lib_id, {"status": "idle", "poses": [], "error": ""})
+    return status
+
+
+@app.get("/api/character_library/{lib_id}/poses")
+async def api_library_poses(lib_id: str):
+    """List all pose images for a character."""
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return {"poses": []}
+    meta_path = lib_dir / "meta.json"
+    structure = "quest"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            structure = meta.get("structure", "quest")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    poses = []
+    if structure == "quest":
+        for i in range(8):
+            p = lib_dir / f"pose_char_a_{i}.png"
+            if p.exists():
+                poses.append({"name": p.name, "url": f"/api/character_library/{lib_id}/poses/{p.name}"})
+    else:
+        p = lib_dir / "char_scene.png"
+        if p.exists():
+            poses.append({"name": p.name, "url": f"/api/character_library/{lib_id}/poses/{p.name}"})
+    return {"poses": poses}
+
+
+@app.get("/api/character_library/{lib_id}/poses/{filename}")
+async def api_library_pose_file(lib_id: str, filename: str):
+    """Serve a pose image file."""
+    lib_dir = LIBRARY_DIR / lib_id
+    # Prevent path traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return JSONResponse({"error": "Invalid filename"}, status_code=400)
+    pose_path = lib_dir / filename
+    if not pose_path.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(pose_path), media_type="image/png")
 
 
 # ===========================================================================
