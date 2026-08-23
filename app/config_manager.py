@@ -62,6 +62,10 @@ PARAM_SPEC = {
                     "label": "LLM 重试次数"},
     "llm_min_interval": {"default": 3, "type": "number", "group": "llm",
                          "label": "LLM 最小间隔(秒)"},
+    "quest_beat_lines": {"default": 10, "type": "number", "group": "llm",
+                         "label": "Quest 节拍行数", "help": "节拍表每拍的行数预算 (默认10)"},
+    "quest_qa_rounds": {"default": 3, "type": "number", "group": "llm",
+                        "label": "Quest QA 轮数", "help": "自评-修复循环最大轮数 (默认3, 0=关闭)"},
 
     # --- TTS ---
     "tts_engine": {"default": "kokoro", "type": "select", "group": "tts",

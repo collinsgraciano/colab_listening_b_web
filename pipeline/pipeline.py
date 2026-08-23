@@ -292,7 +292,12 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
         script_path = work_dir / "script.json"
         for d in dirs.values():
             d.mkdir(parents=True, exist_ok=True)
+        qa_report = script.pop("_qa", None)
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+        if qa_report:
+            qa_path = work_dir / "qa_report.json"
+            qa_path.write_text(json.dumps(qa_report, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"  QA report saved: {qa_path}")
         _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr, structure=args.structure, animation=args.animation)
         mark_topic_used(used_topics_file, topic)
     print(f"  Script saved: {script_path}")
