@@ -14,6 +14,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from .config_manager import resolve_provider
+
 # Add pipeline source to path (local copy — fully independent)
 PIPELINE_DIR = Path(__file__).parent.parent / "pipeline"
 if str(PIPELINE_DIR) not in sys.path:
@@ -187,19 +189,20 @@ class PipelineService:
             os.environ["LLM_MIN_INTERVAL"] = str(config["llm_min_interval"])
 
         provider = config.get("llm_provider", "sensenova")
-        os.environ["LLM_PROVIDER"] = provider
-        if provider == "sensenova":
-            if config.get("sensenova_api_key"):
-                os.environ["SENSENOVA_API_KEY"] = config["sensenova_api_key"]
-            if config.get("sensenova_model"):
-                os.environ["SENSENOVA_MODEL"] = config["sensenova_model"]
+        p_type, p_base_url, p_api_key, p_model = resolve_provider(config)
+        os.environ["LLM_PROVIDER"] = p_type
+        if p_type == "sensenova":
+            if p_api_key:
+                os.environ["SENSENOVA_API_KEY"] = p_api_key
+            if p_model:
+                os.environ["SENSENOVA_MODEL"] = p_model
         else:
-            if config.get("openai_base_url"):
-                os.environ["OPENAI_BASE_URL"] = config["openai_base_url"]
-            if config.get("openai_api_key"):
-                os.environ["OPENAI_API_KEY"] = config["openai_api_key"]
-            if config.get("openai_model"):
-                os.environ["OPENAI_MODEL"] = config["openai_model"]
+            if p_base_url:
+                os.environ["OPENAI_BASE_URL"] = p_base_url
+            if p_api_key:
+                os.environ["OPENAI_API_KEY"] = p_api_key
+            if p_model:
+                os.environ["OPENAI_MODEL"] = p_model
 
         if config.get("voxcpm_worker_url"):
             os.environ["VOXCPM_WORKER_URL"] = config["voxcpm_worker_url"]
@@ -226,6 +229,7 @@ class PipelineService:
         reuse_raw = config.get("character_reuse", "")
         fixes_raw = config.get("character_fixes", "")
         lib_raw = config.get("character_library", "")
+        voices_raw = config.get("character_voices", "")
 
         reuse_map: dict = {}
         fixes_map: dict[str, str] = {}
@@ -244,6 +248,12 @@ class PipelineService:
         if lib_raw:
             try:
                 lib_map = json.loads(lib_raw) if isinstance(lib_raw, str) else lib_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        voices_map: dict[str, str] = {}
+        if voices_raw:
+            try:
+                voices_map = json.loads(voices_raw) if isinstance(voices_raw, str) else voices_raw
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -307,6 +317,13 @@ class PipelineService:
 
             if char_info:
                 overrides[key] = char_info
+
+            # Priority 4: explicit voice binding (highest priority)
+            voice = voices_map.get(key, "").strip()
+            if voice:
+                if key not in overrides:
+                    overrides[key] = {}
+                overrides[key]["qwen_speaker"] = voice
 
         return overrides
 
@@ -515,6 +532,20 @@ class PipelineService:
                             for p in poses
                         ]
 
+        # --- character_voices: override qwen_speaker (highest priority) ---
+        voices_raw = self.config.get("character_voices", "")
+        voices_map: dict[str, str] = {}
+        if voices_raw:
+            try:
+                voices_map = json.loads(voices_raw) if isinstance(voices_raw, str) else voices_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        for key in all_char_keys:
+            voice = voices_map.get(key, "").strip()
+            if voice:
+                script[f"{key}_qwen_speaker"] = voice
+                overridden.append(f"{key}_qwen_speaker")
+
         script_path = work_dir / "script.json"
         script_path.write_text(
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -526,6 +557,9 @@ class PipelineService:
 
     def _build_args(self, config: dict) -> SimpleNamespace:
         """Convert config dict → SimpleNamespace matching pipeline.py args."""
+        # Resolve LLM provider (handles custom: prefix → openai)
+        p_type, p_base_url, p_api_key, p_model = resolve_provider(config)
+
         num_lines = config.get("num_lines", "")
         try:
             num_lines = int(num_lines) if num_lines else None
@@ -556,13 +590,13 @@ class PipelineService:
             structure=structure,
             animation=config.get("animation", "landing"),
             llm_provider=config.get("llm_provider", "sensenova"),
-            sensenova_api_key=config.get("sensenova_api_key", ""),
-            sensenova_model=config.get("sensenova_model", "deepseek-v4-flash"),
-            model=config.get("sensenova_model", "deepseek-v4-flash"),
-            api_key=config.get("sensenova_api_key", ""),
-            openai_base_url=config.get("openai_base_url", ""),
-            openai_api_key=config.get("openai_api_key", ""),
-            openai_model=config.get("openai_model", "grok-4.6"),
+            sensenova_api_key=p_api_key if p_type == "sensenova" else "",
+            sensenova_model=p_model if p_type == "sensenova" else "deepseek-v4-flash",
+            model=p_model if p_type == "sensenova" else "",
+            api_key=p_api_key if p_type == "sensenova" else "",
+            openai_base_url=p_base_url if p_type == "openai" else "",
+            openai_api_key=p_api_key if p_type == "openai" else "",
+            openai_model=p_model if p_type == "openai" else "grok-4.6",
             llm_retries=int(config.get("llm_retries", 10)),
             mcp_tokens=mcp_tokens or None,
             mcp_token=None,

@@ -38,6 +38,8 @@ PARAM_SPEC = {
                         "label": "固定角色描述", "help": "手动指定角色外观描述 (JSON)"},
     "character_library": {"default": "", "type": "text", "group": "content",
                            "label": "素材库分配", "help": "JSON: {char_a: 'lib_id', char_b: 'lib_id'}"},
+    "character_voices": {"default": "", "type": "text", "group": "content",
+                          "label": "角色音色绑定", "help": "JSON: {char_a: 'Vivian', char_b: 'Ryan'} — 复用角色时绑定 Qwen TTS 音色"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -75,7 +77,12 @@ PARAM_SPEC = {
                        "label": "VoxCPM API Key"},
     "qwen_model_path": {"default": r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
                         "type": "text", "group": "tts",
-                        "label": "Qwen3-TTS 模型路径"},
+                        "label": "Qwen3-TTS 模型路径",
+                        "help": "CustomVoice 模型 (预设音色)"},
+    "qwen_base_model_path": {"default": r"H:\models\Qwen3-TTS-12Hz-1.7B-Base",
+                             "type": "text", "group": "tts",
+                             "label": "Qwen3-TTS Base 模型路径",
+                             "help": "Base 模型 (voice clone 需要)"},
     "qwen_device": {"default": "cuda:0", "type": "text", "group": "tts",
                     "label": "Qwen3-TTS 设备", "help": "如 cuda:0, cpu"},
 
@@ -176,6 +183,76 @@ def delete_preset(name: str) -> None:
         path.unlink()
 
 
+# --- Custom LLM Providers ---
+
+LLM_PROVIDERS_PATH = CONFIGS_DIR / "llm_providers.json"
+
+
+def load_llm_providers() -> list[dict]:
+    """Load custom LLM providers from configs/llm_providers.json."""
+    if not LLM_PROVIDERS_PATH.exists():
+        return []
+    try:
+        data = json.loads(LLM_PROVIDERS_PATH.read_text(encoding="utf-8"))
+        return data.get("providers", [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_llm_providers(providers: list[dict]) -> None:
+    LLM_PROVIDERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LLM_PROVIDERS_PATH.write_text(
+        json.dumps({"providers": providers}, ensure_ascii=False, indent=2),
+        encoding="utf-8")
+
+
+def get_provider_options() -> dict[str, str]:
+    """Return all LLM provider options (static + custom) as {value: label}."""
+    options = {
+        "sensenova": "SenseNova",
+        "openai": "OpenAI Compatible (内置)",
+    }
+    custom = load_llm_providers()
+    for p in custom:
+        options[f"custom:{p['id']}"] = p["name"]
+    return options
+
+
+def resolve_provider(config: dict[str, Any]) -> tuple[str, str, str, str]:
+    """Resolve LLM provider config → (provider_type, base_url, api_key, model).
+
+    For custom:* providers, reads from llm_providers.json.
+    Returns provider_type as 'sensenova' or 'openai' (custom always → openai).
+    """
+    provider = config.get("llm_provider", "sensenova")
+    if provider == "sensenova":
+        return (
+            "sensenova",
+            "https://token.sensenova.cn/v1",
+            config.get("sensenova_api_key", ""),
+            config.get("sensenova_model", "deepseek-v4-flash"),
+        )
+    elif provider.startswith("custom:"):
+        custom_id = provider.split(":", 1)[1]
+        customs = load_llm_providers()
+        cp = next((p for p in customs if p["id"] == custom_id), None)
+        if cp:
+            model = config.get("openai_model") or (cp["models"][0] if cp.get("models") else "")
+            return (
+                "openai",
+                cp.get("base_url", ""),
+                cp.get("api_key", ""),
+                model,
+            )
+    # Default: openai
+    return (
+        "openai",
+        config.get("openai_base_url", "https://x666.me/v1"),
+        config.get("openai_api_key", ""),
+        config.get("openai_model", "grok-4.6"),
+    )
+
+
 def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     """Build pipeline.py CLI arguments from config dict."""
     args: list[str] = ["python"]
@@ -202,17 +279,18 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
 
     # LLM
     provider = config.get("llm_provider", "sensenova")
-    args += ["--llm-provider", provider]
-    if provider == "sensenova":
-        if config.get("sensenova_api_key"):
-            args += ["--api-key", config["sensenova_api_key"]]
-        args += ["--model", str(config.get("sensenova_model", "deepseek-v4-flash"))]
+    p_type, p_base_url, p_api_key, p_model = resolve_provider(config)
+    args += ["--llm-provider", p_type]
+    if p_type == "sensenova":
+        if p_api_key:
+            args += ["--api-key", p_api_key]
+        args += ["--model", str(p_model or "deepseek-v4-flash")]
     else:
-        if config.get("openai_base_url"):
-            args += ["--openai-base-url", config["openai_base_url"]]
-        if config.get("openai_api_key"):
-            args += ["--openai-api-key", config["openai_api_key"]]
-        args += ["--openai-model", str(config.get("openai_model", "grok-4.6"))]
+        if p_base_url:
+            args += ["--openai-base-url", p_base_url]
+        if p_api_key:
+            args += ["--openai-api-key", p_api_key]
+        args += ["--openai-model", str(p_model or "grok-4.6")]
     args += ["--llm-retries", str(config.get("llm_retries", 10))]
     if config.get("llm_min_interval"):
         os.environ["LLM_MIN_INTERVAL"] = str(config["llm_min_interval"])
@@ -227,6 +305,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--voxcpm-api-key", config["voxcpm_api_key"]]
     if config.get("qwen_model_path"):
         args += ["--qwen-model-path", config["qwen_model_path"]]
+    if config.get("qwen_base_model_path"):
+        args += ["--qwen-base-model-path", config["qwen_base_model_path"]]
     if config.get("qwen_device"):
         args += ["--qwen-device", config["qwen_device"]]
 

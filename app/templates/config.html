@@ -140,6 +140,7 @@ function toggleAnimationField(structure) {
 }
 
 function toggleLLMFields(provider) {
+    const showOpenAI = provider !== 'sensenova';
     document.querySelectorAll('.config-field').forEach(f => {
         const field = f.querySelector('[data-field]');
         if (!field) return;
@@ -148,7 +149,7 @@ function toggleLLMFields(provider) {
             f.style.display = provider === 'sensenova' ? '' : 'none';
         }
         if (key.startsWith('openai_')) {
-            f.style.display = provider === 'openai' ? '' : 'none';
+            f.style.display = showOpenAI ? '' : 'none';
         }
     });
 }

@@ -23,6 +23,8 @@ from .config_manager import (
     load_config, save_config,
     list_presets, save_preset, load_preset, delete_preset,
     build_cli_args, detect_local_mcp_token,
+    load_llm_providers, save_llm_providers,
+    get_provider_options, resolve_provider,
 )
 from .pipeline_service import get_service, STEP_ORDER
 from .config_manager import detect_local_mcp_token
@@ -82,6 +84,8 @@ async def dashboard(request: Request):
 async def config_page(request: Request):
     config = load_config()
     presets = list_presets()
+    # Inject dynamic LLM provider options into PARAM_SPEC
+    PARAM_SPEC["llm_provider"]["options"] = get_provider_options()
     # Group params by group
     grouped = {}
     for key, spec in PARAM_SPEC.items():
@@ -1125,7 +1129,6 @@ async def api_qwen_custom_delete(name: str):
 # ===========================================================================
 
 AI_TEST_CONFIG_PATH = WEB_ROOT / "configs" / "ai_test_config.json"
-LLM_PROVIDERS_PATH = WEB_ROOT / "configs" / "llm_providers.json"
 
 
 def _load_ai_test_config() -> dict:
@@ -1145,24 +1148,6 @@ def _save_ai_test_config(cfg: dict) -> None:
     AI_TEST_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     AI_TEST_CONFIG_PATH.write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _load_llm_providers() -> list[dict]:
-    """Load custom LLM providers from configs/llm_providers.json."""
-    if not LLM_PROVIDERS_PATH.exists():
-        return []
-    try:
-        data = json.loads(LLM_PROVIDERS_PATH.read_text(encoding="utf-8"))
-        return data.get("providers", [])
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def _save_llm_providers(providers: list[dict]) -> None:
-    LLM_PROVIDERS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    LLM_PROVIDERS_PATH.write_text(
-        json.dumps({"providers": providers}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
 
 
 @app.get("/ai_test", response_class=HTMLResponse)
@@ -1186,7 +1171,7 @@ async def api_ai_test_config_get():
         "openai_model": config.get("openai_model", "grok-4.6"),
         "openai_base_url": config.get("openai_base_url", ""),
         "system_prompt": ai_cfg.get("system_prompt", ""),
-        "custom_providers": _load_llm_providers(),
+        "custom_providers": load_llm_providers(),
     }
 
 
@@ -1204,7 +1189,7 @@ async def api_ai_test_config_put(request: Request):
 
 @app.get("/api/ai_test/providers")
 async def api_providers_list():
-    return {"providers": _load_llm_providers()}
+    return {"providers": load_llm_providers()}
 
 
 @app.post("/api/ai_test/providers")
@@ -1214,7 +1199,7 @@ async def api_providers_create(request: Request):
     base_url = (data.get("base_url") or "").strip()
     if not name or not base_url:
         return JSONResponse({"ok": False, "error": "名称和 Base URL 不能为空"}, status_code=400)
-    providers = _load_llm_providers()
+    providers = load_llm_providers()
     # Check duplicate name
     if any(p["name"] == name for p in providers):
         return JSONResponse({"ok": False, "error": "名称已存在"}, status_code=400)
@@ -1226,14 +1211,14 @@ async def api_providers_create(request: Request):
         "models": [m.strip() for m in (data.get("models") or "").split(",") if m.strip()],
     }
     providers.append(provider)
-    _save_llm_providers(providers)
+    save_llm_providers(providers)
     return {"ok": True, "provider": provider}
 
 
 @app.put("/api/ai_test/providers/{provider_id}")
 async def api_providers_update(provider_id: str, request: Request):
     data = await request.json()
-    providers = _load_llm_providers()
+    providers = load_llm_providers()
     target = None
     for p in providers:
         if p["id"] == provider_id:
@@ -1256,15 +1241,15 @@ async def api_providers_update(provider_id: str, request: Request):
             target["models"] = [m.strip() for m in data["models"].split(",") if m.strip()]
         else:
             target["models"] = data["models"]
-    _save_llm_providers(providers)
+    save_llm_providers(providers)
     return {"ok": True, "provider": target}
 
 
 @app.delete("/api/ai_test/providers/{provider_id}")
 async def api_providers_delete(provider_id: str):
-    providers = _load_llm_providers()
+    providers = load_llm_providers()
     providers = [p for p in providers if p["id"] != provider_id]
-    _save_llm_providers(providers)
+    save_llm_providers(providers)
     return {"ok": True}
 
 
@@ -1290,31 +1275,17 @@ async def api_ai_test_chat(request: Request):
 
     config = load_config()
 
-    # Resolve API key and base URL from config, override, or custom provider
-    if provider == "sensenova":
-        api_key = api_key_override or config.get("sensenova_api_key", "")
-        base_url = "https://token.sensenova.cn/v1"
-        if not model:
-            model = config.get("sensenova_model", "deepseek-v4-flash")
-    elif provider.startswith("custom:"):
-        custom_id = provider.split(":", 1)[1]
-        custom_providers = _load_llm_providers()
-        custom = next((p for p in custom_providers if p["id"] == custom_id), None)
-        if not custom:
-            return JSONResponse(
-                {"error": f"未找到自定义 Provider: {custom_id}"},
-                status_code=400)
-        api_key = api_key_override or custom.get("api_key", "")
-        base_url = custom.get("base_url", "")
-        if not model and custom.get("models"):
-            model = custom["models"][0]
-        # Custom providers are always OpenAI-compatible
-        provider = "openai"
-    else:
-        api_key = api_key_override or config.get("openai_api_key", "")
-        base_url = config.get("openai_base_url", "https://x666.me/v1")
-        if not model:
-            model = config.get("openai_model", "grok-4.6")
+    # Override config provider with the one selected in AI test page
+    config["llm_provider"] = provider
+
+    p_type, base_url, api_key, resolved_model = resolve_provider(config)
+    if api_key_override:
+        api_key = api_key_override
+    if model:
+        resolved_model = model
+    model = resolved_model
+    # p_type is "sensenova" or "openai" (custom → openai)
+    provider = p_type
 
     if not api_key:
         return JSONResponse(
