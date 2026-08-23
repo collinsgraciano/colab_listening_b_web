@@ -22,6 +22,7 @@
         <button onclick="switchTab('clips')" id="tab-clips" class="tab-btn">🎬 视频片段 ({{ clips | length }})</button>
         <button onclick="switchTab('audio')" id="tab-audio" class="tab-btn">🎵 音频 ({{ audio | length }})</button>
         <button onclick="switchTab('videos')" id="tab-videos" class="tab-btn">📹 最终视频 ({{ videos | length }})</button>
+        <button onclick="switchTab('youtube')" id="tab-youtube" class="tab-btn">📺 YouTube</button>
         <button onclick="switchTab('script')" id="tab-script" class="tab-btn">📄 脚本</button>
     </div>
 
@@ -107,6 +108,58 @@
         {% endif %}
     </div>
 
+    <!-- YouTube tab -->
+    <div id="content-youtube" class="tab-content hidden">
+        {% if yt_desc or yt_title or yt_tags %}
+        <p class="text-xs mb-4">
+            {% if has_yt_meta %}
+            <span class="text-emerald-400">✓ 最终版 youtube_metadata.json（含真实章节时间戳 + 标签）</span>
+            {% else %}
+            <span class="text-amber-400">⚠ 未找到 youtube_metadata.json，显示原始脚本字段（时间戳为占位，建议先跑完 Step 4.5）</span>
+            {% endif %}
+        </p>
+        <div class="space-y-4">
+            <div class="bg-slate-800 rounded-lg border border-slate-700">
+                <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
+                    <span class="text-sm font-medium text-slate-200">📝 标题（繁中）</span>
+                    <button onclick="copyText(this, 'yt-copy-title')" class="copy-btn">📋 复制</button>
+                </div>
+                <pre id="yt-copy-title" class="px-4 py-3 text-sm text-slate-300 whitespace-pre-wrap font-sans">{{ yt_title }}</pre>
+            </div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700">
+                <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
+                    <span class="text-sm font-medium text-slate-200">📝 标题（英文）</span>
+                    <button onclick="copyText(this, 'yt-copy-title-en')" class="copy-btn">📋 复制</button>
+                </div>
+                <pre id="yt-copy-title-en" class="px-4 py-3 text-sm text-slate-300 whitespace-pre-wrap font-sans">{{ yt_title_en }}</pre>
+            </div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700">
+                <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
+                    <span class="text-sm font-medium text-slate-200">📄 描述（繁中）</span>
+                    <button onclick="copyText(this, 'yt-copy-desc')" class="copy-btn">📋 复制</button>
+                </div>
+                <pre id="yt-copy-desc" class="px-4 py-3 text-xs text-slate-300 whitespace-pre-wrap font-sans max-h-96 overflow-y-auto">{{ yt_desc }}</pre>
+            </div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700">
+                <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
+                    <span class="text-sm font-medium text-slate-200">📄 描述（英文）</span>
+                    <button onclick="copyText(this, 'yt-copy-desc-en')" class="copy-btn">📋 复制</button>
+                </div>
+                <pre id="yt-copy-desc-en" class="px-4 py-3 text-xs text-slate-300 whitespace-pre-wrap font-sans max-h-96 overflow-y-auto">{{ yt_desc_en }}</pre>
+            </div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700">
+                <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
+                    <span class="text-sm font-medium text-slate-200">🏷️ 标签 Tags（逗号分隔）</span>
+                    <button onclick="copyText(this, 'yt-copy-tags')" class="copy-btn">📋 复制</button>
+                </div>
+                <pre id="yt-copy-tags" class="px-4 py-3 text-xs text-slate-300 whitespace-pre-wrap font-sans">{{ yt_tags | join(', ') }}</pre>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-center py-12">没有 YouTube 元数据（需完成脚本生成，建议跑完 Step 4.5 生成最终版）</p>
+        {% endif %}
+    </div>
+
     <!-- Script tab -->
     <div id="content-script" class="tab-content hidden">
         {% if script %}
@@ -151,6 +204,30 @@ function closeImageModal(e) {
     if (e && e.target !== document.getElementById('image-modal')) return;
     document.getElementById('image-modal').classList.add('hidden');
 }
+
+function copyText(btn, sourceId) {
+    const text = document.getElementById(sourceId).innerText;
+    const done = () => {
+        btn.textContent = '✓ 已复制';
+        setTimeout(() => { btn.textContent = '📋 复制'; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选择文本复制'); }
+    document.body.removeChild(ta);
+}
 </script>
 <style>
 .tab-btn {
@@ -162,5 +239,15 @@ function closeImageModal(e) {
 }
 .tab-btn:hover { color: #e2e8f0; }
 .tab-btn.active { color: #fff; border-bottom-color: #6366f1; }
+.copy-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #c7d2fe;
+    background: #4338ca;
+    border-radius: 6px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.copy-btn:hover { background: #4f46e5; color: #fff; }
 </style>
 {% endblock %}

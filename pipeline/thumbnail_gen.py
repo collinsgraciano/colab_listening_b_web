@@ -7,6 +7,7 @@ prompt so the AI renders everything in one step.
 Fallback: if AI image gen fails, falls back to Pillow text overlay on scene image.
 """
 import os
+import re
 import sys
 import json
 import subprocess
@@ -244,6 +245,28 @@ def _pillow_fallback(script: dict, scene_img: str, output_path: str,
     return output_path
 
 
+# "⏱️ Chapters:" marker line + consecutive chapter timestamp lines (00:00 / 00:xx style)
+_CHAPTERS_SECTION = re.compile(
+    r"⏱️?\s*Chapters:[^\n]*\n"
+    r"(?:[ \t]*[-•*]?[ \t]*(?:[\dx]{1,2}:)?[\dx]{1,2}:[\dx]{2}[^\n]*\n?)+"
+)
+
+
+def _inject_chapters(desc: str, chapters: list[str]) -> str:
+    """Inject real chapter timestamps into a description.
+
+    The LLM often leaves placeholder timestamps (00:xx) in its own Chapters
+    section — replace that section with the real ones computed from the
+    timeline. Append a new section only if none exists.
+    """
+    if not desc or not chapters:
+        return desc
+    block = "⏱️ Chapters:\n" + "\n".join(chapters)
+    if _CHAPTERS_SECTION.search(desc):
+        return _CHAPTERS_SECTION.sub(block + "\n", desc, count=1)
+    return desc.rstrip() + "\n\n" + block + "\n"
+
+
 def save_youtube_metadata(script: dict, timeline: list[dict],
                            output_path: str, structure: str = "original") -> str:
     """Save YouTube metadata (title, description, tags) as JSON.
@@ -304,14 +327,10 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
             chapters.append(f"{_fmt_ts(timestamps['outro'])} Outro")
 
     description = script.get("youtube_description", "")
-    if chapters and "⏱️" not in description:
-        chapters_text = "\n⏱️ Chapters:\n" + "\n".join(chapters) + "\n"
-        description = description + "\n" + chapters_text
+    description = _inject_chapters(description, chapters)
 
     description_en = script.get("youtube_description_en", "")
-    if chapters and description_en and "⏱️" not in description_en:
-        chapters_text = "\n⏱️ Chapters:\n" + "\n".join(chapters) + "\n"
-        description_en = description_en + "\n" + chapters_text
+    description_en = _inject_chapters(description_en, chapters)
 
     tags = script.get("youtube_tags", [])
     # Append tags as #hashtag string at the end of description

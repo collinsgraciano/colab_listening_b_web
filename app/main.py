@@ -147,6 +147,15 @@ async def gallery_page(request: Request, name: str):
             script = json.loads(script_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
+    # YouTube metadata: prefer final youtube_metadata.json (real chapter timestamps
+    # + hashtags injected in step 4.5), fallback to raw script fields
+    yt_meta = {}
+    yt_meta_path = run_dir / "youtube_metadata.json"
+    if yt_meta_path.exists():
+        try:
+            yt_meta = json.loads(yt_meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
     images_dir = run_dir / "images"
     images = sorted([f.name for f in images_dir.glob("*.png")]) if images_dir.exists() else []
     clips_dir = run_dir / "clips"
@@ -175,6 +184,12 @@ async def gallery_page(request: Request, name: str):
         "clips": clips,
         "audio": audio,
         "videos": videos,
+        "has_yt_meta": bool(yt_meta),
+        "yt_title": yt_meta.get("title") or script.get("youtube_title", ""),
+        "yt_title_en": yt_meta.get("title_en") or script.get("youtube_title_en", ""),
+        "yt_desc": yt_meta.get("description") or script.get("youtube_description", ""),
+        "yt_desc_en": yt_meta.get("description_en") or script.get("youtube_description_en", ""),
+        "yt_tags": yt_meta.get("tags") or script.get("youtube_tags", []),
         "active_page": "runs",
     })
 
