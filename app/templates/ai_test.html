@@ -13,7 +13,10 @@
         <div class="p-4 space-y-4 flex-1">
             <!-- Provider -->
             <div>
-                <label class="text-xs text-slate-400 block mb-1">LLM Provider</label>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="text-xs text-slate-400">LLM Provider</label>
+                    <button onclick="openProviderModal()" class="text-[10px] text-indigo-400 hover:text-indigo-300 transition">⚙️ 管理自定义</button>
+                </div>
                 <select id="st-provider" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                     <option value="sensenova">SenseNova</option>
                     <option value="openai">OpenAI Compatible</option>
@@ -87,6 +90,35 @@
         </div>
     </aside>
 
+    <!-- Provider Management Modal -->
+    <div id="provider-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center" onclick="closeProviderModal(event)">
+        <div class="bg-slate-800 border border-slate-600 rounded-xl w-[640px] max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-white">⚙️ 自定义 LLM Provider</h3>
+                <button onclick="closeProviderModal()" class="text-slate-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="overflow-y-auto p-5 space-y-4 flex-1">
+                <!-- New/Edit Form -->
+                <div class="bg-slate-900 rounded-lg p-4 border border-slate-700 space-y-3">
+                    <div class="text-sm font-medium text-slate-300" id="provider-form-title">新建 Provider</div>
+                    <input type="hidden" id="pf-id">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="text" id="pf-name" placeholder="名称 (如 MyAPI)" class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <input type="text" id="pf-base-url" placeholder="Base URL (https://...)" class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    </div>
+                    <input type="password" id="pf-api-key" placeholder="API Key (sk-...)" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <textarea id="pf-models" rows="2" placeholder="模型列表，逗号分隔 (如 gpt-4, gpt-3.5-turbo, claude-3)" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white resize-none"></textarea>
+                    <div class="flex gap-2">
+                        <button onclick="saveProvider()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存</button>
+                        <button onclick="resetProviderForm()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">清空表单</button>
+                    </div>
+                </div>
+                <!-- Provider List -->
+                <div id="provider-list" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Chat Area -->
     <div class="flex-1 flex flex-col min-w-0">
         <!-- Toolbar -->
@@ -137,6 +169,7 @@ let conversation = [];       // [{role, content, model?, elapsed?, usage?}]
 let isGenerating = false;
 let abortController = null;
 let stats = { requests: 0, tokens: 0, time: 0 };
+let CUSTOM_PROVIDERS = [];   // [{id, name, base_url, api_key, models[]}]
 
 const SENSENOVA_MODELS = ['deepseek-v4-flash', 'glm-5.2'];
 const OPENAI_MODELS = ['grok-4.6', 'grok-4.5', 'gemini-3.1-pro-preview', 'gemini-3.7-flash', 'claude-sonnet-5', 'gemini-2.5-pro-1m'];
@@ -155,11 +188,10 @@ function loadConfig() {
     fetch('/api/ai_test/config')
         .then(r => r.json())
         .then(cfg => {
+            CUSTOM_PROVIDERS = cfg.custom_providers || [];
             document.getElementById('st-provider').value = cfg.llm_provider || 'sensenova';
             document.getElementById('st-system-prompt').value = cfg.system_prompt || '';
-            if (cfg.llm_provider === 'openai' && cfg.openai_base_url) {
-                // keep base url from config
-            }
+            rebuildProviderDropdown();
             onProviderChange();
             if (cfg.sensenova_model) {
                 const sel = document.getElementById('st-model');
@@ -172,13 +204,53 @@ function loadConfig() {
         });
 }
 
+// --- Rebuild provider dropdown with custom providers ---
+function rebuildProviderDropdown() {
+    const sel = document.getElementById('st-provider');
+    const current = sel.value;
+    let html = `
+        <option value="sensenova">SenseNova</option>
+        <option value="openai">OpenAI Compatible (内置)</option>`;
+    if (CUSTOM_PROVIDERS.length > 0) {
+        html += '<option disabled>── 自定义 ──</option>';
+        CUSTOM_PROVIDERS.forEach(p => {
+            html += `<option value="custom:${p.id}">${p.name}</option>`;
+        });
+    }
+    sel.innerHTML = html;
+    // Restore selection if still valid
+    if ([...sel.options].some(o => o.value === current)) {
+        sel.value = current;
+    }
+}
+
 // --- Provider change ---
 function onProviderChange() {
     const provider = document.getElementById('st-provider').value;
     const sel = document.getElementById('st-model');
-    const models = provider === 'sensenova' ? SENSENOVA_MODELS : OPENAI_MODELS;
+    let models;
+
+    if (provider === 'sensenova') {
+        models = SENSENOVA_MODELS;
+    } else if (provider.startsWith('custom:')) {
+        const pid = provider.split(':', 1)[1];
+        const cp = CUSTOM_PROVIDERS.find(p => p.id === pid);
+        models = cp ? cp.models : [];
+    } else {
+        models = OPENAI_MODELS;
+    }
     sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+
     document.getElementById('st-reasoning-wrap').style.display = provider === 'sensenova' ? '' : 'none';
+
+    // Auto-fill API key for custom providers
+    if (provider.startsWith('custom:')) {
+        const pid = provider.split(':', 1)[1];
+        const cp = CUSTOM_PROVIDERS.find(p => p.id === pid);
+        if (cp && cp.api_key) {
+            document.getElementById('st-api-key').value = cp.api_key;
+        }
+    }
     updateModelBadge();
 }
 
@@ -216,6 +288,109 @@ function updateModelBadge() {
 // --- Quick prompts ---
 function quickPrompt(label, text) {
     document.getElementById('st-system-prompt').value = text;
+}
+
+// --- Provider Modal ---
+function openProviderModal() {
+    const modal = document.getElementById('provider-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    renderProviderList();
+    fetchProviders();
+}
+
+function closeProviderModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    const modal = document.getElementById('provider-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    resetProviderForm();
+}
+
+async function fetchProviders() {
+    const resp = await fetch('/api/ai_test/providers');
+    const data = await resp.json();
+    CUSTOM_PROVIDERS = data.providers || [];
+    renderProviderList();
+    rebuildProviderDropdown();
+}
+
+function renderProviderList() {
+    const list = document.getElementById('provider-list');
+    if (!CUSTOM_PROVIDERS.length) {
+        list.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">暂无自定义 Provider</p>';
+        return;
+    }
+    list.innerHTML = CUSTOM_PROVIDERS.map(p => `
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-white">${p.name}</div>
+                <div class="text-xs text-slate-400 truncate">${p.base_url}</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">${p.models.length} 个模型 · Key: ${p.api_key ? '✓' : '✗'}</div>
+            </div>
+            <div class="flex gap-1.5 ml-2 shrink-0">
+                <button onclick="editProvider('${p.id}')" class="px-2.5 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition">编辑</button>
+                <button onclick="deleteProvider('${p.id}')" class="px-2.5 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition">删除</button>
+            </div>
+        </div>`).join('');
+}
+
+function editProvider(id) {
+    const p = CUSTOM_PROVIDERS.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('provider-form-title').textContent = `编辑: ${p.name}`;
+    document.getElementById('pf-id').value = p.id;
+    document.getElementById('pf-name').value = p.name;
+    document.getElementById('pf-base-url').value = p.base_url;
+    document.getElementById('pf-api-key').value = p.api_key || '';
+    document.getElementById('pf-models').value = (p.models || []).join(', ');
+}
+
+function resetProviderForm() {
+    document.getElementById('provider-form-title').textContent = '新建 Provider';
+    document.getElementById('pf-id').value = '';
+    document.getElementById('pf-name').value = '';
+    document.getElementById('pf-base-url').value = '';
+    document.getElementById('pf-api-key').value = '';
+    document.getElementById('pf-models').value = '';
+}
+
+async function saveProvider() {
+    const id = document.getElementById('pf-id').value;
+    const name = document.getElementById('pf-name').value.trim();
+    const baseUrl = document.getElementById('pf-base-url').value.trim();
+    const apiKey = document.getElementById('pf-api-key').value.trim();
+    const modelsRaw = document.getElementById('pf-models').value.trim();
+    if (!name || !baseUrl) { alert('名称和 Base URL 不能为空'); return; }
+
+    const body = { name, base_url: baseUrl, api_key: apiKey, models: modelsRaw };
+    if (id) {
+        await fetch(`/api/ai_test/providers/${id}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+    } else {
+        await fetch('/api/ai_test/providers', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+    }
+    resetProviderForm();
+    await fetchProviders();
+}
+
+async function deleteProvider(id) {
+    const p = CUSTOM_PROVIDERS.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`删除 Provider "${p.name}"?`)) return;
+    await fetch(`/api/ai_test/providers/${id}`, { method: 'DELETE' });
+    // If current provider was deleted, switch to default
+    const sel = document.getElementById('st-provider');
+    if (sel.value === `custom:${id}`) {
+        sel.value = 'sensenova';
+        onProviderChange();
+    }
+    await fetchProviders();
 }
 
 // --- Send message ---

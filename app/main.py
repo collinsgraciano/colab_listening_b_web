@@ -1125,6 +1125,7 @@ async def api_qwen_custom_delete(name: str):
 # ===========================================================================
 
 AI_TEST_CONFIG_PATH = WEB_ROOT / "configs" / "ai_test_config.json"
+LLM_PROVIDERS_PATH = WEB_ROOT / "configs" / "llm_providers.json"
 
 
 def _load_ai_test_config() -> dict:
@@ -1144,6 +1145,24 @@ def _save_ai_test_config(cfg: dict) -> None:
     AI_TEST_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     AI_TEST_CONFIG_PATH.write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _load_llm_providers() -> list[dict]:
+    """Load custom LLM providers from configs/llm_providers.json."""
+    if not LLM_PROVIDERS_PATH.exists():
+        return []
+    try:
+        data = json.loads(LLM_PROVIDERS_PATH.read_text(encoding="utf-8"))
+        return data.get("providers", [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_llm_providers(providers: list[dict]) -> None:
+    LLM_PROVIDERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LLM_PROVIDERS_PATH.write_text(
+        json.dumps({"providers": providers}, ensure_ascii=False, indent=2),
+        encoding="utf-8")
 
 
 @app.get("/ai_test", response_class=HTMLResponse)
@@ -1167,6 +1186,7 @@ async def api_ai_test_config_get():
         "openai_model": config.get("openai_model", "grok-4.6"),
         "openai_base_url": config.get("openai_base_url", ""),
         "system_prompt": ai_cfg.get("system_prompt", ""),
+        "custom_providers": _load_llm_providers(),
     }
 
 
@@ -1177,6 +1197,74 @@ async def api_ai_test_config_put(request: Request):
     if "system_prompt" in data:
         ai_cfg["system_prompt"] = data["system_prompt"]
     _save_ai_test_config(ai_cfg)
+    return {"ok": True}
+
+
+# --- Custom LLM Provider CRUD ---
+
+@app.get("/api/ai_test/providers")
+async def api_providers_list():
+    return {"providers": _load_llm_providers()}
+
+
+@app.post("/api/ai_test/providers")
+async def api_providers_create(request: Request):
+    data = await request.json()
+    name = (data.get("name") or "").strip()
+    base_url = (data.get("base_url") or "").strip()
+    if not name or not base_url:
+        return JSONResponse({"ok": False, "error": "名称和 Base URL 不能为空"}, status_code=400)
+    providers = _load_llm_providers()
+    # Check duplicate name
+    if any(p["name"] == name for p in providers):
+        return JSONResponse({"ok": False, "error": "名称已存在"}, status_code=400)
+    provider = {
+        "id": f"custom_{int(time.time()*1000)}",
+        "name": name,
+        "base_url": base_url,
+        "api_key": (data.get("api_key") or "").strip(),
+        "models": [m.strip() for m in (data.get("models") or "").split(",") if m.strip()],
+    }
+    providers.append(provider)
+    _save_llm_providers(providers)
+    return {"ok": True, "provider": provider}
+
+
+@app.put("/api/ai_test/providers/{provider_id}")
+async def api_providers_update(provider_id: str, request: Request):
+    data = await request.json()
+    providers = _load_llm_providers()
+    target = None
+    for p in providers:
+        if p["id"] == provider_id:
+            target = p
+            break
+    if not target:
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    if "name" in data:
+        new_name = data["name"].strip()
+        if new_name and new_name != target["name"]:
+            if any(p["name"] == new_name for p in providers if p["id"] != provider_id):
+                return JSONResponse({"ok": False, "error": "名称已存在"}, status_code=400)
+            target["name"] = new_name
+    if "base_url" in data:
+        target["base_url"] = data["base_url"].strip()
+    if "api_key" in data:
+        target["api_key"] = data["api_key"].strip()
+    if "models" in data:
+        if isinstance(data["models"], str):
+            target["models"] = [m.strip() for m in data["models"].split(",") if m.strip()]
+        else:
+            target["models"] = data["models"]
+    _save_llm_providers(providers)
+    return {"ok": True, "provider": target}
+
+
+@app.delete("/api/ai_test/providers/{provider_id}")
+async def api_providers_delete(provider_id: str):
+    providers = _load_llm_providers()
+    providers = [p for p in providers if p["id"] != provider_id]
+    _save_llm_providers(providers)
     return {"ok": True}
 
 
@@ -1202,12 +1290,26 @@ async def api_ai_test_chat(request: Request):
 
     config = load_config()
 
-    # Resolve API key and base URL from config or override
+    # Resolve API key and base URL from config, override, or custom provider
     if provider == "sensenova":
         api_key = api_key_override or config.get("sensenova_api_key", "")
         base_url = "https://token.sensenova.cn/v1"
         if not model:
             model = config.get("sensenova_model", "deepseek-v4-flash")
+    elif provider.startswith("custom:"):
+        custom_id = provider.split(":", 1)[1]
+        custom_providers = _load_llm_providers()
+        custom = next((p for p in custom_providers if p["id"] == custom_id), None)
+        if not custom:
+            return JSONResponse(
+                {"error": f"未找到自定义 Provider: {custom_id}"},
+                status_code=400)
+        api_key = api_key_override or custom.get("api_key", "")
+        base_url = custom.get("base_url", "")
+        if not model and custom.get("models"):
+            model = custom["models"][0]
+        # Custom providers are always OpenAI-compatible
+        provider = "openai"
     else:
         api_key = api_key_override or config.get("openai_api_key", "")
         base_url = config.get("openai_base_url", "https://x666.me/v1")
