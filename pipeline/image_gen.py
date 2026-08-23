@@ -3,11 +3,14 @@ import json
 import os
 import re
 import sys
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 from mcp_client import call_tool, parse_task_id, poll_task, download_file
 from checkpoint import step_done
 from media_utils import get_duration as _get_audio_duration
+from atlas_split import split_atlas
 
 
 def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=False):
@@ -51,20 +54,9 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=Fal
     image_urls = {}
     for filename in reupload_files:
         filepath = str(img_dir / filename)
-        print(f"  [Image] Re-uploading {filename} for CDN URL...")
-        try:
-            upload_result = call_tool("file_upload", {"file_path": filepath})
-            if "result" in upload_result:
-                for item in upload_result["result"].get("content", []):
-                    if item.get("type") == "resource":
-                        res_json = json.loads(item.get("resource", {}).get("text", ""))
-                        image_urls[filename] = res_json.get("file_url", "")
-                    elif item.get("type") == "text":
-                        m = re.search(r"(https?://[^\s`'\")]+)", item.get("text", ""))
-                        if m:
-                            image_urls[filename] = m.group(1)
-        except Exception as e:
-            print(f"    [Image] Re-upload failed: {e}")
+        url = _reupload_for_cdn(filepath, filename)
+        if url:
+            image_urls[filename] = url
 
     normal_paths = [str(audio_dir / f"dialogue_{i}.mp3") for i in range(n)]
     if is_quest:
@@ -90,18 +82,75 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=Fal
     return tts_results, image_urls
 
 
+def _reupload_for_cdn(filepath, filename):
+    """Re-upload an existing local image to TOS and return the CDN URL.
+
+    file_upload MCP tool only returns presigned URLs — the actual PUT upload
+    must be done by the caller. Without this, Seedance2 gets a URL pointing to
+    nothing → 'resource download failed'.
+    """
+    print(f"  [Image] {filename} already exists, re-uploading for CDN URL...")
+    try:
+        upload_result = call_tool("file_upload", {"file_path": filepath})
+        if "result" not in upload_result:
+            print(f"    [Image] file_upload returned no result")
+            return ""
+        upload_url = ""
+        file_url = ""
+        for item in upload_result["result"].get("content", []):
+            if item.get("type") == "resource":
+                res_json = json.loads(item.get("resource", {}).get("text", ""))
+                upload_url = res_json.get("upload_url", "")
+                file_url = res_json.get("file_url", "")
+                break
+            elif item.get("type") == "text":
+                m = re.search(r"(https?://[^\s`'\")]+)", item.get("text", ""))
+                if m and not file_url:
+                    file_url = m.group(1)
+        if not file_url:
+            print(f"    [Image] No file_url in file_upload response")
+            return ""
+        if not upload_url:
+            print(f"    [Image] WARNING: No upload_url — file may already exist on TOS")
+        else:
+            # PUT the actual file to upload_url
+            print(f"    [Image] Uploading {filename} to TOS...")
+            with open(filepath, "rb") as f:
+                file_data = f.read()
+            req = urllib.request.Request(upload_url, data=file_data, method="PUT")
+            req.add_header("Content-Type", "image/png")
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    if resp.status == 200:
+                        print(f"    [Image] Upload OK ({len(file_data)//1024}KB)")
+                    else:
+                        print(f"    [Image] Upload returned status {resp.status}")
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")[:300]
+                print(f"    [Image] Upload FAILED: HTTP {e.code}: {body}")
+                return ""
+        print(f"    [Image] CDN URL: {file_url[:80]}...")
+        return file_url
+    except Exception as e:
+        print(f"    [Image] Re-upload failed: {e}")
+    return ""
+
+
 def generate_images(image_prompts, img_dir, tts_thread, max_workers=4):
     """Generate character/scene images via MCP (concurrent). Returns image_urls dict."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     image_urls = {}
     image_failed = False
 
-    # Filter out already-existing files
+    # Filter out already-existing files (but re-upload them for CDN URLs)
     pending = [(prompt, filename) for prompt, filename in image_prompts
                if not os.path.exists(str(img_dir / filename))]
     for _, filename in image_prompts:
         if os.path.exists(str(img_dir / filename)):
-            print(f"  [Image] {filename} already exists, skipping")
+            print(f"  [Image] {filename} already exists, re-uploading for CDN URL...")
+            url = _reupload_for_cdn(str(img_dir / filename), filename)
+            if url:
+                image_urls[filename] = url
 
     if not pending:
         return image_urls
@@ -229,7 +278,6 @@ def generate_pose_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
     and reduces API calls by 4×.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from PIL import Image as PILImage
     n = len(dialogue)
     print(f"  [PoseAtlas] Generating {n} pose atlases (2×2 grid → 4 poses each)...")
 
@@ -305,21 +353,9 @@ def generate_pose_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
             download_file(url, atlas_path)
             print(f"      [PoseAtlas] Downloaded atlas: pose_atlas_{line_idx}.png")
 
-            # Split into 4 quadrants
-            atlas = PILImage.open(atlas_path).convert("RGBA")
-            w, h = atlas.size
-            half_w, half_h = w // 2, h // 2
-            quads = [
-                (0, 0, half_w, half_h),          # top-left
-                (half_w, 0, w, half_h),           # top-right
-                (0, half_h, half_w, h),           # bottom-left
-                (half_w, half_h, w, h),           # bottom-right
-            ]
-            for j, (left, top, right, bottom) in enumerate(quads):
-                cell = atlas.crop((left, top, right, bottom))
-                out_path = str(img_dir / f"pose_{line_idx}_{j}.png")
-                cell.save(out_path)
-                print(f"      [PoseAtlas] Split: pose_{line_idx}_{j}.png ({cell.size})")
+            # Split into 4 quadrants（含分隔线检测 + 残边修剪，无缝时回退等分）
+            out_paths = [str(img_dir / f"pose_{line_idx}_{j}.png") for j in range(4)]
+            split_atlas(atlas_path, 2, 2, out_paths, log_prefix="[PoseAtlas]")
 
             # atlas 原图保留，不再删除
 
@@ -351,8 +387,6 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4):
     Shared style prefix ensures visual consistency across all characters.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from PIL import Image as PILImage
-
     _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
               "cel-shaded with thin clean black outline, "
               "vibrant saturated colors, smooth surfaces")
@@ -421,17 +455,10 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4):
             download_file(url, atlas_path)
             print(f"    [QuestAtlas] Downloaded: pose_atlas_{char_key}.png")
 
-            atlas = PILImage.open(atlas_path).convert("RGBA")
-            w, h = atlas.size
-            cw, ch = w // grid_w, h // grid_h
-            idx = 0
-            for row in range(grid_h):
-                for col in range(grid_w):
-                    cell = atlas.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch))
-                    out_path = str(img_dir / f"pose_{char_key}_{idx}.png")
-                    cell.save(out_path)
-                    print(f"    [QuestAtlas] Split: pose_{char_key}_{idx}.png ({cell.size})")
-                    idx += 1
+            # 切分 4×2 网格（含分隔线检测 + 残边修剪，无缝时回退等分）
+            out_paths = [str(img_dir / f"pose_{char_key}_{j}.png")
+                         for j in range(grid_w * grid_h)]
+            split_atlas(atlas_path, grid_w, grid_h, out_paths, log_prefix="[QuestAtlas]")
 
             # atlas 原图保留，不再删除
         except RuntimeError as e:
@@ -459,8 +486,6 @@ def generate_scene_atlas(scene_images, scene, img_dir, tts_thread):
     Each atlas is one API call. Saves (N-ceil(N/4)) API calls vs per-scene.
     Uses frontier 4K: atlas ~2880×2880 → each cell ~1440×1440.
     """
-    from PIL import Image as PILImage
-
     _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
               "cel-shaded, vibrant saturated colors, smooth surfaces")
 
@@ -514,6 +539,9 @@ def generate_scene_atlas(scene_images, scene, img_dir, tts_thread):
             f"bottom-right: {scene_descs[3]}, "
             f"all four panels show the same {scene} location from different angles, "
             f"wide shots showing key elements, no people, no characters, no text, "
+            f"seamless collage, panels placed edge to edge, no borders, no gutters, "
+            f"no dividing lines, no frames, no white or gray lines between panels, "
+            f"no margins around the outer edges, each panel fills its quadrant fully, "
             f"{_STYLE}"
         )
 
@@ -549,18 +577,11 @@ def generate_scene_atlas(scene_images, scene, img_dir, tts_thread):
             download_file(url, atlas_path)
             print(f"    [SceneAtlas] Downloaded: scene_atlas_{batch_idx}.png")
 
-            atlas = PILImage.open(atlas_path).convert("RGB")
-            w, h = atlas.size
-            cw, ch = w // 2, h // 2
-            for j in range(n_batch):
-                row, col = j // 2, j % 2
-                cell = atlas.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch))
-                out_path = str(img_dir / f"scene_{start + j}.png")
-                cell.save(out_path)
-                print(f"    [SceneAtlas] Split: scene_{start + j}.png ({cell.size[0]}x{cell.size[1]})")
+            # 切分 2×2 网格（分隔线检测 + 残边修剪；填充格丢弃，只切前 n_batch 格）
+            out_paths = [str(img_dir / f"scene_{start + j}.png") for j in range(n_batch)]
+            split_atlas(atlas_path, 2, 2, out_paths, log_prefix="[SceneAtlas]")
 
-            if os.path.exists(atlas_path):
-                os.remove(atlas_path)
+            # atlas 原图保留，不再删除（便于排查切分问题）
 
         except RuntimeError as e:
             if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):

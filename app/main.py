@@ -1393,7 +1393,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
         if _pipeline not in sys.path:
             sys.path.insert(0, _pipeline)
         from mcp_client import reinitialize as mcp_reinit, call_tool, parse_task_id, poll_task, download_file
-        from PIL import Image as PILImage
+        from atlas_split import split_atlas
 
         # Initialize MCP with configured tokens
         if mcp_tokens:
@@ -1465,24 +1465,15 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
             return
 
         if structure == "quest":
-            # Download atlas, split into 8 poses
+            # Download atlas, split into 8 poses（分隔线检测 + 残边修剪，无缝时回退等分）
             atlas_path = str(lib_dir / f"pose_atlas_{src_key}.png")
             download_file(url, atlas_path)
             print(f"  [CharGen] Downloaded atlas for {lib_id}")
 
-            atlas = PILImage.open(atlas_path).convert("RGBA")
-            w, h = atlas.size
-            grid_w, grid_h = 4, 2
-            cw, ch = w // grid_w, h // grid_h
-            pose_files = []
-            idx = 0
-            for row in range(grid_h):
-                for col in range(grid_w):
-                    cell = atlas.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch))
-                    out_path = str(lib_dir / f"pose_{src_key}_{idx}.png")
-                    cell.save(out_path)
-                    pose_files.append(f"pose_{src_key}_{idx}.png")
-                    idx += 1
+            pose_files = [f"pose_{src_key}_{idx}.png" for idx in range(8)]
+            split_atlas(atlas_path, 4, 2,
+                        [str(lib_dir / f) for f in pose_files],
+                        log_prefix="[CharGen]")
             print(f"  [CharGen] Split into {len(pose_files)} poses for {lib_id}")
         else:
             # Original: save as char_scene.png
