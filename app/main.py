@@ -924,6 +924,34 @@ async def scripts_page(request: Request):
     })
 
 
+SCRIPTS_FORM_PATH = WEB_ROOT / "configs" / "scripts_form.json"
+
+
+def _load_scripts_form() -> dict:
+    """Remember the last-used provider/model on the scripts page."""
+    if SCRIPTS_FORM_PATH.exists():
+        try:
+            data = json.loads(SCRIPTS_FORM_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _remember_scripts_form(provider: str, model: str) -> None:
+    if not provider and not model:
+        return
+    cfg = _load_scripts_form()
+    if provider:
+        cfg["provider"] = provider
+    if model:
+        cfg["model"] = model
+    SCRIPTS_FORM_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCRIPTS_FORM_PATH.write_text(
+        json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 @app.get("/api/scripts/form_options")
 async def api_scripts_form_options():
     """Everything the generate form needs in one call."""
@@ -937,6 +965,7 @@ async def api_scripts_form_options():
         "used_topics": _load_used_topic_names(config),
         "used_by_mode": script_library.used_by_mode_all(),
         "default_lines": script_library.DEFAULT_LINES,
+        "last": _load_scripts_form(),  # 上次使用的 provider/model（优先于 current 回显）
         "current": {
             "provider": config.get("llm_provider", "sensenova"),
             "sensenova_model": config.get("sensenova_model", ""),
@@ -944,6 +973,14 @@ async def api_scripts_form_options():
             "cefr": config.get("cefr", "A2"),
         },
     }
+
+
+@app.post("/api/scripts/form_memory")
+async def api_scripts_form_memory(request: Request):
+    """Persist the user's last-selected provider/model on the scripts page."""
+    data = await request.json()
+    _remember_scripts_form(str(data.get("provider", "")), str(data.get("model", "")))
+    return {"ok": True}
 
 
 @app.get("/api/scripts")
@@ -1023,6 +1060,7 @@ async def api_scripts_generate(request: Request):
         "num_lines": data.get("num_lines", ""),
         "topics": topics,
     }
+    _remember_scripts_form(data.get("provider", ""), data.get("model", ""))
 
     import queue as _queue
     q: _queue.Queue = _queue.Queue()
@@ -1078,6 +1116,7 @@ async def api_scripts_review(request: Request):
         script_library.start_review_thread(ids, provider, model, q)
     except RuntimeError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
+    _remember_scripts_form(provider, model)
 
     async def event_stream():
         yield _sse({"type": "progress",
@@ -1122,6 +1161,7 @@ async def api_script_fix(request: Request):
         script_library.start_fix_thread(sid, issues, provider, model, re_review, q)
     except RuntimeError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
+    _remember_scripts_form(provider, model)
 
     async def event_stream():
         yield _sse({"type": "progress", "message": "开始修复选中的问题..."})

@@ -25,7 +25,7 @@
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">模型</label>
-                    <select id="gen-model"
+                    <select id="gen-model" onchange="saveFormMemory()"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
                 <div>
@@ -193,7 +193,10 @@ function loadFormOptions() {
 
 function renderProviderSelect() {
     const sel = document.getElementById('gen-provider');
-    const cur = FORM.current ? FORM.current.provider : '';
+    // 上次使用的优先；无记录时回退到当前配置
+    const lastP = FORM.last && FORM.last.provider;
+    const cur = (lastP && (lastP in (FORM.providers || {}))) ? lastP
+        : (FORM.current ? FORM.current.provider : '');
     sel.innerHTML = '';
     Object.entries(FORM.providers || {}).forEach(([value, label]) => {
         const opt = document.createElement('option');
@@ -202,10 +205,23 @@ function renderProviderSelect() {
         sel.appendChild(opt);
     });
     if (cur && (cur in (FORM.providers || {}))) sel.value = cur;
-    onProviderChange();
+    onProviderChange(true);
 }
 
-function onProviderChange() {
+// 记住本次选择的 Provider/模型（下次进入页面自动回显）
+function saveFormMemory() {
+    if (!FORM) return;
+    fetch('/api/scripts/form_memory', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            provider: document.getElementById('gen-provider').value,
+            model: document.getElementById('gen-model').value,
+        })
+    }).catch(() => {});
+}
+
+function onProviderChange(skipSave) {
     const provider = document.getElementById('gen-provider').value;
     const sel = document.getElementById('gen-model');
     sel.innerHTML = '';
@@ -223,11 +239,15 @@ function onProviderChange() {
         opt.value = m; opt.textContent = m;
         sel.appendChild(opt);
     });
-    // 回显当前配置的模型
-    if (FORM.current) {
+    // 上次使用的模型优先，其次当前配置的模型
+    const lastM = FORM.last && FORM.last.model;
+    if (lastM && models.includes(lastM)) {
+        sel.value = lastM;
+    } else if (FORM.current) {
         const saved = provider === 'sensenova' ? FORM.current.sensenova_model : FORM.current.openai_model;
         if (saved && models.includes(saved)) sel.value = saved;
     }
+    if (!skipSave) saveFormMemory();
 }
 
 function onStructureChange() {
