@@ -90,6 +90,19 @@
         <!-- Character reuse -->
         <div class="mb-4">
             <label class="block text-xs text-slate-400 mb-1">复用角色 (可选)</label>
+            <!-- Character sets (角色套装：整套角色配置命名保存 / 一键应用) -->
+            <div class="flex gap-2 mb-2">
+                <select id="char-set" onchange="onCharSetChange()"
+                    class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="">— 选择已保存套装一键应用 —</option>
+                </select>
+                <button onclick="saveCharSet()" title="把当前整套角色配置保存为套装"
+                    class="px-3 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-sm text-white whitespace-nowrap">💾 存为套装</button>
+                <button onclick="deleteCharSet()" title="删除选中的套装"
+                    class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🗑</button>
+                <button onclick="loadCharSets()" title="刷新套装列表"
+                    class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🔄</button>
+            </div>
             <div class="flex gap-2">
                 <select id="char-source" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
                     onchange="onCharSourceChange(); _debounceCharSave()">
@@ -103,7 +116,7 @@
             <div id="char-cards" class="hidden mt-3 grid grid-cols-2 md:grid-cols-4 gap-3"></div>
             <!-- Character description editor (always shown) -->
             <div id="char-editor" class="mt-3 space-y-2">
-                <p class="text-xs text-slate-500">「图片+性别」复用源角色图片+描述+性别；「描述+性别」只复用描述+性别(重新生成图片)；不选=LLM自动生成。角色名(role)永远由LLM按主题生成。可绑定 Qwen 音色（需 TTS 引擎选 Qwen）。<span class="text-indigo-400">在下方「人物素材库」点 分配→ 即可把素材库角色绑定到 角色A/B/C/主持（复用图片+描述+性别，优先级最高）</span></p>
+                <p class="text-xs text-slate-500">「图片+性别」复用源角色图片+描述+性别；「描述+性别」只复用描述+性别(重新生成图片)；不选=LLM自动生成。角色名(role)永远由LLM按主题生成。可绑定 Qwen 音色（需 TTS 引擎选 Qwen）。<span class="text-indigo-400">在下方「人物素材库」点 分配→ 即可把素材库角色绑定到 角色A/B/C/主持（复用图片+描述+性别，优先级最高）</span>。<span class="text-emerald-400">「💾 存为套装」可将当前整套角色配置命名保存，下次从上方下拉一键应用。</span></p>
                 <div id="char-editor-fields"></div>
             </div>
         </div>
@@ -225,6 +238,7 @@
 // Store per-mode configs for quick start (all modes preloaded)
 const MODE_CONFIGS = {{ mode_configs | tojson }};
 let ACTIVE_MODE = {{ active_mode | tojson }};
+const MODE_LABELS = {{ mode_labels | tojson }};
 
 // --- 模式 Tab 切换：每个模式独立记住快捷项 + 角色绑定 ---
 function applyModeTabStyles() {
@@ -266,6 +280,7 @@ function switchMode(m) {
     sel.value = (_charSources.some(s => s.name === want)) ? want : '';
     onCharSourceChange();
     renderLibrary();
+    loadCharSets();
     // 同步服务端激活模式（主题管理/运行历史等页面跟随）
     fetch('/api/config/active', {
         method: 'POST',
@@ -856,6 +871,135 @@ function collectLibraryAssignments() {
     return Object.keys(map).length ? JSON.stringify(map) : '';
 }
 
+// --- Character sets (角色套装)：整套角色配置命名保存 / 一键应用 ---
+let _charSets = [];
+
+function loadCharSets() {
+    return fetch('/api/character_sets')
+        .then(r => r.json())
+        .then(data => {
+            _charSets = data.sets || [];
+            const sel = document.getElementById('char-set');
+            const prev = sel.value;
+            sel.innerHTML = '<option value="">— 选择已保存套装一键应用 —</option>';
+            _charSets.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                const label = MODE_LABELS[s.structure] || s.structure || '?';
+                opt.textContent = `${s.name} · ${label}`;
+                sel.appendChild(opt);
+            });
+            sel.value = _charSets.some(s => s.id === prev) ? prev : '';
+        })
+        .catch(() => {});
+}
+
+function saveCharSet() {
+    saveCharState();  // 先同步 DOM → 当前模式配置
+    const cfg = MODE_CONFIGS[ACTIVE_MODE];
+    // 智能默认名：绑定的素材库角色名拼接；无绑定则用源运行标题
+    let defName = '';
+    try {
+        const lib = cfg.character_library ? JSON.parse(cfg.character_library) : {};
+        const names = Object.values(lib)
+            .map(id => (_libraryChars.find(c => c.id === id) || {}).name)
+            .filter(Boolean);
+        if (names.length) defName = names.join(' + ');
+    } catch (e) {}
+    if (!defName) {
+        const src = _charSources.find(s => s.name === cfg.character_source);
+        if (src) defName = src.title;
+    }
+    const name = prompt('为这套角色配置起个名字:', defName || '');
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) { alert('名称不能为空'); return; }
+    fetch('/api/character_sets/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: trimmed,
+            mode: ACTIVE_MODE,
+            character_source: cfg.character_source || '',
+            character_reuse: cfg.character_reuse || '',
+            character_fixes: cfg.character_fixes || '',
+            character_voices: cfg.character_voices || '',
+            character_library: cfg.character_library || '',
+            _ui_descs: cfg._ui_descs || {},
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            loadCharSets().then(() => {
+                document.getElementById('char-set').value = data.set.id;
+            });
+        } else {
+            alert('保存失败: ' + (data.error || ''));
+        }
+    });
+}
+
+function onCharSetChange() {
+    const sel = document.getElementById('char-set');
+    if (!sel.value) return;
+    const set = _charSets.find(s => s.id === sel.value);
+    if (!set) return;
+    // 跨模式应用警告：角色位/图片格式可能不兼容
+    if (set.structure && set.structure !== ACTIVE_MODE) {
+        const from = MODE_LABELS[set.structure] || set.structure;
+        const to = MODE_LABELS[ACTIVE_MODE] || ACTIVE_MODE;
+        if (!confirm(`该套装保存于「${from}」模式，应用于「${to}」模式可能不完全兼容（角色位/图片格式不同），是否继续？`)) {
+            sel.value = '';
+            return;
+        }
+    }
+    applyCharSet(set);
+}
+
+function applyCharSet(set) {
+    const cfg = MODE_CONFIGS[ACTIVE_MODE];
+    cfg.character_source = set.character_source || '';
+    cfg.character_reuse = set.character_reuse || '';
+    cfg.character_fixes = set.character_fixes || '';
+    cfg.character_voices = set.character_voices || '';
+    cfg.character_library = set.character_library || '';
+    cfg._ui_descs = set._ui_descs || {};
+    // 持久化到当前模式配置
+    const mode = ACTIVE_MODE;
+    fetch('/api/config/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            _mode: mode,
+            character_source: cfg.character_source,
+            character_reuse: cfg.character_reuse,
+            character_fixes: cfg.character_fixes,
+            character_voices: cfg.character_voices,
+            character_library: cfg.character_library,
+            _ui_descs: cfg._ui_descs,
+        })
+    }).catch(() => {});
+    // 重渲染角色区 UI（源运行已删时下拉自动回落「生成新角色」）
+    parseLibAssignments();
+    const srcSel = document.getElementById('char-source');
+    const want = cfg.character_source;
+    srcSel.value = (_charSources.some(s => s.name === want)) ? want : '';
+    onCharSourceChange();
+    renderLibrary();
+    loadLibrary();  // 清理指向已删除素材库角色的悬空绑定
+}
+
+function deleteCharSet() {
+    const sel = document.getElementById('char-set');
+    const set = _charSets.find(s => s.id === sel.value);
+    if (!set) { alert('请先在下拉中选择要删除的套装'); return; }
+    if (!confirm(`删除套装「${set.name}」？`)) return;
+    fetch('/api/character_sets/' + set.id, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) loadCharSets(); });
+}
+
 // Load character sources on page load
 window.addEventListener('load', function() {
     applyModeTabStyles();
@@ -865,6 +1009,7 @@ window.addEventListener('load', function() {
     loadQwenVoices();
     loadCharSources();
     loadLibrary();
+    loadCharSets();
     loadScriptLibrary();
     // ?script_id= 预选（脚本页「到控制台」带入）：自动切模式并选中该脚本
     const preselectId = new URLSearchParams(location.search).get('script_id');

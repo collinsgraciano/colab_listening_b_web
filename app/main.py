@@ -1411,6 +1411,74 @@ async def api_character_sources():
 
 
 # ===========================================================================
+# Character Sets API (角色套装：整套角色配置命名保存 / 一键应用)
+# ===========================================================================
+
+CHARACTER_SETS_PATH = WEB_ROOT / "configs" / "character_sets.json"
+_SET_FIELDS = ["character_source", "character_reuse", "character_fixes",
+               "character_library", "character_voices", "_ui_descs"]
+
+
+def _load_char_sets() -> list:
+    if not CHARACTER_SETS_PATH.exists():
+        return []
+    try:
+        return json.loads(CHARACTER_SETS_PATH.read_text(encoding="utf-8")).get("sets", [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_char_sets(sets: list) -> None:
+    CHARACTER_SETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CHARACTER_SETS_PATH.write_text(
+        json.dumps({"sets": sets}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.get("/api/character_sets")
+async def api_char_sets_list():
+    """List all saved character sets (whole-cast presets), newest first."""
+    sets = sorted(_load_char_sets(), key=lambda s: s.get("created", 0), reverse=True)
+    return {"sets": sets}
+
+
+@app.post("/api/character_sets/save")
+async def api_char_sets_save(request: Request):
+    """Save the current character config of a mode as a named set.
+
+    Same name + structure → update in place (keep id/created).
+    """
+    data = await request.json()
+    name = (data.get("name", "") or "").strip()
+    mode = data.get("mode", "") or get_active_mode()
+    if not name:
+        return JSONResponse({"ok": False, "error": "名称不能为空"}, status_code=400)
+    if mode not in MODES:
+        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
+
+    sets = _load_char_sets()
+    entry = next(
+        (s for s in sets if s.get("name") == name and s.get("structure") == mode), None)
+    if entry is None:
+        entry = {"id": f"set_{int(time.time() * 1000)}", "name": name,
+                 "structure": mode, "created": time.time()}
+        sets.append(entry)
+    for f in _SET_FIELDS:
+        entry[f] = data.get(f, "")
+    _save_char_sets(sets)
+    return {"ok": True, "set": entry}
+
+
+@app.delete("/api/character_sets/{set_id}")
+async def api_char_sets_delete(set_id: str):
+    sets = _load_char_sets()
+    remaining = [s for s in sets if s.get("id") != set_id]
+    if len(remaining) == len(sets):
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    _save_char_sets(remaining)
+    return {"ok": True}
+
+
+# ===========================================================================
 # Health check
 # ===========================================================================
 

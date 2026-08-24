@@ -57,6 +57,7 @@ colab_listening_b_web/
 - **单步模式：** `_step_mode` 在每步完成后暂停，等待用户点击"继续"，便于调试和检查中间产物。
 - **断点续传：** 每步完成后写 `checkpoint.json`，`--resume` 时跳过已完成步骤。完整运行后清除 checkpoint。
 - **角色复用：** 支持从之前的运行中复制角色图片和描述，或用自定义描述覆盖（`character_source` + `character_reuse` + `character_fixes`）。
+- **角色套装：** 整套角色配置（复用源/复用模式/素材库绑定/Qwen音色/描述覆盖）可命名保存到 `configs/character_sets.json`，控制台「复用角色」区下拉一键应用到当前模式（同名单模式覆盖更新；跨模式应用有确认警告）。
 - **多 Token 轮换：** MCP 客户端支持多个 OAuth Token，积分耗尽时自动切换到下一个。
 
 ## Pipeline Steps
