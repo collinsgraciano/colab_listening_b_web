@@ -7,36 +7,61 @@ import json
 import re
 import os
 import sys
+import threading
 import urllib.request
 import urllib.error
 from pathlib import Path
 
 from style_manager import get_active_style_prompt, get_active_thumbnail_hint
 
+# 线程局部 LLM 环境覆盖：Web 批量生成等后台线程自带 provider 配置，
+# 与运行中 pipeline 线程读的 os.environ 互不污染（并发运行互不干扰）。
+_LLM_ENV_TLS = threading.local()
+
+
+def set_llm_env_override(cfg: dict | None) -> None:
+    """设置当前线程的 LLM 环境覆盖（传 None 清除）。
+
+    键名与 env var 同名（LLM_PROVIDER / OPENAI_API_KEY / ...）；
+    未覆盖的键回退 os.environ。仅影响调用线程内的 LLM 调用。
+    """
+    _LLM_ENV_TLS.cfg = cfg
+
+
+def _env_get(name: str, default: str = "") -> str:
+    """os.environ.get 的线程局部覆盖版：当前线程的 override 优先。"""
+    cfg = getattr(_LLM_ENV_TLS, "cfg", None)
+    if cfg is not None and name in cfg:
+        return cfg[name]
+    return os.environ.get(name, default)
+
+
 # Rate limiting: enforce minimum interval between LLM API calls to avoid HTTP 429.
 # glm-5.2 is especially aggressive about "request rate increased too quickly".
-_LAST_CALL_TIME = 0.0
+_LAST_CALL_TIME = 0.0  # 最近一次调用的开始时刻（预约槽位）
+_RATE_LOCK = threading.Lock()
 
 
 def _get_min_call_interval() -> float:
-    """Read LLM_MIN_INTERVAL from env per-call (not frozen at import time)."""
-    return float(os.environ.get("LLM_MIN_INTERVAL", "5.0"))
+    """Read LLM_MIN_INTERVAL per-call (thread-local override first)."""
+    return float(_env_get("LLM_MIN_INTERVAL", "5.0"))
 
 
 def _enforce_rate_limit():
-    """Sleep if the previous LLM call completed too recently.
+    """预约式限速：相邻两次 LLM 调用的开始时刻间隔 ≥ min_interval。
 
-    _LAST_CALL_TIME is set AFTER a successful response (not before the request),
-    so the interval measures the gap from the end of the previous call to the
-    start of the next one.
+    并发线程在锁内各自预约开始槽位（start-to-start 间隔），避免多线程
+    同时发起请求触发同一 provider 的 HTTP 429。
     """
     import time as _time
     global _LAST_CALL_TIME
-    min_interval = _get_min_call_interval()
-    elapsed = _time.time() - _LAST_CALL_TIME
-    if elapsed < min_interval:
-        wait = min_interval - elapsed
-        _time.sleep(wait)
+    with _RATE_LOCK:
+        min_interval = _get_min_call_interval()
+        now = _time.time()
+        start_at = max(now, _LAST_CALL_TIME + min_interval)
+        _LAST_CALL_TIME = start_at  # 预约本次调用的开始槽位
+    if start_at > now:
+        _time.sleep(start_at - now)
 
 
 def _dump_raw_debug(raw: str, model: str, kind: str) -> str | None:
@@ -107,16 +132,16 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
     """
     import time as _time
 
-    provider = os.environ.get("LLM_PROVIDER", "sensenova")
+    provider = _env_get("LLM_PROVIDER", "sensenova")
 
     if provider == "openai":
-        model = os.environ.get("OPENAI_MODEL", "grok-4.6")
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        base_url = os.environ.get("OPENAI_BASE_URL", "https://x666.me/v1")
+        model = _env_get("OPENAI_MODEL", "grok-4.6")
+        api_key = _env_get("OPENAI_API_KEY", "")
+        base_url = _env_get("OPENAI_BASE_URL", "https://x666.me/v1")
     else:
-        model = os.environ.get("SENSENOVA_MODEL", "deepseek-v4-flash")
-        api_key = os.environ.get("SENSENOVA_API_KEY", "")
-        base_url = os.environ.get("SENSENOVA_BASE", "https://token.sensenova.cn/v1")
+        model = _env_get("SENSENOVA_MODEL", "deepseek-v4-flash")
+        api_key = _env_get("SENSENOVA_API_KEY", "")
+        base_url = _env_get("SENSENOVA_BASE", "https://token.sensenova.cn/v1")
 
     # Retry on 429 (rate limit) and 524 (Cloudflare gateway timeout)
     _RETRY_CODES = [429, 524]
@@ -207,11 +232,8 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
                         f"Full raw ({len(raw)} chars)"
                         f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
                     )
-                # Record successful completion time for rate limiting.
-                # This ensures the next call waits at least min_interval seconds
-                # AFTER this response, not from when this request started.
-                import time as _time
-                _LAST_CALL_TIME = _time.time()
+                # 限速槽位已在 _enforce_rate_limit 中预约（start-to-start 间隔），
+                # 无需在响应后再次记录时间。
                 return content
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")
@@ -278,8 +300,8 @@ def _extract_json(text: str) -> dict:
 
 
 def _get_character_overrides() -> dict:
-    """Read character overrides from env var (set by pipeline_service before step0)."""
-    raw = os.environ.get("CHARACTER_OVERRIDES", "")
+    """Read character overrides (env var set by pipeline_service before step0)."""
+    raw = _env_get("CHARACTER_OVERRIDES", "")
     if not raw:
         return {}
     try:

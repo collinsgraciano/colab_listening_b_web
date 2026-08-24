@@ -858,10 +858,11 @@ def _generate_preview_worker(style_id: str, style_prompt: str):
     """后台线程：用 MCP 生成标准测试图（咖啡店双人场景）作为风格预览。"""
     import urllib.request
     try:
-        from mcp_client import call_tool, parse_task_id, poll_task
+        from mcp_client import ensure_initialized as mcp_ensure_init, call_tool, parse_task_id, poll_task
         prompt = (f"a friendly young woman barista in a green apron and a young man "
                   f"customer talking at a coffee shop counter, warm daylight, "
                   f"{style_prompt}, 16:9")
+        mcp_ensure_init()  # 幂等：未初始化才初始化，绝不动运行中 pipeline 的会话
         result = call_tool("generate_image", {
             "prompt": prompt,
             "provider": "frontier",
@@ -2072,16 +2073,15 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
         _pipeline = str(PIPELINE_DIR)
         if _pipeline not in sys.path:
             sys.path.insert(0, _pipeline)
-        from mcp_client import reinitialize as mcp_reinit, call_tool, parse_task_id, poll_task, download_file
+        from mcp_client import ensure_initialized as mcp_ensure_init, call_tool, parse_task_id, poll_task, download_file
         from atlas_split import split_atlas
 
-        # Initialize MCP with configured tokens
+        # 幂等初始化 MCP（token 集与当前一致时不动会话，避免打断运行中的 pipeline）
         if mcp_tokens:
             tokens = [t.strip() for t in mcp_tokens.split("\n") if t.strip()]
-            tokens_str = ",".join(tokens)
-            mcp_reinit(tokens=tokens)
+            mcp_ensure_init(tokens=tokens)
         else:
-            mcp_reinit()
+            mcp_ensure_init()
 
         _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
                   "cel-shaded with thin clean black outline, "

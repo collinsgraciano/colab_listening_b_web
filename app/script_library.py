@@ -11,7 +11,6 @@ provider only affects this batch. AI review follows topics_ai's chat pattern
 but with an explicit provider override.
 """
 import json
-import os
 import random
 import sys
 import threading
@@ -34,7 +33,7 @@ _PIPELINE_DIR = WEB_ROOT / "pipeline"
 if str(_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_PIPELINE_DIR))
 
-from llm_client import _extract_json  # noqa: E402
+from llm_client import _extract_json, set_llm_env_override  # noqa: E402
 
 DEFAULT_LINES = {"original": 18, "image": 18, "quest": 48}
 
@@ -314,17 +313,13 @@ def _resolve_batch_provider(provider_id: str, model: str, structure: str):
     return resolve_provider(cfg), cfg
 
 
-_ENV_KEYS = [
-    "LLM_PROVIDER", "SENSENOVA_API_KEY", "SENSENOVA_MODEL",
-    "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL",
-    "LLM_RETRIES", "LLM_MIN_INTERVAL",
-    "QUEST_BEAT_LINES", "QUEST_QA_MAX_ROUNDS",
-    "CHARACTER_OVERRIDES",
-]
+def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
+    """构建批量生成专用的线程局部 LLM 配置（不修改 os.environ）。
 
-
-def _apply_llm_env(provider_id: str, model: str, structure: str) -> dict:
-    """Set env vars for the batch-selected provider. Returns backup dict."""
+    返回 dict 的键名与 env var 同名，供 set_llm_env_override 使用——
+    批量生成线程读自己的 override，运行中的 pipeline 线程读 os.environ，
+    两者并发互不污染。
+    """
     (p_type, base_url, api_key, resolved_model), cfg = _resolve_batch_provider(
         provider_id, model, structure)
     if not api_key:
@@ -332,34 +327,26 @@ def _apply_llm_env(provider_id: str, model: str, structure: str) -> dict:
             f"未配置所选大模型的 API Key（provider={provider_id}）— "
             f"请先在「参数配置」页面填写，或在「AI 对话测试」页管理自定义 Provider")
 
-    backup = {k: os.environ.get(k) for k in _ENV_KEYS}
-    os.environ["LLM_PROVIDER"] = p_type
+    ov: dict[str, str] = {
+        "LLM_PROVIDER": p_type,
+        "LLM_RETRIES": str(cfg.get("llm_retries", 10)),
+        "CHARACTER_OVERRIDES": "",  # 批量脚本是通用脚本：不注入角色覆盖
+    }
     if p_type == "sensenova":
-        os.environ["SENSENOVA_API_KEY"] = api_key
-        os.environ["SENSENOVA_MODEL"] = resolved_model or "deepseek-v4-flash"
+        ov["SENSENOVA_API_KEY"] = api_key
+        ov["SENSENOVA_MODEL"] = resolved_model or "deepseek-v4-flash"
     else:
-        os.environ["OPENAI_BASE_URL"] = base_url
-        os.environ["OPENAI_API_KEY"] = api_key
-        os.environ["OPENAI_MODEL"] = resolved_model or "grok-4.6"
-    os.environ["LLM_RETRIES"] = str(cfg.get("llm_retries", 10))
+        ov["OPENAI_BASE_URL"] = base_url
+        ov["OPENAI_API_KEY"] = api_key
+        ov["OPENAI_MODEL"] = resolved_model or "grok-4.6"
     if cfg.get("llm_min_interval"):
-        os.environ["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
+        ov["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
     if structure == "quest":
         if cfg.get("quest_beat_lines"):
-            os.environ["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])
+            ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])
         if cfg.get("quest_qa_rounds") is not None and cfg.get("quest_qa_rounds") != "":
-            os.environ["QUEST_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
-    # 批量脚本是通用脚本：不注入角色覆盖
-    os.environ.pop("CHARACTER_OVERRIDES", None)
-    return backup
-
-
-def _restore_env(backup: dict) -> None:
-    for k, v in backup.items():
-        if v is None:
-            os.environ.pop(k, None)
-        else:
-            os.environ[k] = v
+            ov["QUEST_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
+    return ov
 
 
 def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
@@ -417,12 +404,14 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
     max_attempts = 2 if structure == "quest" else 3
 
     try:
-        backup = _apply_llm_env(provider, model, structure)
+        override = _build_llm_override(provider, model, structure)
     except RuntimeError as e:
         q.put(("fatal", str(e)))
         q.put(None)
         return
 
+    # 线程局部覆盖：批量线程用自己的 provider 配置，与运行中的 pipeline 互不干扰
+    set_llm_env_override(override)
     try:
         for i, topic in enumerate(topics):
             if stop_event.is_set():
@@ -460,7 +449,7 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
                        f"❌ 「{topic}」失败: {type(e).__name__}: {str(e)[:120]}"))
         q.put(("done", summary))
     finally:
-        _restore_env(backup)
+        set_llm_env_override(None)
         q.put(None)
 
 

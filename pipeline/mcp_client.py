@@ -15,6 +15,7 @@ import os
 import json
 import time
 import re
+import threading
 import urllib.request
 import urllib.error
 
@@ -174,6 +175,25 @@ def reinitialize(tokens=None):
     _session_id = None
     _msg_id = 0
     return initialize(tokens=tokens) if tokens else initialize()
+
+
+_INIT_LOCK = threading.Lock()
+
+
+def ensure_initialized(tokens=None):
+    """幂等初始化：已用相同 token 集初始化过则直接复用现有会话。
+
+    与 reinitialize 的区别：绝不重置其他线程（如运行中 pipeline 步骤 2/3
+    的图片/视频生成轮询）正在使用的全局会话状态。Web 后台线程
+    （角色库图片生成、风格预览等）应优先用它。
+    """
+    with _INIT_LOCK:
+        want = [t.strip() for t in (tokens or []) if t.strip()]
+        if TOKEN and _TOKENS:
+            # 已初始化且 token 集一致（或调用方未指定）→ 复用现有会话
+            if not want or set(want) == set(_TOKENS):
+                return
+        return initialize(tokens=want or None)
 
 
 def call_tool(name, arguments):

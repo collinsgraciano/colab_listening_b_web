@@ -17,7 +17,6 @@ Reuses _chat, _extract_json from parent llm_client.
 """
 import json
 import math
-import os
 import sys
 import time
 from pathlib import Path
@@ -28,6 +27,7 @@ if _PARENT not in sys.path:
 
 from llm_client import (
     _chat,
+    _env_get,
     _extract_json,
     _load_used_listening_summaries,
     _build_character_override_prompt,
@@ -42,7 +42,7 @@ except ImportError:
 
 def _env_int(name: str, default: int) -> int:
     try:
-        return int(os.environ.get(name, "") or default)
+        return int(_env_get(name, "") or default)
     except ValueError:
         return default
 
