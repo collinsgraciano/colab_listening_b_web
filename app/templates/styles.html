@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block content %}
+{% macro style_card(s) %}
+<div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col"
+     id="card-{{ s.id }}">
+    {% if s.has_preview %}
+    <img src="/api/styles/preview/{{ s.id }}" class="w-full aspect-video object-cover bg-slate-900 cursor-pointer"
+         onclick="this.src='/api/styles/preview/{{ s.id }}?t='+Date.now()" title="点击刷新预览图">
+    {% else %}
+    <div class="w-full aspect-video bg-slate-900 flex items-center justify-center border-b border-slate-700">
+        <span class="text-3xl opacity-40">🖼️</span>
+    </div>
+    {% endif %}
+    <div class="p-4 flex-1 flex flex-col gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-white text-sm">{{ s.name }}</span>
+            {% if s.id == current_id %}
+            <span class="px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 text-[10px]">当前使用</span>
+            {% endif %}
+            {% if s.experimental %}
+            <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">实验性</span>
+            {% endif %}
+        </div>
+        <p class="text-[11px] text-slate-500">{{ s.name_en }} · {{ s.id }}</p>
+        <p class="text-xs text-slate-400 leading-relaxed flex-1">{{ s.description }}</p>
+        <code class="text-[10px] text-emerald-300/80 bg-slate-900/60 rounded px-2 py-1.5 block break-all leading-relaxed"
+              title="{{ s.style_prompt }}">{{ s.style_prompt[:110] }}{% if s.style_prompt|length > 110 %}…{% endif %}</code>
+        <div class="flex items-center gap-2 flex-wrap mt-1">
+            {% if s.id == current_id %}
+            <button disabled class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-400 cursor-not-allowed">使用中</button>
+            {% else %}
+            <button onclick="selectStyle('{{ s.id }}')" class="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white">使用此风格</button>
+            {% endif %}
+            <button onclick="genPreview('{{ s.id }}', this)" class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300" title="用此风格生成一张标准测试图（消耗 MCP 积分）">生成预览图</button>
+            {% if not s.builtin %}
+            <button onclick="editStyle('{{ s.id }}')" class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">编辑</button>
+            <button onclick="deleteStyle('{{ s.id }}')" class="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 hover:bg-red-800 text-red-300">删除</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+<div class="p-6 max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">🎨 画面风格</h2>
+            <p class="text-sm text-slate-400 mt-1">
+                画面风格贯穿 LLM 脚本 → 图片 → 视频片段 → 缩略图 全流程，保证整条视频风格统一。
+                当前应用于模式：<span class="text-indigo-300 font-medium">{{ mode_labels[active_mode] }}</span>
+            </p>
+        </div>
+        <button onclick="showStyleForm()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">+ 新建风格</button>
+    </div>
+
+    <!-- 当前风格横幅 -->
+    <div class="rounded-xl p-5 mb-6 border border-indigo-500/60 bg-gradient-to-r from-indigo-900/40 to-slate-800">
+        <div class="flex items-start gap-5">
+            {% if current_style.has_preview %}
+            <img src="/api/styles/preview/{{ current_style.id }}" class="w-64 rounded-lg border border-slate-600 object-cover aspect-video bg-slate-900">
+            {% else %}
+            <div class="w-64 rounded-lg border border-slate-600 bg-slate-900 aspect-video flex items-center justify-center">
+                <span class="text-4xl">🖼️</span>
+            </div>
+            {% endif %}
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 text-xs font-medium">✓ 当前使用</span>
+                    <h3 class="text-lg font-bold text-white">{{ current_style.name }}</h3>
+                    <span class="text-xs text-slate-400">{{ current_style.name_en }} · {{ current_style.id }}</span>
+                </div>
+                <p class="text-sm text-slate-300 mb-2">{{ current_style.description }}</p>
+                <code class="block text-xs text-emerald-300/90 bg-slate-900/70 rounded-lg px-3 py-2 break-all leading-relaxed">{{ current_style.style_prompt }}</code>
+                <p class="text-xs text-slate-500 mt-2">在下方风格卡片或「参数配置」页可切换风格；切换只影响新生成的视频。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建/编辑表单 (hidden) -->
+    <div id="style-form" class="hidden bg-slate-800 rounded-xl p-5 mb-6 border border-indigo-700/60">
+        <h3 id="style-form-title" class="text-sm font-semibold text-white mb-3">新建画面风格</h3>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">风格 ID *（小写字母/数字/下划线）</label>
+                <input type="text" id="sf-id" placeholder="如 my_watercolor"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">名称 *（中文）</label>
+                <input type="text" id="sf-name" placeholder="如 我的水彩风"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">英文名</label>
+                <input type="text" id="sf-name-en" placeholder="My Watercolor"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="col-span-2">
+                <label class="text-xs text-slate-400 block mb-1">风格 Prompt *（英文，注入所有图片/视频提示词）</label>
+                <textarea id="sf-prompt" rows="3" placeholder="如: soft watercolor illustration style, pastel colors, hand-painted texture"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white resize-none"></textarea>
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">缩略图提示短语（英文）</label>
+                <input type="text" id="sf-thumb" placeholder="如 watercolor-style"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <p class="text-[10px] text-slate-500 mt-1 leading-relaxed">用于缩略图提示词中替代 "3D Pixar-style" 的短语，留空自动填 "custom-style"</p>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="text-xs text-slate-400 block mb-1">描述（中文，展示在风格卡片上）</label>
+            <input type="text" id="sf-desc" placeholder="一句话说明这个风格的特点和适用场景"
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div class="flex gap-2">
+            <button onclick="saveStyle()" id="sf-save" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存</button>
+            <button onclick="hideStyleForm()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">取消</button>
+        </div>
+    </div>
+
+    <!-- 内置风格 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>📦</span> 内置风格（{{ styles | selectattr('builtin') | list | length }} 个）
+        </h3>
+        <div class="grid grid-cols-3 gap-4">
+            {% for s in styles if s.builtin %}
+            {{ style_card(s) }}
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- 自定义风格 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>✏️</span> 自定义风格（{{ styles | rejectattr('builtin') | list | length }} 个）
+        </h3>
+        <div id="custom-grid" class="grid grid-cols-3 gap-4">
+            {% for s in styles if not s.builtin %}
+            {{ style_card(s) }}
+            {% endfor %}
+        </div>
+        {% if styles | rejectattr('builtin') | list | length == 0 %}
+        <p class="text-xs text-slate-500">暂无自定义风格。点击右上角「+ 新建风格」创建属于你自己的画面风格。</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CURRENT_ID = {{ current_id | tojson }};
+const STYLE_DATA = {};
+{% for s in styles %}
+STYLE_DATA[{{ s.id | tojson }}] = {{ s | tojson }};
+{% endfor %}
+
+function toast(msg, ok = true) {
+    const t = document.createElement('div');
+    t.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-sm text-white shadow-lg ${ok ? 'bg-green-600' : 'bg-red-600'}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+async function api(url, opts = {}) {
+    const res = await fetch(url, {
+        headers: {'Content-Type': 'application/json'},
+        ...opts,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+}
+
+async function selectStyle(id) {
+    try {
+        await api('/api/styles/select', {method: 'POST', body: JSON.stringify({style_id: id})});
+        toast(`已设为当前画面风格（跟随当前模式）`);
+        setTimeout(() => location.reload(), 600);
+    } catch (e) { toast(e.message, false); }
+}
+
+function showStyleForm(editing = null) {
+    document.getElementById('style-form').classList.remove('hidden');
+    document.getElementById('style-form').scrollIntoView({behavior: 'smooth'});
+    document.getElementById('style-form-title').textContent = editing ? `编辑风格: ${editing.name}` : '新建画面风格';
+    document.getElementById('sf-id').value = editing ? editing.id : '';
+    document.getElementById('sf-id').disabled = !!editing;
+    document.getElementById('sf-name').value = editing ? editing.name : '';
+    document.getElementById('sf-name-en').value = editing ? (editing.name_en || '') : '';
+    document.getElementById('sf-prompt').value = editing ? editing.style_prompt : '';
+    document.getElementById('sf-thumb').value = editing ? (editing.thumbnail_hint || '') : '';
+    document.getElementById('sf-desc').value = editing ? (editing.description || '') : '';
+}
+
+function hideStyleForm() {
+    document.getElementById('style-form').classList.add('hidden');
+    document.getElementById('sf-id').disabled = false;
+}
+
+function editStyle(id) { showStyleForm(STYLE_DATA[id]); }
+
+async function saveStyle() {
+    const id = document.getElementById('sf-id').value.trim();
+    const name = document.getElementById('sf-name').value.trim();
+    const style_prompt = document.getElementById('sf-prompt').value.trim();
+    if (!id || !name || !style_prompt) { toast('ID、名称、风格 Prompt 均必填', false); return; }
+    const body = {
+        id, name, style_prompt,
+        name_en: document.getElementById('sf-name-en').value.trim(),
+        thumbnail_hint: document.getElementById('sf-thumb').value.trim(),
+        description: document.getElementById('sf-desc').value.trim(),
+    };
+    const editing = !document.getElementById('sf-id').disabled;
+    try {
+        await api(editing ? '/api/styles/update' : '/api/styles/create', {method: 'POST', body: JSON.stringify(body)});
+        toast('已保存');
+        setTimeout(() => location.reload(), 500);
+    } catch (e) { toast(e.message, false); }
+}
+
+async function deleteStyle(id) {
+    if (!confirm(`确定删除自定义风格「${id}」？若当前模式正在使用将自动回落默认风格。`)) return;
+    try {
+        const r = await api(`/api/styles/${id}`, {method: 'DELETE'});
+        toast(r.reset_modes?.length ? `已删除（${r.reset_modes.length} 个模式配置已回落默认）` : '已删除');
+        setTimeout(() => location.reload(), 600);
+    } catch (e) { toast(e.message, false); }
+}
+
+async function genPreview(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '生成中…';
+    try {
+        await api(`/api/styles/preview/${id}`, {method: 'POST'});
+        toast('预览图生成中（约 1-2 分钟），完成后卡片自动刷新');
+        pollPreview(id);
+    } catch (e) {
+        toast(e.message, false);
+        btn.disabled = false;
+        btn.textContent = '生成预览图';
+    }
+}
+
+const _polling = new Set();
+function pollPreview(id) {
+    if (_polling.has(id)) return;
+    _polling.add(id);
+    const timer = setInterval(async () => {
+        try {
+            const r = await api(`/api/styles/preview/${id}/status`);
+            if (r.has_preview) {
+                clearInterval(timer);
+                _polling.delete(id);
+                const card = document.getElementById(`card-${id}`);
+                if (card) {
+                    const holder = card.querySelector('.aspect-video');
+                    holder.outerHTML = `<img src="/api/styles/preview/${id}?t=${Date.now()}" class="w-full aspect-video object-cover bg-slate-900">`;
+                }
+            } else if (r.status && r.status.startsWith('failed')) {
+                clearInterval(timer);
+                _polling.delete(id);
+                toast(`预览生成失败: ${r.status}`, false);
+            }
+        } catch (e) { /* keep polling */ }
+    }, 8000);
+}
+</script>
+{% endblock %}

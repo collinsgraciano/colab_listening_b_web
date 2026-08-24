@@ -11,6 +11,8 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
+from style_manager import get_active_style_prompt, get_active_thumbnail_hint
+
 # Rate limiting: enforce minimum interval between LLM API calls to avoid HTTP 429.
 # glm-5.2 is especially aggressive about "request rate increased too quickly".
 _LAST_CALL_TIME = 0.0
@@ -337,6 +339,13 @@ IMPORTANT — AVOID DUPLICATES: The following dialogue scenarios have already be
 Do NOT create dialogue that is too similar to these. Use a DIFFERENT situation, different speakers, different story:
 {chr(10).join(f"  - {d}" for d in used_dialogues[:20])}
 """
+    style_prompt = get_active_style_prompt()
+    thumb_hint = get_active_thumbnail_hint()
+    style_section = f"""
+VISUAL STYLE (CRITICAL): The video's art style is: "{style_prompt}".
+- EVERY image_prompt, video_prompt, and poses entry MUST include this EXACT style descriptor phrase (copy it verbatim).
+- Do NOT use any other art style, do NOT mix styles, do NOT add contradicting style words (e.g. photorealistic, sketch).
+"""
     return f"""You are an expert ESL teacher creating ENGLISH LISTENING PRACTICE content for overseas Chinese learners.
 
 CORE MISSION: 帮助海外华人用最地道最日常的英语，搞定真实生活中的每一个场景.
@@ -387,7 +396,7 @@ TECHNICAL REQUIREMENTS:
 - "thumbnail_action": a short description of what the main character is doing on the thumbnail (e.g. "pointing to a menu", "holding a shopping bag", "waving hello", "gesturing toward the counter")
 - "thumbnail_subtitle": a short Traditional Chinese subtitle shown below the title on the thumbnail (e.g. "18句聽力練習", "每天50句", "實用日常英語")
 - "thumbnail_icons": an array of 4-5 objects with "en" and "zh" string keys, describing scene-related keywords shown as circular icons at the bottom of the thumbnail. Each has an English label and a Traditional Chinese label. Example for pharmacy: [{{"en": "Prescription", "zh": "處方"}}, {{"en": "Refill", "zh": "補充"}}, {{"en": "Cough Syrup", "zh": "止咳糖漿"}}, {{"en": "Side Effects", "zh": "副作用"}}]
-- "thumbnail_prompt": a detailed prompt for generating a YouTube thumbnail background image. Must describe: a 3D Pixar-style character with an expressive face, the scene location, bright colors, reference-style layout.
+- "thumbnail_prompt": a detailed prompt for generating a YouTube thumbnail background image. Must describe: a {thumb_hint} character with an expressive face, the scene location, bright colors, reference-style layout.
 - "title": English title (e.g. "AT THE AIRPORT")
 - "cefr": the CEFR level of this lesson, exactly "{cefr}" (used for thumbnail level badge)
 - "title_zh": Traditional Chinese short title (max 6 characters, e.g. "在機場")
@@ -400,7 +409,7 @@ TECHNICAL REQUIREMENTS:
 - "practice_intro_zh": Traditional Chinese translation of the practice intro
 - ALL Chinese text MUST be in Traditional Chinese (繁體中文)
 
-CONSISTENCY RULES (CRITICAL):
+{style_section}CONSISTENCY RULES (CRITICAL):
 - Gender: char_a_gender/char_b_gender MUST match the description text. If female, description MUST say "a young woman" and ALL her prompts MUST say so. NEVER mix genders.
 - Appearance: each speaker's description (hair, clothing, etc.) MUST be IDENTICAL across ALL their image_prompt/video_prompt/poses entries.
 - Scene: image_prompt and video_prompt MUST match the dialogue context (if at a restaurant, say "restaurant", NOT "airport"). Scene MUST be consistent throughout ALL lines.

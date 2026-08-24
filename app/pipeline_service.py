@@ -188,6 +188,12 @@ class PipelineService:
         if config.get("llm_min_interval"):
             os.environ["LLM_MIN_INTERVAL"] = str(config["llm_min_interval"])
 
+        # 画面风格：注入 env 供 llm_client / thumbnail_gen / 各 step 读取
+        from style_manager import resolve_style_prompt as _rsp
+        style_id = str(config.get("visual_style", "pixar3d"))
+        os.environ["VISUAL_STYLE_ID"] = style_id
+        os.environ["VISUAL_STYLE_PROMPT"] = _rsp(style_id)
+
         provider = config.get("llm_provider", "sensenova")
         p_type, p_base_url, p_api_key, p_model = resolve_provider(config)
         os.environ["LLM_PROVIDER"] = p_type
@@ -595,6 +601,7 @@ class PipelineService:
             num_lines=num_lines,
             structure=structure,
             animation=config.get("animation", "landing"),
+            visual_style=str(config.get("visual_style", "pixar3d")),
             llm_provider=config.get("llm_provider", "sensenova"),
             sensenova_api_key=p_api_key if p_type == "sensenova" else "",
             sensenova_model=p_model if p_type == "sensenova" else "deepseek-v4-flash",

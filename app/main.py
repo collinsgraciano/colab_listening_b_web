@@ -33,6 +33,7 @@ from .pipeline_service import get_service, STEP_ORDER
 from .config_manager import detect_local_mcp_token
 from . import topics_ai
 from . import script_library
+import style_manager as style_lib
 
 # Paths
 WEB_ROOT = Path(__file__).parent.parent.resolve()
@@ -98,6 +99,13 @@ async def config_page(request: Request, mode: str = ""):
     presets = list_presets()
     # Inject dynamic LLM provider options into PARAM_SPEC
     PARAM_SPEC["llm_provider"]["options"] = get_provider_options()
+    # Inject visual style options (built-in + custom styles)
+    style_opts = style_lib.get_style_options()
+    cur_style = config.get("visual_style", "pixar3d")
+    if cur_style and cur_style not in style_opts:
+        # 自定义风格已删除：诚实显示，让用户重新选择
+        style_opts = {cur_style: f"{cur_style}（已失效，请重新选择）", **style_opts}
+    PARAM_SPEC["visual_style"]["options"] = style_opts
     # Group params by group
     grouped = {}
     for key, spec in PARAM_SPEC.items():
@@ -734,6 +742,173 @@ async def api_topics_update(request: Request):
         return {"ok": True, "topics": result["topics"]}
     reason = result["skipped"][0] if result["skipped"] else "未知错误"
     return JSONResponse({"error": f"重命名失败: {reason}"}, status_code=400)
+
+
+# ===========================================================================
+# Visual Styles — 画面风格管理
+# ===========================================================================
+
+# 预览图生成任务状态: {style_id: "running" | "done" | "错误信息"}
+_PREVIEW_JOBS: dict[str, str] = {}
+
+
+@app.get("/styles", response_class=HTMLResponse)
+async def styles_page(request: Request):
+    config = load_config()
+    current_id = config.get("visual_style", "pixar3d")
+    styles = style_lib.list_styles()
+    for s in styles:
+        s["has_preview"] = style_lib.preview_path(s["id"]).exists()
+    current = style_lib.get_style(current_id) or style_lib.get_style("pixar3d")
+    return templates.TemplateResponse(request, "styles.html", {
+        "styles": styles,
+        "current_style": current,
+        "current_id": current_id,
+        "active_mode": get_active_mode(),
+        "mode_labels": MODE_LABELS,
+        "active_page": "styles",
+    })
+
+
+@app.get("/api/styles")
+async def api_styles_list():
+    config = load_config()
+    current_id = config.get("visual_style", "pixar3d")
+    styles = style_lib.list_styles()
+    for s in styles:
+        s["has_preview"] = style_lib.preview_path(s["id"]).exists()
+    return {
+        "styles": styles,
+        "current_id": current_id,
+        "active_mode": get_active_mode(),
+        "preview_jobs": _PREVIEW_JOBS,
+    }
+
+
+@app.post("/api/styles/create")
+async def api_styles_create(request: Request):
+    data = await request.json()
+    try:
+        style = await asyncio.to_thread(style_lib.save_custom_style, data)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"ok": True, "style": style}
+
+
+@app.post("/api/styles/update")
+async def api_styles_update(request: Request):
+    data = await request.json()
+    style_id = str(data.get("id", ""))
+    existing = style_lib.get_style(style_id)
+    if not existing:
+        return JSONResponse({"error": f"风格 '{style_id}' 不存在"}, status_code=404)
+    if existing.get("builtin"):
+        return JSONResponse({"error": "内置风格不可编辑"}, status_code=400)
+    try:
+        style = await asyncio.to_thread(style_lib.save_custom_style, data)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"ok": True, "style": style}
+
+
+@app.delete("/api/styles/{style_id}")
+async def api_styles_delete(style_id: str):
+    existing = style_lib.get_style(style_id)
+    if not existing:
+        return JSONResponse({"error": f"风格 '{style_id}' 不存在"}, status_code=404)
+    if existing.get("builtin"):
+        return JSONResponse({"error": "内置风格不可删除"}, status_code=400)
+    ok = await asyncio.to_thread(style_lib.delete_custom_style, style_id)
+    # 删除后：所有正在使用该风格的模式配置回落默认
+    reset_modes = []
+    if ok:
+        for mode in MODES:
+            mc = load_mode_config(mode)
+            if mc.get("visual_style") == style_id:
+                mc["visual_style"] = "pixar3d"
+                save_mode_config(mode, mc)
+                reset_modes.append(mode)
+    return {"ok": ok, "reset_modes": reset_modes}
+
+
+@app.post("/api/styles/select")
+async def api_styles_select(request: Request):
+    """为当前 active mode 设置画面风格。"""
+    data = await request.json()
+    style_id = str(data.get("style_id", "")).strip()
+    if not style_lib.get_style(style_id):
+        return JSONResponse({"error": f"风格 '{style_id}' 不存在"}, status_code=404)
+    mode = get_active_mode()
+    mc = load_mode_config(mode)
+    mc["visual_style"] = style_id
+    save_mode_config(mode, mc)
+    return {"ok": True, "mode": mode, "visual_style": style_id}
+
+
+@app.get("/api/styles/preview/{style_id}")
+async def api_styles_preview_get(style_id: str):
+    p = style_lib.preview_path(style_id)
+    if not p.exists():
+        return JSONResponse({"error": "预览图不存在"}, status_code=404)
+    return FileResponse(str(p), media_type="image/png")
+
+
+def _generate_preview_worker(style_id: str, style_prompt: str):
+    """后台线程：用 MCP 生成标准测试图（咖啡店双人场景）作为风格预览。"""
+    import urllib.request
+    try:
+        from mcp_client import call_tool, parse_task_id, poll_task
+        prompt = (f"a friendly young woman barista in a green apron and a young man "
+                  f"customer talking at a coffee shop counter, warm daylight, "
+                  f"{style_prompt}, 16:9")
+        result = call_tool("generate_image", {
+            "prompt": prompt,
+            "provider": "frontier",
+            "quality": "medium",
+            "image_size": {"width": 1280, "height": 720},
+            "output_format": "png",
+        })
+        task_id = parse_task_id(result)
+        data = poll_task(task_id, interval=10, max_wait=600)
+        url = data.get("url", "")
+        if not url:
+            raise RuntimeError("未获取到图片 URL")
+        out = style_lib.preview_path(style_id)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=120) as resp, open(out, "wb") as f:
+            f.write(resp.read())
+        if out.stat().st_size < 10000:
+            out.unlink(missing_ok=True)
+            raise RuntimeError("下载文件过小，疑似失败")
+        _PREVIEW_JOBS[style_id] = "done"
+    except Exception as e:
+        _PREVIEW_JOBS[style_id] = f"failed: {e}"
+
+
+@app.post("/api/styles/preview/{style_id}")
+async def api_styles_preview_generate(style_id: str):
+    """生成风格预览图（消耗 MCP 积分，后台执行）。"""
+    style = style_lib.get_style(style_id)
+    if not style:
+        return JSONResponse({"error": f"风格 '{style_id}' 不存在"}, status_code=404)
+    status = _PREVIEW_JOBS.get(style_id, "")
+    if status == "running":
+        return {"ok": True, "status": "running", "note": "已有任务进行中"}
+    _PREVIEW_JOBS[style_id] = "running"
+    threading.Thread(
+        target=_generate_preview_worker,
+        args=(style_id, style.get("style_prompt", style_lib.DEFAULT_STYLE_PROMPT)),
+        daemon=True,
+    ).start()
+    return {"ok": True, "status": "running"}
+
+
+@app.get("/api/styles/preview/{style_id}/status")
+async def api_styles_preview_status(style_id: str):
+    status = _PREVIEW_JOBS.get(style_id, "")
+    has = style_lib.preview_path(style_id).exists()
+    return {"status": status, "has_preview": has}
 
 
 # ===========================================================================

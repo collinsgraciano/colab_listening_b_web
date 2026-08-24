@@ -2,6 +2,7 @@
 and build CLI args for pipeline.py."""
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,11 @@ WEB_ROOT = Path(__file__).parent.parent.resolve()
 PIPELINE_DIR = Path(__file__).parent.parent.parent / "colab_listening_b"
 CONFIGS_DIR = WEB_ROOT / "configs"
 DEFAULT_CONFIG_PATH = CONFIGS_DIR / "default.json"
+
+# pipeline 模块目录（style_manager 在其中）
+_LOCAL_PIPELINE_DIR = WEB_ROOT / "pipeline"
+if str(_LOCAL_PIPELINE_DIR) not in sys.path:
+    sys.path.insert(0, str(_LOCAL_PIPELINE_DIR))
 
 # All configurable parameters with defaults, types, and metadata
 PARAM_SPEC = {
@@ -30,6 +36,10 @@ PARAM_SPEC = {
                       "none": "None (静态)",
                       "landing": "Landing (降落变换)",
                       "stop_motion": "Stop Motion (定格动画)"}},
+    "visual_style": {"default": "pixar3d", "type": "select", "group": "content",
+                     "label": "画面风格",
+                     "options": {"pixar3d": "3D 卡通（皮克斯）"},
+                     "help": "贯穿图片/视频/缩略图的画面风格，可在「画面风格」页管理自定义风格"},
     "character_source": {"default": "", "type": "text", "group": "content",
                          "label": "复用角色来源", "help": "留空=全部新生成。选择之前运行可复用其角色"},
     "character_reuse": {"default": "", "type": "text", "group": "content",
@@ -337,7 +347,6 @@ def resolve_provider(config: dict[str, Any]) -> tuple[str, str, str, str]:
 def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     """Build pipeline.py CLI arguments from config dict."""
     args: list[str] = ["python"]
-
     # Find pipeline.py
     pipeline_py = PIPELINE_DIR / "pipeline.py"
     if not pipeline_py.exists():
@@ -357,6 +366,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--num-lines", str(config["num_lines"])]
     args += ["--structure", str(config.get("structure", "original"))]
     args += ["--animation", str(config.get("animation", "landing"))]
+    args += ["--visual-style", str(config.get("visual_style", "pixar3d"))]
 
     # LLM
     provider = config.get("llm_provider", "sensenova")

@@ -131,7 +131,7 @@ def generate_quest_script(topic: str, cefr: str = "A1",
         "char_b_personality": outline.get("char_b_personality", "calm and knowledgeable"),
         "host_description": outline.get("host_description", ""),
         "host_gender": outline.get("host_gender", ""),
-        "host_bg_prompt": meta.get("host_bg_prompt", "a bright modern TV studio set, 3D cartoon style, no people"),
+        "host_bg_prompt": meta.get("host_bg_prompt", "a bright modern TV studio set, no people"),
         "youtube_title": meta.get("youtube_title", ""),
         "youtube_title_en": meta.get("youtube_title_en", ""),
         "youtube_description": meta.get("youtube_description", ""),
@@ -709,6 +709,9 @@ _META_TARGETS = {
 
 def _build_metadata_prompt(topic: str, cefr: str, outline: dict, dialogue: list[dict]) -> str:
     import json
+    from style_manager import get_active_style_prompt, get_active_thumbnail_hint
+    style_prompt = get_active_style_prompt()
+    thumb_hint = get_active_thumbnail_hint()
     dialogue_text = json.dumps(
         [{"s": d.get("speaker",""), "t": d.get("text",""), "p": d.get("phase","")}
          for d in dialogue],
@@ -737,19 +740,21 @@ Generate JSON with these fields:
   "hook_intro_zh": "繁中",
   "outro": "narrator closing 80-110 words: how was it→repeat question→comment CTA→channel description→subscribe→bye",
   "outro_zh": "繁中",
-  "host_bg_prompt": "TV studio background prompt (3D cartoon, no people)",
+  "host_bg_prompt": "TV studio background prompt (no people)",
   "youtube_title": "高CTR繁中标题 with 【】and ｜ format. Pattern D: 【英文聽力挑戰】{{emoji}}{{topic 繁中}}｜❓你能聽出答案嗎？｜{{CEFR}}慢速英文｜不用背多聽就會用｜英文聽力訓練｜{{English topic}}",
   "youtube_title_en": "high-CTR PURE ENGLISH title (no Chinese). Include topic + key skill + compelling hook. Max 100 chars. Example: Can You Guess Why It's Called Bubble Tea? ☕ Slow English Listening",
   "youtube_description": "full 繁中 description with chapters + key_words",
-  "youtube_description_en": "full PURE ENGLISH description (no Chinese). Include chapters section, key_words, hashtags, and subscribe CTA.",
+  "youtube_description_en": "full PURE ENGLISH description. Include chapters section, key_words, hashtags, and subscribe CTA.",
   "youtube_tags": ["tag1","tag2",... 15-20 tags],
-  "thumbnail_prompt": "thumbnail image prompt",
+  "thumbnail_prompt": "thumbnail image prompt ({thumb_hint} style)",
   "thumbnail_expression": "main character expression",
   "thumbnail_action": "main character action",
   "thumbnail_subtitle": "繁中 short subtitle",
   "thumbnail_icons": [{{"en":"word","zh":"繁中"}}, ... 4-5 icons],
-  "scene_images": [{{"prompt":"specific 3D cartoon scene description with details (counter, menu board, equipment, decor), 16:9, no people","label":"short English label"}}]
+  "scene_images": [{{"prompt":"specific scene description with details (counter, menu board, equipment, decor), 16:9, no people","label":"short English label"}}]
 }}
+
+VISUAL STYLE (CRITICAL): The video's art style is: "{style_prompt}". EVERY host_bg_prompt, thumbnail_prompt, and scene_images prompt MUST include this EXACT style descriptor phrase. Do NOT mix other art styles.
 
 IMPORTANT: Generate at least 8 scene_images covering different angles and details of the scene (e.g. exterior, counter, menu board, equipment, seating area, product close-up, kitchen, decoration).
 

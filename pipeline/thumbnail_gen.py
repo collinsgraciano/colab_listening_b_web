@@ -31,7 +31,7 @@ def _build_thumbnail_prompt(script: dict, structure: str) -> str:
     - Top-left orange banner: "A1-A2 LEVEL"
     - Top-right green icon: "中英對照"
     - Top center: "沉浸式聽力動畫" (listening) or "沉浸式英文動畫" (original)
-    - Main scene: 3D Pixar characters + background + props
+    - Main scene: characters in the active visual style + background + props
     - Large text below characters: Traditional Chinese title (e.g. "在藥房買藥英文")
     - Smaller text below: English title (e.g. "AT THE PHARMACY") + subtitle
     - Bottom row of circular icons with bilingual text (scene keywords)
@@ -39,6 +39,9 @@ def _build_thumbnail_prompt(script: dict, structure: str) -> str:
     Key design: the LARGE title is in Traditional Chinese (the audience's native
     language) for maximum CTR, with the English title as a smaller subtitle below.
     """
+    from style_manager import get_active_style_prompt, get_active_thumbnail_hint
+    style_prompt = get_active_style_prompt()
+    thumb_hint = get_active_thumbnail_hint()
     title_en = script.get("title", "ENGLISH LISTENING")
     title_zh = script.get("title_zh", script.get("intro_zh", ""))
     # Build a descriptive Chinese title: topic + "英文" suffix (e.g. "在藥房買藥英文")
@@ -70,7 +73,7 @@ def _build_thumbnail_prompt(script: dict, structure: str) -> str:
     else:
         top_center = "沉浸式英文動畫"
 
-    return f"""A highly complex 3D Pixar-style YouTube thumbnail for {scene_en} English listening practice, complete with an orange banner at the top left reading "{cefr} LEVEL" and a green icon at the top right with the text "中英對照". At the top center, the text "{top_center}" is integrated.
+    return f"""A highly complex {thumb_hint} YouTube thumbnail for {scene_en} English listening practice, complete with an orange banner at the top left reading "{cefr} LEVEL" and a green icon at the top right with the text "中英對照". At the top center, the text "{top_center}" is integrated.
 
 The main scene features a detailed view of {scene_en} with {char_a_desc} and {char_b_desc}, both with a {expression} expression, {action}. The background shows a detailed {scene_en} setting with relevant props and environment.
 
@@ -78,7 +81,7 @@ The LARGE bold text below the characters reads "{title_zh_large}" in bright yell
 
 At the very bottom, a precise row of circular icons is rendered with legible text associated: {icon_lines}.
 
-Clean legible text, bright studio lighting, vibrant colors, highly detailed, professional composition, 3D animated movie style, Pixar quality rendering, soft shadows, subsurface scattering, cinematic lighting.
+Clean legible text, bright studio lighting, vibrant colors, highly detailed, professional composition, {style_prompt}, soft shadows, cinematic lighting.
 
 CRITICAL: The largest and most prominent text on the thumbnail must be the Traditional Chinese title "{title_zh_large}". The English title "{title_en}" must be noticeably smaller, serving as a subtitle below the Chinese title. The Chinese audience sees the Chinese title first — it must grab attention."""
 

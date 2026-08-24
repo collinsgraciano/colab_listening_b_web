@@ -6,6 +6,7 @@ import time
 from mcp_client import call_tool, parse_task_id, poll_task, download_file
 from media_utils import get_duration as _get_audio_duration
 from grouping_b import merge_group_prompt
+from style_manager import DEFAULT_STYLE_PROMPT
 
 
 def file_ok(path: str, min_size: int) -> bool:
@@ -13,11 +14,12 @@ def file_ok(path: str, min_size: int) -> bool:
     return bool(path) and os.path.exists(path) and os.path.getsize(path) > min_size
 
 
-def build_scene_clip_task(scene: str, scene_url: str) -> dict:
+def build_scene_clip_task(scene: str, scene_url: str,
+                          style_prompt: str = DEFAULT_STYLE_PROMPT) -> dict:
     """Build the clip_0 scene establishing-pan task (pure function)."""
     return {
         "image_urls": scene_url,
-        "prompt": f"{scene}, slow camera pan, establishing shot, no characters, 3D cartoon style. The video MUST closely reference the uploaded reference image. CRITICAL: do NOT show any characters in this establishing shot.",
+        "prompt": f"{scene}, slow camera pan, establishing shot, no characters, {style_prompt}. The video MUST closely reference the uploaded reference image. CRITICAL: do NOT show any characters in this establishing shot.",
         "filename": "clip_0.mp4",
         "duration": 5,
         "generate_audio": True,
@@ -25,7 +27,8 @@ def build_scene_clip_task(scene: str, scene_url: str) -> dict:
 
 
 def build_group_clip_tasks(scene: str, char_scene_url: str, groups: list[dict],
-                           dialogue: list[dict], pad: float) -> list[dict]:
+                           dialogue: list[dict], pad: float,
+                           style_prompt: str = DEFAULT_STYLE_PROMPT) -> list[dict]:
     """Build one Seedance2 video task per dialogue group (pure function).
 
     Duration = group total TTS audio + pad per line, rounded to int and
@@ -34,7 +37,7 @@ def build_group_clip_tasks(scene: str, char_scene_url: str, groups: list[dict],
     tasks = []
     for gi, group in enumerate(groups):
         combined_prompt = merge_group_prompt(group, dialogue)
-        video_prompt = f"{scene}. {combined_prompt} 3D cartoon style. The video MUST closely reference the uploaded reference image — the characters' appearance, clothing, and the scene must match the reference image exactly. CRITICAL: only ONE instance of each character should appear on screen — do NOT create duplicate characters or clones. Each character appears exactly once, no mirror images, no doubling."
+        video_prompt = f"{scene}. {combined_prompt} {style_prompt}. The video MUST closely reference the uploaded reference image — the characters' appearance, clothing, and the scene must match the reference image exactly. CRITICAL: only ONE instance of each character should appear on screen — do NOT create duplicate characters or clones. Each character appears exactly once, no mirror images, no doubling."
         n_lines_in_group = len(group["lines"])
         group_total_with_pad = group["total_audio"] + n_lines_in_group * pad
         group_dur = round(group_total_with_pad)

@@ -68,6 +68,17 @@ from image_gen import (
 )
 from timeline_enrich import enrich_timeline as _enrich_timeline
 from group_audio import build_group_info as _build_group_info
+from style_manager import resolve_style_prompt as _resolve_style_prompt
+
+
+def _get_style_prompt(args) -> str:
+    """当前画面风格 prompt 片段（env 注入优先，CLI --visual-style 兜底）。
+
+    pipeline_service 直接调用 _stepN_* 时不经过 main()，因此通过
+    VISUAL_STYLE_PROMPT 环境变量传递风格（与 CHARACTER_OVERRIDES 同模式）。
+    """
+    return os.environ.get("VISUAL_STYLE_PROMPT") or _resolve_style_prompt(
+        getattr(args, "visual_style", None))
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +192,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
     parser.add_argument("--structure", default="original", choices=["original", "image", "quest"],
                         help="Video structure: 'original' (4-chapter, video clips), 'image' (all images, animation controlled by --animation), or 'quest' (task-hook listening)")
+    parser.add_argument("--visual-style", default="pixar3d",
+                        help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
     parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
                         help="Dialogue animation for --structure image: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow). Default: landing")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint in output dir")
@@ -338,25 +351,28 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     char_b_desc = script.get("char_b_description", "friendly young woman")
     scene = script.get("scene") or args.topic
 
-    _QUEST_STYLE = "3D cartoon style, Pixar-like, warm soft lighting, cel-shaded, vibrant saturated colors, smooth surfaces"
+    style_prompt = _get_style_prompt(args)
+    if not os.environ.get("VISUAL_STYLE_PROMPT"):
+        os.environ["VISUAL_STYLE_PROMPT"] = style_prompt
+    print(f"  [Style] Using style_prompt: {style_prompt[:80]}...")
 
     image_prompts = []
     if not is_quest:
         image_prompts.append(
-            (f"Character design sheet, {char_a_desc} on the left, {char_b_desc} on the right, plain white background, full body, front view, {_QUEST_STYLE}, no text, no background, 16:9", "char_scene.png"))
+            (f"Character design sheet, {char_a_desc} on the left, {char_b_desc} on the right, plain white background, full body, front view, {style_prompt}, no text, no background, 16:9", "char_scene.png"))
         image_prompts.append(
-            (f"Scene background, {scene}, wide shot, showing all key elements of the scene, {_QUEST_STYLE}, no characters, no text, 16:9", "scene.png"))
+            (f"Scene background, {scene}, wide shot, showing all key elements of the scene, {style_prompt}, no characters, no text, 16:9", "scene.png"))
     if is_stop_motion:
         # Per-character three-view reference sheets for pose consistency
         image_prompts.append(
-            (f"Character reference, {char_a_desc}, single character, plain white background, half-body close-up, waist up, front view, 3D cartoon style, no text, no background scene", "char_a_ref.png"))
+            (f"Character reference, {char_a_desc}, single character, plain white background, half-body close-up, waist up, front view, {style_prompt}, no text, no background scene", "char_a_ref.png"))
         image_prompts.append(
-            (f"Character reference, {char_b_desc}, single character, plain white background, half-body close-up, waist up, front view, 3D cartoon style, no text, no background scene", "char_b_ref.png"))
+            (f"Character reference, {char_b_desc}, single character, plain white background, half-body close-up, waist up, front view, {style_prompt}, no text, no background scene", "char_b_ref.png"))
     if is_quest:
         char_c_desc = script.get("char_c_description", "friendly staff member")
         # Host background (TV studio)
         host_bg_prompt = script.get("host_bg_prompt", "a bright modern TV studio set with a large screen behind, warm lighting")
-        image_prompts.append((f"{host_bg_prompt}, {_QUEST_STYLE}, no people, 16:9", "host_bg.png"))
+        image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
         # Scene backgrounds generated as 2×2 atlas in _generate_scene_atlas below
 
     # --- Resume check ---
@@ -390,22 +406,26 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             if is_quest:
                 # Quest uses per-character atlas (4 chars × 8 poses), no ref images
                 _generate_quest_atlases(script, img_dir, tts_thread,
-                                         max_workers=args.image_concurrency)
+                                         max_workers=args.image_concurrency,
+                                         style_prompt=style_prompt)
                 # Generate scene backgrounds as 2×2 grid atlas (1 API call instead of 4)
                 _scene_images = script.get("scene_images", [])
-                _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread)
+                _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
+                                       style_prompt=style_prompt)
             else:
                 _generate_dialogue_images(
                     dialogue, img_dir, char_a_desc, char_b_desc, scene,
                     is_quest, char_scene_cdn, "", tts_thread,
-                    max_workers=args.image_concurrency)
+                    max_workers=args.image_concurrency,
+                    style_prompt=style_prompt)
         elif is_stop_motion:
             char_a_ref_cdn = image_urls.get("char_a_ref.png", "")
             char_b_ref_cdn = image_urls.get("char_b_ref.png", "")
             _generate_pose_images(
                 dialogue, img_dir, char_a_desc, char_b_desc, scene,
                 char_a_ref_cdn, char_b_ref_cdn, tts_thread,
-                max_workers=args.image_concurrency)
+                max_workers=args.image_concurrency,
+                style_prompt=style_prompt)
 
         print("  [Image] All images done. Waiting for TTS...")
 
@@ -420,7 +440,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         clip_paths = []
         print(f"  [{'Image' if is_image else 'Quest'}] Skipping clip_0 generation (no video clips)")
     else:
-        scene_clip_task = _build_scene_clip_task(scene, scene_url)
+        scene_clip_task = _build_scene_clip_task(scene, scene_url, style_prompt=style_prompt)
         clip0_path = str(clips_dir / "clip_0.mp4")
         clip_paths = [clip0_path if _file_ok(clip0_path, 500000) else None]
         if clip_paths[0] is None:
@@ -499,7 +519,8 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
         print(f"    Group {gi}: lines={g['lines']} speakers={g['speakers']} total_audio={g['total_audio']:.1f}s")
 
     group_tasks = _build_group_clip_tasks(ctx["scene"], ctx["char_scene_url"],
-                                          groups, dialogue, args.pad)
+                                          groups, dialogue, args.pad,
+                                          style_prompt=_get_style_prompt(args))
     n_total_clips = 1 + len(group_tasks)
 
     clip_paths = list(ctx["clip_paths"])
@@ -829,6 +850,17 @@ def main():
         args.pad = 0.4
 
     os.environ["LLM_RETRIES"] = str(args.llm_retries)
+    # 画面风格：注入 env 供 llm_client / thumbnail_gen / 各 step 读取
+    os.environ["VISUAL_STYLE_ID"] = str(getattr(args, "visual_style", "pixar3d"))
+    os.environ["VISUAL_STYLE_PROMPT"] = _resolve_style_prompt(args.visual_style)
+    style_name = ""
+    try:
+        from style_manager import get_style
+        _s = get_style(args.visual_style)
+        style_name = f" ({_s['name']})" if _s else ""
+    except Exception:
+        pass
+    print(f"  [Style] Visual style: {args.visual_style}{style_name}")
     # Full raw LLM responses are dumped here when _chat hits errors
     os.environ.setdefault("LLM_DEBUG_DIR", str(Path(args.output).resolve() / "llm_debug"))
 

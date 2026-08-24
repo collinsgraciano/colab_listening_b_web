@@ -11,6 +11,7 @@ from mcp_client import call_tool, parse_task_id, poll_task, download_file
 from checkpoint import step_done
 from media_utils import get_duration as _get_audio_duration
 from atlas_split import split_atlas
+from style_manager import DEFAULT_STYLE_PROMPT
 
 
 def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=False):
@@ -210,7 +211,8 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4):
 
 def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
                                is_quest, char_scene_cdn, char_scene_c_cdn,
-                               tts_thread, max_workers=4):
+                               tts_thread, max_workers=4,
+                               style_prompt: str = DEFAULT_STYLE_PROMPT):
     """Generate per-line dialogue images for static/quest modes (5 concurrent)."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     n = len(dialogue)
@@ -223,7 +225,7 @@ def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
             print(f"    [Image] dialogue_img_{i} already exists, skipping")
             return i, True
         img_prompt = line.get("image_prompt",
-                                f"{char_a_desc} and {char_b_desc} at {scene}, 3D cartoon style, 16:9")
+                                f"{char_a_desc} and {char_b_desc} at {scene}, {style_prompt}, 16:9")
         if is_quest and line.get("phase") == "core" and char_scene_c_cdn:
             ref_cdn = char_scene_c_cdn
         else:
@@ -268,7 +270,8 @@ def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
 
 
 def generate_pose_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
-                          char_a_ref_cdn, char_b_ref_cdn, tts_thread, max_workers=4):
+                          char_a_ref_cdn, char_b_ref_cdn, tts_thread, max_workers=4,
+                          style_prompt: str = DEFAULT_STYLE_PROMPT):
     """Generate per-line character pose atlas (2×2 grid) and split into 4 poses.
 
     For each dialogue line, generates ONE image containing 4 poses arranged in
@@ -326,8 +329,8 @@ def generate_pose_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
             f"bottom-left: {_with_desc(pose_c)}, "
             f"bottom-right: {_with_desc(pose_d)}, "
             f"half-body close-up, waist up, all four poses same character same outfit, "
-            f"plain white background, 3D cartoon style, "
-            f"cel-shaded with thin clean black outline tightly hugging the character silhouette, "
+            f"plain white background, {style_prompt}, "
+            f"clean outline tightly hugging the character silhouette, "
             f"no props, no objects, no scene, no text"
         )
 
@@ -380,16 +383,15 @@ def generate_pose_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
     print(f"  [PoseAtlas] Done — {n} atlases → {n*4} pose images.")
 
 
-def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4):
+def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
+                           style_prompt: str = DEFAULT_STYLE_PROMPT):
     """Generate character pose atlases for quest mode.
 
     All characters (char_a, char_b, char_c, host): 4×2 grid (8 poses each).
     Shared style prefix ensures visual consistency across all characters.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
-              "cel-shaded with thin clean black outline, "
-              "vibrant saturated colors, smooth surfaces")
+    _STYLE = style_prompt
 
     chars = [
         ("char_a", script.get("char_a_description", "friendly young man"), 8),
@@ -479,15 +481,15 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4):
     return {}
 
 
-def generate_scene_atlas(scene_images, scene, img_dir, tts_thread):
+def generate_scene_atlas(scene_images, scene, img_dir, tts_thread,
+                         style_prompt: str = DEFAULT_STYLE_PROMPT):
     """Generate scene backgrounds in batches of 4 via 2×2 grid atlases.
 
     Handles any number of scenes: 1-4 → one atlas, 5-8 → two atlases, etc.
     Each atlas is one API call. Saves (N-ceil(N/4)) API calls vs per-scene.
     Uses frontier 4K: atlas ~2880×2880 → each cell ~1440×1440.
     """
-    _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
-              "cel-shaded, vibrant saturated colors, smooth surfaces")
+    _STYLE = style_prompt
 
     n_total = len(scene_images)
     if n_total == 0:
