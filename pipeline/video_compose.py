@@ -709,6 +709,8 @@ def compose_image(
     progress_cb=None,
     animation: str = "landing",
     subtitle_font_size: int = 60,
+    target_w: int = TARGET_W,
+    target_h: int = TARGET_H,
 ) -> str:
     """Compose final listening practice video using images (no video clips).
 
@@ -745,6 +747,9 @@ def compose_image(
         pad: Audio pad between segments (seconds).
         progress_cb: callback(percent, message).
         animation: "none", "landing", or "stop_motion".
+        target_w / target_h: Output canvas size. Defaults to 1280x720;
+            shorts mode passes 1080x1920 (vertical). stop_motion always
+            renders at the default canvas.
 
     Returns:
         Path to final video.
@@ -767,6 +772,19 @@ def compose_image(
     n = len(dialogue)
 
     is_stop_motion = (animation == "stop_motion")
+
+    # Resolution-aware normalization filter + canvas for this compose call
+    # (defaults are the module constants; shorts passes 1080x1920)
+    tw, th = target_w, target_h
+    vf_norm = (
+        f"scale={tw}:{th}:force_original_aspect_ratio=decrease,"
+        f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2"
+    )
+
+    # Skip Ch3 static frame rendering when the timeline has no listen
+    # segments (shorts timeline has none — saves n×2 Pillow renders)
+    has_listen_segs = any(seg.get("type", "").startswith("listen_")
+                          for seg in timeline)
 
     # --- Stop-motion: preprocess poses + subtitle overlays ---
     processed_poses: list[list] = []
@@ -807,17 +825,17 @@ def compose_image(
             subtitle_overlays[i] = _render_subtitle_overlay(en, zh)
 
     # --- Render static frames for Ch3 (same as compose_listening) ---
-    if os.path.exists(scene_img):
+    if os.path.exists(scene_img) and has_listen_segs:
         _cb(10 if is_stop_motion else 5, f"Rendering {n} static frames...")
         for i, line in enumerate(dialogue):
             p_en = str(static_dir / f"en_{i}.png")
             _render_static_frame(
                 line.get("text", ""), line.get("phonetic", ""),
-                "", scene_img, p_en, i, n)
+                "", scene_img, p_en, i, n, w=tw, h=th)
             p = str(static_dir / f"zh_{i}.png")
             _render_static_frame(
                 line.get("text", ""), line.get("phonetic", ""),
-                line.get("zh", ""), scene_img, p, i, n)
+                line.get("zh", ""), scene_img, p, i, n, w=tw, h=th)
         _cb(12 if is_stop_motion else 10, "Static frames done.")
 
     # --- Build each segment ---
@@ -877,7 +895,7 @@ def compose_image(
             if audio_file and os.path.exists(audio_file):
                 cmd = ["ffmpeg", "-y", "-loop", "1", "-i", video_src, "-i", audio_file,
                        "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", vf_norm, "-r", "24",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                        "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
                        out_path]
@@ -885,23 +903,24 @@ def compose_image(
                 cmd = ["ffmpeg", "-y", "-loop", "1", "-i", video_src,
                        "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                        "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", vf_norm, "-r", "24",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                        out_path]
 
         elif seg_type == "title_card":
             # Static scene image + title overlay (transparent PNG) + silence
             # scene_img may be at frontier's native size — normalize before
-            # overlaying the 1280x720 title PNG, else text gets cropped
+            # overlaying the title PNG, else text gets cropped
             title_en = seg.get("subtitle_en", "")
             title_zh = seg.get("subtitle_zh", "")
             title_overlay = str(static_dir / "title_overlay.png")
-            _render_title_card(title_en, title_zh, "", scene_img, title_overlay)
+            _render_title_card(title_en, title_zh, "", scene_img, title_overlay,
+                               w=tw, h=th)
             cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
                    "-i", title_overlay,
                    "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                    "-t", f"{duration:.3f}",
-                   "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
+                   "-filter_complex", f"[0:v]{vf_norm}[bg];[bg][1:v]overlay=0:0[v]",
                    "-map", "[v]", "-map", "2:a",
                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -912,7 +931,8 @@ def compose_image(
             intro_en = seg.get("subtitle_en", "")
             intro_zh = seg.get("subtitle_zh", "")
             intro_overlay = str(static_dir / "practice_intro_overlay.png")
-            _render_practice_intro(intro_en, intro_zh, scene_img, intro_overlay)
+            _render_practice_intro(intro_en, intro_zh, scene_img, intro_overlay,
+                                   w=tw, h=th)
             out_dur = audio_dur + pad
             narration_audio = narration.get("practice_intro")
             if narration_audio and os.path.exists(narration_audio):
@@ -920,7 +940,7 @@ def compose_image(
                        "-i", narration_audio, "-i", intro_overlay,
                        "-t", f"{out_dur:.3f}",
                        "-filter_complex",
-                       f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
+                       f"[0:v]{vf_norm}[bg];[bg][2:v]overlay=0:0[v];"
                        f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
                        "-map", "[v]", "-map", "[a]",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
@@ -931,7 +951,7 @@ def compose_image(
                        "-i", intro_overlay,
                        "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                        "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
+                       "-filter_complex", f"[0:v]{vf_norm}[bg];[bg][1:v]overlay=0:0[v]",
                        "-map", "[v]", "-map", "2:a",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -942,7 +962,8 @@ def compose_image(
             outro_en = seg.get("subtitle_en", "")
             outro_zh = seg.get("subtitle_zh", "")
             outro_overlay = str(static_dir / "outro_overlay.png")
-            _render_practice_intro(outro_en, outro_zh, scene_img, outro_overlay)
+            _render_practice_intro(outro_en, outro_zh, scene_img, outro_overlay,
+                                   w=tw, h=th)
             out_dur = audio_dur + pad
             outro_audio = narration.get("outro")
             if outro_audio and os.path.exists(outro_audio):
@@ -950,7 +971,7 @@ def compose_image(
                        "-i", outro_audio, "-i", outro_overlay,
                        "-t", f"{out_dur:.3f}",
                        "-filter_complex",
-                       f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
+                       f"[0:v]{vf_norm}[bg];[bg][2:v]overlay=0:0[v];"
                        f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
                        "-map", "[v]", "-map", "[a]",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
@@ -961,7 +982,7 @@ def compose_image(
                        "-i", outro_overlay,
                        "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                        "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
+                       "-filter_complex", f"[0:v]{vf_norm}[bg];[bg][1:v]overlay=0:0[v]",
                        "-map", "[v]", "-map", "2:a",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -1028,24 +1049,25 @@ def compose_image(
                 d_img = scene_img
 
             # Build VF: landing-transform micro-animation when animation=="landing",
-            # else plain VF_NORM.  Landing transform: scale 1.04x → crop to
-            # 1280x720 with time-varying pan (±14px x, ±10px sine y, 0.3s decay,
-            # alternating direction per line) — gives stop-motion "settle" feel.
+            # else plain vf_norm.  Landing transform: scale 1.04x → crop to
+            # target canvas with time-varying pan (±14px x, ±10px sine y,
+            # 0.3s decay, alternating direction per line) — gives
+            # stop-motion "settle" feel.
             if animation == "landing":
                 _dir = 1 if (idx % 2 == 0) else -1
                 _ld = 0.3  # landing duration (seconds)
-                _up_w = int(TARGET_W * 1.04)
-                _up_h = int(TARGET_H * 1.04)
+                _up_w = int(tw * 1.04)
+                _up_h = int(th * 1.04)
                 vf_dialogue = (
-                    f"scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=decrease,"
-                    f"pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2,"
+                    f"scale={tw}:{th}:force_original_aspect_ratio=decrease,"
+                    f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,"
                     f"scale={_up_w}:{_up_h},"
-                    f"crop=w={TARGET_W}:h={TARGET_H}:"
-                    f"x='(iw-{TARGET_W})/2+{_dir}*14*max(0,1-t/{_ld})':"
-                    f"y='(ih-{TARGET_H})/2-10*sin(min(1,t/{_ld})*PI)'"
+                    f"crop=w={tw}:h={th}:"
+                    f"x='(iw-{tw})/2+{_dir}*14*max(0,1-t/{_ld})':"
+                    f"y='(ih-{th})/2-10*sin(min(1,t/{_ld})*PI)'"
                 )
             else:
-                vf_dialogue = VF_NORM
+                vf_dialogue = vf_norm
 
             if audio_file and os.path.exists(audio_file):
                 cmd = ["ffmpeg", "-y", "-loop", "1", "-i", d_img, "-i", audio_file,
@@ -1073,7 +1095,7 @@ def compose_image(
             fallback_cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
                            "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                            "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
+                           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", vf_norm, "-r", "24",
                            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                            out_path]
             try:

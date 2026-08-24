@@ -99,6 +99,7 @@ def generate_quest_script(topic: str, cefr: str = "A1",
     script = {
         "lesson_type": "listening",
         "title": meta.get("title", topic.upper()),
+        "title_quote": meta.get("title_quote", ""),
         "cefr": cefr,
         "title_zh": meta.get("title_zh", ""),
         "scene_zh": meta.get("scene_zh", ""),
@@ -731,6 +732,7 @@ Full dialogue:
 Generate JSON with these fields:
 {{
   "title": "ENGLISH TITLE (e.g. AT THE COFFEE SHOP)",
+  "title_quote": "the single most catchy dialogue line from the dialogue above, copied VERBATIM (under 10 words), to be used as the title hook",
   "title_zh": "繁中短标题 (max 6 chars)",
   "scene_zh": "繁中場景描述",
   "intro_zh": "繁中 story hook translation",
@@ -742,7 +744,7 @@ Generate JSON with these fields:
   "outro_zh": "繁中",
   "host_bg_prompt": "TV studio background prompt (no people)",
   "youtube_title": "高CTR繁中标题 with 【】and ｜ format. Pattern D: 【英文聽力挑戰】{{emoji}}{{topic 繁中}}｜❓你能聽出答案嗎？｜{{CEFR}}慢速英文｜不用背多聽就會用｜英文聽力訓練｜{{English topic}}",
-  "youtube_title_en": "high-CTR PURE ENGLISH title (no Chinese). Include topic + key skill + compelling hook. Max 100 chars. Example: Can You Guess Why It's Called Bubble Tea? ☕ Slow English Listening",
+  "youtube_title_en": "high-CTR PURE ENGLISH title (no Chinese). STRONGLY PREFER opening with title_quote in quotes, then the scene context (e.g. \"Can You Guess Why It's Called Bubble Tea?\" — bubble tea shop mystery). Otherwise use a curiosity question. Max 100 chars.",
   "youtube_description": "full 繁中 description with chapters + key_words",
   "youtube_description_en": "full PURE ENGLISH description. Include chapters section, key_words, hashtags, and subscribe CTA.",
   "youtube_tags": ["tag1","tag2",... 15-20 tags],

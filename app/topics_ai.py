@@ -173,6 +173,16 @@ TOPIC FORMAT RULES:
 - Avoid abstract themes ("Friendship") or textbook categories ("Food") — use concrete scenes ("Ordering Bubble Tea", "Complaining About Cold Food")
 - Varied: mix everyday routine, problem-solving, and emotionally engaging situations; suitable for CEFR A2-B1
 
+MATRIX MINING (vary the ANGLE, not just the scene — a proven channel strategy):
+Mine each scene from MULTIPLE angles instead of producing N variations of "At the X":
+- Customer how-to: "Paying Inside at the Gas Station", "Using Self-Checkout for the First Time"
+- Employee POV: "Opening the Coffee Shop at 5 AM", "The Last Customers of the Night", "A Delivery Driver's Last Stop"
+- Brand-specific: "Ordering at the McDonald's Drive-Thru", "Shopping at Costco" (brand name = built-in search traffic)
+- First-time experience: "First Time at an American Steakhouse", "Trying Southern Food for the First Time"
+- Mishap/trouble: "Wrong Food Delivery Address", "The Parking Ticket Argument"
+- Specific moment/detail with numbers or quotes: "Working the Lunch Rush at Noon", "Do You Have a Rewards Card?"
+Each batch should cover at least 3 DIFFERENT angles from this list.
+
 AVOID DUPLICATES — these topics already exist in the library (do NOT reuse or trivially rephrase any of them):
 {existing_ref}
 

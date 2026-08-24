@@ -11,7 +11,7 @@ def _audio_exists(path: str) -> bool:
 
 
 def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=None,
-                 tts_engine="kokoro"):
+                 tts_engine="kokoro", shorts=False):
     """Generate all TTS audio. Runs in a thread.
 
     Produces narration and dialogue EN/ZH audio.
@@ -22,6 +22,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
                   If None, uses mode default (quest: '0%', non-quest: '-15%').
         tts_engine: 'kokoro' (default, local Kokoro TTS) or 'voxcpm'
                     (VoxCPM via Cloudflare Worker, LLM-designed voices).
+        shorts: Shorts mode — narration is outro CTA only, no Chinese dialogue.
     """
     # --- Engine + voice map setup ---
     if tts_engine == "voxcpm":
@@ -54,8 +55,9 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         from qwen_tts_engine import QwenTTSEngine, build_qwen_voice_map
 
         model_path = os.environ.get("QWEN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
+        base_model_path = os.environ.get("QWEN_BASE_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
         device = os.environ.get("QWEN_DEVICE", "cuda:0")
-        tts = QwenTTSEngine(model_path, device)
+        tts = QwenTTSEngine(model_path, device, base_model_path)
         voice_map = build_qwen_voice_map(script)
         narration_voice = voice_map.get("host", "Serena")
         voice_label = "qwen"
@@ -83,6 +85,18 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
                 dur = tts.synth_english(text, narration_voice, path, rate=rate)
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
+    elif shorts:
+        # Shorts: only the outro CTA is narrated (title card is silent)
+        outro_text = script.get("outro", "Follow for more easy English every day!")
+        path = str(audio_dir / "outro.mp3")
+        if _audio_exists(path):
+            dur = get_duration(path)
+            narration["outro"] = path
+            print(f"  [TTS] outro: {dur:.1f}s (cached)")
+        else:
+            dur = tts.synth_english(outro_text, narration_voice, path, rate="+0%")
+            narration["outro"] = path
+            print(f"  [TTS] outro: {dur:.1f}s")
     else:
         intro_text = script.get("story_hook", "")
         outro_text = script.get("outro", "That's all for today. Keep practicing!")
@@ -120,9 +134,9 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         dialogue_durations.append(dur)
         print(f"  [TTS] dialogue_{i}: {dur:.1f}s ({voice_label})")
 
-    # Dialogue Chinese (quest skips entirely)
+    # Dialogue Chinese (quest/shorts skip entirely)
     zh_paths = []
-    if not quest:
+    if not quest and not shorts:
         for i, line in enumerate(dialogue):
             text = line.get("zh", "")
             if not text:

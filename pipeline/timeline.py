@@ -95,6 +95,55 @@ def build_listening_timeline(script: dict, dialogue_durations: list[float],
     return timeline
 
 
+def build_shorts_timeline(script: dict, dialogue_durations: list[float],
+                          pad: float = 0.4) -> list[dict]:
+    """Build a timeline for a Shorts culture Q&A video (vertical, 45-60s).
+
+    Structure (NO shadowing/practice chapter — Shorts must stay short):
+      1. Title card with the question (4s)
+      2. Full dialogue (all lines, normal speed)
+      3. Outro CTA (narration)
+    """
+    dialogue = script.get("dialogue", [])
+    outro = script.get("outro", "Follow for more easy English every day!")
+    outro_zh = script.get("outro_zh", "")
+
+    timeline = []
+
+    def _add(seg_type, dur, sub_en, sub_zh, audio_idx=0, image_idx=0, d_idx=-1):
+        timeline.append({
+            "type": seg_type,
+            "duration": dur,
+            "subtitle_en": sub_en,
+            "subtitle_zh": sub_zh,
+            "speaker": "",
+            "audio_index": audio_idx,
+            "image_idx": image_idx,
+            "dialogue_idx": d_idx,
+        })
+
+    # 1. Title card — the knowledge question as the hook
+    title_en = script.get("title", "")
+    title_zh = script.get("title_zh", script.get("intro_zh", ""))
+    scene_zh = script.get("scene_zh", "")
+    if title_en:
+        _add("title_card", 4.0, title_en, title_zh, audio_idx=0, image_idx=0)
+        timeline[-1]["scene_zh"] = scene_zh
+
+    # 2. Full dialogue
+    for i, line in enumerate(dialogue):
+        dur = dialogue_durations[i] if i < len(dialogue_durations) else 3.0
+        _add("dialogue", dur, line.get("text", ""), line.get("zh", ""),
+             audio_idx=i, image_idx=i + 1)
+
+    # 3. Outro CTA
+    if outro:
+        outro_dur = min(max(len(outro) * 0.08, 3.0), 6.0)
+        _add("outro", outro_dur, outro, outro_zh, audio_idx=0, image_idx=0)
+
+    return timeline
+
+
 def build_srt_from_timeline(timeline: list[dict], gap: float = 0.0) -> str:
     """Build SRT from a timeline list. Timestamps match video exactly.
 

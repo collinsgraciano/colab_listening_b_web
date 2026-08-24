@@ -1025,7 +1025,7 @@ async def api_scripts_generate(request: Request):
     """SSE: batch-generate scripts for the given topics."""
     data = await request.json()
     structure = data.get("structure", "original")
-    if structure not in ("original", "image", "quest"):
+    if structure not in ("original", "image", "quest", "shorts"):
         return JSONResponse({"error": f"未知模式: {structure}"}, status_code=400)
 
     topics = [str(t).strip() for t in data.get("topics", []) if str(t).strip()]

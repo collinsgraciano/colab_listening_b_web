@@ -21,8 +21,8 @@ colab_listening_b_web/
 │   └── static/                    # CSS (style.css) + JS (app.js)
 ├── pipeline/                     # 独立 Pipeline 代码（自包含，不依赖外部项目）
 │   ├── pipeline.py               # 主编排器：7 步流程 + argparse CLI 入口
-│   ├── structures.py             # 结构分发注册表（original/image/quest → LLM/timeline/SRT/compose 函数）
-│   ├── llm_client.py             # LLM 客户端（SenseNova DeepSeek V4 Flash / OpenAI 兼容 API）
+│   ├── structures.py             # 结构分发注册表（original/image/quest/shorts → LLM/timeline/SRT/compose 函数）
+│   ├── llm_client.py             # LLM 客户端（SenseNova / OpenAI 兼容 API；listening + shorts 文化问答脚本生成）
 │   ├── mcp_client.py             # TJGenerators MCP HTTP 客户端（多 Token 轮换，积分耗尽自动切换）
 │   ├── tts_engine.py             # Kokoro TTS 引擎（英文+中文，音量归一化，语音修复）
 │   ├── tts_pipeline.py           # 批量 TTS 生成（对话+旁白+词汇）
@@ -31,7 +31,7 @@ colab_listening_b_web/
 │   ├── clip_gen.py               # Seedance2 视频片段生成（任务构建+轮询+下载+重试）
 │   ├── grouping_b.py             # 对话行分组（连续行合并为一个视频片段）
 │   ├── group_audio.py            # 分组音频拼接
-│   ├── timeline.py               # 时间轴构建（4章结构）+ SRT 生成
+│   ├── timeline.py               # 时间轴构建（listening 4章结构 / shorts 3段结构）+ SRT 生成
 │   ├── timeline_enrich.py        # 时间轴补全（audio_dur/duration）
 │   ├── video_compose.py          # FFmpeg + Pillow 视频合成（original/image 模式）
 │   ├── stop_motion.py             # 定格动画渲染（多姿势+光流插帧）
@@ -66,17 +66,24 @@ colab_listening_b_web/
 | Step 0 | `_step0_script` | LLM 脚本生成（SenseNova / OpenAI 兼容 API），含验证+重试 |
 | Step 1 | `_step1_mcp` | TJGenerators MCP 初始化（多 Token 轮换） |
 | Step 2 | `_step2_images_tts` | 并发：AI 图片生成 + TTS 配音（后台线程） |
-| Step 3 | `_step3_clips` | Seedance2 视频片段生成（image/quest 模式跳过） |
+| Step 3 | `_step3_clips` | Seedance2 视频片段生成（image/quest/shorts 模式跳过） |
 | Step 4 | `_step4_timeline` | 时间轴 + SRT 字幕构建 |
-| Step 4.5 | `_step45_thumbnail` | YouTube 缩略图 + 元数据 |
+| Step 4.5 | `_step45_thumbnail` | YouTube 缩略图 + 元数据（shorts 跳过缩略图，仅存元数据） |
 | Step 5 | `_step5_compose` | FFmpeg + Pillow 最终视频合成 |
-| Step 6 | `_step6_4k` | 可选 4K 超分辨率（`--no-4k` 跳过） |
+| Step 6 | `_step6_4k` | 可选 4K 超分辨率（`--no-4k` 跳过；shorts 恒跳过） |
 
 ### 视频结构模式
 
 - **original** — 4 章视频片段模式（对话用 Seedance2 AI 视频，含跟读练习）
 - **image** — 纯图片模式（无视频生成，用动画类型控制：none/landing/stop_motion）
 - **quest** — 任务听力模式（48 行对话，4 阶段结构，定格动画，3+1 角色）
+- **shorts** — 竖屏文化问答短视频模式（1080×1920，10 行好友对话讲一个美国文化/语言知识点，问题片头→对话→CTA，无跟读章节；跳过视频片段/缩略图/4K；stop_motion 自动降级为 landing）
+
+### 标题策略（title_quote 引语钩子）
+
+- LLM 脚本新增 `title_quote` 字段：从对话中逐字挑选最抓耳的一句（<10 词）
+- `youtube_title_en` 优先用引语钩子模式：`"Pump Number 3, Please" — Paying Inside at an American Gas Station`
+- `youtube_title`（繁中）可用引语的繁中翻译开头（「三號加油機，麻煩了！」）
 
 ## Building and Running
 
@@ -149,3 +156,5 @@ python pipeline.py --resume  # 断点续传
 - IPA 音标用 `C:\Windows\Fonts\cambria.ttc`（msyh.ttc 渲染为方框）
 - Seedance2 视频最大并发 5 个任务，超出需分批创建
 - MCP 下载文件需验证大小 > 500KB（防止静默失败的小文件）
+- `probe_resolution` 解析 ffprobe csv 输出（`1080,1920` 逗号分隔，非 `x` 分隔）— 字幕叠加按实测画布渲染，shorts 竖屏自动适配
+- 主题库矩阵策略：每个场景从多角度开采（顾客操作/员工POV/品牌具体/首次体验/小麻烦/文化问答），`pipeline/topics.json` 现 726 条 26 分类；topics_ai.py 生成 prompt 已内置矩阵思维

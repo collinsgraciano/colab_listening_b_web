@@ -137,8 +137,13 @@ def _reupload_for_cdn(filepath, filename):
     return ""
 
 
-def generate_images(image_prompts, img_dir, tts_thread, max_workers=4):
-    """Generate character/scene images via MCP (concurrent). Returns image_urls dict."""
+def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
+                    image_size="landscape_16_9"):
+    """Generate character/scene images via MCP (concurrent). Returns image_urls dict.
+
+    image_size: MCP generate_image size spec — "landscape_16_9" (default) or
+    "portrait_16_9" (shorts vertical mode).
+    """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     image_urls = {}
     image_failed = False
@@ -164,7 +169,7 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4):
             result = call_tool("generate_image", {
                 "prompt": prompt,
                 "provider": "seedream",
-                "image_size": "landscape_16_9",
+                "image_size": image_size,
                 "output_format": "png",
             })
             task_id = parse_task_id(result)
@@ -212,12 +217,19 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4):
 def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
                                is_quest, char_scene_cdn, char_scene_c_cdn,
                                tts_thread, max_workers=4,
-                               style_prompt: str = DEFAULT_STYLE_PROMPT):
-    """Generate per-line dialogue images for static/quest modes (5 concurrent)."""
+                               style_prompt: str = DEFAULT_STYLE_PROMPT,
+                               image_size=None):
+    """Generate per-line dialogue images for static/quest modes (5 concurrent).
+
+    image_size: size dict for MCP generate_image, e.g. {"width":1280,"height":720}
+    (default landscape) or {"width":720,"height":1280} (shorts vertical).
+    """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     n = len(dialogue)
     mode_label = "quest" if is_quest else "image"
     print(f"  [Image] Generating {n} dialogue line images ({mode_label} mode, {max_workers} concurrent)...")
+    if image_size is None:
+        image_size = {"width": 1280, "height": 720}
 
     def _gen_one(i, line):
         d_img_path = str(img_dir / f"dialogue_img_{i}.png")
@@ -236,7 +248,7 @@ def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
                 "prompt": img_prompt,
                 "provider": "frontier",
                 "quality": "high",
-                "image_size": {"width": 1280, "height": 720},
+                "image_size": image_size,
                 "output_format": "png",
             }
             if ref_cdn:

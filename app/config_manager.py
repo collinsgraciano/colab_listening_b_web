@@ -25,12 +25,13 @@ PARAM_SPEC = {
     "cefr": {"default": "A2", "type": "select", "group": "content",
              "label": "CEFR 等级", "options": ["A1", "A2", "B1", "B2", "C1", "C2"]},
     "num_lines": {"default": "", "type": "number", "group": "content",
-                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48)"},
+                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48, shorts:10)"},
     "structure": {"default": "original", "type": "select", "group": "content",
                   "label": "视频结构", "options": {
                       "original": "Original (4章视频片段)",
                       "image": "Image (纯图片+动画)",
-                      "quest": "Quest (任务听力)"}},
+                      "quest": "Quest (任务听力)",
+                      "shorts": "Shorts (竖屏文化问答)"}},
     "animation": {"default": "landing", "type": "select", "group": "content",
                   "label": "动画类型 (image模式)", "options": {
                       "none": "None (静态)",
@@ -148,14 +149,15 @@ GROUP_META = {
 
 
 # --- Per-mode config storage ---
-# 3 种视频结构模式各一份完整独立配置，切换互不覆盖。
+# 4 种视频结构模式各一份完整独立配置，切换互不覆盖。
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
 
-MODES = ["original", "image", "quest"]
+MODES = ["original", "image", "quest", "shorts"]
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
     "image": "Image (纯图片+动画)",
     "quest": "Quest (任务听力)",
+    "shorts": "Shorts (竖屏文化问答)",
 }
 ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
 

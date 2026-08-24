@@ -12,8 +12,9 @@ if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
 # --- Original ---
-from llm_client import generate_listening_script
-from timeline import build_listening_timeline, build_srt_from_timeline
+from llm_client import generate_listening_script, generate_shorts_script
+from timeline import (build_listening_timeline, build_srt_from_timeline,
+                      build_shorts_timeline)
 from video_compose import compose_listening, compose_image
 
 # --- Quest (lazy import) ---
@@ -61,6 +62,16 @@ STRUCTURES = {
             script, ddur, pad=pad),
         "build_srt": _quest_srt,
         "compose": _quest_compose,
+        "needs_video_clips": False,
+        "needs_zh_tts": False,
+        "needs_dialogue_images": True,
+    },
+    "shorts": {
+        "generate_script": generate_shorts_script,
+        "build_timeline": lambda script, ddur, pad, pd: build_shorts_timeline(
+            script, ddur, pad=pad),
+        "build_srt": lambda tl, gap=0.0: build_srt_from_timeline(tl, gap=gap),
+        "compose": compose_image,
         "needs_video_clips": False,
         "needs_zh_tts": False,
         "needs_dialogue_images": True,

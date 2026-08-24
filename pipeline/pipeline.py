@@ -43,9 +43,9 @@ SCRIPTS_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from mcp_client import initialize, call_tool, parse_task_id, poll_task, download_file
-from llm_client import generate_listening_script
+from llm_client import generate_listening_script, generate_shorts_script
 from tts_engine import TTSEngine
-from timeline import build_listening_timeline, build_srt_from_timeline
+from timeline import build_listening_timeline, build_srt_from_timeline, build_shorts_timeline
 from video_compose import compose_listening
 from grouping_b import build_dialogue_groups
 from topic_manager import pick_random_topic, mark_topic_used
@@ -135,7 +135,7 @@ def _validate_script(script: dict, num_lines: int,
 
 
 def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
-                                quest=False, max_attempts=5) -> dict:
+                                quest=False, shorts=False, max_attempts=5) -> dict:
     """Generate and validate script, retrying on failure."""
     for attempt in range(max_attempts):
         try:
@@ -144,6 +144,9 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                 from quest.llm_client_quest import generate_quest_script
                 script = generate_quest_script(topic, cefr, lessons_dir=lessons_dir,
                                                num_lines=num_lines)
+            elif shorts:
+                script = generate_shorts_script(topic, cefr, lessons_dir=lessons_dir,
+                                                num_lines=num_lines)
             else:
                 script = generate_listening_script(topic, cefr, lessons_dir=lessons_dir,
                                                    num_lines=num_lines)
@@ -178,7 +181,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--lessons-dir", default=None, help="Lessons dir for anti-duplicate check")
     parser.add_argument("--topics-file", default=str(Path(__file__).parent / "topics.json"), help="Path to topics.json")
     parser.add_argument("--used-topics-file", default=None, help="Path to used_topics.json (default: <output>/used_topics.json — persists on Drive across Colab sessions)")
-    parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48)")
+    parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48; shorts mode: 10)")
     parser.add_argument("--mcp-tokens", default=None, help="TJGenerators MCP OAuth tokens, comma-separated for multi-token rotation")
     parser.add_argument("--mcp-token", default=None, help="(Deprecated) Single MCP token. Use --mcp-tokens instead.")
     parser.add_argument("--api-key", default=None, help="SenseNova API key (or set SENSENOVA_API_KEY env var)")
@@ -190,8 +193,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--openai-api-key", default=None, help="OpenAI-compatible API key (or set OPENAI_API_KEY env var)")
     parser.add_argument("--openai-model", default=None, help="OpenAI-compatible model name (default: grok-4.6). Available: grok-4.6, grok-4.5, gemini-3.1-pro-preview, gemini-3.7-flash, claude-sonnet-5, gemini-2.5-pro-1m")
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
-    parser.add_argument("--structure", default="original", choices=["original", "image", "quest"],
-                        help="Video structure: 'original' (4-chapter, video clips), 'image' (all images, animation controlled by --animation), or 'quest' (task-hook listening)")
+    parser.add_argument("--structure", default="original", choices=["original", "image", "quest", "shorts"],
+                        help="Video structure: 'original' (4-chapter, video clips), 'image' (all images, animation controlled by --animation), 'quest' (task-hook listening), or 'shorts' (vertical 9:16 culture Q&A short video)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
     parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
@@ -296,9 +299,9 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
         script = json.loads(script_path.read_text(encoding="utf-8"))
         mark_topic_used(used_topics_file, topic)
     else:
-        script = _generate_script_with_retry(topic, args.cefr, args.lessons_dir,
-                                             args.num_lines,
-                                             quest=(args.structure == "quest"))
+        script = _generate_script_with_retry(
+            topic, args.cefr, args.lessons_dir, args.num_lines,
+            quest=(args.structure == "quest"), shorts=(args.structure == "shorts"))
         yt_title = script.get("youtube_title", script.get("title", topic))
         safe_title = _safe_dirname(yt_title, topic)
         work_dir = parent_dir / safe_title
@@ -345,6 +348,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     is_image = (args.structure == "image")
     is_stop_motion = (is_image and args.animation == "stop_motion")
     is_quest = (args.structure == "quest")
+    is_shorts = (args.structure == "shorts")
     img_dir, audio_dir, clips_dir = dirs["images"], dirs["audio"], dirs["clips"]
 
     char_a_desc = script.get("char_a_description", "friendly young man")
@@ -356,12 +360,17 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         os.environ["VISUAL_STYLE_PROMPT"] = style_prompt
     print(f"  [Style] Using style_prompt: {style_prompt[:80]}...")
 
+    # Shorts mode renders a vertical 9:16 canvas — images are generated portrait
+    aspect_hint = "vertical 9:16 portrait composition, tall framing" if is_shorts else "16:9"
+    portrait_size = "portrait_16_9" if is_shorts else "landscape_16_9"
+    dialogue_img_size = {"width": 720, "height": 1280} if is_shorts else None
+
     image_prompts = []
     if not is_quest:
         image_prompts.append(
-            (f"Character design sheet, {char_a_desc} on the left, {char_b_desc} on the right, plain white background, full body, front view, {style_prompt}, no text, no background, 16:9", "char_scene.png"))
+            (f"Character design sheet, {char_a_desc} on the left, {char_b_desc} on the right, plain white background, full body, front view, {style_prompt}, no text, no background, {aspect_hint}", "char_scene.png"))
         image_prompts.append(
-            (f"Scene background, {scene}, wide shot, showing all key elements of the scene, {style_prompt}, no characters, no text, 16:9", "scene.png"))
+            (f"Scene background, {scene}, wide shot, showing all key elements of the scene, {style_prompt}, no characters, no text, {aspect_hint}", "scene.png"))
     if is_stop_motion:
         # Per-character three-view reference sheets for pose consistency
         image_prompts.append(
@@ -388,7 +397,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             try:
                 _generate_tts(script, dialogue, audio_dir, tts_results,
                               quest=is_quest, tts_rate=args.tts_rate,
-                              tts_engine=args.tts_engine)
+                              tts_engine=args.tts_engine, shorts=is_shorts)
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -399,9 +408,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         print("  [TTS] Started TTS generation in background thread.")
 
         image_urls = _generate_images(image_prompts, img_dir, tts_thread,
-                                      max_workers=args.image_concurrency)
+                                      max_workers=args.image_concurrency,
+                                      image_size=portrait_size)
 
-        if is_image or is_quest:
+        if is_image or is_quest or is_shorts:
             char_scene_cdn = image_urls.get("char_scene.png", "")
             if is_quest:
                 # Quest uses per-character atlas (4 chars × 8 poses), no ref images
@@ -417,7 +427,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                     dialogue, img_dir, char_a_desc, char_b_desc, scene,
                     is_quest, char_scene_cdn, "", tts_thread,
                     max_workers=args.image_concurrency,
-                    style_prompt=style_prompt)
+                    style_prompt=style_prompt,
+                    image_size=dialogue_img_size)
         elif is_stop_motion:
             char_a_ref_cdn = image_urls.get("char_a_ref.png", "")
             char_b_ref_cdn = image_urls.get("char_b_ref.png", "")
@@ -436,9 +447,9 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     scene_clip_task = None
     scene_clip_thread = None
 
-    if is_image or is_quest:
+    if is_image or is_quest or is_shorts:
         clip_paths = []
-        print(f"  [{'Image' if is_image else 'Quest'}] Skipping clip_0 generation (no video clips)")
+        print(f"  [{'Image' if is_image else 'Quest' if is_quest else 'Shorts'}] Skipping clip_0 generation (no video clips)")
     else:
         scene_clip_task = _build_scene_clip_task(scene, scene_url, style_prompt=style_prompt)
         clip0_path = str(clips_dir / "clip_0.mp4")
@@ -501,7 +512,7 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
     dialogue_durations = tts_results.get("dialogue_durations", [])
     audio_dir, clips_dir = dirs["audio"], dirs["clips"]
 
-    if args.structure in ("image", "quest"):
+    if args.structure in ("image", "quest", "shorts"):
         print(f"Step 3: Skipped ({args.structure} mode — no video generation)")
         _save_checkpoint(work_dir, "step3_video")
         print(f"  TTS: {len(normal_paths)} EN + {sum(1 for p in zh_paths if p)} ZH")
@@ -584,6 +595,10 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
         timeline = build_quest_timeline(script, dialogue_durations, pad=args.pad)
         _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration, output_fps=25)
         srt = build_srt_from_timeline_quest(timeline, gap=0.0)
+    elif args.structure == "shorts":
+        timeline = build_shorts_timeline(script, dialogue_durations, pad=args.pad)
+        _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration)
+        srt = build_srt_from_timeline(timeline, gap=0.0)
     else:
         timeline = build_listening_timeline(
             script, dialogue_durations,
@@ -617,17 +632,32 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
     print("Step 4.5: Generating YouTube metadata + thumbnail...")
     from thumbnail_gen import generate_thumbnail, save_youtube_metadata
 
+    thumb_path = str(work_dir / "thumbnail.jpg")
+    yt_meta_path = str(work_dir / "youtube_metadata.json")
+    if _step_done(checkpoint, "step4.5_thumbnail") and os.path.exists(yt_meta_path) and (
+            args.structure == "shorts" or os.path.exists(thumb_path)):
+        print("  [Resume] Thumbnail + YouTube metadata already exist, skipping...")
+        return
+
+    # Shorts feed shows video frames — no custom thumbnail needed, but the
+    # YouTube metadata (title/description/tags) is still required for upload.
+    if args.structure == "shorts":
+        print("  [Shorts] Skipping thumbnail generation (Shorts feed uses video frames).")
+        save_youtube_metadata(
+            script=script,
+            timeline=timeline,
+            output_path=yt_meta_path,
+            structure=args.structure,
+        )
+        _save_checkpoint(work_dir, "step4.5_thumbnail")
+        return
+
     # Quest mode uses scene_0.png as thumbnail bg (scene.png not generated)
     if args.structure == "quest":
         _s0 = dirs["images"] / "scene_0.png"
         scene_img_full = str(_s0 if _s0.exists() else dirs["images"] / "scene.png")
     else:
         scene_img_full = str(dirs["images"] / "scene.png")
-    thumb_path = str(work_dir / "thumbnail.jpg")
-    yt_meta_path = str(work_dir / "youtube_metadata.json")
-    if _step_done(checkpoint, "step4.5_thumbnail") and os.path.exists(thumb_path) and os.path.exists(yt_meta_path):
-        print("  [Resume] Thumbnail + YouTube metadata already exist, skipping...")
-        return
     # Quest mode uses pose_char_a_0.png; others use char_scene.png
     if args.structure == "quest":
         char_scene_cdn = ctx["image_urls"].get("pose_char_a_0.png", "")
@@ -771,6 +801,34 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             animation=args.animation,
             subtitle_font_size=args.subtitle_font_size,
         )
+    elif args.structure == "shorts":
+        # Vertical 9:16 Shorts — reuse the image compose path at 1080x1920.
+        # stop_motion is not vertical-aware yet; fall back to landing.
+        from video_compose import compose_image
+        if args.animation == "stop_motion":
+            print("  [Shorts] stop_motion is not supported in shorts mode, falling back to 'landing'.")
+            args.animation = "landing"
+        n = len(script.get("dialogue", []))
+        dialogue_images = [str(dirs["images"] / f"dialogue_img_{i}.png") for i in range(n)]
+        final_path = compose_image(
+            work_dir=str(work_dir),
+            dialogue_images=dialogue_images,
+            pose_images=[],
+            background_img=scene_img,
+            timeline=timeline,
+            script=script,
+            narration=narration,
+            normal_paths=normal_paths,
+            zh_paths=zh_paths,
+            scene_img=scene_img,
+            srt_dir=str(sub_dir),
+            pad=args.pad,
+            progress_cb=progress_cb,
+            animation=args.animation,
+            subtitle_font_size=args.subtitle_font_size,
+            target_w=1080,
+            target_h=1920,
+        )
     else:
         final_path = compose_listening(
             work_dir=str(work_dir),
@@ -801,6 +859,9 @@ def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
     print("\n" + "=" * 60)
     print("Step 6: Upscaling to 4K...")
     final_4k_path = work_dir / f"{safe_vid_name}_4K.mp4"
+    if args.structure == "shorts":
+        print("  [4K] Skipped (shorts mode — YouTube Shorts caps at 1080x1920).")
+        return None
     if args.no_4k:
         print("  [4K] Skipped (--no-4k).")
         return None
@@ -845,7 +906,7 @@ def main():
 
     # Per-structure defaults (explicit CLI values win)
     if args.num_lines is None:
-        args.num_lines = 48 if args.structure == "quest" else 18
+        args.num_lines = 48 if args.structure == "quest" else 10 if args.structure == "shorts" else 18
     if args.pad is None:
         args.pad = 0.4
 

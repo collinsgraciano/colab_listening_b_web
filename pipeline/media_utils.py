@@ -84,8 +84,9 @@ def probe_resolution(video_path: str) -> tuple[int, int]:
             ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
              "-show_entries", "stream=width,height", "-of", "csv=p=0",
              str(video_path)], text=True, encoding="utf-8", errors="replace").strip()
-        w_str, h_str = out.split("x")
-        w, h = int(w_str), int(h_str)
+        # csv writer prints "width,height" (comma-separated)
+        parts = out.replace("x", ",").split(",")
+        w, h = int(parts[0]), int(parts[1])
         if w > 0 and h > 0:
             return w, h
     except Exception:

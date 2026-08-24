@@ -35,7 +35,7 @@ if str(_PIPELINE_DIR) not in sys.path:
 
 from llm_client import _extract_json, set_llm_env_override  # noqa: E402
 
-DEFAULT_LINES = {"original": 18, "image": 18, "quest": 48}
+DEFAULT_LINES = {"original": 18, "image": 18, "quest": 48, "shorts": 10}
 
 # 简体独有字（繁体无此字形）— 检测中文文案误用简体
 _SIMP_ONLY_CHARS = set(
@@ -355,12 +355,17 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
     from pipeline import _validate_script
 
     quest = (structure == "quest")
+    shorts = (structure == "shorts")
     last_err: Exception | None = None
     for attempt in range(max_attempts):
         try:
             if quest:
                 from quest.llm_client_quest import generate_quest_script
                 script = generate_quest_script(
+                    topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines)
+            elif shorts:
+                from llm_client import generate_shorts_script
+                script = generate_shorts_script(
                     topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines)
             else:
                 from llm_client import generate_listening_script

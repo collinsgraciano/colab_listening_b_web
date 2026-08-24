@@ -586,7 +586,7 @@ class PipelineService:
 
         structure = config.get("structure", "original")
         if num_lines is None:
-            num_lines = 48 if structure == "quest" else 18
+            num_lines = 48 if structure == "quest" else 10 if structure == "shorts" else 18
         if pad is None:
             pad = 0.4
 

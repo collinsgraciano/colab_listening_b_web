@@ -35,6 +35,7 @@
                         <option value="original">Original (4章视频片段)</option>
                         <option value="image">Image (纯图片+动画)</option>
                         <option value="quest">Quest (任务听力 · 单个约5-10分钟)</option>
+                        <option value="shorts">Shorts (竖屏文化问答 · 10行约1分钟)</option>
                     </select>
                 </div>
                 <div>
@@ -47,7 +48,7 @@
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">对话行数</label>
-                    <input type="number" id="gen-numlines" min="4" max="80" placeholder="留空=默认 (18 / quest 48)"
+                    <input type="number" id="gen-numlines" min="4" max="80" placeholder="留空=默认 (18 / quest 48 / shorts 10)"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600">
                 </div>
                 <div>
@@ -101,6 +102,7 @@
                 <option value="original">Original</option>
                 <option value="image">Image</option>
                 <option value="quest">Quest</option>
+                <option value="shorts">Shorts</option>
             </select>
             <select id="filter-status" onchange="loadScripts()"
                 class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
