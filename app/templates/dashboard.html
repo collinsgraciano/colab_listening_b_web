@@ -68,6 +68,25 @@
             </div>
         </div>
 
+        <!-- Script library source -->
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs text-slate-400">脚本库 (可选)
+                    <span class="text-slate-600">— 选择后跳过 Step 0 LLM 生成，直接使用「批量脚本」页生成的脚本</span>
+                </label>
+                <a href="/scripts" class="text-xs text-indigo-400 hover:text-indigo-300">📝 管理脚本库 →</a>
+            </div>
+            <div class="flex gap-2">
+                <select id="script-lib-select" onchange="onScriptLibChange()"
+                    class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="">— 不使用（AI 新生成）—</option>
+                </select>
+                <button type="button" onclick="loadScriptLibrary()" title="刷新脚本库"
+                    class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🔄</button>
+            </div>
+            <p id="script-lib-info" class="text-xs text-indigo-300 mt-1 hidden"></p>
+        </div>
+
         <!-- Character reuse -->
         <div class="mb-4">
             <label class="block text-xs text-slate-400 mb-1">复用角色 (可选)</label>
@@ -237,6 +256,9 @@ function switchMode(m) {
     ACTIVE_MODE = m;
     applyModeTabStyles();
     applyQuickFields();
+    // 脚本库按模式过滤，切换后重新加载并清空选择
+    _selectedScript = null;
+    loadScriptLibrary();
     // 角色区切换到新模式状态
     parseLibAssignments();
     const sel = document.getElementById('char-source');
@@ -284,6 +306,53 @@ function loadQwenVoices() {
             renderLibrary();
         })
         .catch(() => {});
+}
+
+// --- Script library (脚本库直接使用) ---
+let _scriptLibScripts = [];
+let _selectedScript = null;
+
+function loadScriptLibrary() {
+    fetch('/api/scripts?status=unused&structure=' + ACTIVE_MODE)
+        .then(r => r.json())
+        .then(data => {
+            _scriptLibScripts = data.scripts || [];
+            const sel = document.getElementById('script-lib-select');
+            const prev = _selectedScript ? _selectedScript.id : sel.value;
+            sel.innerHTML = '<option value="">— 不使用（AI 新生成）—</option>';
+            _scriptLibScripts.forEach(s => {
+                const score = (s.score !== null && s.score !== undefined) ? ` · ★${s.score}` : '';
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.topic}${score} · ${s.lines}行 · ${s.cefr}`;
+                sel.appendChild(opt);
+            });
+            if (prev && _scriptLibScripts.some(s => s.id === prev)) sel.value = prev;
+            else _selectedScript = null;
+            onScriptLibChange();
+        });
+}
+
+function onScriptLibChange() {
+    const sel = document.getElementById('script-lib-select');
+    const info = document.getElementById('script-lib-info');
+    const topicInput = document.getElementById('quick-topic');
+    const cefrSel = document.getElementById('quick-cefr');
+    _selectedScript = _scriptLibScripts.find(s => s.id === sel.value) || null;
+    if (_selectedScript) {
+        topicInput.value = _selectedScript.topic;
+        topicInput.readOnly = true;
+        if (_selectedScript.cefr) cefrSel.value = _selectedScript.cefr;
+        cefrSel.disabled = true;
+        info.textContent = `将使用脚本库脚本「${_selectedScript.topic}」· ${_selectedScript.lines} 行 · ${_selectedScript.title}`;
+        info.classList.remove('hidden');
+    } else {
+        topicInput.readOnly = false;
+        cefrSel.disabled = false;
+        topicInput.value = MODE_CONFIGS[ACTIVE_MODE].topic || '';
+        cefrSel.value = MODE_CONFIGS[ACTIVE_MODE].cefr || 'A2';
+        info.classList.add('hidden');
+    }
 }
 
 // --- Character reuse ---
@@ -794,6 +863,7 @@ window.addEventListener('load', function() {
     loadQwenVoices();
     loadCharSources();
     loadLibrary();
+    loadScriptLibrary();
     // ... existing status check
     fetch('/api/run/status')
         .then(r => r.json())
@@ -809,6 +879,10 @@ window.addEventListener('load', function() {
 });
 
 function pickRandomTopic() {
+    if (_selectedScript) {
+        alert('已选择脚本库脚本 — 请先将「脚本库」切回「不使用」再随机选主题');
+        return;
+    }
     fetch('/api/topics/random')
         .then(r => r.json())
         .then(data => {
@@ -827,6 +901,7 @@ function startPipeline(resume) {
         topic: document.getElementById('quick-topic').value,
         cefr: document.getElementById('quick-cefr').value,
         structure: ACTIVE_MODE,
+        script_id: _selectedScript ? _selectedScript.id : '',
         ...collectCharacterConfig(),
     };
     // Merge with the active mode's full config

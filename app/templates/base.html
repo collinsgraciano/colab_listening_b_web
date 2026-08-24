@@ -32,6 +32,10 @@
                 {% if active_page == 'topics' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
                 <span class="text-lg">📚</span> 主题管理
             </a>
+            <a href="/scripts" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                {% if active_page == 'scripts' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
+                <span class="text-lg">📝</span> 批量脚本
+            </a>
             <a href="/runs" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
                 {% if active_page == 'runs' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">
                 <span class="text-lg">📁</span> 运行历史

@@ -1,0 +1,779 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+        <div>
+            <h2 class="text-2xl font-bold text-white">📝 批量脚本工坊</h2>
+            <p class="text-sm text-slate-400 mt-1">批量生成 → AI 审查 → 控制台一键使用（使用过的脚本自动标记，防重复）</p>
+        </div>
+        <a href="/" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">▶ 到控制台使用</a>
+    </div>
+
+    <!-- Generate panel -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 mb-6">
+        <button type="button" onclick="toggleGenPanel()" class="w-full flex items-center justify-between px-5 py-4 text-left">
+            <span class="text-lg font-semibold text-white">✨ 批量生成脚本</span>
+            <span id="gen-panel-arrow" class="text-slate-400 text-lg">▾</span>
+        </button>
+        <div id="gen-panel" class="px-5 pb-5 border-t border-slate-700 pt-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">大模型 Provider</label>
+                    <select id="gen-provider" onchange="onProviderChange()"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">模型</label>
+                    <select id="gen-model"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">模式 (视频结构)</label>
+                    <select id="gen-structure" onchange="onStructureChange()"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="original">Original (4章视频片段)</option>
+                        <option value="image">Image (纯图片+动画)</option>
+                        <option value="quest">Quest (任务听力 · 单个约5-10分钟)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">CEFR</label>
+                    <select id="gen-cefr"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option>A1</option><option>A2</option><option>B1</option>
+                        <option>B2</option><option>C1</option><option>C2</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">对话行数</label>
+                    <input type="number" id="gen-numlines" min="4" max="80" placeholder="留空=默认 (18 / quest 48)"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">🎲 随机抽取未用主题</label>
+                    <div class="flex gap-2">
+                        <select id="random-count"
+                            class="w-20 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-white">
+                            <option>1</option><option>2</option><option>3</option>
+                            <option>5</option><option selected>10</option>
+                        </select>
+                        <button type="button" onclick="randomPick()"
+                            class="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200">🎲 抽取</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Topic picker -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-1 gap-2 flex-wrap">
+                    <label class="text-xs text-slate-400">从主题库选择（可多选，<span class="line-through text-slate-500">划线</span>=已用主题）</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="text" id="topic-search" oninput="renderTopicList()" placeholder="🔍 搜索主题..."
+                            class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white w-48">
+                        <button type="button" onclick="clearSelectedTopics()" class="text-xs text-slate-400 hover:text-slate-200">清空已选</button>
+                    </div>
+                </div>
+                <div id="topic-list" class="max-h-56 overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-1 border border-slate-700 rounded-lg p-2 bg-slate-900"></div>
+                <div id="selected-topics" class="flex flex-wrap gap-1.5 mt-2"></div>
+                <textarea id="custom-topics" rows="2" placeholder="或自定义主题，每行一个（与上方勾选合并，共 N 个脚本）"
+                    class="w-full mt-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600"></textarea>
+            </div>
+
+            <div class="flex flex-wrap gap-2 items-center">
+                <button type="button" id="btn-generate" onclick="startGenerate()"
+                    class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium text-sm">▶ 开始批量生成</button>
+                <button type="button" id="btn-gen-stop" onclick="stopGenerate()" style="display:none"
+                    class="px-5 py-2.5 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium text-sm">⏹ 停止</button>
+                <span class="text-xs text-slate-500">串行执行，LLM 限流自动等待 · 完成的脚本立即入库可审查/使用</span>
+            </div>
+            <div id="gen-status" class="hidden mt-3 text-sm text-indigo-300"></div>
+            <div id="gen-log" class="hidden mt-2 font-mono text-xs bg-slate-950 rounded-lg p-3 h-44 overflow-y-auto text-slate-300 whitespace-pre-wrap"></div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div class="flex gap-2 items-center flex-wrap">
+            <select id="filter-structure" onchange="loadScripts()"
+                class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <option value="">全部结构</option>
+                <option value="original">Original</option>
+                <option value="image">Image</option>
+                <option value="quest">Quest</option>
+            </select>
+            <select id="filter-status" onchange="loadScripts()"
+                class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <option value="">全部状态</option>
+                <option value="unused">未使用</option>
+                <option value="draft">草稿</option>
+                <option value="reviewed">已审查</option>
+                <option value="used">已使用</option>
+            </select>
+            <input type="text" id="filter-q" oninput="debounceLoadScripts()" placeholder="搜索 topic / 标题..."
+                class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white w-52">
+        </div>
+        <div class="flex gap-2">
+            <button type="button" id="btn-review-all" onclick="reviewAll()"
+                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white font-medium">🔍 批量审查未审查</button>
+            <button type="button" onclick="loadScripts()"
+                class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🔄 刷新</button>
+        </div>
+    </div>
+    <div id="review-progress" class="hidden mb-4 bg-slate-800 border border-amber-700/50 rounded-lg px-4 py-3 text-sm text-amber-300"></div>
+
+    <!-- Script list -->
+    <div id="script-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+</div>
+
+<!-- Editor modal -->
+<div id="editor-modal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" onclick="closeEditor(event)">
+    <div class="bg-slate-800 border border-slate-600 rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+            <h3 class="text-lg font-bold text-white" id="ed-title">脚本编辑</h3>
+            <div class="flex gap-2">
+                <button type="button" onclick="saveEditor()" id="ed-save"
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white font-medium">💾 保存</button>
+                <button type="button" onclick="closeEditor()" class="text-slate-400 hover:text-white text-xl px-2">✕</button>
+            </div>
+        </div>
+        <div id="ed-body" class="overflow-y-auto p-5 space-y-4"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// =========================================================================
+// 表单数据 + Provider/Model 联动
+// =========================================================================
+let FORM = null;
+let SCRIPTS = [];
+let _selectedTopics = new Set();
+let _editingDoc = null;
+let _sseBusy = false;
+
+const STRUCT_LABEL = {original: 'Original', image: 'Image', quest: 'Quest'};
+const STATUS_BADGE = {
+    draft:   ['草稿', 'bg-slate-600 text-white'],
+    reviewed:['已审查', 'bg-blue-600 text-white'],
+    used:    ['✓ 已使用', 'bg-green-600 text-white'],
+};
+
+function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+}
+
+function fmtDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    const now = Date.now();
+    const diff = (now - ts * 1000) / 1000;
+    if (diff < 3600) return Math.max(1, Math.floor(diff / 60)) + '分钟前';
+    if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+    if (diff < 604800) return Math.floor(diff / 86400) + '天前';
+    return `${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function loadFormOptions() {
+    fetch('/api/scripts/form_options')
+        .then(r => r.json())
+        .then(data => {
+            FORM = data;
+            renderProviderSelect();
+            renderTopicList();
+            if (data.current) {
+                if (data.current.cefr) document.getElementById('gen-cefr').value = data.current.cefr;
+            }
+        });
+}
+
+function renderProviderSelect() {
+    const sel = document.getElementById('gen-provider');
+    const cur = FORM.current ? FORM.current.provider : '';
+    sel.innerHTML = '';
+    Object.entries(FORM.providers || {}).forEach(([value, label]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        sel.appendChild(opt);
+    });
+    if (cur && (cur in (FORM.providers || {}))) sel.value = cur;
+    onProviderChange();
+}
+
+function onProviderChange() {
+    const provider = document.getElementById('gen-provider').value;
+    const sel = document.getElementById('gen-model');
+    sel.innerHTML = '';
+    let models = [];
+    if (provider === 'sensenova') {
+        models = FORM.sensenova_models || [];
+    } else if (provider.startsWith('custom:')) {
+        const cp = (FORM.custom_providers || []).find(p => 'custom:' + p.id === provider);
+        models = cp ? cp.models : [];
+    } else {
+        models = FORM.openai_models || [];
+    }
+    models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        sel.appendChild(opt);
+    });
+    // 回显当前配置的模型
+    if (FORM.current) {
+        const saved = provider === 'sensenova' ? FORM.current.sensenova_model : FORM.current.openai_model;
+        if (saved && models.includes(saved)) sel.value = saved;
+    }
+}
+
+function onStructureChange() {
+    const s = document.getElementById('gen-structure').value;
+    const input = document.getElementById('gen-numlines');
+    input.placeholder = `留空=默认 (${FORM && FORM.default_lines ? (FORM.default_lines[s] || 18) : 18})`;
+}
+
+function toggleGenPanel() {
+    const panel = document.getElementById('gen-panel');
+    const arrow = document.getElementById('gen-panel-arrow');
+    const hidden = panel.style.display === 'none';
+    panel.style.display = hidden ? '' : 'none';
+    arrow.textContent = hidden ? '▾' : '▸';
+}
+
+// =========================================================================
+// 主题选择
+// =========================================================================
+
+function renderTopicList() {
+    const container = document.getElementById('topic-list');
+    if (!FORM) { container.innerHTML = ''; return; }
+    const needle = (document.getElementById('topic-search').value || '').toLowerCase();
+    let html = '';
+    const usedSet = new Set(FORM.used_topics || []);
+    Object.entries(FORM.topics_data || {}).forEach(([cat, topics]) => {
+        const hits = topics.filter(t => !needle || t.toLowerCase().includes(needle));
+        if (!hits.length) return;
+        html += `<div class="col-span-full text-[11px] text-slate-500 mt-1">${escapeHtml(cat)}</div>`;
+        hits.forEach(t => {
+            const used = usedSet.has(t);
+            const checked = _selectedTopics.has(t);
+            html += `
+                <label class="flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-slate-800 cursor-pointer ${used ? 'opacity-50' : ''}">
+                    <input type="checkbox" ${checked ? 'checked' : ''} ${used ? 'disabled' : ''}
+                        onchange="toggleTopic('${escapeHtml(t).replace(/'/g, '&#39;')}', this.checked)"
+                        class="accent-indigo-500 w-3.5 h-3.5">
+                    <span class="${used ? 'line-through text-slate-500' : 'text-slate-300'} truncate">${escapeHtml(t)}</span>
+                </label>`;
+        });
+    });
+    container.innerHTML = html || '<p class="text-xs text-slate-500 col-span-full p-2">无匹配主题</p>';
+    renderSelectedChips();
+}
+
+function toggleTopic(topic, checked) {
+    if (checked) _selectedTopics.add(topic);
+    else _selectedTopics.delete(topic);
+    renderSelectedChips();
+}
+
+function clearSelectedTopics() {
+    _selectedTopics.clear();
+    renderTopicList();
+}
+
+function renderSelectedChips() {
+    const box = document.getElementById('selected-topics');
+    if (!_selectedTopics.size) { box.innerHTML = ''; return; }
+    let html = `<span class="text-xs text-slate-500 self-center">已选 ${_selectedTopics.size}:</span>`;
+    _selectedTopics.forEach(t => {
+        html += `<span class="inline-flex items-center gap-1 bg-indigo-900/50 border border-indigo-700 rounded-full px-2.5 py-0.5 text-xs text-indigo-200">
+            ${escapeHtml(t)}
+            <button type="button" onclick="toggleTopic('${escapeHtml(t).replace(/'/g, '&#39;')}', false); renderTopicList()"
+                class="text-indigo-400 hover:text-white">✕</button>
+        </span>`;
+    });
+    box.innerHTML = html;
+}
+
+function randomPick() {
+    if (!FORM) return;
+    const usedSet = new Set(FORM.used_topics || []);
+    const pool = [];
+    Object.values(FORM.topics_data || {}).forEach(topics => {
+        topics.forEach(t => { if (!usedSet.has(t) && !_selectedTopics.has(t)) pool.push(t); });
+    });
+    const n = parseInt(document.getElementById('random-count').value) || 1;
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    pool.slice(0, n).forEach(t => _selectedTopics.add(t));
+    renderTopicList();
+}
+
+// =========================================================================
+// 批量生成 (SSE)
+// =========================================================================
+
+function genLog(line, cls) {
+    const log = document.getElementById('gen-log');
+    log.classList.remove('hidden');
+    const div = document.createElement('div');
+    div.className = cls || 'text-slate-300';
+    div.textContent = line;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+}
+
+function genStatus(msg, show) {
+    const el = document.getElementById('gen-status');
+    if (msg !== null) el.textContent = msg;
+    el.classList.toggle('hidden', show === false);
+}
+
+function collectTopics() {
+    const topics = Array.from(_selectedTopics);
+    const custom = (document.getElementById('custom-topics').value || '')
+        .split('\n').map(t => t.trim()).filter(t => t && !topics.includes(t));
+    return topics.concat(custom);
+}
+
+async function startGenerate() {
+    if (_sseBusy) return;
+    const topics = collectTopics();
+    if (!topics.length) {
+        alert('请先勾选主题、填写自定义主题，或点「🎲 抽取」随机选择');
+        return;
+    }
+    const body = {
+        provider: document.getElementById('gen-provider').value,
+        model: document.getElementById('gen-model').value,
+        structure: document.getElementById('gen-structure').value,
+        cefr: document.getElementById('gen-cefr').value,
+        num_lines: document.getElementById('gen-numlines').value || '',
+        topics: topics,
+        random_count: 0,
+    };
+
+    document.getElementById('btn-generate').disabled = true;
+    document.getElementById('btn-gen-stop').style.display = '';
+    document.getElementById('gen-log').innerHTML = '';
+    genStatus('生成中...');
+    _sseBusy = true;
+    let generated = 0;
+
+    try {
+        const resp = await fetch('/api/scripts/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${resp.status}`);
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, {stream: true});
+            let idx;
+            while ((idx = buf.indexOf('\n\n')) >= 0) {
+                const chunk = buf.slice(0, idx);
+                buf = buf.slice(idx + 2);
+                if (!chunk.startsWith('data: ')) continue;
+                let ev;
+                try { ev = JSON.parse(chunk.slice(6)); } catch (e) { continue; }
+                if (ev.type === 'progress') {
+                    genLog(ev.message, ev.message.startsWith('✅') ? 'text-green-400'
+                        : ev.message.startsWith('❌') ? 'text-red-400'
+                        : ev.message.startsWith('⏹') ? 'text-amber-400' : 'text-slate-300');
+                    genStatus(ev.message);
+                } else if (ev.type === 'script') {
+                    generated++;
+                    genLog(`  → 已入库: ${ev.data.topic} (id=${ev.data.id})`, 'text-indigo-400');
+                    SCRIPTS.unshift(ev.data);
+                    renderList();
+                } else if (ev.type === 'error_item') {
+                    genLog(`  → 失败: ${ev.data.topic}: ${ev.data.error}`, 'text-red-400');
+                } else if (ev.type === 'done') {
+                    genStatus(`完成: 成功 ${ev.data.generated}/${ev.data.total}` +
+                        (ev.data.failed ? `，失败 ${ev.data.failed}` : '') +
+                        (ev.data.stopped ? '（已停止）' : ''));
+                } else if (ev.type === 'error') {
+                    genLog('FATAL: ' + ev.error, 'text-red-400');
+                    genStatus('生成失败: ' + ev.error, false);
+                }
+            }
+        }
+    } catch (e) {
+        alert('生成失败: ' + e.message);
+        genStatus(null, false);
+    } finally {
+        _sseBusy = false;
+        document.getElementById('btn-generate').disabled = false;
+        document.getElementById('btn-gen-stop').style.display = 'none';
+        loadScripts();
+    }
+}
+
+function stopGenerate() {
+    fetch('/api/scripts/generate/stop', {method: 'POST'}).catch(() => {});
+    genLog('⏹ 已请求停止（当前主题完成后中止）...', 'text-amber-400');
+}
+
+/* APPEND_JS_CORE */
+// =========================================================================
+// 脚本列表
+// =========================================================================
+
+let _loadTimer = null;
+function debounceLoadScripts() {
+    clearTimeout(_loadTimer);
+    _loadTimer = setTimeout(loadScripts, 300);
+}
+
+function loadScripts() {
+    const structure = document.getElementById('filter-structure').value;
+    const status = document.getElementById('filter-status').value;
+    const q = document.getElementById('filter-q').value.trim();
+    const params = new URLSearchParams();
+    if (structure) params.set('structure', structure);
+    if (status) params.set('status', status);
+    if (q) params.set('q', q);
+    fetch('/api/scripts?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            SCRIPTS = data.scripts || [];
+            renderList();
+        });
+}
+
+function scoreBadge(meta) {
+    if (meta.score === null || meta.score === undefined)
+        return '<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-400">未审查</span>';
+    let cls = 'bg-green-700 text-green-100';
+    if (meta.score < 60) cls = 'bg-red-700 text-red-100';
+    else if (meta.score < 80) cls = 'bg-amber-700 text-amber-100';
+    return `<span class="px-2 py-0.5 rounded-full text-[10px] ${cls}">★ ${meta.score}</span>`;
+}
+
+function renderList() {
+    const box = document.getElementById('script-list');
+    if (!SCRIPTS.length) {
+        box.innerHTML = '<div class="col-span-full bg-slate-800 border border-slate-700 rounded-xl p-8 text-center text-slate-500 text-sm">脚本库为空 — 用上方「✨ 批量生成脚本」生成第一批脚本</div>';
+        return;
+    }
+    let html = '';
+    SCRIPTS.forEach(m => {
+        const [stLabel, stCls] = STATUS_BADGE[m.status] || [m.status, 'bg-slate-600 text-white'];
+        const used = m.status === 'used';
+        html += `
+        <div class="bg-slate-800 rounded-xl border ${used ? 'border-green-800/70' : 'border-slate-700'} p-4 flex flex-col gap-2 ${used ? 'opacity-70' : ''}">
+            <div class="flex flex-wrap gap-1.5">
+                <span class="px-2 py-0.5 rounded-full text-[10px] ${stCls}">${stLabel}</span>
+                ${scoreBadge(m)}
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${STRUCT_LABEL[m.structure] || m.structure}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${escapeHtml(m.cefr)}</span>
+                ${m.local_issues ? '<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-900/60 text-amber-300">⚠ 本地' + m.local_issues + '</span>' : ''}
+            </div>
+            <div>
+                <p class="font-medium text-white text-sm ${used ? 'line-through' : ''}">${escapeHtml(m.topic)}</p>
+                <p class="text-xs text-slate-400 truncate" title="${escapeHtml(m.title)}">${escapeHtml(m.title)}</p>
+                <p class="text-[11px] text-slate-500 mt-1">${m.lines} 行 · ${escapeHtml(m.llm_model || m.llm_provider || '?')} · ${fmtDate(m.created)}</p>
+                ${used ? `<p class="text-[11px] text-green-400 mt-0.5">已用于: ${escapeHtml(m.used_by || '')} (${fmtDate(m.used_at)})</p>` : ''}
+            </div>
+            <div class="flex flex-wrap gap-2 mt-auto pt-1 text-xs">
+                <button type="button" onclick="openEditor('${m.id}')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200">👁 查看/编辑</button>
+                <button type="button" onclick="reviewOne('${m.id}')" class="px-2.5 py-1 bg-amber-700/80 hover:bg-amber-600 rounded-lg text-white">🔍 AI审查</button>
+                ${used ? `<button type="button" onclick="resetUsed('${m.id}')" class="px-2.5 py-1 bg-green-800 hover:bg-green-700 rounded-lg text-green-100">↺ 重置使用</button>`
+                       : `<a href="/" class="px-2.5 py-1 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white">▶ 到控制台</a>`}
+                <button type="button" onclick="deleteScript('${m.id}')" class="px-2.5 py-1 text-red-400 hover:text-red-300">✕</button>
+            </div>
+        </div>`;
+    });
+    box.innerHTML = html;
+}
+
+async function deleteScript(id) {
+    const m = SCRIPTS.find(s => s.id === id);
+    if (!confirm(`删除脚本「${m ? m.topic : id}」? 不可恢复。`)) return;
+    await fetch('/api/scripts/' + id, {method: 'DELETE'});
+    loadScripts();
+}
+
+async function resetUsed(id) {
+    const resp = await fetch(`/api/scripts/${id}/reset_used`, {method: 'POST'});
+    const data = await resp.json();
+    if (data.ok) loadScripts();
+    else alert(data.error || '重置失败');
+}
+
+// =========================================================================
+// AI 审查 (SSE，逐个)
+// =========================================================================
+
+async function runReviewSSE(ids) {
+    if (_sseBusy || !ids.length) return;
+    const body = {
+        ids: ids,
+        provider: document.getElementById('gen-provider').value,
+        model: document.getElementById('gen-model').value,
+    };
+    const progress = document.getElementById('review-progress');
+    progress.classList.remove('hidden');
+    progress.textContent = `开始 AI 审查 ${ids.length} 个脚本...`;
+    _sseBusy = true;
+    document.getElementById('btn-review-all').disabled = true;
+    let done = 0;
+    try {
+        const resp = await fetch('/api/scripts/review', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${resp.status}`);
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const {done: fin, value} = await reader.read();
+            if (fin) break;
+            buf += decoder.decode(value, {stream: true});
+            let idx;
+            while ((idx = buf.indexOf('\n\n')) >= 0) {
+                const chunk = buf.slice(0, idx);
+                buf = buf.slice(idx + 2);
+                if (!chunk.startsWith('data: ')) continue;
+                let ev;
+                try { ev = JSON.parse(chunk.slice(6)); } catch (e) { continue; }
+                if (ev.type === 'progress') {
+                    progress.textContent = ev.message;
+                } else if (ev.type === 'reviewed') {
+                    done++;
+                    const i = SCRIPTS.findIndex(s => s.id === ev.data.id);
+                    if (i >= 0) SCRIPTS[i] = ev.data;
+                    renderList();
+                    if (_editingDoc && _editingDoc.id === ev.data.id) openEditor(ev.data.id, true);
+                } else if (ev.type === 'error_item') {
+                    progress.textContent = `❌ ${ev.data.topic}: ${ev.data.error}`;
+                } else if (ev.type === 'done') {
+                    progress.textContent = `审查完成: ${ev.data.reviewed}/${ev.data.total}` +
+                        (ev.data.failed ? `，失败 ${ev.data.failed}` : '') +
+                        (ev.data.stopped ? '（已停止）' : '');
+                } else if (ev.type === 'error') {
+                    progress.textContent = '审查失败: ' + ev.error;
+                }
+            }
+        }
+    } catch (e) {
+        progress.textContent = '审查失败: ' + e.message;
+    } finally {
+        _sseBusy = false;
+        document.getElementById('btn-review-all').disabled = false;
+        setTimeout(() => progress.classList.add('hidden'), 6000);
+        loadScripts();
+    }
+}
+
+function reviewOne(id) {
+    runReviewSSE([id]);
+}
+
+function reviewAll() {
+    const ids = SCRIPTS.filter(s => !s.reviewed && s.status !== 'used').map(s => s.id);
+    if (!ids.length) {
+        alert('当前筛选下没有未审查的脚本');
+        return;
+    }
+    runReviewSSE(ids);
+}
+
+// =========================================================================
+// 编辑器
+// =========================================================================
+
+function closeEditor(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('editor-modal').classList.add('hidden');
+    document.getElementById('editor-modal').style.display = 'none';
+    _editingDoc = null;
+}
+
+function openEditor(id, silent) {
+    fetch('/api/scripts/' + id)
+        .then(r => r.json())
+        .then(doc => {
+            if (doc.error) { alert(doc.error); return; }
+            _editingDoc = doc;
+            renderEditor();
+            const modal = document.getElementById('editor-modal');
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        });
+}
+
+const CHAR_LABELS = {'char_a': '角色 A', 'char_b': '角色 B', 'char_c': '角色 C', 'host': '主持人'};
+
+function severityCls(sev) {
+    if (sev === 'high') return 'text-red-400';
+    if (sev === 'medium') return 'text-amber-400';
+    return 'text-slate-400';
+}
+
+function renderEditor() {
+    const doc = _editingDoc;
+    const s = doc.script || {};
+    const dialogue = s.dialogue || [];
+    const review = doc.review || {};
+    const body = document.getElementById('ed-body');
+    document.getElementById('ed-title').textContent = `脚本编辑 — ${doc.topic}`;
+
+    const charKeys = [];
+    for (const k of ['char_a', 'char_b', 'char_c', 'host']) {
+        if ((s[k + '_description'] !== undefined)) charKeys.push(k);
+    }
+    const speakerOpts = charKeys;
+
+    // --- 审查报告 ---
+    let reviewHtml = '';
+    if (review.score !== undefined && review.score !== null) {
+        reviewHtml = `
+        <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-4">
+            <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="text-lg font-bold ${review.score >= 80 ? 'text-green-400' : review.score >= 60 ? 'text-amber-400' : 'text-red-400'}">★ ${review.score}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${review.verdict || ''}</span>
+                <span class="text-xs text-slate-500">审查模型: ${escapeHtml(review.model || '')}</span>
+            </div>
+            ${review.summary_zh ? `<p class="text-xs text-slate-300 mb-2">${escapeHtml(review.summary_zh)}</p>` : ''}
+            <div class="space-y-1.5 max-h-44 overflow-y-auto">
+                ${(review.issues || []).map(it => `
+                    <div class="text-xs bg-slate-900 rounded px-2.5 py-1.5">
+                        <span class="${severityCls(it.severity)}">[${it.severity}]</span>
+                        <span class="text-slate-500">${escapeHtml(it.dimension)}${it.line ? ' · 第' + it.line + '行' : ''}:</span>
+                        <span class="text-slate-300">${escapeHtml(it.comment)}</span>
+                        ${it.suggestion ? `<span class="text-indigo-400"> → ${escapeHtml(it.suggestion)}</span>` : ''}
+                    </div>`).join('')}
+            </div>
+        </div>`;
+    } else if ((review.local_issues || []).length) {
+        reviewHtml = `
+        <div class="bg-slate-900/60 border border-amber-800/60 rounded-lg p-4">
+            <p class="text-xs text-amber-300 mb-2">⚠ 本地校验提示（未做 AI 审查）</p>
+            <div class="space-y-1">
+                ${(review.local_issues || []).map(it => `
+                    <div class="text-xs text-slate-300">[${it.severity}] ${it.line ? '第' + it.line + '行 · ' : ''}${escapeHtml(it.comment)}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // --- 元数据 + 角色 ---
+    let metaHtml = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div><label class="block text-xs text-slate-400 mb-1">Topic</label>
+                <input data-meta="topic" value="${escapeHtml(doc.topic)}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
+            <div><label class="block text-xs text-slate-400 mb-1">CEFR</label>
+                <input data-meta="cefr" value="${escapeHtml(doc.cefr)}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
+            <div><label class="block text-xs text-slate-400 mb-1">英文标题</label>
+                <input data-field="title" value="${escapeHtml(s.title || '')}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
+            <div><label class="block text-xs text-slate-400 mb-1">YouTube 标题</label>
+                <input data-field="youtube_title" value="${escapeHtml(s.youtube_title || '')}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">`;
+    charKeys.forEach(ck => {
+        metaHtml += `
+            <div class="bg-slate-900/50 rounded-lg p-3">
+                <p class="text-xs text-indigo-400 font-medium mb-2">${CHAR_LABELS[ck] || ck}</p>
+                <textarea data-field="${ck}_description" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white mb-1.5">${escapeHtml(s[ck + '_description'] || '')}</textarea>
+                <div class="flex gap-2">
+                    <input data-field="${ck}_gender" value="${escapeHtml(s[ck + '_gender'] || '')}" placeholder="性别" class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                    <input data-field="${ck}_role" value="${escapeHtml(s[ck + '_role'] || '')}" placeholder="身份" class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                </div>
+            </div>`;
+    });
+    metaHtml += '</div>';
+
+    // --- 对话 ---
+    let dlgHtml = `<p class="text-xs text-slate-400">对话 (${dialogue.length} 行) — 可直接编辑</p><div class="space-y-2 max-h-[420px] overflow-y-auto pr-1">`;
+    dialogue.forEach((line, i) => {
+        const phase = line.phase ? `<span class="text-[9px] text-purple-400 ml-1">${line.phase}</span>` : '';
+        dlgHtml += `
+            <div class="bg-slate-900/50 rounded-lg p-2.5 grid grid-cols-12 gap-2 items-start">
+                <div class="col-span-1 pt-1"><span class="text-xs text-slate-500 font-mono">#${i + 1}</span>${phase}</div>
+                <div class="col-span-2">
+                    <select data-line="${i}" data-field="speaker" class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1.5 text-xs text-white">
+                        ${speakerOpts.map(sp => `<option value="${sp}" ${line.speaker === sp ? 'selected' : ''}>${sp}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-span-9 space-y-1">
+                    <textarea data-line="${i}" data-field="text" rows="1" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white resize-y min-h-[28px]">${escapeHtml(line.text || '')}</textarea>
+                    <textarea data-line="${i}" data-field="zh" rows="1" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-amber-300/90 resize-y min-h-[28px]">${escapeHtml(line.zh || '')}</textarea>
+                    <input data-line="${i}" data-field="phonetic" value="${escapeHtml(line.phonetic || '')}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-400" placeholder="音标">
+                </div>
+            </div>`;
+    });
+    dlgHtml += '</div>';
+
+    body.innerHTML = reviewHtml + metaHtml + dlgHtml;
+    body.querySelectorAll('textarea').forEach(el => {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+        el.addEventListener('input', () => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; });
+    });
+}
+
+function saveEditor() {
+    if (!_editingDoc) return;
+    const body = document.getElementById('ed-body');
+    const s = _editingDoc.script;
+    body.querySelectorAll('[data-field]:not([data-line])').forEach(el => {
+        s[el.dataset.field] = el.value;
+    });
+    body.querySelectorAll('[data-line]').forEach(el => {
+        const idx = parseInt(el.dataset.line);
+        if (s.dialogue && s.dialogue[idx]) s.dialogue[idx][el.dataset.field] = el.value;
+    });
+    const patch = {script: s};
+    const topicEl = body.querySelector('[data-meta="topic"]');
+    if (topicEl) patch.topic = topicEl.value;
+    const cefrEl = body.querySelector('[data-meta="cefr"]');
+    if (cefrEl) patch.cefr = cefrEl.value;
+
+    const btn = document.getElementById('ed-save');
+    fetch('/api/scripts/' + _editingDoc.id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(patch),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            btn.textContent = '✅ 已保存';
+            btn.classList.add('bg-green-600');
+            setTimeout(() => { btn.textContent = '💾 保存'; btn.classList.remove('bg-green-600'); }, 2000);
+            loadScripts();
+        } else {
+            alert('保存失败: ' + (data.error || ''));
+        }
+    });
+}
+
+// =========================================================================
+// 初始化
+// ==========================================================================
+window.addEventListener('load', function() {
+    loadFormOptions();
+    loadScripts();
+});
+
+</script>
+{% endblock %}

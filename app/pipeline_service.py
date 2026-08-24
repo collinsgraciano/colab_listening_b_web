@@ -628,6 +628,58 @@ class PipelineService:
             resume=False,
         )
 
+    def _seed_from_script_library(self, script_id: str, args, topic: str,
+                                  parent_dir: Path, used_topics_file: str):
+        """Step 0 alternative: seed the run dir from a library script (no LLM).
+
+        Writes script.json + subdirs + checkpoint, marks the script USED.
+        Returns (script, work_dir, dirs); (None, None, None) after _fail().
+        """
+        from . import script_library
+
+        doc = script_library.get_script_doc(script_id)
+        if not doc:
+            self._fail(f"脚本库中未找到脚本: {script_id}")
+            return None, None, None
+        script = doc.get("script") or {}
+        if not script.get("dialogue"):
+            self._fail(f"脚本库脚本无对话内容: {script_id}")
+            return None, None, None
+        if doc.get("structure") and doc["structure"] != args.structure:
+            self._fail(
+                f"脚本结构不匹配: 脚本为 {doc['structure']}，当前模式为 {args.structure}")
+            return None, None, None
+
+        topic = doc.get("topic") or script.get("title") or topic
+        args.topic = topic
+        if doc.get("cefr"):
+            args.cefr = doc["cefr"]
+
+        self._on_log_line("\n" + "=" * 60)
+        self._on_log_line("Step 0: 使用脚本库脚本（跳过 LLM 生成）...")
+        yt_title = script.get("youtube_title", script.get("title", topic))
+        safe_title = _safe_dirname(yt_title, topic)
+        work_dir = parent_dir / safe_title
+        work_dir.mkdir(parents=True, exist_ok=True)
+        dirs = {k: work_dir / k for k in ("images", "clips", "audio", "subtitles", "videos")}
+        for d in dirs.values():
+            d.mkdir(parents=True, exist_ok=True)
+        script_path = work_dir / "script.json"
+        script_path.write_text(
+            json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+        _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
+                         structure=args.structure, animation=args.animation)
+        mark_topic_used(used_topics_file, topic)
+        script_library.mark_used(script_id, run_name=safe_title)
+        review = doc.get("review") or {}
+        score_info = (f"，审查 {review.get('score')} 分"
+                      if review.get("score") is not None else "")
+        self._on_log_line(f"  [ScriptLib] {topic} "
+                          f"({len(script.get('dialogue', []))} 行{score_info})")
+        self._on_log_line(f"  [ScriptLib] 已标记为「已使用」(run: {safe_title})")
+        self._on_log_line(f"  Script saved: {script_path}")
+        return script, work_dir, dirs
+
     def _on_log_line(self, line: str):
         """Called for each stdout line from pipeline."""
         with self._lock:
@@ -695,9 +747,16 @@ class PipelineService:
                     return
             args.topic = topic
 
-            # Step 0: Script generation
-            script, work_dir, dirs = _step0_script(
-                args, checkpoint, topic, parent_dir, used_topics_file)
+            # Step 0: Script generation — 脚本库脚本直接落盘（跳过 LLM 生成）
+            script_id = str(config.get("script_id") or "").strip()
+            if script_id and not resume:
+                script, work_dir, dirs = self._seed_from_script_library(
+                    script_id, args, topic, parent_dir, used_topics_file)
+                if script is None:
+                    return
+            else:
+                script, work_dir, dirs = _step0_script(
+                    args, checkpoint, topic, parent_dir, used_topics_file)
             self.work_dir = str(work_dir)
 
             # --- Character reuse: copy images + override descriptions ---

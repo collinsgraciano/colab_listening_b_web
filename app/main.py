@@ -32,6 +32,7 @@ from .config_manager import (
 from .pipeline_service import get_service, STEP_ORDER
 from .config_manager import detect_local_mcp_token
 from . import topics_ai
+from . import script_library
 
 # Paths
 WEB_ROOT = Path(__file__).parent.parent.resolve()
@@ -733,6 +734,197 @@ async def api_topics_update(request: Request):
         return {"ok": True, "topics": result["topics"]}
     reason = result["skipped"][0] if result["skipped"] else "未知错误"
     return JSONResponse({"error": f"重命名失败: {reason}"}, status_code=400)
+
+
+# ===========================================================================
+# Scripts Library — batch generation & quality review
+# ===========================================================================
+
+@app.get("/scripts", response_class=HTMLResponse)
+async def scripts_page(request: Request):
+    config = load_config()
+    return templates.TemplateResponse(request, "scripts.html", {
+        "config": config,
+        "active_page": "scripts",
+    })
+
+
+@app.get("/api/scripts/form_options")
+async def api_scripts_form_options():
+    """Everything the generate form needs in one call."""
+    config = load_config()
+    return {
+        "providers": get_provider_options(),
+        "sensenova_models": PARAM_SPEC["sensenova_model"]["options"],
+        "openai_models": PARAM_SPEC["openai_model"]["options"],
+        "custom_providers": load_llm_providers(),
+        "topics_data": _load_topics_data(config),
+        "used_topics": _load_used_topic_names(config),
+        "default_lines": script_library.DEFAULT_LINES,
+        "current": {
+            "provider": config.get("llm_provider", "sensenova"),
+            "sensenova_model": config.get("sensenova_model", ""),
+            "openai_model": config.get("openai_model", ""),
+            "cefr": config.get("cefr", "A2"),
+        },
+    }
+
+
+@app.get("/api/scripts")
+async def api_scripts_list(structure: str = "", status: str = "", q: str = ""):
+    return {"scripts": script_library.list_scripts(structure, status, q)}
+
+
+@app.get("/api/scripts/{sid}")
+async def api_script_get(sid: str):
+    doc = script_library.get_script_doc(sid)
+    if not doc:
+        return JSONResponse({"error": "脚本不存在"}, status_code=404)
+    return doc
+
+
+@app.put("/api/scripts/{sid}")
+async def api_script_update(sid: str, request: Request):
+    data = await request.json()
+    doc = script_library.update_script(sid, data)
+    if not doc:
+        return JSONResponse({"error": "脚本不存在"}, status_code=404)
+    return {"ok": True, "meta": script_library.doc_meta(doc)}
+
+
+@app.delete("/api/scripts/{sid}")
+async def api_script_delete(sid: str):
+    return {"ok": script_library.delete_script(sid)}
+
+
+@app.post("/api/scripts/{sid}/reset_used")
+async def api_script_reset_used(sid: str):
+    doc = script_library.reset_used(sid)
+    if not doc:
+        return JSONResponse({"error": "脚本不存在"}, status_code=404)
+    return {"ok": True, "meta": script_library.doc_meta(doc)}
+
+
+@app.post("/api/scripts/generate")
+async def api_scripts_generate(request: Request):
+    """SSE: batch-generate scripts for the given topics."""
+    data = await request.json()
+    structure = data.get("structure", "original")
+    if structure not in ("original", "image", "quest"):
+        return JSONResponse({"error": f"未知模式: {structure}"}, status_code=400)
+
+    # Pipeline 运行中禁止批量生成（LLM 环境变量互斥）
+    if get_service().is_running:
+        return JSONResponse(
+            {"error": "Pipeline 正在运行中 — 请等待完成后再批量生成脚本（避免 LLM 配置冲突）"},
+            status_code=400)
+
+    topics = [str(t).strip() for t in data.get("topics", []) if str(t).strip()]
+    try:
+        random_count = max(0, min(int(data.get("random_count", 0) or 0), 30))
+    except (TypeError, ValueError):
+        random_count = 0
+    if random_count > 0:
+        import random as _random
+        config = load_config()
+        topics_data = _load_topics_data(config)
+        used = set(_load_used_topic_names(config))
+        pool = [t for ts in topics_data.values() for t in ts
+                if t not in used and t not in topics]
+        _random.shuffle(pool)
+        topics += pool[:random_count]
+
+    if not topics:
+        return JSONResponse(
+            {"error": "未选择主题（主题库也没有可随机抽取的未用主题）"}, status_code=400)
+
+    params = {
+        "provider": data.get("provider", ""),
+        "model": data.get("model", ""),
+        "structure": structure,
+        "cefr": data.get("cefr", "A2"),
+        "num_lines": data.get("num_lines", ""),
+        "topics": topics,
+    }
+
+    import queue as _queue
+    q: _queue.Queue = _queue.Queue()
+    try:
+        script_library.start_generate_thread(params, q)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    async def event_stream():
+        yield _sse({"type": "progress",
+                    "message": f"开始批量生成 {len(topics)} 个脚本（串行执行）..."})
+        while True:
+            item = await asyncio.to_thread(q.get, True, None)
+            if item is None:
+                break
+            kind, payload = item
+            if kind == "progress":
+                yield _sse({"type": "progress", "message": payload})
+            elif kind == "script":
+                yield _sse({"type": "script", "data": payload})
+            elif kind == "error_item":
+                yield _sse({"type": "error_item", "data": payload})
+            elif kind == "done":
+                yield _sse({"type": "done", "data": payload})
+                break
+            else:  # fatal
+                yield _sse({"type": "error", "error": payload})
+                break
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers=_SSE_HEADERS)
+
+
+@app.post("/api/scripts/generate/stop")
+async def api_scripts_generate_stop():
+    script_library.request_stop_batch()
+    return {"ok": True}
+
+
+@app.post("/api/scripts/review")
+async def api_scripts_review(request: Request):
+    """SSE: batch AI review of library scripts."""
+    data = await request.json()
+    ids = data.get("ids", [])
+    if not isinstance(ids, list) or not ids:
+        return JSONResponse({"error": "ids 不能为空"}, status_code=400)
+    provider = data.get("provider", "")
+    model = data.get("model", "")
+
+    import queue as _queue
+    q: _queue.Queue = _queue.Queue()
+    try:
+        script_library.start_review_thread(ids, provider, model, q)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    async def event_stream():
+        yield _sse({"type": "progress",
+                    "message": f"开始 AI 审查 {len(ids)} 个脚本..."})
+        while True:
+            item = await asyncio.to_thread(q.get, True, None)
+            if item is None:
+                break
+            kind, payload = item
+            if kind == "progress":
+                yield _sse({"type": "progress", "message": payload})
+            elif kind == "reviewed":
+                yield _sse({"type": "reviewed", "data": payload})
+            elif kind == "error_item":
+                yield _sse({"type": "error_item", "data": payload})
+            elif kind == "done":
+                yield _sse({"type": "done", "data": payload})
+                break
+            else:  # fatal
+                yield _sse({"type": "error", "error": payload})
+                break
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers=_SSE_HEADERS)
 
 
 # ===========================================================================
