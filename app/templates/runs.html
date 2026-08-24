@@ -38,6 +38,7 @@
                 {% endif %}
                 <div class="flex items-center gap-2 mt-2">
                     {% if run.cefr %}<span class="text-xs px-2 py-0.5 bg-indigo-600/30 text-indigo-300 rounded">{{ run.cefr }}</span>{% endif %}
+                    <span id="upload-badge-{{ run.name }}" class="text-xs px-2 py-0.5 bg-emerald-600/30 text-emerald-300 rounded{% if not run.uploaded %} hidden{% endif %}">已上传</span>
                     {% if run.videos %}
                     {% for v in run.videos %}
                     <span class="text-xs text-slate-400">{{ v.size_mb }}MB</span>
@@ -47,13 +48,17 @@
                 </div>
 
                 <!-- Actions -->
-                <div class="flex gap-2 mt-3">
+                <div class="flex flex-wrap gap-2 mt-3">
                     {% if run.videos %}
                     <button onclick="showVideo('{{ run.name }}', '{{ run.videos[0].name }}')"
                         class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs text-white">播放</button>
                     {% endif %}
                     <a href="/runs/{{ run.name }}/gallery"
                         class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs text-white text-center">画廊</a>
+                    <button id="upload-btn-{{ run.name }}" onclick="toggleUploaded('{{ run.name }}')"
+                        class="px-3 py-1.5 rounded-lg text-xs text-white {% if run.uploaded %}bg-emerald-600 hover:bg-emerald-500{% else %}bg-amber-600/80 hover:bg-amber-500{% endif %}">
+                        {% if run.uploaded %}已上传 ✓{% else %}标记已上传{% endif %}
+                    </button>
                     {% if run.has_script %}
                     <button onclick="viewScript('{{ run.name }}')"
                         class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">脚本</button>
@@ -121,6 +126,26 @@ function viewScript(runName) {
 function closeScriptModal(e) {
     if (e && e.target !== document.getElementById('script-modal')) return;
     document.getElementById('script-modal').classList.add('hidden');
+}
+
+function toggleUploaded(runName) {
+    fetch(`/api/runs/${runName}/mark_uploaded`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) return;
+            const btn = document.getElementById(`upload-btn-${runName}`);
+            const badge = document.getElementById(`upload-badge-${runName}`);
+            if (!btn) return;
+            if (data.uploaded) {
+                btn.textContent = '已上传 ✓';
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-500';
+                if (badge) badge.classList.remove('hidden');
+            } else {
+                btn.textContent = '标记已上传';
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-amber-600/80 hover:bg-amber-500';
+                if (badge) badge.classList.add('hidden');
+            }
+        });
 }
 
 function deleteRun(runName) {

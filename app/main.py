@@ -237,6 +237,7 @@ async def runs_page(request: Request):
                 "has_script": script_path.exists(),
                 "has_thumbnail": thumbnail.exists(),
                 "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
+                "uploaded": (d / "uploaded.flag").exists(),
             }
             # Find video files — final videos are in work_dir root, not videos/
             video_files = []
@@ -1026,12 +1027,6 @@ async def api_scripts_generate(request: Request):
     if structure not in ("original", "image", "quest"):
         return JSONResponse({"error": f"未知模式: {structure}"}, status_code=400)
 
-    # Pipeline 运行中禁止批量生成（LLM 环境变量互斥）
-    if get_service().is_running:
-        return JSONResponse(
-            {"error": "Pipeline 正在运行中 — 请等待完成后再批量生成脚本（避免 LLM 配置冲突）"},
-            status_code=400)
-
     topics = [str(t).strip() for t in data.get("topics", []) if str(t).strip()]
     try:
         random_count = max(0, min(int(data.get("random_count", 0) or 0), 30))
@@ -1291,6 +1286,22 @@ async def api_delete_run(name: str):
             shutil.rmtree(str(run_dir))
             return {"ok": True}
     return JSONResponse({"ok": False, "error": "Cannot delete"}, status_code=400)
+
+
+@app.post("/api/runs/{name}/mark_uploaded")
+async def api_mark_uploaded(name: str):
+    """切换运行目录的 uploaded.flag 标记（记录视频已上传到 YouTube）。"""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = output_dir / name
+    if not run_dir.is_dir():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    flag = run_dir / "uploaded.flag"
+    if flag.exists():
+        flag.unlink()
+        return {"ok": True, "uploaded": False}
+    flag.touch()
+    return {"ok": True, "uploaded": True}
 
 
 # ===========================================================================
