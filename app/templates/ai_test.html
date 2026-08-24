@@ -189,16 +189,23 @@ function loadConfig() {
         .then(r => r.json())
         .then(cfg => {
             CUSTOM_PROVIDERS = cfg.custom_providers || [];
-            document.getElementById('st-provider').value = cfg.llm_provider || 'sensenova';
             document.getElementById('st-system-prompt').value = cfg.system_prompt || '';
+            // 先重建下拉（含自定义 Provider），再回显保存的 Provider —— 否则 custom:* 选项尚不存在，选择会丢失
             rebuildProviderDropdown();
+            const selP = document.getElementById('st-provider');
+            selP.value = cfg.llm_provider || 'sensenova';
+            if (![...selP.options].some(o => o.value === selP.value)) selP.value = 'sensenova';
             onProviderChange();
-            if (cfg.sensenova_model) {
-                const sel = document.getElementById('st-model');
-                if (![...sel.options].some(o => o.value === cfg.sensenova_model)) {
-                    addModelOption(cfg.sensenova_model);
+            // 回显保存的模型：sensenova 允许追加缺失项；其余 Provider 仅在列表中存在时回显，避免污染
+            const sel = document.getElementById('st-model');
+            const savedModel = selP.value === 'sensenova' ? cfg.sensenova_model : cfg.openai_model;
+            if (savedModel) {
+                if ([...sel.options].some(o => o.value === savedModel)) {
+                    sel.value = savedModel;
+                } else if (selP.value === 'sensenova') {
+                    addModelOption(savedModel);
+                    sel.value = savedModel;
                 }
-                sel.value = cfg.sensenova_model;
             }
             updateModelBadge();
         });

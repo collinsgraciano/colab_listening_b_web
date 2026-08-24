@@ -136,6 +136,8 @@
 {% block scripts %}
 <script>
 const MODE = {{ mode | tojson }};  // 当前编辑的模式 Tab（structure 恒等于它）
+const CUSTOM_PROVIDERS = {{ custom_providers | tojson }};  // [{id, name, models[]}]
+const OPENAI_MODEL_OPTIONS = {{ params.openai_model.options | tojson }};
 
 function toggleSection(btn) {
     const content = btn.nextElementSibling;
@@ -167,6 +169,38 @@ function toggleLLMFields(provider) {
             f.style.display = showOpenAI ? '' : 'none';
         }
     });
+    updateModelOptions(provider);
+}
+
+// 自定义 Provider 时，模型下拉切换为该 Provider 自己的模型列表
+function updateModelOptions(provider) {
+    const modelSel = document.querySelector('[data-field="openai_model"]');
+    if (!modelSel) return;
+    const saved = modelSel.value;
+    let models = OPENAI_MODEL_OPTIONS;
+    let label = 'OpenAI Model';
+    if (provider && provider.startsWith('custom:')) {
+        const pid = provider.split(':')[1];
+        const cp = CUSTOM_PROVIDERS.find(p => p.id === pid);
+        if (cp) {
+            models = cp.models || [];
+            label = `模型 (${cp.name})`;
+        }
+    }
+    modelSel.innerHTML = '';
+    models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        modelSel.appendChild(opt);
+    });
+    if (models.includes(saved)) {
+        modelSel.value = saved;
+    } else if (models.length) {
+        modelSel.value = models[0];
+    }
+    const labelEl = modelSel.closest('.config-field')?.querySelector('label');
+    if (labelEl) labelEl.textContent = label;
 }
 
 function toggleTTSFields(engine) {

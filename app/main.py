@@ -126,6 +126,12 @@ async def config_page(request: Request, mode: str = ""):
         "active_page": "config",
         "mode": mode,
         "mode_labels": MODE_LABELS,
+        # 自定义 Provider 模型列表（不含 api_key 等敏感字段；去重保持顺序）
+        "custom_providers": [
+            {"id": p.get("id", ""), "name": p.get("name", ""),
+             "models": list(dict.fromkeys(p.get("models") or []))}
+            for p in load_llm_providers()
+        ],
     })
 
 

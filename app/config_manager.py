@@ -330,7 +330,11 @@ def resolve_provider(config: dict[str, Any]) -> tuple[str, str, str, str]:
         customs = load_llm_providers()
         cp = next((p for p in customs if p["id"] == custom_id), None)
         if cp:
-            model = config.get("openai_model") or (cp["models"][0] if cp.get("models") else "")
+            models = cp.get("models") or []
+            model = config.get("openai_model") or ""
+            if model not in models:
+                # 配置里的 openai_model 不属于该 Provider（如内置 OpenAI 的模型）→ 用第一个
+                model = models[0] if models else ""
             return (
                 "openai",
                 cp.get("base_url", ""),
