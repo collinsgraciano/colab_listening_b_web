@@ -18,11 +18,16 @@ _LAST_CALL_TIME = 0.0
 
 def _get_min_call_interval() -> float:
     """Read LLM_MIN_INTERVAL from env per-call (not frozen at import time)."""
-    return float(os.environ.get("LLM_MIN_INTERVAL", "3.0"))
+    return float(os.environ.get("LLM_MIN_INTERVAL", "5.0"))
 
 
 def _enforce_rate_limit():
-    """Sleep if the previous LLM call was too recent."""
+    """Sleep if the previous LLM call completed too recently.
+
+    _LAST_CALL_TIME is set AFTER a successful response (not before the request),
+    so the interval measures the gap from the end of the previous call to the
+    start of the next one.
+    """
     import time as _time
     global _LAST_CALL_TIME
     min_interval = _get_min_call_interval()
@@ -30,7 +35,61 @@ def _enforce_rate_limit():
     if elapsed < min_interval:
         wait = min_interval - elapsed
         _time.sleep(wait)
-    _LAST_CALL_TIME = _time.time()
+
+
+def _dump_raw_debug(raw: str, model: str, kind: str) -> str | None:
+    """Write a full raw LLM response to LLM_DEBUG_DIR for offline inspection.
+
+    Returns the file path on success, or None when LLM_DEBUG_DIR is unset or
+    the write fails — debug dumping must never break the pipeline.
+    """
+    debug_dir = os.environ.get("LLM_DEBUG_DIR", "").strip()
+    if not debug_dir:
+        return None
+    try:
+        from datetime import datetime as _dt
+        d = Path(debug_dir)
+        d.mkdir(parents=True, exist_ok=True)
+        safe_model = re.sub(r"[^\w.-]", "_", model) or "model"
+        path = d / f"{kind}_{safe_model}_{_dt.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+        path.write_text(raw, encoding="utf-8")
+        return str(path)
+    except OSError:
+        return None
+
+
+def _diagnose_response(result: dict) -> str:
+    """Build a compact human-readable diagnosis of an LLM response dict.
+
+    Surfaces the fields that explain empty/failed completions (finish_reason,
+    message keys, reasoning_content length, usage counts, provider error).
+    """
+    parts: list[str] = []
+    try:
+        choices = result.get("choices") or []
+        if choices:
+            finish = choices[0].get("finish_reason")
+            if finish:
+                parts.append(f"finish_reason={finish!r}")
+            msg = choices[0].get("message") or {}
+            keys = list(msg.keys())
+            if keys:
+                parts.append(f"message keys={keys}")
+            rc = msg.get("reasoning_content") or msg.get("reasoning")
+            if rc:
+                parts.append(f"reasoning_content={len(str(rc))} chars")
+    except (AttributeError, IndexError, TypeError):
+        pass
+    usage = result.get("usage")
+    if isinstance(usage, dict):
+        u = {k: usage[k] for k in
+             ("prompt_tokens", "completion_tokens", "reasoning_tokens", "total_tokens")
+             if k in usage}
+        if u:
+            parts.append(f"usage={u}")
+    if result.get("error"):
+        parts.append(f"error={result['error']}")
+    return "; ".join(parts) if parts else "no diagnostic fields found"
 
 
 def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
@@ -60,6 +119,8 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
     # Retry on 429 (rate limit) and 524 (Cloudflare gateway timeout)
     _RETRY_CODES = [429, 524]
     _RETRY_BACKOFFS = [15, 30, 60, 90, 120]
+    # One-shot rescue for finish_reason=length empty content (reasoning burn)
+    _length_retried = False
 
     for _retry_attempt in range(len(_RETRY_BACKOFFS) + 1):
         _enforce_rate_limit()
@@ -90,15 +151,65 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
                 try:
                     result = json.loads(raw)
                 except json.JSONDecodeError:
-                    raise RuntimeError(f"LLM returned non-JSON response (first 500 chars): {raw[:500]}") from None
+                    dbg = _dump_raw_debug(raw, model, "non_json")
+                    print(f"  [LLM] Non-JSON response (model={model}). "
+                          f"Full raw response ({len(raw)} chars)"
+                          f"{' saved to ' + dbg if dbg else ''}:")
+                    print(raw)
+                    print("  [LLM] End raw response")
+                    raise RuntimeError(
+                        f"LLM returned non-JSON response (model={model}). "
+                        f"Full raw ({len(raw)} chars)"
+                        f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
+                    ) from None
                 if "choices" not in result or not result["choices"]:
-                    raise RuntimeError(f"LLM response has no 'choices' field: {raw[:500]}")
+                    diag = _diagnose_response(result)
+                    dbg = _dump_raw_debug(raw, model, "no_choices")
+                    print(f"  [LLM] Response has no 'choices' (model={model}). {diag}")
+                    print(f"  [LLM] Full raw response ({len(raw)} chars)"
+                          f"{' saved to ' + dbg if dbg else ''}:")
+                    print(raw)
+                    print("  [LLM] End raw response")
+                    raise RuntimeError(
+                        f"LLM response has no 'choices' field (model={model}). {diag}. "
+                        f"Full raw ({len(raw)} chars)"
+                        f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
+                    )
                 content = result["choices"][0]["message"]["content"]
                 if not content or not content.strip():
+                    # Reasoning models can burn the whole token budget on
+                    # reasoning (finish_reason=length, content empty). Retry
+                    # once with a doubled budget before surfacing the error.
+                    choice0 = result["choices"][0]
+                    finish = choice0.get("finish_reason") or ""
+                    has_reasoning = bool(
+                        (choice0.get("message") or {}).get("reasoning_content"))
+                    if (finish == "length" and has_reasoning
+                            and not _length_retried and max_tokens < 16384):
+                        new_max = min(max_tokens * 2, 16384)
+                        print(f"  [LLM] Empty content with finish_reason=length "
+                              f"(reasoning consumed the token budget); "
+                              f"retrying with max_tokens={new_max} (was {max_tokens})...")
+                        max_tokens = new_max
+                        _length_retried = True
+                        continue
+                    diag = _diagnose_response(result)
+                    dbg = _dump_raw_debug(raw, model, "empty_content")
+                    print(f"  [LLM] Empty content (HTTP 200, model={model}). {diag}")
+                    print(f"  [LLM] Full raw response ({len(raw)} chars)"
+                          f"{' saved to ' + dbg if dbg else ''}:")
+                    print(raw)
+                    print("  [LLM] End raw response")
                     raise RuntimeError(
-                        f"LLM returned empty content (HTTP 200, model={model}). "
-                        f"Raw response (first 500 chars): {raw[:500]}"
+                        f"LLM returned empty content (HTTP 200, model={model}). {diag}. "
+                        f"Full raw ({len(raw)} chars)"
+                        f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
                     )
+                # Record successful completion time for rate limiting.
+                # This ensures the next call waits at least min_interval seconds
+                # AFTER this response, not from when this request started.
+                import time as _time
+                _LAST_CALL_TIME = _time.time()
                 return content
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")

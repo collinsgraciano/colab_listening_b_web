@@ -280,7 +280,7 @@ def _chat_and_parse(prompt: str = "", temperature: float = 0.8,
         except (json.JSONDecodeError, RuntimeError, KeyError) as e:
             last_error = e
             print(f"  [LLM {label} retry {attempt+1}/{max_retries}] "
-                  f"{type(e).__name__}: {str(e)[:200]}")
+                  f"{type(e).__name__}: {str(e)[:600]}")
             if attempt < max_retries - 1:
                 time.sleep(5)
     raise RuntimeError(f"LLM {label} failed after {max_retries} retries: {last_error}")
@@ -331,7 +331,7 @@ def _generate_beat_sheet(outline: dict, n_buildup: int, n_core: int,
                 raw = result
             raw = [b for b in raw if isinstance(b, dict)]
         except RuntimeError as e:
-            print(f"  [LLM] Beat sheet '{ph}' failed ({str(e)[:120]}); "
+            print(f"  [LLM] Beat sheet '{ph}' failed ({str(e)[:600]}); "
                   f"using programmatic fallback")
 
         budgets = alloc[ph]

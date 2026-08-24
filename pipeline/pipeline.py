@@ -193,7 +193,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--voxcpm-worker-url", default=None, help="VoxCPM Cloudflare Worker URL (or set VOXCPM_WORKER_URL env var)")
     parser.add_argument("--voxcpm-api-key", default=None, help="VoxCPM Worker API key (optional, or set VOXCPM_API_KEY env var)")
     parser.add_argument("--qwen-model-path", default=r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
-                        help="Qwen3-TTS model path (local directory)")
+                        help="Qwen3-TTS CustomVoice model path (preset speakers)")
+    parser.add_argument("--qwen-base-model-path", default=r"H:\models\Qwen3-TTS-12Hz-1.7B-Base",
+                        help="Qwen3-TTS Base model path (for voice clone)")
     parser.add_argument("--qwen-device", default="cuda:0",
                         help="Device for Qwen3-TTS (e.g. cuda:0, cpu)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
@@ -827,6 +829,8 @@ def main():
         args.pad = 0.4
 
     os.environ["LLM_RETRIES"] = str(args.llm_retries)
+    # Full raw LLM responses are dumped here when _chat hits errors
+    os.environ.setdefault("LLM_DEBUG_DIR", str(Path(args.output).resolve() / "llm_debug"))
 
     # TTS engine config
     if args.voxcpm_worker_url:
@@ -835,6 +839,8 @@ def main():
         os.environ["VOXCPM_API_KEY"] = args.voxcpm_api_key
     if args.qwen_model_path:
         os.environ["QWEN_MODEL_PATH"] = args.qwen_model_path
+    if args.qwen_base_model_path:
+        os.environ["QWEN_BASE_MODEL_PATH"] = args.qwen_base_model_path
     if args.qwen_device:
         os.environ["QWEN_DEVICE"] = args.qwen_device
 

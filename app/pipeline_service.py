@@ -674,6 +674,8 @@ class PipelineService:
         try:
             parent_dir = Path(args.output).resolve()
             parent_dir.mkdir(parents=True, exist_ok=True)
+            # Full raw LLM responses are dumped here when _chat hits errors
+            os.environ["LLM_DEBUG_DIR"] = str(parent_dir / "llm_debug")
             used_topics_file = args.used_topics_file or str(parent_dir / "used_topics.json")
 
             # Load checkpoint for resume
