@@ -26,6 +26,8 @@ from .config_manager import (
     build_cli_args, detect_local_mcp_token,
     load_llm_providers, save_llm_providers,
     get_provider_options, resolve_provider,
+    MODES, MODE_LABELS, get_active_mode, set_active_mode,
+    load_mode_config, save_mode_config, load_all_mode_configs,
 )
 from .pipeline_service import get_service, STEP_ORDER
 from .config_manager import detect_local_mcp_token
@@ -79,18 +81,27 @@ async def dashboard(request: Request):
         "config": config,
         "runner": service,
         "active_page": "dashboard",
+        "mode_configs": load_all_mode_configs(),
+        "active_mode": get_active_mode(),
+        "mode_labels": MODE_LABELS,
     })
 
 
 @app.get("/config", response_class=HTMLResponse)
-async def config_page(request: Request):
-    config = load_config()
+async def config_page(request: Request, mode: str = ""):
+    # ?mode= 切换 Tab：同步激活模式并渲染该模式配置
+    if mode and mode in MODES:
+        set_active_mode(mode)
+    mode = get_active_mode()
+    config = load_mode_config(mode)
     presets = list_presets()
     # Inject dynamic LLM provider options into PARAM_SPEC
     PARAM_SPEC["llm_provider"]["options"] = get_provider_options()
     # Group params by group
     grouped = {}
     for key, spec in PARAM_SPEC.items():
+        if key == "structure":
+            continue  # 结构由 Tab 决定，不渲染下拉
         g = spec["group"]
         if g not in grouped:
             grouped[g] = []
@@ -104,6 +115,8 @@ async def config_page(request: Request):
         "group_meta": GROUP_META,
         "presets": presets,
         "active_page": "config",
+        "mode": mode,
+        "mode_labels": MODE_LABELS,
     })
 
 
@@ -255,22 +268,50 @@ async def runs_page(request: Request):
 @app.post("/api/config/save")
 async def api_save_config(request: Request):
     data = await request.json()
-    config = load_config()
+    mode = data.pop("_mode", "") or get_active_mode()
+    if mode not in MODES:
+        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
+    config = load_mode_config(mode)
     config.update(data)
-    save_config(config)
-    return {"ok": True}
+    config["structure"] = mode
+    save_mode_config(mode, config)
+    return {"ok": True, "mode": mode}
 
 
 @app.post("/api/config/save_all")
 async def api_save_all_config(request: Request):
     data = await request.json()
-    save_config(data)
-    return {"ok": True}
+    mode = data.pop("_mode", "") or get_active_mode()
+    if mode not in MODES:
+        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
+    data["structure"] = mode
+    save_mode_config(mode, data)
+    return {"ok": True, "mode": mode}
 
 
 @app.get("/api/config")
-async def api_get_config():
-    return load_config()
+async def api_get_config(mode: str = ""):
+    return load_mode_config(mode) if mode in MODES else load_config()
+
+
+@app.get("/api/config/all")
+async def api_get_all_configs():
+    """一次性返回 3 个模式的完整配置 + 当前激活模式（控制台预载用）。"""
+    return {
+        "active_mode": get_active_mode(),
+        "modes": load_all_mode_configs(),
+        "mode_labels": MODE_LABELS,
+    }
+
+
+@app.post("/api/config/active")
+async def api_set_active_mode(request: Request):
+    data = await request.json()
+    mode = data.get("mode", "")
+    if mode not in MODES:
+        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
+    set_active_mode(mode)
+    return {"ok": True, "active_mode": mode}
 
 
 @app.get("/api/config/defaults")
@@ -1876,6 +1917,5 @@ async def startup():
     # Ensure configs dir exists
     (WEB_ROOT / "configs").mkdir(parents=True, exist_ok=True)
     (WEB_ROOT / "configs" / "character_library").mkdir(parents=True, exist_ok=True)
-    # Create default config if missing
-    if not (WEB_ROOT / "configs" / "default.json").exists():
-        save_config(get_default_config())
+    # 首次运行：从 legacy default.json 迁移生成 3 个模式配置文件
+    load_all_mode_configs()

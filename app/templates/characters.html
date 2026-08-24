@@ -529,7 +529,7 @@ function assignToRole(libId, role) {
             }).then(r => r.json()).then(d => {
                 if (d.ok) {
                     const char = _libraryChars.find(c => c.id === libId);
-                    alert(`已分配「${char ? char.name : libId}」到 ${getCharKeys().find(c=>c.key===role)?.label || role}\n\n控制台「开始生成」时生效，也可在控制台角色位看到绑定徽章`);
+                    alert(`已分配「${char ? char.name : libId}」到 ${getCharKeys().find(c=>c.key===role)?.label || role}（当前激活模式）\n\n控制台「开始生成」时生效，也可在控制台角色位看到绑定徽章`);
                 }
             });
         });

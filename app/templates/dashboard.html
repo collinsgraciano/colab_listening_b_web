@@ -15,13 +15,29 @@
 
     <!-- Quick start card -->
     <div class="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-        <h3 class="text-lg font-semibold text-white mb-4">快捷启动</h3>
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 class="text-lg font-semibold text-white">快捷启动</h3>
+            <span class="text-xs text-slate-500">每个模式独立记住全部配置 · 当前保存到 configs/mode_<span id="mode-file-name">{{ active_mode }}</span>.json</span>
+        </div>
+
+        <!-- Mode tabs：每个模式一份完整独立配置 -->
+        <div id="mode-tabs" class="flex gap-2 mb-4 flex-wrap">
+            {% for m, label in mode_labels.items() %}
+            <button type="button" data-mode="{{ m }}" onclick="switchMode('{{ m }}')"
+                class="mode-tab px-4 py-2 rounded-lg text-sm font-medium transition
+                {% if m == active_mode %}bg-indigo-600 text-white{% else %}bg-slate-700 text-slate-300 hover:bg-slate-600{% endif %}">
+                {{ label }}
+            </button>
+            {% endfor %}
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <!-- Topic -->
             <div>
-                <label class="block text-xs text-slate-400 mb-1">主题</label>
+                <label class="block text-xs text-slate-400 mb-1">主题 <span class="text-slate-600">(各模式独立记忆)</span></label>
                 <div class="flex gap-2">
                     <input type="text" id="quick-topic" value="{{ config.topic }}"
+                        oninput="onQuickInput('topic', this.value)"
                         class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
                         placeholder="留空=随机选择">
                     <button onclick="pickRandomTopic()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300" title="随机选择">
@@ -29,22 +45,23 @@
                     </button>
                 </div>
             </div>
-            <!-- CEFR + Structure -->
+            <!-- CEFR + Animation -->
             <div class="grid grid-cols-2 gap-3">
-                <div>
+                <div id="cefr-cell" class="{% if active_mode != 'image' %}col-span-2{% endif %}">
                     <label class="block text-xs text-slate-400 mb-1">CEFR</label>
-                    <select id="quick-cefr" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <select id="quick-cefr" onchange="onQuickInput('cefr', this.value)"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                         {% for level in ['A1','A2','B1','B2','C1','C2'] %}
                         <option value="{{ level }}" {% if config.cefr == level %}selected{% endif %}>{{ level }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">结构</label>
-                    <select id="quick-structure" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
-                        onchange="updateQuickDefaults()">
-                        {% for s in ['original','image','quest'] %}
-                        <option value="{{ s }}" {% if config.structure == s %}selected{% endif %}>{{ s }}</option>
+                <div id="quick-anim-wrap" {% if active_mode != 'image' %}style="display:none"{% endif %}>
+                    <label class="block text-xs text-slate-400 mb-1">动画类型</label>
+                    <select id="quick-animation" onchange="onQuickInput('animation', this.value)"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        {% for v, l in [('none', 'None (静态)'), ('landing', 'Landing (降落变换)'), ('stop_motion', 'Stop Motion (定格动画)')] %}
+                        <option value="{{ v }}" {% if mode_configs[active_mode].animation == v %}selected{% endif %}>{{ l }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -56,7 +73,7 @@
             <label class="block text-xs text-slate-400 mb-1">复用角色 (可选)</label>
             <div class="flex gap-2">
                 <select id="char-source" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
-                    onchange="onCharSourceChange()">
+                    onchange="onCharSourceChange(); _debounceCharSave()">
                     <option value="">生成新角色</option>
                 </select>
                 <button onclick="loadCharSources()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300" title="刷新列表">
@@ -186,20 +203,68 @@
 
 {% block scripts %}
 <script>
-// Store current config for quick start
-const CURRENT_CONFIG = {{ config | tojson }};
+// Store per-mode configs for quick start (all 3 modes preloaded)
+const MODE_CONFIGS = {{ mode_configs | tojson }};
+let ACTIVE_MODE = {{ active_mode | tojson }};
 
-function updateQuickDefaults() {
-    const structure = document.getElementById('quick-structure').value;
-    const numLinesInput = document.querySelector('[data-field="num_lines"]');
-    if (structure === 'quest') {
-        if (numLinesInput && !numLinesInput.value) numLinesInput.value = '48';
-    }
-    // Re-render character editor fields for the new structure
+// --- 模式 Tab 切换：每个模式独立记住快捷项 + 角色绑定 ---
+function applyModeTabStyles() {
+    document.querySelectorAll('.mode-tab').forEach(b => {
+        if (b.dataset.mode === ACTIVE_MODE) {
+            b.className = 'mode-tab px-4 py-2 rounded-lg text-sm font-medium transition bg-indigo-600 text-white';
+        } else {
+            b.className = 'mode-tab px-4 py-2 rounded-lg text-sm font-medium transition bg-slate-700 text-slate-300 hover:bg-slate-600';
+        }
+    });
+    const nameEl = document.getElementById('mode-file-name');
+    if (nameEl) nameEl.textContent = ACTIVE_MODE;
+}
+
+function applyQuickFields() {
+    const cfg = MODE_CONFIGS[ACTIVE_MODE];
+    document.getElementById('quick-topic').value = cfg.topic || '';
+    document.getElementById('quick-cefr').value = cfg.cefr || 'A2';
+    const isImage = ACTIVE_MODE === 'image';
+    document.getElementById('quick-anim-wrap').style.display = isImage ? '' : 'none';
+    document.getElementById('cefr-cell').className = isImage ? '' : 'col-span-2';
+    if (isImage) document.getElementById('quick-animation').value = cfg.animation || 'landing';
+}
+
+function switchMode(m) {
+    if (m === ACTIVE_MODE) return;
+    // 切走前捕获当前角色区状态，防止丢失未保存输入
+    saveCharState();
+    ACTIVE_MODE = m;
+    applyModeTabStyles();
+    applyQuickFields();
+    // 角色区切换到新模式状态
+    parseLibAssignments();
     const sel = document.getElementById('char-source');
-    const src = _charSources.find(s => s.name === sel.value);
-    renderCharEditor(src || null);
+    const want = MODE_CONFIGS[m].character_source;
+    sel.value = (_charSources.some(s => s.name === want)) ? want : '';
+    onCharSourceChange();
     renderLibrary();
+    // 同步服务端激活模式（主题管理/运行历史等页面跟随）
+    fetch('/api/config/active', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mode: m})
+    }).catch(() => {});
+}
+
+// --- 快捷项即时保存（带模式，刷新不丢） ---
+let _quickSaveTimer = null;
+function onQuickInput(field, value) {
+    MODE_CONFIGS[ACTIVE_MODE][field] = value;
+    clearTimeout(_quickSaveTimer);
+    const mode = ACTIVE_MODE;
+    _quickSaveTimer = setTimeout(() => {
+        fetch('/api/config/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({_mode: mode, [field]: value})
+        }).catch(() => {});
+    }, 600);
 }
 
 // --- Qwen voices (for voice binding dropdowns) ---
@@ -225,8 +290,7 @@ function loadQwenVoices() {
 let _charSources = [];
 
 function getCharKeys() {
-    const structure = document.getElementById('quick-structure').value;
-    if (structure === 'quest') {
+    if (ACTIVE_MODE === 'quest') {
         return [
             {key: 'char_a', label: '角色A'},
             {key: 'char_b', label: '角色B'},
@@ -254,8 +318,13 @@ function loadCharSources() {
                 opt.textContent = s.title;
                 sel.appendChild(opt);
             });
-            sel.value = current;
-            if (current) onCharSourceChange();
+            // 回显当前模式持久化的复用源（优先于内存值）
+            const saved = MODE_CONFIGS[ACTIVE_MODE].character_source;
+            const restore = (current && _charSources.some(s => s.name === current))
+                ? current
+                : ((saved && _charSources.some(s => s.name === saved)) ? saved : '');
+            sel.value = restore;
+            if (restore) onCharSourceChange();
         });
 }
 
@@ -267,6 +336,7 @@ function onCharSourceChange() {
     if (!sel.value || !src || !src.characters) {
         cardsContainer.classList.add('hidden');
         renderCharEditor(null);
+        applySavedCharBindings();
         return;
     }
 
@@ -297,7 +367,7 @@ function onCharSourceChange() {
         modeSelect.dataset.charKey = char.key;
         modeSelect.innerHTML = `
             <option value="">不复用</option>
-            <option value="image" selected>图片+性别</option>
+            <option value="image">图片+性别</option>
             <option value="desc" selected>描述+性别</option>
         `;
 
@@ -324,7 +394,81 @@ function onCharSourceChange() {
     });
 
     renderCharEditor(src);
+    applySavedCharBindings();
     syncReuseWithEditor();
+}
+
+// 回显当前模式持久化的复用模式/音色/描述，并挂接变更保存
+function applySavedCharBindings() {
+    const cfg = MODE_CONFIGS[ACTIVE_MODE];
+    let reuse = {}; let voices = {};
+    try { reuse = cfg.character_reuse ? JSON.parse(cfg.character_reuse) : {}; } catch (e) {}
+    try { voices = cfg.character_voices ? JSON.parse(cfg.character_voices) : {}; } catch (e) {}
+    const descs = cfg._ui_descs || {};
+
+    document.querySelectorAll('.char-reuse-mode').forEach(dd => {
+        const v = reuse[dd.dataset.charKey];
+        if (v) dd.value = v;
+        dd.addEventListener('change', saveCharState);
+    });
+    document.querySelectorAll('.char-voice').forEach(dd => {
+        const v = voices[dd.dataset.charKey];
+        if (v) dd.value = v;
+        dd.addEventListener('change', saveCharState);
+    });
+    document.querySelectorAll('[data-char-desc]').forEach(ta => {
+        const v = descs[ta.dataset.charDesc];
+        if (v) ta.value = v;
+        ta.addEventListener('input', _debounceCharSave);
+    });
+    syncReuseWithEditor();
+}
+
+let _charSaveTimer = null;
+function _debounceCharSave() {
+    clearTimeout(_charSaveTimer);
+    _charSaveTimer = setTimeout(saveCharState, 600);
+}
+
+// 捕获角色区状态并持久化到当前模式配置
+function saveCharState() {
+    const source = document.getElementById('char-source')?.value || '';
+    const reuse = {}; const descs = {}; const voices = {};
+    document.querySelectorAll('.char-reuse-mode').forEach(dd => {
+        if (dd.value) reuse[dd.dataset.charKey] = dd.value;
+    });
+    document.querySelectorAll('.char-voice').forEach(dd => {
+        if (dd.value) voices[dd.dataset.charKey] = dd.value;
+    });
+    document.querySelectorAll('[data-char-desc]').forEach(ta => {
+        const val = ta.value.trim();
+        if (val) descs[ta.dataset.charDesc] = val;
+    });
+    // fixes 语义与 collectCharacterConfig 一致：仅无复用模式的手填描述
+    const fixes = {};
+    Object.entries(descs).forEach(([k, v]) => { if (!reuse[k]) fixes[k] = v; });
+
+    const cfg = MODE_CONFIGS[ACTIVE_MODE];
+    cfg.character_source = source;
+    cfg.character_reuse = Object.keys(reuse).length ? JSON.stringify(reuse) : '';
+    cfg.character_fixes = Object.keys(fixes).length ? JSON.stringify(fixes) : '';
+    cfg.character_voices = Object.keys(voices).length ? JSON.stringify(voices) : '';
+    cfg._ui_descs = descs;
+
+    const mode = ACTIVE_MODE;
+    const payload = {
+        _mode: mode,
+        character_source: cfg.character_source,
+        character_reuse: cfg.character_reuse,
+        character_fixes: cfg.character_fixes,
+        character_voices: cfg.character_voices,
+        _ui_descs: cfg._ui_descs,
+    };
+    fetch('/api/config/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    }).catch(() => {});
 }
 
 function syncReuseWithEditor() {
@@ -474,12 +618,12 @@ let _libAssignments = {};
 function parseLibAssignments() {
     _libAssignments = {};
     try {
-        const raw = CURRENT_CONFIG.character_library;
+        const raw = MODE_CONFIGS[ACTIVE_MODE].character_library;
         if (raw) _libAssignments = JSON.parse(raw) || {};
     } catch (e) { _libAssignments = {}; }
 }
 
-// 保存绑定（立即写回配置，刷新不丢失）
+// 保存绑定（立即写回当前模式配置，刷新/切 Tab 不丢失）
 function saveLibAssignments() {
     const map = {};
     getCharKeys().forEach(c => {
@@ -488,11 +632,12 @@ function saveLibAssignments() {
     });
     _libAssignments = map;
     const payload = Object.keys(map).length ? JSON.stringify(map) : '';
-    CURRENT_CONFIG.character_library = payload;
+    MODE_CONFIGS[ACTIVE_MODE].character_library = payload;
+    const mode = ACTIVE_MODE;
     fetch('/api/config/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({character_library: payload})
+        body: JSON.stringify({_mode: mode, character_library: payload})
     }).catch(() => {});
 }
 
@@ -601,7 +746,7 @@ function renderLibrary() {
 function saveToLibrary(char) {
     const name = prompt('给这个角色起个名字:', `${char.label} (${char.role || ''})`);
     if (name === null) return;
-    const structure = document.getElementById('quick-structure').value;
+    const structure = ACTIVE_MODE;
     const sourceRun = document.getElementById('char-source').value;
     fetch('/api/character_library/save', {
         method: 'POST',
@@ -642,6 +787,8 @@ function collectLibraryAssignments() {
 
 // Load character sources on page load
 window.addEventListener('load', function() {
+    applyModeTabStyles();
+    applyQuickFields();
     parseLibAssignments();
     renderCharEditor(null);
     loadQwenVoices();
@@ -667,6 +814,7 @@ function pickRandomTopic() {
         .then(data => {
             if (data.ok) {
                 document.getElementById('quick-topic').value = data.topic;
+                onQuickInput('topic', data.topic);
             } else {
                 alert(data.error || '没有可用主题');
             }
@@ -674,15 +822,16 @@ function pickRandomTopic() {
 }
 
 function startPipeline(resume) {
-    // Gather quick config overrides
+    // Gather quick config overrides (当前激活模式)
     const overrides = {
         topic: document.getElementById('quick-topic').value,
         cefr: document.getElementById('quick-cefr').value,
-        structure: document.getElementById('quick-structure').value,
+        structure: ACTIVE_MODE,
         ...collectCharacterConfig(),
     };
-    // Merge with saved config
-    const config = {...CURRENT_CONFIG, ...overrides};
+    // Merge with the active mode's full config
+    const config = {...MODE_CONFIGS[ACTIVE_MODE], ...overrides};
+    MODE_CONFIGS[ACTIVE_MODE] = config;
     const stepMode = document.getElementById('step-mode-toggle').checked;
 
     fetch('/api/run/start', {

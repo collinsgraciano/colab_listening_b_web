@@ -137,24 +137,101 @@ GROUP_META = {
 }
 
 
+# --- Per-mode config storage ---
+# 3 种视频结构模式各一份完整独立配置，切换互不覆盖。
+# default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
+
+MODES = ["original", "image", "quest"]
+MODE_LABELS = {
+    "original": "Original (4章视频片段)",
+    "image": "Image (纯图片+动画)",
+    "quest": "Quest (任务听力)",
+}
+ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
+
+
+def _mode_config_path(mode: str) -> Path:
+    return CONFIGS_DIR / f"mode_{mode}.json"
+
+
+def _read_legacy_default() -> dict[str, Any] | None:
+    """Read legacy default.json (migration source only)."""
+    if DEFAULT_CONFIG_PATH.exists():
+        try:
+            return json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+    return None
+
+
+def get_active_mode() -> str:
+    if ACTIVE_MODE_PATH.exists():
+        try:
+            mode = json.loads(ACTIVE_MODE_PATH.read_text(encoding="utf-8")).get("mode", "original")
+            if mode in MODES:
+                return mode
+        except (json.JSONDecodeError, OSError):
+            pass
+    return "original"
+
+
+def set_active_mode(mode: str) -> str:
+    if mode not in MODES:
+        raise ValueError(f"未知模式: {mode}")
+    CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+    ACTIVE_MODE_PATH.write_text(
+        json.dumps({"mode": mode}, ensure_ascii=False, indent=2), encoding="utf-8")
+    return mode
+
+
+def load_mode_config(mode: str) -> dict[str, Any]:
+    """Load full config for a mode; lazily initialize from legacy default.json."""
+    if mode not in MODES:
+        raise ValueError(f"未知模式: {mode}")
+    path = _mode_config_path(mode)
+    if path.exists():
+        try:
+            saved = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            saved = None
+    else:
+        saved = None
+    if saved is None:
+        # 首次：继承现有全局配置（或出厂默认）
+        base = _read_legacy_default() or get_default_config()
+        saved = dict(base)
+    merged = get_default_config()
+    merged.update(saved)
+    merged["structure"] = mode  # 结构由模式文件决定，恒等于文件名
+    save_mode_config(mode, merged)
+    return merged
+
+
+def save_mode_config(mode: str, config: dict[str, Any]) -> None:
+    if mode not in MODES:
+        raise ValueError(f"未知模式: {mode}")
+    CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+    config = dict(config)
+    config["structure"] = mode  # 防止串模式
+    _mode_config_path(mode).write_text(
+        json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_all_mode_configs() -> dict[str, dict[str, Any]]:
+    return {mode: load_mode_config(mode) for mode in MODES}
+
+
 def get_default_config() -> dict[str, Any]:
     return {k: v["default"] for k, v in PARAM_SPEC.items()}
 
 
 def load_config() -> dict[str, Any]:
-    if DEFAULT_CONFIG_PATH.exists():
-        saved = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
-        # Merge with defaults to pick up new params
-        merged = get_default_config()
-        merged.update(saved)
-        return merged
-    return get_default_config()
+    """Current active mode's config (all pages follow the active mode)."""
+    return load_mode_config(get_active_mode())
 
 
 def save_config(config: dict[str, Any]) -> None:
-    CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
-    DEFAULT_CONFIG_PATH.write_text(
-        json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_mode_config(get_active_mode(), config)
 
 
 def list_presets() -> list[str]:

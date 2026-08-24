@@ -2,10 +2,10 @@
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-4">
         <div>
             <h2 class="text-2xl font-bold text-white">参数配置</h2>
-            <p class="text-sm text-slate-400 mt-1">所有参数自动保存到 configs/default.json</p>
+            <p class="text-sm text-slate-400 mt-1">当前编辑：<span class="text-indigo-400 font-medium">{{ mode_labels[mode] }}</span> · 保存到 configs/mode_{{ mode }}.json（各模式独立）</p>
         </div>
         <div class="flex items-center gap-3">
             <!-- Preset selector -->
@@ -25,6 +25,17 @@
         </div>
     </div>
 
+    <!-- Mode tabs：每个模式一份完整独立配置（与控制台 Tab 联动） -->
+    <div class="flex gap-2 mb-6 flex-wrap">
+        {% for m, label in mode_labels.items() %}
+        <a href="/config?mode={{ m }}"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition
+            {% if m == mode %}bg-indigo-600 text-white{% else %}bg-slate-700 text-slate-300 hover:bg-slate-600{% endif %}">
+            {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+
     <!-- Save indicator -->
     <div id="save-indicator" class="hidden mb-4 px-4 py-2 bg-green-600/20 border border-green-600/50 rounded-lg text-sm text-green-400">
         ✓ 配置已保存
@@ -32,6 +43,8 @@
 
     <!-- Config sections -->
     <form id="config-form" class="space-y-4">
+        <!-- 结构由当前 Tab 决定，隐藏域保证保存值正确 -->
+        <input type="hidden" data-field="structure" value="{{ mode }}">
         {% for group_key, params in grouped %}
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <button type="button" onclick="toggleSection(this)"
@@ -122,6 +135,8 @@
 
 {% block scripts %}
 <script>
+const MODE = {{ mode | tojson }};  // 当前编辑的模式 Tab（structure 恒等于它）
+
 function toggleSection(btn) {
     const content = btn.nextElementSibling;
     const icon = btn.querySelector('.toggle-icon');
@@ -180,6 +195,13 @@ function collectConfig() {
     return config;
 }
 
+// 强制 structure = 当前 Tab 模式（预设/默认值可能带来其它模式的 structure）
+function forceStructureMode() {
+    const hidden = document.querySelector('[data-field="structure"]');
+    if (hidden) hidden.value = MODE;
+    toggleAnimationField(MODE);
+}
+
 function fillForm(config) {
     document.querySelectorAll('[data-field]').forEach(el => {
         const key = el.getAttribute('data-field');
@@ -191,8 +213,8 @@ function fillForm(config) {
             }
         }
     });
+    forceStructureMode();
     // Trigger conditional displays
-    toggleAnimationField(config.structure || 'original');
     toggleLLMFields(config.llm_provider || 'sensenova');
     toggleTTSFields(config.tts_engine || 'kokoro');
 }
@@ -202,7 +224,7 @@ function saveConfig() {
     fetch('/api/config/save_all', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(config)
+        body: JSON.stringify({...config, _mode: MODE})
     })
     .then(r => r.json())
     .then(data => {
@@ -277,7 +299,7 @@ function detectMCPToken() {
 // Initialize conditional displays on load
 window.addEventListener('load', function() {
     const config = {{ config | tojson }};
-    toggleAnimationField(config.structure || 'original');
+    toggleAnimationField(MODE);
     toggleLLMFields(config.llm_provider || 'sensenova');
     toggleTTSFields(config.tts_engine || 'kokoro');
 });
