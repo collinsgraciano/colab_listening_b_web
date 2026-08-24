@@ -99,14 +99,20 @@ def doc_meta(doc: dict) -> dict:
 
 
 def list_scripts(structure: str = "", status: str = "", q: str = "") -> list[dict]:
-    """List script metadata. status: draft|reviewed|used|unused|''(all)."""
+    """List script metadata. status: draft|reviewed|used|unused|''(all).
+
+    只匹配 script_*.json 脚本文档 — 排除 used_topics_by_mode.json 等状态文件，
+    避免其被渲染成"0 行"幽灵卡片。
+    """
     SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
     items: list[dict] = []
-    for f in sorted(SCRIPTS_DIR.glob("*.json")):
+    for f in sorted(SCRIPTS_DIR.glob("script_*.json")):
         try:
             doc = json.loads(f.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
+        if not doc.get("id"):
+            doc["id"] = f.stem  # 兜底：文件名即权威 id
         meta = _doc_meta(doc)
         if structure and meta["structure"] != structure:
             continue
@@ -128,8 +134,11 @@ def list_scripts(structure: str = "", status: str = "", q: str = "") -> list[dic
 
 
 def get_script_doc(sid: str) -> dict | None:
+    # 只接受脚本文档 id（排除 used_topics_by_mode 等状态文件名）
+    if not sid.startswith("script_"):
+        return None
     p = _doc_path(sid)
-    if not sid or not p.exists():
+    if not p.exists():
         return None
     try:
         return json.loads(p.read_text(encoding="utf-8"))
@@ -180,8 +189,10 @@ def update_script(sid: str, patch: dict) -> dict | None:
 
 
 def delete_script(sid: str) -> bool:
+    if not sid.startswith("script_"):
+        return False
     p = _doc_path(sid)
-    if sid and p.exists():
+    if p.exists():
         p.unlink()
         return True
     return False
