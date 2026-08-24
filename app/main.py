@@ -935,6 +935,7 @@ async def api_scripts_form_options():
         "custom_providers": load_llm_providers(),
         "topics_data": _load_topics_data(config),
         "used_topics": _load_used_topic_names(config),
+        "used_by_mode": script_library.used_by_mode_all(),
         "default_lines": script_library.DEFAULT_LINES,
         "current": {
             "provider": config.get("llm_provider", "sensenova"),
@@ -1003,9 +1004,10 @@ async def api_scripts_generate(request: Request):
         import random as _random
         config = load_config()
         topics_data = _load_topics_data(config)
-        used = set(_load_used_topic_names(config))
+        # 各模式独立排除：只排除当前模式已用的主题（同主题可在其他模式再用）
+        used_mode = set(script_library.used_topics_for_mode(structure))
         pool = [t for ts in topics_data.values() for t in ts
-                if t not in used and t not in topics]
+                if t not in used_mode and t not in topics]
         _random.shuffle(pool)
         topics += pool[:random_count]
 
@@ -1091,6 +1093,49 @@ async def api_scripts_review(request: Request):
                 yield _sse({"type": "reviewed", "data": payload})
             elif kind == "error_item":
                 yield _sse({"type": "error_item", "data": payload})
+            elif kind == "done":
+                yield _sse({"type": "done", "data": payload})
+                break
+            else:  # fatal
+                yield _sse({"type": "error", "error": payload})
+                break
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers=_SSE_HEADERS)
+
+
+@app.post("/api/scripts/fix")
+async def api_script_fix(request: Request):
+    """SSE: fix SELECTED issues on one script via LLM patch, then re-review."""
+    data = await request.json()
+    sid = str(data.get("id", "")).strip()
+    issues = data.get("issues", [])
+    if not sid or not isinstance(issues, list) or not issues:
+        return JSONResponse({"error": "缺少脚本 id 或未勾选任何问题"}, status_code=400)
+    provider = data.get("provider", "")
+    model = data.get("model", "")
+    re_review = bool(data.get("re_review", True))
+
+    import queue as _queue
+    q: _queue.Queue = _queue.Queue()
+    try:
+        script_library.start_fix_thread(sid, issues, provider, model, re_review, q)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    async def event_stream():
+        yield _sse({"type": "progress", "message": "开始修复选中的问题..."})
+        while True:
+            item = await asyncio.to_thread(q.get, True, None)
+            if item is None:
+                break
+            kind, payload = item
+            if kind == "progress":
+                yield _sse({"type": "progress", "message": payload})
+            elif kind == "fixed":
+                yield _sse({"type": "fixed", "data": payload})
+            elif kind == "reviewed":
+                yield _sse({"type": "reviewed", "data": payload})
             elif kind == "done":
                 yield _sse({"type": "done", "data": payload})
                 break

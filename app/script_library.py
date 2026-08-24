@@ -26,6 +26,10 @@ from .config_manager import load_mode_config, resolve_provider
 WEB_ROOT = Path(__file__).parent.parent.resolve()
 SCRIPTS_DIR = WEB_ROOT / "configs" / "script_library"
 
+# 各模式独立记录的「已用主题」——同一主题在每个模式各可用一次
+_USED_BY_MODE_PATH = SCRIPTS_DIR / "used_topics_by_mode.json"
+_store_lock = threading.Lock()
+
 _PIPELINE_DIR = WEB_ROOT / "pipeline"
 if str(_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_PIPELINE_DIR))
@@ -117,7 +121,9 @@ def list_scripts(structure: str = "", status: str = "", q: str = "") -> list[dic
             if needle not in hay:
                 continue
         items.append(meta)
-    items.sort(key=lambda m: m["created"], reverse=True)
+    # 排序：审查分数降序（未审查视为 -1 排后），同分按创建时间降序
+    items.sort(key=lambda m: (m["score"] if m["score"] is not None else -1,
+                              m["created"]), reverse=True)
     return items
 
 
@@ -204,7 +210,69 @@ def reset_used(sid: str) -> dict | None:
     doc["used_by"] = ""
     doc["used_at"] = 0
     _write_doc(doc)
+    # 同步移除该模式已用主题记录（若由该脚本写入）
+    if doc["status"] != "used":
+        remove_topic_used_mode(doc.get("structure", ""), doc.get("topic", ""), sid)
     return doc
+
+
+# ===========================================================================
+# Per-mode used topics (各模式独立记录已用主题)
+# ===========================================================================
+
+def _load_used_by_mode() -> dict[str, dict]:
+    if _USED_BY_MODE_PATH.exists():
+        try:
+            data = json.loads(_USED_BY_MODE_PATH.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _save_used_by_mode(data: dict[str, dict]) -> None:
+    SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+    _USED_BY_MODE_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def mark_topic_used_mode(mode: str, topic: str, script_id: str = "",
+                         run_name: str = "") -> None:
+    """Record topic as used IN ONE MODE only (idempotent per mode+topic)."""
+    if mode not in DEFAULT_LINES or not topic:
+        return
+    with _store_lock:
+        data = _load_used_by_mode()
+        entry = data.setdefault(mode, {})
+        if topic not in entry:
+            entry[topic] = {"script_id": script_id, "run": run_name,
+                            "used_at": time.time()}
+            _save_used_by_mode(data)
+
+
+def remove_topic_used_mode(mode: str, topic: str, script_id: str = "") -> None:
+    """Remove a mode-used record (when resetting a script's used mark)."""
+    if mode not in DEFAULT_LINES or not topic:
+        return
+    with _store_lock:
+        data = _load_used_by_mode()
+        entry = data.get(mode, {})
+        rec = entry.get(topic)
+        if rec is None:
+            return
+        # 若记录由其他脚本/全新生成写入，且未指定要删的 script_id，则不删
+        if script_id and rec.get("script_id") and rec.get("script_id") != script_id:
+            return
+        entry.pop(topic, None)
+        _save_used_by_mode(data)
+
+
+def used_topics_for_mode(mode: str) -> list[str]:
+    return list(_load_used_by_mode().get(mode, {}).keys())
+
+
+def used_by_mode_all() -> dict[str, list[str]]:
+    return {m: list(v.keys()) for m, v in _load_used_by_mode().items()}
 
 
 # ===========================================================================
@@ -676,6 +744,172 @@ def start_review_thread(ids: list[str], provider_id: str, model: str, q) -> thre
     def _wrap():
         try:
             review_batch(ids, provider_id, model, q, _batch_state["stop"])
+        finally:
+            _batch_state["running"] = False
+
+    t = threading.Thread(target=_wrap, daemon=True)
+    t.start()
+    return t
+
+
+# ===========================================================================
+# Selected-issue AI fix (patch-based, line-count preserving)
+# ===========================================================================
+
+_PATCHABLE_LINE_KEYS = ("text", "zh", "phonetic", "image_prompt", "video_prompt",
+                       "poses", "speaker")
+
+def _apply_patch(script: dict, patch: dict) -> dict:
+    """Apply an LLM JSON patch to a deep copy of the script. Returns the copy."""
+    import copy
+    patched = copy.deepcopy(script)
+    dialogue = patched.get("dialogue") or []
+    for p in (patch.get("dialogue") or []):
+        if not isinstance(p, dict):
+            continue
+        idx = p.get("index")
+        if not isinstance(idx, int) or not (0 <= idx < len(dialogue)):
+            continue
+        for k in _PATCHABLE_LINE_KEYS:
+            if k in p and p[k] is not None:
+                dialogue[idx][k] = p[k]
+    for k, v in (patch.get("fields") or {}).items():
+        if isinstance(v, (str, list)) and k not in ("dialogue", "lesson_type"):
+            patched[k] = v
+    return patched
+
+
+def fix_script(sid: str, issues: list[dict], provider_id: str, model: str,
+               re_review: bool, q, stop_event: threading.Event) -> None:
+    """Fix SELECTED issues on one script via LLM patch, then optionally re-review.
+
+    Emits ("progress"/"fixed"/"reviewed"/"done"/"fatal") + None terminator.
+    Original script is preserved unless the patched version passes validation.
+    """
+    from pipeline import _validate_script
+
+    doc = get_script_doc(sid)
+    if not doc:
+        q.put(("fatal", "脚本不存在"))
+        q.put(None)
+        return
+    script = doc.get("script") or {}
+    dialogue = script.get("dialogue") or []
+    n = len(dialogue)
+    structure = doc.get("structure", "original")
+    cefr = doc.get("cefr", script.get("cefr", "A2"))
+    if not n:
+        q.put(("fatal", "脚本无对话内容"))
+        q.put(None)
+        return
+
+    lines_ref = "\n".join(
+        f"{i}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
+        f"   zh: {ln.get('zh', '')}\n"
+        f"   phonetic: {ln.get('phonetic', '')}"
+        for i, ln in enumerate(dialogue))
+    chars = "\n".join(
+        f"- {k}: {script.get(k + '_description', '')} "
+        f"(gender={script.get(k + '_gender', '')}, role={script.get(k + '_role', '')})"
+        for k in ("char_a", "char_b", "char_c", "host")
+        if script.get(k + "_description"))
+    issues_ref = "\n".join(
+        f"- [{it.get('dimension') or it.get('type') or '?'}/"
+        f"{it.get('severity', '?')}"
+        f"{'/line ' + str(it['line']) if it.get('line') else ''}] "
+        f"{it.get('comment', '')} → {it.get('suggestion', '')}"
+        for it in issues[:12])
+
+    q.put(("progress", "AI 正在修复选中的问题（补丁式，行数保持不变）..."))
+    prompt = f"""You are an expert ESL script editor. Apply ONLY the selected fixes below to a listening-video script. Change nothing else.
+
+Topic: {doc.get('topic', '')}
+Structure: {structure}
+Target CEFR: {cefr}
+
+SELECTED ISSUES TO FIX:
+{issues_ref}
+
+CURRENT SCRIPT:
+Characters:
+{chars or '  (none)'}
+
+Dialogue (index is 0-based, {n} lines total):
+{lines_ref}
+
+YouTube title: {script.get('youtube_title', '')}
+
+OUTPUT a JSON PATCH ONLY (no markdown, no explanation):
+{{"dialogue": [{{"index": 0, "text": "corrected text", "zh": "繁體中文", "phonetic": "/ipa/"}}, ...], "fields": {{"youtube_title": "..."}}}}
+
+RULES:
+- The dialogue MUST keep exactly {n} lines — never add or remove lines
+- Include ONLY dialogue lines that change; within a line include ONLY the fields that change (text/zh/phonetic/image_prompt/video_prompt/poses)
+- Do NOT change "speaker" unless an issue explicitly requires it
+- "fields" may contain top-level script fields (char_a_description, char_b_description, youtube_title, title, title_zh, intro_zh, outro_zh, ...)
+- If you change a character description, also patch that character's affected dialogue lines' image_prompt/video_prompt to keep the description consistent
+- All Chinese output MUST be Traditional Chinese (繁體中文)
+- If an issue cannot be fixed without changing the line count, skip it (it will be handled manually)"""
+
+    try:
+        data = _chat_json_provider(
+            provider_id, model, structure,
+            [{"role": "system",
+              "content": "You are a precise ESL script editor. Output valid JSON patches only."},
+             {"role": "user", "content": prompt}],
+            temperature=0.3, max_tokens=4096)
+    except Exception as e:  # noqa: BLE001
+        q.put(("fatal", f"修复调用失败: {e}"))
+        q.put(None)
+        return
+
+    if not isinstance(data, dict):
+        q.put(("fatal", "AI 返回的补丁格式无效（非 JSON 对象）"))
+        q.put(None)
+        return
+
+    patched = _apply_patch(script, data)
+    valid, msg = _validate_script(patched, n, quest=(structure == "quest"))
+    if not valid:
+        q.put(("fatal", f"修复后校验未通过（原稿已保留）: {msg}"))
+        q.put(None)
+        return
+
+    # 保存：清掉过时的 AI 审查结论，重算本地校验
+    doc["script"] = patched
+    review = doc.get("review") or {}
+    for k in ("score", "verdict", "issues", "summary_zh", "reviewed_at", "model"):
+        review.pop(k, None)
+    review["local_issues"] = local_checks(patched, structure, n)
+    doc["review"] = review
+    if doc.get("status") != "used":
+        doc["status"] = "draft"
+    _write_doc(doc)
+    q.put(("progress", "✅ 修复已保存"))
+    q.put(("fixed", _doc_meta(doc)))
+
+    if re_review and not stop_event.is_set():
+        try:
+            meta = ai_review_script(sid, provider_id, model)
+            q.put(("reviewed", meta or _doc_meta(doc)))
+        except Exception as e:  # noqa: BLE001
+            q.put(("progress", f"⚠ 自动复审失败: {str(e)[:120]}"))
+    q.put(("done", {"fixed": 1, "re_reviewed": bool(re_review)}))
+    q.put(None)
+
+
+def start_fix_thread(sid: str, issues: list[dict], provider_id: str, model: str,
+                     re_review: bool, q) -> threading.Thread:
+    """Start a single-script fix in a daemon thread (shares busy-guard)."""
+    if _batch_state["running"]:
+        raise RuntimeError("已有批量任务进行中，请等待完成或先停止")
+    _batch_state["running"] = True
+    _batch_state["stop"].clear()
+
+    def _wrap():
+        try:
+            fix_script(sid, issues, provider_id, model, re_review, q,
+                       _batch_state["stop"])
         finally:
             _batch_state["running"] = False
 

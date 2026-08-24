@@ -23,7 +23,7 @@ if str(PIPELINE_DIR) not in sys.path:
 
 # Import pipeline modules (all lazy-heavy, import is cheap)
 from mcp_client import initialize as mcp_initialize, reinitialize as mcp_reinit
-from topic_manager import pick_random_topic, mark_topic_used
+from topic_manager import pick_random_topic
 from media_utils import safe_filename as _safe_dirname
 from checkpoint import (
     save_checkpoint as _save_checkpoint,
@@ -676,7 +676,10 @@ class PipelineService:
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
         _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
                          structure=args.structure, animation=args.animation)
-        mark_topic_used(used_topics_file, topic)
+        # 各模式独立记录已用主题（不再写全局 used_topics.json，
+        # 同一主题仍可在其他模式生成/使用）
+        script_library.mark_topic_used_mode(
+            args.structure, topic, script_id=script_id, run_name=safe_title)
         script_library.mark_used(script_id, run_name=safe_title)
         review = doc.get("review") or {}
         score_info = (f"，审查 {review.get('score')} 分"
@@ -764,6 +767,13 @@ class PipelineService:
             else:
                 script, work_dir, dirs = _step0_script(
                     args, checkpoint, topic, parent_dir, used_topics_file)
+                # 全新生成也补记「模式已用」（脚本页按模式排除主题用）
+                try:
+                    from . import script_library as _sl
+                    _sl.mark_topic_used_mode(
+                        args.structure, topic, run_name=Path(work_dir).name)
+                except Exception:
+                    pass
             self.work_dir = str(work_dir)
 
             # --- Character reuse: copy images + override descriptions ---

@@ -311,14 +311,15 @@ function loadQwenVoices() {
 // --- Script library (脚本库直接使用) ---
 let _scriptLibScripts = [];
 let _selectedScript = null;
+let _pendingPreselect = null;  // ?script_id= 带入的预选（跳转自脚本页「到控制台」）
 
 function loadScriptLibrary() {
-    fetch('/api/scripts?status=unused&structure=' + ACTIVE_MODE)
+    return fetch('/api/scripts?status=unused&structure=' + ACTIVE_MODE)
         .then(r => r.json())
         .then(data => {
             _scriptLibScripts = data.scripts || [];
             const sel = document.getElementById('script-lib-select');
-            const prev = _selectedScript ? _selectedScript.id : sel.value;
+            const prev = _pendingPreselect || (_selectedScript ? _selectedScript.id : sel.value);
             sel.innerHTML = '<option value="">— 不使用（AI 新生成）—</option>';
             _scriptLibScripts.forEach(s => {
                 const score = (s.score !== null && s.score !== undefined) ? ` · ★${s.score}` : '';
@@ -329,6 +330,7 @@ function loadScriptLibrary() {
             });
             if (prev && _scriptLibScripts.some(s => s.id === prev)) sel.value = prev;
             else _selectedScript = null;
+            _pendingPreselect = null;
             onScriptLibChange();
         });
 }
@@ -864,6 +866,30 @@ window.addEventListener('load', function() {
     loadCharSources();
     loadLibrary();
     loadScriptLibrary();
+    // ?script_id= 预选（脚本页「到控制台」带入）：自动切模式并选中该脚本
+    const preselectId = new URLSearchParams(location.search).get('script_id');
+    if (preselectId) {
+        history.replaceState(null, '', location.pathname);
+        fetch('/api/scripts/' + encodeURIComponent(preselectId))
+            .then(r => r.json())
+            .then(m => {
+                if (!m || m.error || !m.id) {
+                    alert('脚本库中未找到该脚本');
+                    return;
+                }
+                if (m.status === 'used') {
+                    alert(`脚本「${m.topic}」已被使用，请先在脚本页重置使用标记`);
+                    return;
+                }
+                _pendingPreselect = preselectId;
+                if (m.structure && m.structure !== ACTIVE_MODE) {
+                    switchMode(m.structure);  // 内部会 loadScriptLibrary 并消费 pending
+                } else {
+                    loadScriptLibrary();
+                }
+            })
+            .catch(() => {});
+    }
     // ... existing status check
     fetch('/api/run/status')
         .then(r => r.json())
