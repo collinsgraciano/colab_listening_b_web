@@ -59,6 +59,8 @@
                         class="px-3 py-1.5 rounded-lg text-xs text-white {% if run.uploaded %}bg-emerald-600 hover:bg-emerald-500{% else %}bg-amber-600/80 hover:bg-amber-500{% endif %}">
                         {% if run.uploaded %}已上传 ✓{% else %}标记已上传{% endif %}
                     </button>
+                    <button onclick="openFolder('{{ run.name }}')"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">打开目录</button>
                     {% if run.has_script %}
                     <button onclick="viewScript('{{ run.name }}')"
                         class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">脚本</button>
@@ -145,6 +147,14 @@ function toggleUploaded(runName) {
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-amber-600/80 hover:bg-amber-500';
                 if (badge) badge.classList.add('hidden');
             }
+        });
+}
+
+function openFolder(runName) {
+    fetch(`/api/runs/${runName}/open_folder`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) alert('打开目录失败: ' + (data.error || '未知错误'));
         });
 }
 

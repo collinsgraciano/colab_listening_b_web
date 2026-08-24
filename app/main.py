@@ -1305,6 +1305,29 @@ async def api_mark_uploaded(name: str):
     return {"ok": True, "uploaded": True}
 
 
+@app.post("/api/runs/{name}/open_folder")
+async def api_open_folder(name: str):
+    """在系统文件管理器中打开运行目录（视频及所有素材所在目录）。"""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = output_dir / name
+    if not run_dir.is_dir():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    # Safety: ensure it's within output_dir
+    if not str(run_dir.resolve()).startswith(str(output_dir.resolve())):
+        return JSONResponse({"ok": False, "error": "Invalid path"}, status_code=400)
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(run_dir))
+        else:
+            import subprocess
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.Popen([opener, str(run_dir)])
+        return {"ok": True, "path": str(run_dir)}
+    except OSError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 # ===========================================================================
 # MCP Token detection
 # ===========================================================================
