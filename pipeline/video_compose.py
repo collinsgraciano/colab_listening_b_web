@@ -311,6 +311,7 @@ def compose_listening(
     line_to_group: dict | None = None,
     subtitle_font_size: int = 60,
     subtitle_style: dict | None = None,
+    show_zh: bool = True,
 ) -> str:
     """Compose final listening practice video.
 
@@ -682,7 +683,7 @@ def compose_listening(
 
     # --- Burn subtitles via Pillow overlay ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
 
     # Cleanup
     shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -713,6 +714,7 @@ def compose_image(
     animation: str = "landing",
     subtitle_font_size: int = 60,
     subtitle_style: dict | None = None,
+    show_zh: bool = True,
     target_w: int = TARGET_W,
     target_h: int = TARGET_H,
 ) -> str:
@@ -1121,7 +1123,7 @@ def compose_image(
 
     # --- Burn subtitles via Pillow overlay (same as compose_listening) ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
 
     # Cleanup
     shutil.rmtree(tmp_dir, ignore_errors=True)

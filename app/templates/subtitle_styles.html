@@ -3,9 +3,18 @@
 {% macro style_card(s) %}
 <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col"
      id="card-{{ s.id }}">
-    <img src="/api/subtitle-styles/preview/{{ s.id }}?bg=pixar3d&canvas=16:9&t={{ range(1, 9999) | random }}"
-         class="w-full aspect-video object-cover bg-slate-900" loading="lazy"
-         onerror="this.src='/api/subtitle-styles/preview/{{ s.id }}?canvas=16:9'">
+    <div class="flex gap-2 justify-between px-4 pt-4">
+        {% for m in mode_infos %}
+        <div class="flex flex-col items-center gap-1 min-w-0"
+             title="{{ m.label }} · {{ m.mode }}{% if not m.zh_visible %}（该模式已隐藏中文字幕）{% endif %}">
+            <img src="/api/subtitle-styles/preview/{{ s.id }}?mode={{ m.mode }}&bg=gradient&thumb=1"
+                 onerror="this.onerror=null;this.src='/api/subtitle-styles/preview/{{ s.id }}?mode={{ m.mode }}&thumb=1'"
+                 class="{% if m.canvas == '9:16' %}h-20{% else %}h-14{% endif %} w-auto rounded border border-slate-700 bg-slate-900"
+                 loading="lazy" alt="{{ m.label }}">
+            <span class="text-[10px] text-slate-500 whitespace-nowrap">{{ m.label }}</span>
+        </div>
+        {% endfor %}
+    </div>
     <div class="p-4 flex-1 flex flex-col gap-2">
         <div class="flex items-center gap-2 flex-wrap">
             <span class="font-semibold text-white text-sm">{{ s.name }}</span>
@@ -52,9 +61,18 @@
     <!-- 当前样式横幅 -->
     <div class="rounded-xl p-5 mb-6 border border-indigo-500/60 bg-gradient-to-r from-indigo-900/40 to-slate-800">
         <div class="flex items-start gap-5">
-            <img src="/api/subtitle-styles/preview/current?bg=pixar3d&canvas=16:9&t={{ range(1, 9999) | random }}"
-                 onerror="this.src='/api/subtitle-styles/preview/current?canvas=16:9'"
-                 class="w-64 rounded-lg border border-slate-600 object-cover aspect-video bg-slate-900">
+            <div class="flex gap-2.5 shrink-0">
+                {% for m in mode_infos %}
+                <div class="flex flex-col items-center gap-1"
+                     title="{{ m.label }} · {{ m.mode }}{% if not m.zh_visible %}（该模式已隐藏中文字幕）{% endif %}">
+                    <img src="/api/subtitle-styles/preview/current?mode={{ m.mode }}&bg=gradient&thumb=1"
+                         onerror="this.onerror=null;this.src='/api/subtitle-styles/preview/current?mode={{ m.mode }}&thumb=1'"
+                         class="{% if m.canvas == '9:16' %}h-24{% else %}h-16{% endif %} w-auto rounded border border-slate-600 bg-slate-900"
+                         loading="lazy" alt="{{ m.label }}">
+                    <span class="text-[10px] text-slate-500 whitespace-nowrap">{{ m.label }}</span>
+                </div>
+                {% endfor %}
+            </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1 flex-wrap">
                     <span class="px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 text-xs font-medium">✓ 当前使用</span>
@@ -63,9 +81,9 @@
                 </div>
                 <p class="text-sm text-slate-300 mb-2">
                     {% if current_style %}{{ current_style.description }}{% else %}
-                    未选择字幕样式 —— 使用「参数配置 → 字幕字体大小」的传统行为（EN {{ config_font_size }}px / ZH {{ (config_font_size * 0.85) | int }}px 白字金译）。{% endif %}
+                    未选择字幕样式 —— 各模式沿用各自「参数配置 → 字幕字体大小」的传统行为，左侧按模式预览实际效果。{% endif %}
                 </p>
-                <p class="text-xs text-slate-500 mt-2">切换只影响新生成的视频；shorts 模式为竖屏 9:16 画布，预览可切换画布查看效果。</p>
+                <p class="text-xs text-slate-500 mt-2">缩略图按模式真实参数渲染（画布/中文字幕可见性/字号规则）；下方样式卡片的每张预览图也都按模式区分。切换只影响新生成的视频。</p>
             </div>
         </div>
     </div>
@@ -235,22 +253,23 @@
                         <img id="live-preview" class="w-full block" alt="字幕预览">
                     </div>
                     <div class="flex gap-2">
-                        <select id="pv-canvas" onchange="refreshPreview()"
+                        <select id="pv-mode" onchange="onModeChange()"
                             class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
-                            <option value="16:9">画布 16:9 (1280×720)</option>
-                            <option value="9:16">画布 9:16 (1080×1920, shorts)</option>
                         </select>
                         <select id="pv-bg" onchange="refreshPreview()"
                             class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
                             <option value="gradient">测试渐变</option>
                         </select>
                     </div>
+                    <p id="pv-mode-zh-hint" class="text-[10px] text-amber-400 hidden">
+                        ⚠ 此模式配置了「隐藏中文字幕」——即使样式含中文参数，成片与预览都只显示英文。
+                    </p>
                     <div class="space-y-2">
                         <input type="text" id="pv-sample-en" placeholder="英文样例文本"
-                            oninput="refreshPreview()"
+                            oninput="onSampleInput()"
                             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white">
                         <input type="text" id="pv-sample-zh" placeholder="中文样例文本（繁体）"
-                            oninput="refreshPreview()"
+                            oninput="onSampleInput()"
                             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white">
                     </div>
                 </div>
@@ -268,7 +287,7 @@
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>📦</span> 内置样式（{{ styles | selectattr('builtin') | list | length }} 个）
         </h3>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 gap-4">
             {% for s in styles if s.builtin %}
             {{ style_card(s) }}
             {% endfor %}
@@ -280,7 +299,7 @@
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>✏️</span> 自定义样式（{{ styles | rejectattr('builtin') | list | length }} 个）
         </h3>
-        <div id="custom-grid" class="grid grid-cols-3 gap-4">
+        <div id="custom-grid" class="grid grid-cols-2 gap-4">
             {% for s in styles if not s.builtin %}
             {{ style_card(s) }}
             {% endfor %}
@@ -301,12 +320,13 @@ STYLE_DATA[{{ s.id | tojson }}] = {{ s | tojson }};
 {% endfor %}
 const FONTS = {{ fonts | tojson }};
 const BACKGROUNDS = {{ backgrounds | tojson }};
-const DEFAULT_SAMPLE_EN = "Could I get a large iced latte, please?";
-const DEFAULT_SAMPLE_ZH = "我可以要一杯大杯冰拿鐵嗎？";
+const MODE_INFOS = {{ mode_infos | tojson }};
+const ACTIVE_MODE = {{ active_mode | tojson }};
 
 let previewTimer = null;
 let previewSeq = 0;
 let editingExisting = false;
+let samplesCustomized = false;  // 用户手动改过样例文本后，切换模式不再覆盖
 
 function toast(msg, ok = true) {
     const t = document.createElement('div');
@@ -436,7 +456,32 @@ function applySizePreset(en, zh, enStroke, zhStroke) {
     refreshPreview();
 }
 
-// --- 实时预览（防抖 350ms） ---------------------------------------------------
+// --- 模式切换（画布/ZH 可见性/样例文本联动） ------------------------------------
+function currentModeInfo() {
+    return MODE_INFOS.find(m => m.mode === document.getElementById('pv-mode').value);
+}
+
+function onModeChange() {
+    const m = currentModeInfo();
+    if (m && !samplesCustomized) {
+        document.getElementById('pv-sample-en').value = m.sample_en;
+        document.getElementById('pv-sample-zh').value = m.sample_zh;
+    }
+    updateModeHint();
+    refreshPreview();
+}
+
+function onSampleInput() {
+    samplesCustomized = true;
+    refreshPreview();
+}
+
+function updateModeHint() {
+    const m = currentModeInfo();
+    document.getElementById('pv-mode-zh-hint').classList.toggle('hidden', !m || m.zh_visible);
+}
+
+// --- 实时预览（防抖 350ms，按模式渲染） -----------------------------------------
 function refreshPreview() {
     clearTimeout(previewTimer);
     previewTimer = setTimeout(async () => {
@@ -447,8 +492,8 @@ function refreshPreview() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     style: collectStyle(),
+                    mode: document.getElementById('pv-mode').value,
                     bg: document.getElementById('pv-bg').value,
-                    canvas: document.getElementById('pv-canvas').value,
                     sample_en: document.getElementById('pv-sample-en').value,
                     sample_zh: document.getElementById('pv-sample-zh').value,
                 }),
@@ -536,9 +581,16 @@ async function deleteStyle(id) {
     // 背景下拉
     document.getElementById('pv-bg').innerHTML = BACKGROUNDS.map(b =>
         `<option value="${b.id}">${b.name}</option>`).join('');
-    // 样例文本
-    document.getElementById('pv-sample-en').value = DEFAULT_SAMPLE_EN;
-    document.getElementById('pv-sample-zh').value = DEFAULT_SAMPLE_ZH;
+    // 模式下拉（按模式渲染预览，默认当前激活模式）
+    document.getElementById('pv-mode').innerHTML = MODE_INFOS.map(m =>
+        `<option value="${m.mode}">${m.label} (${m.canvas === '9:16' ? '竖屏' : '16:9'})</option>`).join('');
+    document.getElementById('pv-mode').value = MODE_INFOS.some(m => m.mode === ACTIVE_MODE) ? ACTIVE_MODE : 'original';
+    const m = currentModeInfo();
+    if (m) {
+        document.getElementById('pv-sample-en').value = m.sample_en;
+        document.getElementById('pv-sample-zh').value = m.sample_zh;
+    }
+    updateModeHint();
 })();
 </script>
 {% endblock %}

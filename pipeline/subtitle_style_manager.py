@@ -122,6 +122,71 @@ CANVASES = {
 DEFAULT_SAMPLE_EN = "Could I get a large iced latte, please?"
 DEFAULT_SAMPLE_ZH = "我可以要一杯大杯冰拿鐵嗎？"
 
+# 各模式预览参数：画布 + 代表性样例文本（对应各模式脚本的真实行长风格）。
+# 画布 = 该模式成片分辨率（shorts 1080x1920，其余 1280x720）。
+MODE_INFO: dict[str, dict[str, Any]] = {
+    "original": {"label": "原版", "canvas": "16:9",
+                 "sample_en": "Could I get a large iced latte, please?",
+                 "sample_zh": "我可以要一杯大杯冰拿鐵嗎？"},
+    "image": {"label": "图片", "canvas": "16:9",
+              "sample_en": "I'd like to book a table for two tonight.",
+              "sample_zh": "我想預訂今晚兩個人的位子。"},
+    "quest": {"label": "任务", "canvas": "16:9",
+              "sample_en": "Your mission is to find the missing key before sunset.",
+              "sample_zh": "你的任務是在日落前找到遺失的鑰匙。"},
+    "quest_v2": {"label": "任务V2", "canvas": "16:9",
+                 "sample_en": "Hurry! We only have ten minutes to find the exit.",
+                 "sample_zh": "快點！我們只有十分鐘找到出口。"},
+    "shorts": {"label": "Shorts", "canvas": "9:16",
+               "sample_en": "Why do Americans tip at restaurants?",
+               "sample_zh": "為什麼美國人在餐廳要給小費？"},
+}
+
+
+def _mode_config(mode: str) -> dict[str, Any]:
+    """读取 web configs/mode_{mode}.json（缺省/损坏 → {}）。"""
+    p = _WEB_ROOT / "configs" / f"mode_{mode}.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def mode_zh_visible(mode: str) -> bool:
+    """该模式成片是否渲染中文字幕（= not no_zh_subtitle，与 compose 行为一致）。"""
+    return not bool(_mode_config(mode).get("no_zh_subtitle", False))
+
+
+def build_mode_style(style: dict[str, Any] | None, mode: str) -> dict[str, Any]:
+    """样式 + 模式实际行为 → 该模式最终生效的样式（预览与成片一致）。
+
+    - style=None（跟随参数配置）：字号取模式配置 subtitle_font_size，
+      ZH = 85% EN（与 compose 调用处比例一致）；ZH 可见性按模式配置。
+    - style 给定：样式参数全覆盖（与 burn_subtitles 的覆盖规则一致），
+      ZH 可见性 = 模式配置 AND 样式 show_zh。
+    """
+    mode_show_zh = mode_zh_visible(mode)
+    if style is None:
+        try:
+            fs = int(_mode_config(mode).get("subtitle_font_size", 60))
+        except (ValueError, TypeError):
+            fs = 60
+        fs = max(20, min(160, fs))
+        return {"en_size": fs, "zh_size": int(fs * 0.85), "show_zh": mode_show_zh}
+    st = dict(style)
+    st["show_zh"] = mode_show_zh and bool(st.get("show_zh", True))
+    return st
+
+
+def list_mode_infos() -> list[dict[str, Any]]:
+    """模式预览信息（页面注入 + JS 渲染用）。"""
+    return [
+        {"mode": m, "label": v["label"], "canvas": v["canvas"],
+         "sample_en": v["sample_en"], "sample_zh": v["sample_zh"],
+         "zh_visible": mode_zh_visible(m)}
+        for m, v in MODE_INFO.items()
+    ]
+
 
 # ---------------------------------------------------------------------------
 # 自定义样式持久化
@@ -316,3 +381,38 @@ def render_preview_png(style: dict[str, Any] | None, bg_id: str = "gradient",
     buf = io.BytesIO()
     out.save(buf, "PNG")
     return buf.getvalue()
+
+
+def _to_thumb(data: bytes, long_side: int = 320, quality: int = 85) -> tuple[bytes, str]:
+    """全尺寸预览 → 缩略图 JPEG（卡片网格用，控制页面体积）。"""
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(data))
+    w, h = img.size
+    scale = long_side / max(w, h)
+    if scale < 1.0:
+        img = img.resize((max(1, int(w * scale + 0.5)), max(1, int(h * scale + 0.5))),
+                         Image.LANCZOS)
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, "JPEG", quality=quality)
+    return buf.getvalue(), "image/jpeg"
+
+
+def render_mode_preview(style: dict[str, Any] | None, mode: str,
+                        bg_id: str = "gradient",
+                        sample_en: str = "", sample_zh: str = "",
+                        thumb: bool = False) -> tuple[bytes, str]:
+    """按模式渲染字幕样式预览 → (image_bytes, media_type)。
+
+    画布（shorts 竖屏）、中文字幕可见性（各模式 no_zh_subtitle 配置）、
+    字号规则（跟随参数配置时取各模式 subtitle_font_size）全部与该模式
+    成片行为一致 —— 预览即最终效果。thumb=True 输出缩略 JPEG。
+    """
+    info = MODE_INFO.get(mode) or MODE_INFO["original"]
+    st = build_mode_style(style, mode)
+    png = render_preview_png(st, bg_id, info["canvas"],
+                             sample_en or info["sample_en"],
+                             sample_zh or info["sample_zh"])
+    if thumb:
+        return _to_thumb(png)
+    return png, "image/png"

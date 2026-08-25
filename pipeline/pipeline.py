@@ -893,6 +893,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             animation=args.animation,
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
+            show_zh=not getattr(args, "no_zh_subtitle", False),
         )
     elif args.structure == "shorts":
         # Vertical 9:16 Shorts — reuse the image compose path at 1080x1920.
@@ -920,6 +921,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             animation=args.animation,
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
+            show_zh=not getattr(args, "no_zh_subtitle", False),
             target_w=1080,
             target_h=1920,
         )
@@ -940,6 +942,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             line_to_group=line_to_group,
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
+            show_zh=not getattr(args, "no_zh_subtitle", False),
         )
     if not final_path:
         print("  [Compose] Interrupted or no output, skipping checkpoint save.")

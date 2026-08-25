@@ -965,6 +965,7 @@ async def subtitle_styles_page(request: Request):
         "config_font_size": ctx["config_font_size"],
         "fonts": subtitle_style_lib.get_font_options(),
         "backgrounds": subtitle_style_lib.list_backgrounds(),
+        "mode_infos": subtitle_style_lib.list_mode_infos(),
         "active_mode": get_active_mode(),
         "mode_labels": MODE_LABELS,
         "active_page": "subtitle_styles",
@@ -1037,62 +1038,64 @@ async def api_subtitle_styles_select(request: Request):
     return {"ok": True, "mode": mode, "subtitle_style": style_id}
 
 
-@app.get("/api/subtitle-styles/preview/render")
-async def api_subtitle_styles_preview_adhoc(style: str = "", bg: str = "gradient",
-                                            canvas: str = "16:9",
-                                            sample_en: str = "", sample_zh: str = ""):
-    """GET 快捷预览（style 为样式 id，'current' 表示当前模式样式）。"""
-    style_dict = None
-    if style == "current":
-        ctx = _current_subtitle_style_ctx()
-        style_dict = ctx["current_style"]
-    elif style:
-        style_dict = subtitle_style_lib.get_style(style)
-    png = await asyncio.to_thread(
-        subtitle_style_lib.render_preview_png, style_dict, bg, canvas,
-        sample_en, sample_zh)
-    return Response(content=png, media_type="image/png")
-
-
 @app.post("/api/subtitle-styles/preview/render")
 async def api_subtitle_styles_preview_adhoc_post(request: Request):
-    """编辑器实时预览：body = {style, bg, canvas, sample_en, sample_zh} → PNG。"""
+    """编辑器实时预览：body = {style, mode, bg, sample_en, sample_zh} → PNG。
+
+    按模式渲染：画布/ZH 可见性/字号规则与该模式成片一致。
+    """
     data = await request.json()
     style = data.get("style") or None
     if isinstance(style, dict):
         # 允许未保存的草稿参数；宽松处理无效值（渲染层有兜底）
         style = {k: v for k, v in style.items()
                  if k in subtitle_style_lib.media_utils.SUBTITLE_STYLE_LEGACY_DEFAULTS}
-    png = await asyncio.to_thread(
-        subtitle_style_lib.render_preview_png, style,
-        str(data.get("bg", "gradient")), str(data.get("canvas", "16:9")),
+    mode = str(data.get("mode", "original"))
+    if mode not in subtitle_style_lib.MODE_INFO:
+        mode = "original"
+    png, mime = await asyncio.to_thread(
+        subtitle_style_lib.render_mode_preview, style, mode,
+        str(data.get("bg", "gradient")),
         str(data.get("sample_en", "")), str(data.get("sample_zh", "")))
-    return Response(content=png, media_type="image/png")
+    return Response(content=png, media_type=mime)
 
 
 @app.get("/api/subtitle-styles/preview/current")
-async def api_subtitle_styles_preview_current(bg: str = "gradient", canvas: str = "16:9",
-                                              sample_en: str = "", sample_zh: str = ""):
-    """当前模式字幕样式预览（未选样式 → legacy 默认样式）。"""
+async def api_subtitle_styles_preview_current(mode: str = "original",
+                                              bg: str = "gradient",
+                                              sample_en: str = "", sample_zh: str = "",
+                                              thumb: bool = False):
+    """当前模式字幕样式预览（未选样式 → 该模式「跟随参数配置」行为）。"""
+    if mode not in subtitle_style_lib.MODE_INFO:
+        mode = "original"
     ctx = _current_subtitle_style_ctx()
-    png = await asyncio.to_thread(
-        subtitle_style_lib.render_preview_png, ctx["current_style"],
-        bg, canvas, sample_en, sample_zh)
-    return Response(content=png, media_type="image/png")
+    data, mime = await asyncio.to_thread(
+        subtitle_style_lib.render_mode_preview, ctx["current_style"],
+        mode, bg, sample_en, sample_zh, thumb)
+    return Response(content=data, media_type=mime)
 
 
 @app.get("/api/subtitle-styles/preview/{style_id}")
-async def api_subtitle_styles_preview(style_id: str, bg: str = "gradient",
-                                      canvas: str = "16:9",
-                                      sample_en: str = "", sample_zh: str = ""):
-    """已保存样式的卡片预览图。"""
+async def api_subtitle_styles_preview(style_id: str, mode: str = "original",
+                                      bg: str = "gradient",
+                                      sample_en: str = "", sample_zh: str = "",
+                                      thumb: bool = False):
+    """已保存样式的预览图（按模式渲染，thumb=缩略 JPEG）。"""
     style = subtitle_style_lib.get_style(style_id)
     if not style:
         return JSONResponse({"error": f"样式 '{style_id}' 不存在"}, status_code=404)
-    png = await asyncio.to_thread(
-        subtitle_style_lib.render_preview_png, style, bg, canvas,
-        sample_en, sample_zh)
-    return Response(content=png, media_type="image/png")
+    if mode not in subtitle_style_lib.MODE_INFO:
+        mode = "original"
+    data, mime = await asyncio.to_thread(
+        subtitle_style_lib.render_mode_preview, style, mode, bg,
+        sample_en, sample_zh, thumb)
+    return Response(content=data, media_type=mime)
+
+
+@app.get("/api/subtitle-styles/modes")
+async def api_subtitle_styles_modes():
+    """模式预览信息（画布/样例文本/ZH 可见性）。"""
+    return {"modes": subtitle_style_lib.list_mode_infos()}
 
 
 @app.get("/api/subtitle-styles/fonts")
