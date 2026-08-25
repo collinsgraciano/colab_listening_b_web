@@ -908,16 +908,19 @@ Output JSON ONLY (no markdown):
 
 def generate_random_voice_designs(count: int = 10,
                                   avoid_names: list[str] | None = None,
-                                  language: str = "english") -> list[dict]:
+                                  language: str = "english",
+                                  gender: str = "any") -> list[dict]:
     """Generate diverse random VoiceDesign voice specs via LLM.
 
     用于 Web 端「自定义音色 → LLM 随机生成」：LLM 批量产出音色设计候选，
     用户试听后挑选喜欢的保存为设计音色。
+    gender: "female"/"male" 只生成该性别，"any" 混合。
 
     Returns:
         list[dict]: 每项 {name, gender, language("en"/"zh"), description, instruct}
     """
     avoid = ", ".join(sorted(n for n in (avoid_names or []) if n)) or "(none)"
+    want_gender = gender if gender in ("female", "male") else ""
 
     lang_req = {
         "english": 'All voices speak ENGLISH. Set every "language" field to "en".',
@@ -926,10 +929,17 @@ def generate_random_voice_designs(count: int = 10,
                  'Set each "language" field individually.',
     }.get(language, 'All voices speak ENGLISH. Set every "language" field to "en".')
 
+    gender_req = {
+        "female": 'All voices MUST be FEMALE. Set every "gender" field to "female".',
+        "male": 'All voices MUST be MALE. Set every "gender" field to "male".',
+    }.get(want_gender, 'Mix genders: roughly half female ("female") and half male ("male"). '
+                        'Set each "gender" field individually.')
+
     prompt = f"""You are a creative voice director designing voices for Qwen3-TTS VoiceDesign.
 Generate {count} DIVERSE, DISTINCT voice designs for language learning videos.
 
 {lang_req}
+{gender_req}
 
 Each voice design MUST include these fields:
 - "name": a short English given name (3-10 letters, capitalized, e.g. "Luna", "Jasper"). Unique within the list.
@@ -947,7 +957,7 @@ Example instructs (follow this style):
 - "Speak in a mature, confident American female voice with clear articulation, suitable for narration. Keep a steady, engaging pace with gentle emphasis on key phrases."
 
 DIVERSITY requirements — cover a wide spectrum:
-- Mix genders and age feels (youthful / young adult / middle-aged / senior)
+- Mix age feels (youthful / young adult / middle-aged / senior)
 - Mix pitches: high, mid, low
 - Mix energies: calm, warm, lively, energetic, playful, gentle, husky, crisp, confident
 - Vary use cases: conversation partner, narrator, cheerful host, storyteller
@@ -978,22 +988,25 @@ Output JSON ONLY (no markdown fences):
         if not isinstance(v, dict):
             continue
         name = str(v.get("name", "")).strip()
-        gender = str(v.get("gender", "")).strip().lower()
+        v_gender = str(v.get("gender", "")).strip().lower()
         lang = str(v.get("language", "")).strip().lower()
         instruct = str(v.get("instruct", "")).strip()
         desc = str(v.get("description", "")).strip()
         if not name or not instruct or name in seen:
             continue
-        if gender not in ("female", "male"):
-            gender = "female"
+        # 指定性别时丢弃不符项（instruct 描述的音色性别与标签一致，改标签会造成错配）
+        if want_gender and v_gender != want_gender:
+            continue
+        if v_gender not in ("female", "male"):
+            v_gender = "female"
         if lang not in ("en", "zh"):
             lang = "en"
         seen.add(name)
         result.append({
             "name": name,
-            "gender": gender,
+            "gender": v_gender,
             "language": lang,
-            "description": desc or f"随机设计音色 ({'女声' if gender == 'female' else '男声'})",
+            "description": desc or f"随机设计音色 ({'女声' if v_gender == 'female' else '男声'})",
             "instruct": instruct,
         })
         if len(result) >= count:

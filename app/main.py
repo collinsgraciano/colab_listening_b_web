@@ -1844,14 +1844,20 @@ async def api_qwen_preview(request: Request):
 
     try:
         from qwen_tts_engine import QwenTTSEngine
-        engine = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path = str(cache_path)
-        if language == "chinese":
-            engine.synth_chinese(text, speaker, out_path, rate="+0%")
-        else:
-            engine.synth_english(text, speaker, out_path, rate="+0%")
-        return FileResponse(out_path, media_type="audio/mpeg",
+
+        def _synth() -> None:
+            engine = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path = str(cache_path)
+            # 共享合成锁：与批量试听任务串行化 GPU 合成，防并发冲突
+            with _TTS_SYNTH_LOCK:
+                if language == "chinese":
+                    engine.synth_chinese(text, speaker, out_path, rate="+0%")
+                else:
+                    engine.synth_english(text, speaker, out_path, rate="+0%")
+
+        await asyncio.to_thread(_synth)
+        return FileResponse(str(cache_path), media_type="audio/mpeg",
                             filename="preview.mp3",
                             headers={"Content-Disposition": "attachment; filename=preview.mp3"})
     except Exception as e:
@@ -2044,9 +2050,17 @@ def _build_voice_llm_override() -> dict:
 
 @app.get("/api/qwen_voices/candidates")
 async def api_qwen_candidates_list():
-    """List current LLM-generated candidate voices."""
+    """List current LLM-generated candidate voices (with preview cache state)."""
     config = _load_qwen_voice_config()
-    return {"candidates": config.get("candidate_voices", [])}
+    candidates = []
+    for c in config.get("candidate_voices", []):
+        c = dict(c)
+        language = "chinese" if c.get("language") == "zh" else "english"
+        text = _PREVIEW_TEXTS.get(language, _PREVIEW_TEXTS["english"])
+        c["preview_cached"] = _preview_cache_path(
+            c.get("name", ""), language, text).exists()
+        candidates.append(c)
+    return {"candidates": candidates}
 
 
 @app.post("/api/qwen_voices/candidates/generate")
@@ -2064,6 +2078,9 @@ async def api_qwen_candidates_generate(request: Request):
         count = 10
     count = max(1, min(count, 20))
     language = (data.get("language", "english") or "english").strip()
+    gender = (data.get("gender", "any") or "any").strip().lower()
+    if gender not in ("female", "male", "any"):
+        gender = "any"
 
     def _run() -> list[dict]:
         from llm_client import generate_random_voice_designs, set_llm_env_override
@@ -2076,7 +2093,7 @@ async def api_qwen_candidates_generate(request: Request):
 
         set_llm_env_override(override)
         try:
-            return generate_random_voice_designs(count, sorted(avoid), language)
+            return generate_random_voice_designs(count, sorted(avoid), language, gender)
         finally:
             set_llm_env_override(None)
 
@@ -2142,6 +2159,152 @@ async def api_qwen_candidate_delete(name: str):
     _save_qwen_voice_config(config)
     _purge_preview_cache(name)
     return {"ok": True}
+
+
+@app.post("/api/qwen_voices/candidates/delete_batch")
+async def api_qwen_candidates_delete_batch(request: Request):
+    """Bulk discard candidate voices (一键删除不喜欢的)."""
+    data = await request.json()
+    names = {str(n) for n in (data.get("names") or []) if n}
+    if not names:
+        return JSONResponse({"ok": False, "error": "未选择任何音色"}, status_code=400)
+    config = _load_qwen_voice_config()
+    kept = []
+    removed = 0
+    for c in config.get("candidate_voices", []):
+        if c.get("name") in names:
+            _purge_preview_cache(c["name"])
+            removed += 1
+        else:
+            kept.append(c)
+    config["candidate_voices"] = kept
+    _save_qwen_voice_config(config)
+    return {"ok": True, "removed": removed}
+
+
+# --- 一键生成所有候选试听音频（后台线程 + 轮询进度）---
+
+# 串行化 GPU 合成：批量试听任务与单次试听共用同一模型实例，防并发冲突
+_TTS_SYNTH_LOCK = threading.Lock()
+
+_CANDIDATE_PREVIEW_JOB: dict = {
+    "running": False,
+    "total": 0,
+    "completed": 0,
+    "done_names": [],
+    "failed": [],
+}
+_CANDIDATE_PREVIEW_LOCK = threading.Lock()
+
+
+def _run_candidate_previews(candidates: list[dict]) -> None:
+    """后台线程：逐个为候选音色生成试听音频（跳过已缓存，串行 GPU 合成）。"""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+    from qwen_tts_engine import QwenTTSEngine
+
+    config = load_config()
+    model_path = config.get("qwen_model_path", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
+    base_model_path = config.get("qwen_base_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
+    voicedesign_model_path = config.get("qwen_voicedesign_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign")
+    device = config.get("qwen_device", "cuda:0")
+    engine = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
+
+    try:
+        for c in candidates:
+            with _CANDIDATE_PREVIEW_LOCK:
+                if not _CANDIDATE_PREVIEW_JOB["running"]:  # 已被新任务取代/停止
+                    return
+                done = set(_CANDIDATE_PREVIEW_JOB["done_names"])
+                failed_names = {f["name"] for f in _CANDIDATE_PREVIEW_JOB["failed"]}
+            name = c.get("name", "")
+            if name in done or name in failed_names:
+                continue  # 启动时已预填（已有缓存）或此前已失败
+
+            # 候选可能已被删除/保存后删除 → 跳过，不计入完成
+            current_names = {x.get("name") for x in
+                             _load_qwen_voice_config().get("candidate_voices", [])}
+            if name not in current_names:
+                with _CANDIDATE_PREVIEW_LOCK:
+                    _CANDIDATE_PREVIEW_JOB["total"] = max(0, _CANDIDATE_PREVIEW_JOB["total"] - 1)
+                continue
+
+            language = "chinese" if c.get("language") == "zh" else "english"
+            text = _PREVIEW_TEXTS.get(language, _PREVIEW_TEXTS["english"])
+            cache_path = _preview_cache_path(name, language, text)
+            if cache_path.exists():
+                with _CANDIDATE_PREVIEW_LOCK:
+                    _CANDIDATE_PREVIEW_JOB["done_names"].append(name)
+                    _CANDIDATE_PREVIEW_JOB["completed"] += 1
+                continue
+
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                with _TTS_SYNTH_LOCK:
+                    if language == "chinese":
+                        engine.synth_chinese(text, name, str(cache_path), rate="+0%")
+                    else:
+                        engine.synth_english(text, name, str(cache_path), rate="+0%")
+                with _CANDIDATE_PREVIEW_LOCK:
+                    _CANDIDATE_PREVIEW_JOB["done_names"].append(name)
+                    _CANDIDATE_PREVIEW_JOB["completed"] += 1
+            except Exception as e:  # noqa: BLE001 — 记录失败继续下一个
+                with _CANDIDATE_PREVIEW_LOCK:
+                    _CANDIDATE_PREVIEW_JOB["failed"].append(
+                        {"name": name, "error": str(e)[:200]})
+    finally:
+        with _CANDIDATE_PREVIEW_LOCK:
+            _CANDIDATE_PREVIEW_JOB["running"] = False
+
+
+@app.post("/api/qwen_voices/candidates/previews/generate")
+async def api_qwen_candidates_previews_generate():
+    """一键为所有候选音色后台生成试听音频（已缓存的直接计入完成）。"""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    with _CANDIDATE_PREVIEW_LOCK:
+        if _CANDIDATE_PREVIEW_JOB["running"]:
+            return JSONResponse({"ok": False, "error": "试听音频生成中，请稍候"}, status_code=409)
+        candidates = [dict(c) for c in _load_qwen_voice_config().get("candidate_voices", [])]
+        if not candidates:
+            return JSONResponse({"ok": False, "error": "暂无候选音色，请先生成"}, status_code=400)
+
+        cached_names = []
+        for c in candidates:
+            language = "chinese" if c.get("language") == "zh" else "english"
+            text = _PREVIEW_TEXTS.get(language, _PREVIEW_TEXTS["english"])
+            if _preview_cache_path(c.get("name", ""), language, text).exists():
+                cached_names.append(c.get("name", ""))
+
+        _CANDIDATE_PREVIEW_JOB.update({
+            "running": True,
+            "total": len(candidates),
+            "completed": len(cached_names),
+            "done_names": cached_names,
+            "failed": [],
+        })
+
+    t = threading.Thread(target=_run_candidate_previews, args=(candidates,), daemon=True)
+    t.start()
+    return {"ok": True, "total": len(candidates), "cached": len(cached_names)}
+
+
+@app.get("/api/qwen_voices/candidates/previews/status")
+async def api_qwen_candidates_previews_status():
+    """批量试听生成任务进度（前端轮询）。"""
+    with _CANDIDATE_PREVIEW_LOCK:
+        return {
+            "running": _CANDIDATE_PREVIEW_JOB["running"],
+            "total": _CANDIDATE_PREVIEW_JOB["total"],
+            "completed": _CANDIDATE_PREVIEW_JOB["completed"],
+            "done_names": list(_CANDIDATE_PREVIEW_JOB["done_names"]),
+            "failed": list(_CANDIDATE_PREVIEW_JOB["failed"]),
+        }
 
 
 # ===========================================================================

@@ -97,7 +97,7 @@
         <div class="bg-slate-800/60 rounded-xl p-4 mb-3 border border-slate-700">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div class="text-xs text-slate-400">
-                    🎲 LLM 随机生成音色 — 批量生成设计音色候选，试听后挑选喜欢的保存
+                    🎲 LLM 随机生成音色 — 批量生成设计音色候选（可指定性别），试听后挑选喜欢的保存
                     <span class="text-slate-500">（保存后出现在上方「设计音色」区；重新生成会替换当前候选）</span>
                 </div>
                 <div class="flex items-center gap-2">
@@ -106,6 +106,11 @@
                         <option value="10" selected>10 个</option>
                         <option value="15">15 个</option>
                         <option value="20">20 个</option>
+                    </select>
+                    <select id="cand-gender" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                        <option value="any" selected>任意性别</option>
+                        <option value="female">女声</option>
+                        <option value="male">男声</option>
                     </select>
                     <select id="cand-lang" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
                         <option value="english" selected>英文</option>
@@ -118,6 +123,24 @@
                     </button>
                 </div>
             </div>
+
+            <!-- 候选管理操作行（有候选时显示） -->
+            <div id="cand-actions" class="flex flex-wrap items-center gap-2 mb-3" style="display:none">
+                <button id="cand-preview-all-btn" onclick="generateAllPreviews()"
+                    class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-xs text-white transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    🎧 一键生成试听
+                </button>
+                <button id="cand-select-all-btn" onclick="toggleSelectAll()"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-white transition">
+                    ☑ 全选
+                </button>
+                <button id="cand-delete-selected-btn" onclick="deleteSelectedCandidates()" disabled
+                    class="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-xs text-white transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    🗑 删除选中 (0)
+                </button>
+                <span id="cand-preview-status" class="text-xs text-slate-400"></span>
+            </div>
+
             <div id="candidate-grid" class="grid grid-cols-3 gap-3">
                 <!-- Candidate cards rendered by JS -->
             </div>
@@ -583,6 +606,9 @@ function deleteCustomVoice(name) {
 
 // --- LLM random voice candidates ---
 let CANDIDATES = [];
+const SELECTED = new Set();   // 选中的候选（批量删除用）
+let previewPollTimer = null;
+let lastDoneCount = -1;
 
 function loadCandidates() {
     fetch('/api/qwen_voices/candidates')
@@ -590,19 +616,60 @@ function loadCandidates() {
         .then(data => {
             CANDIDATES = data.candidates || [];
             renderCandidates();
+            // 页面加载时若批量试听任务进行中，恢复进度轮询
+            fetch('/api/qwen_voices/candidates/previews/status')
+                .then(r => r.json())
+                .then(job => {
+                    if (job.running) {
+                        document.getElementById('cand-preview-all-btn').disabled = true;
+                        startPreviewPolling();
+                    }
+                });
         });
 }
 
 function renderCandidates() {
     const grid = document.getElementById('candidate-grid');
+    const actionsRow = document.getElementById('cand-actions');
     grid.innerHTML = '';
     if (!CANDIDATES.length) {
+        actionsRow.style.display = 'none';
+        SELECTED.clear();
+        updateActionButtons();
         grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无候选音色。点击「LLM 随机生成」创建一批，试听后保存喜欢的。</p>';
         return;
     }
+    // 清理已不存在的选中项（候选被保存/删除后）
+    const names = new Set(CANDIDATES.map(v => v.name));
+    [...SELECTED].forEach(n => { if (!names.has(n)) SELECTED.delete(n); });
+    actionsRow.style.display = 'flex';
+
     CANDIDATES.forEach(v => {
+        const selected = SELECTED.has(v.name);
         const card = document.createElement('div');
-        card.className = 'bg-slate-800 border border-slate-600 rounded-lg p-3 flex flex-col items-center gap-2';
+        card.className = 'relative bg-slate-800 border rounded-lg p-3 pt-7 flex flex-col items-center gap-2 transition ' +
+            (selected ? 'border-indigo-500 bg-slate-700/60' : 'border-slate-600');
+
+        // 左上角选择框（勾选后可批量删除）
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.className = 'absolute top-2 left-2 w-4 h-4 accent-indigo-500 cursor-pointer';
+        check.checked = selected;
+        check.title = '勾选不喜欢的，一键批量删除';
+        check.onchange = (e) => {
+            e.stopPropagation();
+            toggleSelect(v.name, e.target.checked);
+            card.className = 'relative bg-slate-800 border rounded-lg p-3 pt-7 flex flex-col items-center gap-2 transition ' +
+                (e.target.checked ? 'border-indigo-500 bg-slate-700/60' : 'border-slate-600');
+        };
+
+        // 右上角已缓存徽章
+        if (v.preview_cached) {
+            const cached = document.createElement('div');
+            cached.className = 'absolute top-1.5 right-2 text-[10px] text-emerald-400';
+            cached.textContent = '✓ 已缓存';
+            card.appendChild(cached);
+        }
 
         const icon = document.createElement('div');
         icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
@@ -653,6 +720,7 @@ function renderCandidates() {
         btnRow.appendChild(saveBtn);
         btnRow.appendChild(delBtn);
 
+        card.appendChild(check);
         card.appendChild(icon);
         card.appendChild(name);
         card.appendChild(desc);
@@ -661,11 +729,115 @@ function renderCandidates() {
         card.appendChild(btnRow);
         grid.appendChild(card);
     });
+    updateActionButtons();
+}
+
+// --- 候选选择 + 批量删除 ---
+function toggleSelect(name, checked) {
+    if (checked) SELECTED.add(name); else SELECTED.delete(name);
+    updateActionButtons();
+}
+
+function toggleSelectAll() {
+    if (CANDIDATES.length && SELECTED.size >= CANDIDATES.length) {
+        SELECTED.clear();
+    } else {
+        CANDIDATES.forEach(v => SELECTED.add(v.name));
+    }
+    renderCandidates();
+}
+
+function updateActionButtons() {
+    const delBtn = document.getElementById('cand-delete-selected-btn');
+    delBtn.textContent = `🗑 删除选中 (${SELECTED.size})`;
+    delBtn.disabled = SELECTED.size === 0;
+    document.getElementById('cand-select-all-btn').textContent =
+        (CANDIDATES.length && SELECTED.size >= CANDIDATES.length) ? '☐ 全不选' : '☑ 全选';
+}
+
+function deleteSelectedCandidates() {
+    if (!SELECTED.size) return;
+    const names = [...SELECTED];
+    if (!confirm(`删除选中的 ${names.length} 个候选音色?`)) return;
+    fetch('/api/qwen_voices/candidates/delete_batch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({names})
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                loadCandidates();
+            } else {
+                alert('删除失败: ' + (data.error || '未知错误'));
+            }
+        });
+}
+
+// --- 一键生成所有试听音频 ---
+function generateAllPreviews() {
+    const btn = document.getElementById('cand-preview-all-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 启动中...';
+    fetch('/api/qwen_voices/candidates/previews/generate', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                alert('启动失败: ' + (data.error || '未知错误'));
+                resetPreviewBtn();
+                return;
+            }
+            if (data.total === data.cached) {
+                CANDIDATES.forEach(v => v.preview_cached = true);
+                renderCandidates();
+                document.getElementById('cand-preview-status').textContent = '✅ 全部已有缓存';
+                resetPreviewBtn();
+                return;
+            }
+            startPreviewPolling();
+        })
+        .catch(err => { alert('启动失败: ' + err.message); resetPreviewBtn(); });
+}
+
+function startPreviewPolling() {
+    const btn = document.getElementById('cand-preview-all-btn');
+    const statusEl = document.getElementById('cand-preview-status');
+    if (previewPollTimer) clearInterval(previewPollTimer);
+    lastDoneCount = -1;
+    previewPollTimer = setInterval(() => {
+        fetch('/api/qwen_voices/candidates/previews/status')
+            .then(r => r.json())
+            .then(job => {
+                btn.textContent = `⏳ 生成中 ${job.completed}/${job.total}...`;
+                const doneList = job.done_names || [];
+                if (doneList.length !== lastDoneCount) {
+                    lastDoneCount = doneList.length;
+                    const doneSet = new Set(doneList);
+                    CANDIDATES.forEach(v => { if (doneSet.has(v.name)) v.preview_cached = true; });
+                    renderCandidates();
+                }
+                if (!job.running) {
+                    clearInterval(previewPollTimer);
+                    previewPollTimer = null;
+                    const failed = (job.failed || []).length;
+                    statusEl.textContent = `✅ 完成 ${job.completed}/${job.total}` +
+                        (failed ? `（${failed} 个失败）` : '');
+                    resetPreviewBtn();
+                }
+            });
+    }, 2000);
+}
+
+function resetPreviewBtn() {
+    const btn = document.getElementById('cand-preview-all-btn');
+    btn.disabled = false;
+    btn.textContent = '🎧 一键生成试听';
 }
 
 function generateCandidates() {
     const btn = document.getElementById('cand-gen-btn');
     const count = document.getElementById('cand-count').value;
+    const gender = document.getElementById('cand-gender').value;
     const language = document.getElementById('cand-lang').value;
     const orig = btn.textContent;
     btn.disabled = true;
@@ -674,12 +846,14 @@ function generateCandidates() {
     fetch('/api/qwen_voices/candidates/generate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({count: parseInt(count, 10), language})
+        body: JSON.stringify({count: parseInt(count, 10), language, gender})
     })
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
                 CANDIDATES = data.candidates || [];
+                SELECTED.clear();
+                document.getElementById('cand-preview-status').textContent = '';
                 renderCandidates();
             } else {
                 alert('生成失败: ' + (data.error || '未知错误'));
