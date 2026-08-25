@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import (
     HTMLResponse, JSONResponse, StreamingResponse,
-    FileResponse, RedirectResponse, PlainTextResponse,
+    FileResponse, RedirectResponse, PlainTextResponse, Response,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -34,6 +34,7 @@ from .config_manager import detect_local_mcp_token
 from . import topics_ai
 from . import script_library
 import style_manager as style_lib
+import subtitle_style_manager as subtitle_style_lib
 
 # Paths
 WEB_ROOT = Path(__file__).parent.parent.resolve()
@@ -106,6 +107,12 @@ async def config_page(request: Request, mode: str = ""):
         # 自定义风格已删除：诚实显示，让用户重新选择
         style_opts = {cur_style: f"{cur_style}（已失效，请重新选择）", **style_opts}
     PARAM_SPEC["visual_style"]["options"] = style_opts
+    # Inject subtitle style options (built-in + custom styles)
+    sub_style_opts = subtitle_style_lib.get_style_options()
+    cur_sub_style = config.get("subtitle_style", "")
+    if cur_sub_style and cur_sub_style not in sub_style_opts:
+        sub_style_opts = {cur_sub_style: f"{cur_sub_style}（已失效，请重新选择）", **sub_style_opts}
+    PARAM_SPEC["subtitle_style"]["options"] = sub_style_opts
     # Group params by group
     grouped = {}
     for key, spec in PARAM_SPEC.items():
@@ -917,6 +924,174 @@ async def api_styles_preview_status(style_id: str):
     status = _PREVIEW_JOBS.get(style_id, "")
     has = style_lib.preview_path(style_id).exists()
     return {"status": status, "has_preview": has}
+
+
+# ===========================================================================
+# Subtitle Styles — 字幕样式设计与预览
+# ===========================================================================
+
+def _current_subtitle_style_ctx() -> dict:
+    """当前模式的字幕样式上下文（current_id/current_style/legacy 字号）。"""
+    config = load_config()
+    current_id = config.get("subtitle_style", "")
+    current_style = subtitle_style_lib.get_style(current_id) if current_id else None
+    try:
+        font_size = int(config.get("subtitle_font_size", 60))
+    except (ValueError, TypeError):
+        font_size = 60
+    return {"current_id": current_id, "current_style": current_style,
+            "config_font_size": font_size}
+
+
+@app.get("/subtitle-styles", response_class=HTMLResponse)
+async def subtitle_styles_page(request: Request):
+    ctx = _current_subtitle_style_ctx()
+    styles = subtitle_style_lib.list_styles()
+    return templates.TemplateResponse(request, "subtitle_styles.html", {
+        "styles": styles,
+        "current_id": ctx["current_id"],
+        "current_style": ctx["current_style"],
+        "config_font_size": ctx["config_font_size"],
+        "fonts": subtitle_style_lib.get_font_options(),
+        "backgrounds": subtitle_style_lib.list_backgrounds(),
+        "active_mode": get_active_mode(),
+        "mode_labels": MODE_LABELS,
+        "active_page": "subtitle_styles",
+    })
+
+
+@app.get("/api/subtitle-styles")
+async def api_subtitle_styles_list():
+    ctx = _current_subtitle_style_ctx()
+    return {"styles": subtitle_style_lib.list_styles(), **ctx}
+
+
+@app.post("/api/subtitle-styles/create")
+async def api_subtitle_styles_create(request: Request):
+    data = await request.json()
+    try:
+        style = await asyncio.to_thread(subtitle_style_lib.save_custom_style, data)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"ok": True, "style": style}
+
+
+@app.post("/api/subtitle-styles/update")
+async def api_subtitle_styles_update(request: Request):
+    data = await request.json()
+    style_id = str(data.get("id", ""))
+    existing = subtitle_style_lib.get_style(style_id)
+    if not existing:
+        return JSONResponse({"error": f"样式 '{style_id}' 不存在"}, status_code=404)
+    if existing.get("builtin"):
+        return JSONResponse({"error": "内置样式不可编辑"}, status_code=400)
+    try:
+        style = await asyncio.to_thread(subtitle_style_lib.save_custom_style, data)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"ok": True, "style": style}
+
+
+@app.delete("/api/subtitle-styles/{style_id}")
+async def api_subtitle_styles_delete(style_id: str):
+    existing = subtitle_style_lib.get_style(style_id)
+    if not existing:
+        return JSONResponse({"error": f"样式 '{style_id}' 不存在"}, status_code=404)
+    if existing.get("builtin"):
+        return JSONResponse({"error": "内置样式不可删除"}, status_code=400)
+    ok = await asyncio.to_thread(subtitle_style_lib.delete_custom_style, style_id)
+    # 删除后：所有正在使用该样式的模式配置回落「跟随参数配置」
+    reset_modes = []
+    if ok:
+        for mode in MODES:
+            mc = load_mode_config(mode)
+            if mc.get("subtitle_style") == style_id:
+                mc["subtitle_style"] = ""
+                save_mode_config(mode, mc)
+                reset_modes.append(mode)
+    return {"ok": ok, "reset_modes": reset_modes}
+
+
+@app.post("/api/subtitle-styles/select")
+async def api_subtitle_styles_select(request: Request):
+    """为当前 active mode 设置字幕样式（"" = 跟随参数配置）。"""
+    data = await request.json()
+    style_id = str(data.get("style_id", "")).strip()
+    if style_id and not subtitle_style_lib.get_style(style_id):
+        return JSONResponse({"error": f"样式 '{style_id}' 不存在"}, status_code=404)
+    mode = get_active_mode()
+    mc = load_mode_config(mode)
+    mc["subtitle_style"] = style_id
+    save_mode_config(mode, mc)
+    return {"ok": True, "mode": mode, "subtitle_style": style_id}
+
+
+@app.get("/api/subtitle-styles/preview/render")
+async def api_subtitle_styles_preview_adhoc(style: str = "", bg: str = "gradient",
+                                            canvas: str = "16:9",
+                                            sample_en: str = "", sample_zh: str = ""):
+    """GET 快捷预览（style 为样式 id，'current' 表示当前模式样式）。"""
+    style_dict = None
+    if style == "current":
+        ctx = _current_subtitle_style_ctx()
+        style_dict = ctx["current_style"]
+    elif style:
+        style_dict = subtitle_style_lib.get_style(style)
+    png = await asyncio.to_thread(
+        subtitle_style_lib.render_preview_png, style_dict, bg, canvas,
+        sample_en, sample_zh)
+    return Response(content=png, media_type="image/png")
+
+
+@app.post("/api/subtitle-styles/preview/render")
+async def api_subtitle_styles_preview_adhoc_post(request: Request):
+    """编辑器实时预览：body = {style, bg, canvas, sample_en, sample_zh} → PNG。"""
+    data = await request.json()
+    style = data.get("style") or None
+    if isinstance(style, dict):
+        # 允许未保存的草稿参数；宽松处理无效值（渲染层有兜底）
+        style = {k: v for k, v in style.items()
+                 if k in subtitle_style_lib.media_utils.SUBTITLE_STYLE_LEGACY_DEFAULTS}
+    png = await asyncio.to_thread(
+        subtitle_style_lib.render_preview_png, style,
+        str(data.get("bg", "gradient")), str(data.get("canvas", "16:9")),
+        str(data.get("sample_en", "")), str(data.get("sample_zh", "")))
+    return Response(content=png, media_type="image/png")
+
+
+@app.get("/api/subtitle-styles/preview/current")
+async def api_subtitle_styles_preview_current(bg: str = "gradient", canvas: str = "16:9",
+                                              sample_en: str = "", sample_zh: str = ""):
+    """当前模式字幕样式预览（未选样式 → legacy 默认样式）。"""
+    ctx = _current_subtitle_style_ctx()
+    png = await asyncio.to_thread(
+        subtitle_style_lib.render_preview_png, ctx["current_style"],
+        bg, canvas, sample_en, sample_zh)
+    return Response(content=png, media_type="image/png")
+
+
+@app.get("/api/subtitle-styles/preview/{style_id}")
+async def api_subtitle_styles_preview(style_id: str, bg: str = "gradient",
+                                      canvas: str = "16:9",
+                                      sample_en: str = "", sample_zh: str = ""):
+    """已保存样式的卡片预览图。"""
+    style = subtitle_style_lib.get_style(style_id)
+    if not style:
+        return JSONResponse({"error": f"样式 '{style_id}' 不存在"}, status_code=404)
+    png = await asyncio.to_thread(
+        subtitle_style_lib.render_preview_png, style, bg, canvas,
+        sample_en, sample_zh)
+    return Response(content=png, media_type="image/png")
+
+
+@app.get("/api/subtitle-styles/fonts")
+async def api_subtitle_styles_fonts():
+    return {"fonts": subtitle_style_lib.get_font_options()}
+
+
+@app.get("/api/subtitle-styles/backgrounds")
+async def api_subtitle_styles_backgrounds():
+    return {"backgrounds": subtitle_style_lib.list_backgrounds()}
 
 
 # ===========================================================================
@@ -1988,8 +2163,7 @@ async def api_qwen_designed_create(request: Request):
     config = _load_qwen_voice_config()
     if any(v["name"] == name for v in config.get("designed_voices", [])):
         return JSONResponse({"ok": False, "error": f"设计音色已存在: {name}"}, status_code=400)
-    if any(v["name"] == name for v in config.get("custom_voices", [])):
-        return JSONResponse({"ok": False, "error": f"名称与克隆音色冲突: {name}"}, status_code=400)
+    # 同名克隆音色不再报错：重新创建即重新冻结，原地覆盖，不产生多个克隆版
 
     lang_short = "zh" if language == "chinese" else "en"
     config.setdefault("designed_voices", []).append({
@@ -2002,10 +2176,12 @@ async def api_qwen_designed_create(request: Request):
     })
     # 同名候选音色清理（避免旧候选的试听缓存命中新音色）
     if any(c["name"] == name for c in config.get("candidate_voices", [])):
-        config["candidate_voices"] = [c for c in config["candidate_voices"] if c["name"] != name]
+        config["candidate_voices"] = [c for c in config.get("candidate_voices", []) if c["name"] != name]
         _purge_preview_cache(name)
     _save_qwen_voice_config(config)
-    return {"ok": True, "name": name}
+    # 保存即冻结：后台生成样本并转为同名克隆音色，音色从此稳定
+    _enqueue_voice_freeze(name)
+    return {"ok": True, "name": name, "freezing": True}
 
 
 @app.delete("/api/qwen_voices/designed/{name}")
@@ -2140,8 +2316,7 @@ async def api_qwen_candidate_save(name: str):
         return JSONResponse({"ok": False, "error": f"名称与内置设计音色冲突: {name}"}, status_code=400)
     if any(v["name"] == name for v in config.get("designed_voices", [])):
         return JSONResponse({"ok": False, "error": f"设计音色已存在: {name}"}, status_code=400)
-    if any(v["name"] == name for v in config.get("custom_voices", [])):
-        return JSONResponse({"ok": False, "error": f"名称与克隆音色冲突: {name}"}, status_code=400)
+    # 同名克隆音色不再报错：重新保存即重新冻结，原地覆盖，不产生多个克隆版
 
     config.setdefault("designed_voices", []).append({
         "name": name,
@@ -2153,7 +2328,9 @@ async def api_qwen_candidate_save(name: str):
     })
     config["candidate_voices"] = [c for c in config.get("candidate_voices", []) if c["name"] != name]
     _save_qwen_voice_config(config)
-    return {"ok": True}
+    # 保存即冻结：后台生成样本并转为同名克隆音色，音色从此稳定
+    _enqueue_voice_freeze(name)
+    return {"ok": True, "freezing": True}
 
 
 @app.delete("/api/qwen_voices/candidates/{name}")
@@ -2312,6 +2489,140 @@ async def api_qwen_candidates_previews_status():
             "done_names": list(_CANDIDATE_PREVIEW_JOB["done_names"]),
             "failed": list(_CANDIDATE_PREVIEW_JOB["failed"]),
         }
+
+
+# --- 保存即冻结：设计音色自动转同名克隆音色 ---
+
+# 冻结样本文本：多句日常口语（~12-18 秒），作克隆参考音频，覆盖多样语音场景
+_FREEZE_SAMPLE_TEXTS = {
+    "english": (
+        "Good morning! It's really nice to see you again. "
+        "I've been thinking about our conversation from last week, "
+        "and I wanted to share some new ideas with you. "
+        "Would you like to grab a coffee this afternoon? "
+        "I always enjoy our little chats, and there's so much more to catch up on."
+    ),
+    "chinese": (
+        "早上好！很高兴又见到你。我一直在想我们上次聊天的内容，"
+        "有些新的想法想跟你分享。今天下午要不要一起喝杯咖啡？"
+        "我很喜欢和你聊天，还有好多话题想跟你聊呢。"
+    ),
+}
+
+# 冻结任务：name -> {status: pending|running|done|error, error}
+_VOICE_FREEZE_JOBS: dict[str, dict] = {}
+_VOICE_FREEZE_QUEUE: list[dict] = []
+_VOICE_FREEZE_LOCK = threading.Lock()
+_VOICE_FREEZE_THREAD_ACTIVE = False
+
+
+def _enqueue_voice_freeze(name: str) -> None:
+    """入队冻结任务并确保 worker 线程在跑。"""
+    global _VOICE_FREEZE_THREAD_ACTIVE
+    with _VOICE_FREEZE_LOCK:
+        _VOICE_FREEZE_QUEUE.append({"name": name})
+        _VOICE_FREEZE_JOBS[name] = {"status": "pending", "error": ""}
+        if not _VOICE_FREEZE_THREAD_ACTIVE:
+            _VOICE_FREEZE_THREAD_ACTIVE = True
+            t = threading.Thread(target=_run_voice_freeze_worker, daemon=True)
+            t.start()
+
+
+def _run_voice_freeze_worker() -> None:
+    """串行处理冻结队列（GPU 合成独占，与试听任务共用 _TTS_SYNTH_LOCK）。"""
+    global _VOICE_FREEZE_THREAD_ACTIVE
+    try:
+        while True:
+            with _VOICE_FREEZE_LOCK:
+                if not _VOICE_FREEZE_QUEUE:
+                    _VOICE_FREEZE_THREAD_ACTIVE = False
+                    return
+                job = _VOICE_FREEZE_QUEUE.pop(0)
+                name = job["name"]
+                _VOICE_FREEZE_JOBS[name] = {"status": "running", "error": ""}
+            try:
+                _freeze_voice_impl(name)
+                with _VOICE_FREEZE_LOCK:
+                    _VOICE_FREEZE_JOBS[name] = {"status": "done", "error": ""}
+            except Exception as e:  # noqa: BLE001 — 失败时音色保留在 designed_voices 仍可用
+                with _VOICE_FREEZE_LOCK:
+                    _VOICE_FREEZE_JOBS[name] = {"status": "error", "error": str(e)[:300]}
+    except Exception:  # noqa: BLE001 — 兜底，绝不常驻死线程
+        with _VOICE_FREEZE_LOCK:
+            _VOICE_FREEZE_THREAD_ACTIVE = False
+
+
+def _freeze_voice_impl(name: str) -> None:
+    """用 VoiceDesign 生成一段多样本音频 → 注册为同名克隆音色（冻结音色身份）。
+
+    设计音色靠 instruct 文字描述定义"音色空间区域"，每次采样结果都会漂移；
+    冻结后以 ref_audio 声学特征为硬锚点，跨句/跨次运行音色稳定。
+    成功：designed_voices → custom_voices（同名覆盖，不产生多版本）。
+    失败：音色保留在 designed_voices（仍以设计模式可用，只是不稳定）。
+    """
+    import subprocess as _sp
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+    from qwen_tts_engine import QwenTTSEngine
+
+    config = _load_qwen_voice_config()
+    meta = next((v for v in config.get("designed_voices", []) if v["name"] == name), None)
+    if not meta:
+        raise RuntimeError("音色已不存在（可能被删除），冻结中止")
+
+    language = "chinese" if meta.get("language") == "zh" else "english"
+    sample_text = _FREEZE_SAMPLE_TEXTS.get(language, _FREEZE_SAMPLE_TEXTS["english"])
+
+    safe = "".join(c for c in name if c.isalnum() or c in "-_") or "voice"
+    CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+    sample_mp3 = CUSTOM_VOICES_DIR / f"{safe}_freeze_sample.mp3"
+    wav_path = CUSTOM_VOICES_DIR / f"{safe}_freeze.wav"
+
+    cfg = load_config()
+    engine = QwenTTSEngine(
+        cfg.get("qwen_model_path", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice"),
+        cfg.get("qwen_device", "cuda:0"),
+        cfg.get("qwen_base_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base"),
+        cfg.get("qwen_voicedesign_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign"),
+    )
+    with _TTS_SYNTH_LOCK:
+        if language == "chinese":
+            engine.synth_chinese(sample_text, name, str(sample_mp3), rate="+0%")
+        else:
+            engine.synth_english(sample_text, name, str(sample_mp3), rate="+0%")
+
+    # mp3 → wav（克隆参考音频用 wav 最稳）
+    _sp.run(
+        ["ffmpeg", "-y", "-i", str(sample_mp3), "-ar", "24000", "-ac", "1", str(wav_path)],
+        check=True, capture_output=True)
+    sample_mp3.unlink(missing_ok=True)
+
+    # 注册为克隆音色（同名覆盖）并从 designed_voices 移除
+    config = _load_qwen_voice_config()
+    config["custom_voices"] = [v for v in config.get("custom_voices", []) if v["name"] != name]
+    config["custom_voices"].append({
+        "name": name,
+        "description": meta.get("description", "") or f"设计音色 ({meta.get('gender', '?')})",
+        "gender": meta.get("gender", ""),
+        "language": meta.get("language", "en"),
+        "ref_audio": str(wav_path),
+        "ref_text": sample_text,
+        "instruct": meta.get("instruct", ""),  # 保留以便将来重新冻结
+        "frozen_from": "designed",
+        "created": time.time(),
+    })
+    config["designed_voices"] = [v for v in config.get("designed_voices", []) if v["name"] != name]
+    _save_qwen_voice_config(config)
+    _purge_preview_cache(name)  # 旧试听缓存是设计模式产物，作废用克隆重生成
+
+
+@app.get("/api/qwen_voices/freeze/status")
+async def api_qwen_freeze_status():
+    """冻结任务进度（前端轮询）。"""
+    with _VOICE_FREEZE_LOCK:
+        return {"jobs": {k: dict(v) for k, v in _VOICE_FREEZE_JOBS.items()}}
 
 
 # ===========================================================================

@@ -137,6 +137,8 @@ def get_all_voices() -> list[dict]:
             "gender": cv.get("gender", ""),
             "lang": cv.get("language", ""),
             "custom": True,
+            # 冻结自设计音色（保存时自动生成的克隆版，音色稳定）
+            "frozen": cv.get("frozen_from") == "designed",
         })
     return voices
 

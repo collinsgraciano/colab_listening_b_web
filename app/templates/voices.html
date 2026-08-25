@@ -32,7 +32,7 @@
     <section class="mb-8">
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>✨</span> 设计音色 (VoiceDesign)
-            <span class="text-[10px] text-slate-500 font-normal">用文字描述生成音色 · 内置 4 个英语女声 · 需要 VoiceDesign 模型</span>
+            <span class="text-[10px] text-slate-500 font-normal">用文字描述生成音色 · 保存后自动❄️冻结为克隆音色锁定音色 · 内置 4 个英语女声</span>
         </h3>
 
         <!-- Create form -->
@@ -66,6 +66,7 @@
     <section class="mb-8">
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>🎭</span> 自定义音色 (Voice Clone)
+            <span class="text-[10px] text-slate-500 font-normal">❄️ 标记 = 从设计音色自动冻结而来（音色已锁定，跨次生成不漂移）</span>
         </h3>
 
         <!-- Upload form -->
@@ -367,8 +368,10 @@ function renderCustomVoices() {
         card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
 
         const icon = document.createElement('div');
-        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-purple-900/50';
-        icon.textContent = '🎭';
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+            (v.frozen ? 'bg-sky-900/50' : 'bg-purple-900/50');
+        icon.textContent = v.frozen ? '❄️' : '🎭';
+        icon.title = v.frozen ? '冻结自设计音色 — 音色已锁定，跨次生成不漂移' : '';
 
         const name = document.createElement('div');
         name.className = 'text-sm font-medium text-white';
@@ -376,11 +379,12 @@ function renderCustomVoices() {
 
         const desc = document.createElement('div');
         desc.className = 'text-[10px] text-slate-400 text-center';
-        desc.textContent = v.desc || '自定义克隆音色';
+        desc.textContent = (v.frozen ? '❄️ ' : '') + (v.desc || (v.frozen ? '冻结设计音色' : '自定义克隆音色'));
+        if (v.frozen) desc.title = 'instruct: ' + (v.instruct || '');
 
         const meta = document.createElement('div');
         meta.className = 'text-[10px] text-slate-500';
-        meta.textContent = `${v.gender || '?'} · ${v.lang || '?'}`;
+        meta.textContent = `${v.gender || '?'} · ${v.lang || '?'}${v.frozen ? ' · 已冻结' : ''}`;
 
         const btnRow = document.createElement('div');
         btnRow.className = 'flex gap-1';
@@ -543,10 +547,19 @@ function createDesignedVoice() {
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
-                alert('设计音色已创建: ' + name);
+                alert('设计音色已创建: ' + name + '\n\n正在自动❄️冻结为克隆音色（后台生成样本并锁定音色，约 30-60 秒），完成后出现在下方「自定义音色」区');
                 document.getElementById('dv-name').value = '';
                 document.getElementById('dv-instruct').value = '';
                 loadVoices();
+                if (data.freezing) {
+                    pollFreezeStatus([name], jobs => {
+                        loadVoices();
+                        const j = jobs[name];
+                        if (j && j.status === 'error') {
+                            alert('❄️ 冻结失败（音色仍以设计模式可用）: ' + j.error);
+                        }
+                    });
+                }
             } else {
                 alert('创建失败: ' + (data.error || ''));
             }
@@ -866,6 +879,35 @@ function generateCandidates() {
         });
 }
 
+// --- 保存即冻结：轮询冻结进度，完成后刷新 ---
+let freezePollTimer = null;
+
+function pollFreezeStatus(names, onFinish) {
+    if (freezePollTimer) clearInterval(freezePollTimer);
+    const statusEl = document.getElementById('cand-preview-status');
+    freezePollTimer = setInterval(() => {
+        fetch('/api/qwen_voices/freeze/status')
+            .then(r => r.json())
+            .then(data => {
+                const jobs = data.jobs || {};
+                const active = names.filter(n => {
+                    const st = jobs[n] && jobs[n].status;
+                    return st === 'pending' || st === 'running';
+                });
+                if (statusEl) {
+                    statusEl.textContent = active.length
+                        ? `❄️ 冻结中 ${names.length - active.length}/${names.length}...（生成样本并注册为克隆音色，约 30-60 秒）`
+                        : '';
+                }
+                if (!active.length) {
+                    clearInterval(freezePollTimer);
+                    freezePollTimer = null;
+                    onFinish(jobs);
+                }
+            }).catch(() => {});
+    }, 2000);
+}
+
 function saveCandidate(name) {
     fetch('/api/qwen_voices/candidates/' + encodeURIComponent(name) + '/save', {method: 'POST'})
         .then(r => r.json())
@@ -873,6 +915,15 @@ function saveCandidate(name) {
             if (data.ok) {
                 loadCandidates();   // 刷新候选列表
                 loadVoices();       // 刷新设计音色区 + 下拉框
+                if (data.freezing) {
+                    pollFreezeStatus([name], jobs => {
+                        loadVoices();
+                        const j = jobs[name];
+                        if (j && j.status === 'error') {
+                            alert('❄️ 冻结失败（音色仍以设计模式可用）: ' + j.error);
+                        }
+                    });
+                }
             } else {
                 alert('保存失败: ' + (data.error || '未知错误'));
             }
