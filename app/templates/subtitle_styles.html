@@ -6,10 +6,11 @@
     <div class="flex gap-2 justify-between px-4 pt-4">
         {% for m in mode_infos %}
         <div class="flex flex-col items-center gap-1 min-w-0"
-             title="{{ m.label }} · {{ m.mode }}{% if not m.zh_visible %}（该模式已隐藏中文字幕）{% endif %}">
+             title="{{ m.label }} · {{ m.mode }}（点击放大查看）{% if not m.zh_visible %} · 该模式已隐藏中文字幕{% endif %}">
             <img src="/api/subtitle-styles/preview/{{ s.id }}?mode={{ m.mode }}&bg=gradient&thumb=1"
                  onerror="this.onerror=null;this.src='/api/subtitle-styles/preview/{{ s.id }}?mode={{ m.mode }}&thumb=1'"
-                 class="{% if m.canvas == '9:16' %}h-20{% else %}h-14{% endif %} w-auto rounded border border-slate-700 bg-slate-900"
+                 onclick='openPreview({{ ('/api/subtitle-styles/preview/' ~ s.id ~ '?mode=' ~ m.mode ~ '&bg=gradient')|tojson }}, {{ (s.name ~ ' · ' ~ m.label)|tojson }})'
+                 class="{% if m.canvas == '9:16' %}h-20{% else %}h-14{% endif %} w-auto rounded border border-slate-700 bg-slate-900 cursor-pointer hover:border-indigo-500 hover:opacity-80 transition-opacity"
                  loading="lazy" alt="{{ m.label }}">
             <span class="text-[10px] text-slate-500 whitespace-nowrap">{{ m.label }}</span>
         </div>
@@ -64,10 +65,11 @@
             <div class="flex gap-2.5 shrink-0">
                 {% for m in mode_infos %}
                 <div class="flex flex-col items-center gap-1"
-                     title="{{ m.label }} · {{ m.mode }}{% if not m.zh_visible %}（该模式已隐藏中文字幕）{% endif %}">
+                     title="{{ m.label }} · {{ m.mode }}（点击放大查看）{% if not m.zh_visible %} · 该模式已隐藏中文字幕{% endif %}">
                     <img src="/api/subtitle-styles/preview/current?mode={{ m.mode }}&bg=gradient&thumb=1"
                          onerror="this.onerror=null;this.src='/api/subtitle-styles/preview/current?mode={{ m.mode }}&thumb=1'"
-                         class="{% if m.canvas == '9:16' %}h-24{% else %}h-16{% endif %} w-auto rounded border border-slate-600 bg-slate-900"
+                         onclick='openPreview({{ ('/api/subtitle-styles/preview/current?mode=' ~ m.mode ~ '&bg=gradient')|tojson }}, {{ ((current_style.name if current_style else '跟随参数配置') ~ ' · ' ~ m.label)|tojson }})'
+                         class="{% if m.canvas == '9:16' %}h-24{% else %}h-16{% endif %} w-auto rounded border border-slate-600 bg-slate-900 cursor-pointer hover:border-indigo-500 hover:opacity-80 transition-opacity"
                          loading="lazy" alt="{{ m.label }}">
                     <span class="text-[10px] text-slate-500 whitespace-nowrap">{{ m.label }}</span>
                 </div>
@@ -249,7 +251,8 @@
             <!-- 右：实时预览 -->
             <div class="lg:w-[430px] shrink-0">
                 <div class="lg:sticky lg:top-4 space-y-3">
-                    <div class="rounded-xl overflow-hidden border border-slate-600 bg-slate-900">
+                    <div class="rounded-xl overflow-hidden border border-slate-600 bg-slate-900 cursor-zoom-in"
+                         title="点击放大查看" onclick="openPreview(document.getElementById('live-preview').src, '实时预览 · ' + (currentModeInfo() ? currentModeInfo().label : ''))">
                         <img id="live-preview" class="w-full block" alt="字幕预览">
                     </div>
                     <div class="flex gap-2">
@@ -309,6 +312,18 @@
         {% endif %}
     </section>
 </div>
+
+<!-- Preview viewer modal（与 gallery.html 图片查看器同款交互） -->
+<div id="preview-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-8"
+     onclick="closePreviewModal(event)">
+    <div class="max-w-6xl max-h-[92vh]" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-2">
+            <span id="preview-modal-title" class="text-sm text-slate-300"></span>
+            <button onclick="closePreviewModal()" class="text-slate-400 hover:text-white text-xl">✕</button>
+        </div>
+        <img id="preview-modal-img" src="" alt="" class="max-w-full max-h-[82vh] rounded-lg">
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -344,6 +359,18 @@ async function api(url, opts = {}) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
+}
+
+// --- 预览图放大查看 -----------------------------------------------------------
+function openPreview(url, title) {
+    document.getElementById('preview-modal-img').src = url;
+    document.getElementById('preview-modal-title').textContent = title || '';
+    document.getElementById('preview-modal').classList.remove('hidden');
+}
+
+function closePreviewModal(e) {
+    if (e && e.target !== document.getElementById('preview-modal')) return;
+    document.getElementById('preview-modal').classList.add('hidden');
 }
 
 // --- 表单值读写 -------------------------------------------------------------
