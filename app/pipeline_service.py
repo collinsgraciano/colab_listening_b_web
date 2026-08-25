@@ -272,7 +272,7 @@ class PipelineService:
                 pass
 
         structure = config.get("structure", "original")
-        if structure == "quest":
+        if structure in ("quest", "quest_v2"):
             all_keys = ["char_a", "char_b", "char_c", "host"]
         else:
             all_keys = ["char_a", "char_b"]
@@ -381,7 +381,7 @@ class PipelineService:
                 pass
 
         structure = self.config.get("structure", "original")
-        if structure == "quest":
+        if structure in ("quest", "quest_v2"):
             all_char_keys = ["char_a", "char_b", "char_c", "host"]
         else:
             all_char_keys = ["char_a", "char_b"]
@@ -418,9 +418,17 @@ class PipelineService:
                             if val:
                                 script[field] = val
                                 overridden.append(field)
-                        if structure == "quest":
+                        if structure in ("quest", "quest_v2"):
                             for j in range(8):
                                 src = src_img_dir / f"pose_{key}_{j}.png"
+                                if src.exists():
+                                    dst = dst_img_dir / src.name
+                                    if not dst.exists():
+                                        shutil.copy2(str(src), str(dst))
+                                        copied.append(src.name)
+                            # 闭嘴配对（quest_v2 唇同步素材；quest 源运行无此文件自动跳过）
+                            for j in range(8):
+                                src = src_img_dir / f"pose_{key}_{j}_c.png"
                                 if src.exists():
                                     dst = dst_img_dir / src.name
                                     if not dst.exists():
@@ -514,11 +522,21 @@ class PipelineService:
                 src_key = lib_meta.get("source_key", key)
                 lib_structure = lib_meta.get("structure", structure)
                 dst_img_dir = dirs["images"]
-                if lib_structure == "quest":
+                if lib_structure in ("quest", "quest_v2"):
                     for j in range(8):
                         src = lib_char_dir / f"pose_{src_key}_{j}.png"
                         if src.exists():
                             dst_name = f"pose_{key}_{j}.png"
+                            dst = dst_img_dir / dst_name
+                            if not dst.exists():
+                                shutil.copy2(str(src), str(dst))
+                                copied.append(dst_name)
+                    # 闭嘴配对（quest_v2 唇同步素材；quest 素材库无此文件自动跳过，
+                    # 运行时由 generate_quest2_atlases 以 atlas 编辑补齐）
+                    for j in range(8):
+                        src = lib_char_dir / f"pose_{src_key}_{j}_c.png"
+                        if src.exists():
+                            dst_name = f"pose_{key}_{j}_c.png"
                             dst = dst_img_dir / dst_name
                             if not dst.exists():
                                 shutil.copy2(str(src), str(dst))
@@ -611,7 +629,7 @@ class PipelineService:
 
         structure = config.get("structure", "original")
         if num_lines is None:
-            num_lines = 48 if structure == "quest" else 10 if structure == "shorts" else 18
+            num_lines = 48 if structure in ("quest", "quest_v2") else 10 if structure == "shorts" else 18
         if pad is None:
             pad = 0.4
 
@@ -652,6 +670,7 @@ class PipelineService:
             subtitle_font_size=int(config.get("subtitle_font_size", 60)),
             no_zh_subtitle=bool(config.get("no_zh_subtitle", False)),
             no_4k=bool(config.get("no_4k", False)),
+            lip_sync=bool(config.get("lip_sync", True)),
             tts_engine=config.get("tts_engine", "kokoro"),
             tts_rate=config.get("tts_rate", "") or None,
             voxcpm_worker_url=config.get("voxcpm_worker_url", ""),

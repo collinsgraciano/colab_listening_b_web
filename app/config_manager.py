@@ -31,6 +31,7 @@ PARAM_SPEC = {
                       "original": "Original (4章视频片段)",
                       "image": "Image (纯图片+动画)",
                       "quest": "Quest (任务听力)",
+                      "quest_v2": "Quest V2 (任务听力+口型同步)",
                       "shorts": "Shorts (竖屏文化问答)"}},
     "animation": {"default": "landing", "type": "select", "group": "content",
                   "label": "动画类型 (image模式)", "options": {
@@ -136,6 +137,9 @@ PARAM_SPEC = {
                           "label": "字幕字体大小"},
     "no_zh_subtitle": {"default": False, "type": "checkbox", "group": "video",
                        "label": "隐藏中文字幕"},
+    "lip_sync": {"default": True, "type": "checkbox", "group": "video",
+                 "label": "口型同步 (quest_v2)",
+                 "help": "说话人嘴型随音频开合（需闭嘴配对图集，缺失自动降级）"},
     "no_4k": {"default": False, "type": "checkbox", "group": "video",
               "label": "跳过4K"},
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
@@ -153,14 +157,15 @@ GROUP_META = {
 
 
 # --- Per-mode config storage ---
-# 4 种视频结构模式各一份完整独立配置，切换互不覆盖。
+# 每种视频结构模式各一份完整独立配置，切换互不覆盖。
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
 
-MODES = ["original", "image", "quest", "shorts"]
+MODES = ["original", "image", "quest", "quest_v2", "shorts"]
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
     "image": "Image (纯图片+动画)",
     "quest": "Quest (任务听力)",
+    "quest_v2": "Quest V2 (任务听力+口型同步)",
     "shorts": "Shorts (竖屏文化问答)",
 }
 ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
@@ -444,6 +449,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--subtitle-font-size", str(config.get("subtitle_font_size", 60))]
     if config.get("no_zh_subtitle"):
         args.append("--no-zh-subtitle")
+    if not config.get("lip_sync", True):
+        args.append("--no-lip-sync")
     if config.get("no_4k"):
         args.append("--no-4k")
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]

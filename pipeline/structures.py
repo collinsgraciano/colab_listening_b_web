@@ -35,6 +35,11 @@ def _quest_compose(**kwargs):
     return compose_quest(**kwargs)
 
 
+def _quest_v2_compose(**kwargs):
+    from quest_v2.video_compose_quest_v2 import compose_quest_v2
+    return compose_quest_v2(**kwargs)
+
+
 STRUCTURES = {
     "original": {
         "generate_script": generate_listening_script,
@@ -62,6 +67,17 @@ STRUCTURES = {
             script, ddur, pad=pad),
         "build_srt": _quest_srt,
         "compose": _quest_compose,
+        "needs_video_clips": False,
+        "needs_zh_tts": False,
+        "needs_dialogue_images": True,
+    },
+    # quest_v2 = quest 内容管线（脚本/时间轴/SRT 完全复用）+ 唇形同步渲染
+    "quest_v2": {
+        "generate_script": _quest_script,
+        "build_timeline": lambda script, ddur, pad, pd: _quest_timeline(
+            script, ddur, pad=pad),
+        "build_srt": _quest_srt,
+        "compose": _quest_v2_compose,
         "needs_video_clips": False,
         "needs_zh_tts": False,
         "needs_dialogue_images": True,

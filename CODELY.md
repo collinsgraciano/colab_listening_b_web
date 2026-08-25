@@ -35,15 +35,19 @@ colab_listening_b_web/
 │   ├── timeline_enrich.py        # 时间轴补全（audio_dur/duration）
 │   ├── video_compose.py          # FFmpeg + Pillow 视频合成（original/image 模式）
 │   ├── stop_motion.py             # 定格动画渲染（多姿势+光流插帧）
+│   ├── audio_envelope.py          # 逐帧音频 RMS 包络（quest_v2 唇同步/姿势调度共用）
 │   ├── thumbnail_gen.py          # YouTube 缩略图 + 元数据生成
 │   ├── media_utils.py            # FFmpeg/Pillow 共享工具（concat/字幕烧录/loudnorm/分辨率探测）
 │   ├── topic_manager.py          # 主题随机选择 + 防重复（topics.json + used_topics.json）
 │   ├── checkpoint.py             # 断点续传（checkpoint.json 保存/加载/步骤完成检查）
 │   ├── topics.json                # 主题库（分类 JSON）
-│   └── quest/                     # Quest 结构变体（任务听力模式）
-│       ├── llm_client_quest.py   # Quest 脚本生成（48行，4阶段：buildup→core→reveal→review）
-│       ├── timeline_quest.py     # Quest 时间轴 + SRT
-│       └── video_compose_quest.py # Quest 视频合成（定格动画，角色姿势图）
+│   ├── quest/                     # Quest 结构变体（任务听力模式）
+│   │   ├── llm_client_quest.py   # Quest 脚本生成（48行，4阶段：buildup→core→reveal→review）
+│   │   ├── timeline_quest.py     # Quest 时间轴 + SRT
+│   │   └── video_compose_quest.py # Quest 视频合成（定格动画，角色姿势图）
+│   └── quest_v2/                  # Quest V2（quest 内容管线全复用 + 唇形同步渲染）
+│       ├── video_compose_quest_v2.py # V2 合成（双态口型混合+站位稳定+去假眨眼+seed固定）
+│       └── test_lipsync_v2.py     # 唇同步独立验证脚本（合成音频+假姿势，免 MCP 积分）
 ├── configs/                      # 配置文件 + 预设
 │   └── default.json              # 默认配置（含所有参数）
 ├── requirements.txt              # Python 依赖
@@ -78,6 +82,7 @@ colab_listening_b_web/
 - **original** — 4 章视频片段模式（对话用 Seedance2 AI 视频，含跟读练习）
 - **image** — 纯图片模式（无视频生成，用动画类型控制：none/landing/stop_motion）
 - **quest** — 任务听力模式（48 行对话，4 阶段结构，定格动画，3+1 角色）
+- **quest_v2** — quest 全复用（脚本/时间轴/SRT 完全一致）+ 唇形同步渲染：每角色 8 姿势图集 + 闭嘴配对图集（图像编辑生成 `pose_{char}_{j}_c.png`，成本每角色 +1 次生成），说话人嘴型按逐帧音频 RMS 包络（`audio_envelope.py`）`Image.blend` 开合；站位按角色身份固定（修复换说话人左右横跳）；听者去假眨眼；seed 固定映射。`--no-lip-sync` / 配置项「口型同步」可关。原 quest 模式零改动，便于 A/B 对比
 - **shorts** — 竖屏文化问答短视频模式（1080×1920，10 行好友对话讲一个美国文化/语言知识点，问题片头→对话→CTA，无跟读章节；跳过视频片段/缩略图/4K；stop_motion 自动降级为 landing）
 
 ### 标题策略（title_quote 引语钩子）

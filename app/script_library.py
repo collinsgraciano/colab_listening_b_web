@@ -36,7 +36,7 @@ if str(_PIPELINE_DIR) not in sys.path:
 
 from llm_client import _extract_json, set_llm_env_override  # noqa: E402
 
-DEFAULT_LINES = {"original": 18, "image": 18, "quest": 48, "shorts": 10}
+DEFAULT_LINES = {"original": 18, "image": 18, "quest": 48, "quest_v2": 48, "shorts": 10}
 
 # 简体独有字（繁体无此字形）— 检测中文文案误用简体
 _SIMP_ONLY_CHARS = set(
@@ -346,7 +346,7 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
         ov["OPENAI_MODEL"] = resolved_model or "grok-4.6"
     if cfg.get("llm_min_interval"):
         ov["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
-    if structure == "quest":
+    if structure in ("quest", "quest_v2"):
         if cfg.get("quest_beat_lines"):
             ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])
         if cfg.get("quest_qa_rounds") is not None and cfg.get("quest_qa_rounds") != "":
@@ -359,7 +359,7 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
     """Generate + validate a single script with retries. Returns (script, attempts)."""
     from pipeline import _validate_script
 
-    quest = (structure == "quest")
+    quest = (structure in ("quest", "quest_v2"))
     shorts = (structure == "shorts")
     last_err: Exception | None = None
     for attempt in range(max_attempts):
@@ -411,7 +411,7 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
     mode_cfg = load_mode_config(structure)
     lessons_dir = mode_cfg.get("lessons_dir", "") or None
     # quest 单次生成 20+ 次 LLM 调用，减少重试次数避免过长等待
-    max_attempts = 2 if structure == "quest" else 3
+    max_attempts = 2 if structure in ("quest", "quest_v2") else 3
 
     try:
         override = _build_llm_override(provider, model, structure)
@@ -490,7 +490,7 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
     from pipeline import _validate_script
 
     issues: list[dict] = []
-    quest = (structure == "quest")
+    quest = (structure in ("quest", "quest_v2"))
     valid, msg = _validate_script(script, num_lines, quest=quest)
     if not valid:
         issues.append({"type": "structure", "severity": "high",
@@ -907,7 +907,7 @@ RULES:
         return
 
     patched = _apply_patch(script, data)
-    valid, msg = _validate_script(patched, n, quest=(structure == "quest"))
+    valid, msg = _validate_script(patched, n, quest=(structure in ("quest", "quest_v2")))
     if not valid:
         q.put(("fatal", f"修复后校验未通过（原稿已保留）: {msg}"))
         q.put(None)

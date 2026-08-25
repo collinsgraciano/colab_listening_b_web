@@ -411,7 +411,7 @@ function onScriptLibChange() {
 let _charSources = [];
 
 function getCharKeys() {
-    if (ACTIVE_MODE === 'quest') {
+    if (ACTIVE_MODE === 'quest' || ACTIVE_MODE === 'quest_v2') {
         return [
             {key: 'char_a', label: '角色A'},
             {key: 'char_b', label: '角色B'},

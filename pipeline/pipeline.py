@@ -64,6 +64,7 @@ from image_gen import (
     generate_dialogue_images as _generate_dialogue_images,
     generate_pose_images as _generate_pose_images,
     generate_quest_atlases as _generate_quest_atlases,
+    generate_quest2_atlases as _generate_quest2_atlases,
     generate_scene_atlas as _generate_scene_atlas,
 )
 from timeline_enrich import enrich_timeline as _enrich_timeline
@@ -178,6 +179,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--pad", type=float, default=None, help="Audio pad between segments (default 0.4; quest mode 5.0 — long thinking pauses for beginners)")
     parser.add_argument("--render-fps", type=int, default=8, help="Quest stop-motion render framerate (default 8; lower=faster but choppier)")
     parser.add_argument("--workers", type=int, default=1, help="Quest render threads (1=single, 2+=multi, 0=auto=cpu_count)")
+    parser.add_argument("--no-lip-sync", dest="lip_sync", action="store_false", default=True,
+                        help="Disable audio-driven mouth animation (quest_v2 only)")
     parser.add_argument("--lessons-dir", default=None, help="Lessons dir for anti-duplicate check")
     parser.add_argument("--topics-file", default=str(Path(__file__).parent / "topics.json"), help="Path to topics.json")
     parser.add_argument("--used-topics-file", default=None, help="Path to used_topics.json (default: <output>/used_topics.json — persists on Drive across Colab sessions)")
@@ -193,8 +196,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--openai-api-key", default=None, help="OpenAI-compatible API key (or set OPENAI_API_KEY env var)")
     parser.add_argument("--openai-model", default=None, help="OpenAI-compatible model name (default: grok-4.6). Available: grok-4.6, grok-4.5, gemini-3.1-pro-preview, gemini-3.7-flash, claude-sonnet-5, gemini-2.5-pro-1m")
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
-    parser.add_argument("--structure", default="original", choices=["original", "image", "quest", "shorts"],
-                        help="Video structure: 'original' (4-chapter, video clips), 'image' (all images, animation controlled by --animation), 'quest' (task-hook listening), or 'shorts' (vertical 9:16 culture Q&A short video)")
+    parser.add_argument("--structure", default="original", choices=["original", "image", "quest", "quest_v2", "shorts"],
+                        help="Video structure: 'original' (4-chapter, video clips), 'image' (all images, animation controlled by --animation), 'quest' (task-hook listening), 'quest_v2' (quest + audio-driven lip-sync), or 'shorts' (vertical 9:16 culture Q&A short video)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
     parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
@@ -303,7 +306,7 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
     else:
         script = _generate_script_with_retry(
             topic, args.cefr, args.lessons_dir, args.num_lines,
-            quest=(args.structure == "quest"), shorts=(args.structure == "shorts"))
+            quest=(args.structure in ("quest", "quest_v2")), shorts=(args.structure == "shorts"))
         yt_title = script.get("youtube_title", script.get("title", topic))
         safe_title = _safe_dirname(yt_title, topic)
         work_dir = parent_dir / safe_title
@@ -349,7 +352,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     n = len(dialogue)
     is_image = (args.structure == "image")
     is_stop_motion = (is_image and args.animation == "stop_motion")
-    is_quest = (args.structure == "quest")
+    is_quest = (args.structure in ("quest", "quest_v2"))
     is_shorts = (args.structure == "shorts")
     img_dir, audio_dir, clips_dir = dirs["images"], dirs["audio"], dirs["clips"]
 
@@ -388,7 +391,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
 
     # --- Resume check ---
     resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest,
-                                          is_stop_motion=is_stop_motion)
+                                          is_stop_motion=is_stop_motion,
+                                          quest_v2=(args.structure == "quest_v2"))
     tts_thread = None
     if resume_result is not None:
         tts_results, image_urls = resume_result
@@ -416,10 +420,16 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         if is_image or is_quest or is_shorts:
             char_scene_cdn = image_urls.get("char_scene.png", "")
             if is_quest:
-                # Quest uses per-character atlas (4 chars × 8 poses), no ref images
-                _generate_quest_atlases(script, img_dir, tts_thread,
-                                         max_workers=args.image_concurrency,
-                                         style_prompt=style_prompt)
+                if args.structure == "quest_v2":
+                    # quest_v2: per-character atlas (open + closed mouths) for lipsync
+                    _generate_quest2_atlases(script, img_dir, tts_thread,
+                                             max_workers=args.image_concurrency,
+                                             style_prompt=style_prompt)
+                else:
+                    # Quest uses per-character atlas (4 chars × 8 poses), no ref images
+                    _generate_quest_atlases(script, img_dir, tts_thread,
+                                            max_workers=args.image_concurrency,
+                                            style_prompt=style_prompt)
                 # Generate scene backgrounds as 2×2 grid atlas (1 API call instead of 4)
                 _scene_images = script.get("scene_images", [])
                 _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
@@ -514,7 +524,7 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
     dialogue_durations = tts_results.get("dialogue_durations", [])
     audio_dir, clips_dir = dirs["audio"], dirs["clips"]
 
-    if args.structure in ("image", "quest", "shorts"):
+    if args.structure in ("image", "quest", "quest_v2", "shorts"):
         print(f"Step 3: Skipped ({args.structure} mode — no video generation)")
         _save_checkpoint(work_dir, "step3_video")
         print(f"  TTS: {len(normal_paths)} EN + {sum(1 for p in zh_paths if p)} ZH")
@@ -592,7 +602,7 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
     normal_paths = tts_results.get("normal_paths", [])
     zh_paths = tts_results.get("zh_paths", [])
 
-    if args.structure == "quest":
+    if args.structure in ("quest", "quest_v2"):
         from quest.timeline_quest import build_quest_timeline, build_srt_from_timeline_quest
         timeline = build_quest_timeline(script, dialogue_durations, pad=args.pad)
         _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration, output_fps=25)
@@ -655,13 +665,13 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
         return
 
     # Quest mode uses scene_0.png as thumbnail bg (scene.png not generated)
-    if args.structure == "quest":
+    if args.structure in ("quest", "quest_v2"):
         _s0 = dirs["images"] / "scene_0.png"
         scene_img_full = str(_s0 if _s0.exists() else dirs["images"] / "scene.png")
     else:
         scene_img_full = str(dirs["images"] / "scene.png")
     # Quest mode uses pose_char_a_0.png; others use char_scene.png
-    if args.structure == "quest":
+    if args.structure in ("quest", "quest_v2"):
         char_scene_cdn = ctx["image_urls"].get("pose_char_a_0.png", "")
     else:
         char_scene_cdn = ctx["image_urls"].get("char_scene.png", "")
@@ -695,7 +705,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
     print("Step 5: Composing final video...")
     scene_img = str(dirs["images"] / "scene.png")
     # Quest mode uses scene_0.png as fallback (scene.png not generated)
-    if args.structure == "quest":
+    if args.structure in ("quest", "quest_v2"):
         _s0 = dirs["images"] / "scene_0.png"
         if _s0.exists():
             scene_img = str(_s0)
@@ -711,7 +721,73 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
         print("  [Resume] Final video already exists, skipping compose...")
         return str(final_video_path), safe_vid_name
 
-    if args.structure == "quest":
+    if args.structure == "quest_v2":
+        from quest_v2.video_compose_quest_v2 import compose_quest_v2
+        # 每角色姿势映射：{"poses": [...], "closed": [...]}（closed 全存在才配对唇同步）
+        char_pose_map = {}
+        for ck in ("char_a", "char_b", "char_c"):
+            poses = [str(dirs["images"] / f"pose_{ck}_{j}.png") for j in range(8)]
+            if all(os.path.exists(p) for p in poses):
+                closed = [str(dirs["images"] / f"pose_{ck}_{j}_c.png") for j in range(8)]
+                char_pose_map[ck] = {
+                    "poses": poses,
+                    "closed": closed if all(os.path.exists(p) for p in closed) else [],
+                }
+        # Host: 8 poses (+ closed 配对，缺失则降级)
+        host_poses = [str(dirs["images"] / f"pose_host_{j}.png") for j in range(8)]
+        if not all(os.path.exists(p) for p in host_poses):
+            host_poses = [str(dirs["images"] / f"pose_host_{j}.png") for j in range(4)]
+        host_closed = [str(dirs["images"] / f"pose_host_{j}_c.png") for j in range(8)]
+        if not all(os.path.exists(p) for p in host_closed):
+            host_closed = []
+        char_pose_map["host"] = {"poses": host_poses, "closed": host_closed}
+
+        # Legacy pose_images fallback (per-line, 同 quest)
+        dialogue = script.get("dialogue", [])
+        pose_images = []
+        for line in dialogue:
+            speaker = line.get("speaker", "char_a")
+            poses = (char_pose_map.get(speaker) or {}).get("poses") or []
+            if not poses:
+                poses = (char_pose_map.get("char_a") or {}).get("poses") or [scene_img]
+            pose_images.append(poses)
+
+        # Host background (TV studio)
+        host_bg = str(dirs["images"] / "host_bg.png")
+        if not os.path.exists(host_bg):
+            host_bg = scene_img
+
+        # Multiple scene backgrounds for dialogue variety
+        scene_bg_list = [scene_img]
+        si_list = script.get("scene_images", [])
+        for si in range(len(si_list)):
+            p = str(dirs["images"] / f"scene_{si}.png")
+            scene_bg_list.append(p if os.path.exists(p) else scene_img)
+
+        final_path = compose_quest_v2(
+            work_dir=str(work_dir),
+            pose_images=pose_images,
+            char_pose_map=char_pose_map,
+            host_poses=host_poses,
+            host_closed=host_closed,
+            host_bg=host_bg,
+            scene_bg_list=scene_bg_list,
+            render_fps=getattr(args, "render_fps", 12),
+            workers=getattr(args, "workers", 1),
+            timeline=timeline,
+            script=script,
+            narration=narration,
+            normal_paths=normal_paths,
+            scene_img=scene_img,
+            srt_dir=str(sub_dir),
+            pad=args.pad,
+            show_zh=not getattr(args, "no_zh_subtitle", False),
+            subtitle_font_size=args.subtitle_font_size,
+            progress_cb=progress_cb,
+            stop_check=stop_check,
+            lip_sync=getattr(args, "lip_sync", True),
+        )
+    elif args.structure == "quest":
         from quest.video_compose_quest import compose_quest
         # Build per-character pose map (all chars: 8 poses each)
         char_pose_map = {}
@@ -908,7 +984,7 @@ def main():
 
     # Per-structure defaults (explicit CLI values win)
     if args.num_lines is None:
-        args.num_lines = 48 if args.structure == "quest" else 10 if args.structure == "shorts" else 18
+        args.num_lines = 48 if args.structure in ("quest", "quest_v2") else 10 if args.structure == "shorts" else 18
     if args.pad is None:
         args.pad = 0.4
 
