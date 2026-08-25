@@ -1,0 +1,149 @@
+{# 🔑 MCP Token 设置（本页独立）— styles.html / characters.html 共用
+   使用方式: {% with page_key = 'styles' %}{% include "partials/mcp_token_panel.html" %}{% endwith %} #}
+<section class="mb-6">
+    <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2 cursor-pointer select-none" onclick="mcpPanelToggle()">
+        <span id="mcp-panel-arrow" class="inline-block transition-transform">▶</span>
+        <span>🔑 MCP Token 设置（本页独立）</span>
+        <span id="mcp-effective-badge" class="text-[10px] font-normal"></span>
+    </h3>
+    <div id="mcp-panel-body" class="hidden bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <p class="text-xs text-slate-400 mb-3 leading-relaxed">
+            本页生成图片（风格预览图 / 角色姿势图集）优先使用这里的专属 Token；
+            <span class="text-indigo-300">留空 = 使用当前激活模式配置的 MCP Tokens</span>（模式配置也为空时用本地检测 Token）。
+            每行一个 token，积分耗尽自动切换下一个。本页走独立 MCP 会话，与 Pipeline 正片生成互不影响、可同时进行。
+        </p>
+        <textarea id="mcp-page-tokens" rows="3"
+            placeholder="留空 = 使用当前激活模式的 MCP Tokens&#10;或每行粘贴一个 token（支持多个，自动轮换）"
+            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-indigo-500 focus:outline-none resize-y"></textarea>
+        <div class="flex items-center gap-2 mt-3 flex-wrap">
+            <button onclick="mcpPanelSave()" id="mcp-save-btn"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存</button>
+            <button onclick="mcpPanelDetect()"
+                class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🔍 检测本地 Token</button>
+            <button onclick="mcpPanelTest()" id="mcp-test-btn"
+                class="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm text-white">⚡ 测试连接</button>
+            <span id="mcp-panel-msg" class="text-xs text-slate-400"></span>
+        </div>
+        <p id="mcp-effective-line" class="text-xs text-slate-500 mt-3"></p>
+        <p class="text-[10px] text-slate-600 mt-2">「测试连接」验证的是已保存的 Token（不花积分）；textarea 修改后请先保存再测试。</p>
+    </div>
+</section>
+
+<script>
+(function () {
+    const PAGE_KEY = {{ page_key | tojson }};
+    const $ = (id) => document.getElementById(id);
+
+    function toast(msg, ok = true) {
+        const t = document.createElement('div');
+        t.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-sm text-white shadow-lg ${ok ? 'bg-green-600' : 'bg-red-600'}`;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    async function api(url, opts = {}) {
+        const res = await fetch(url, {
+            headers: {'Content-Type': 'application/json'},
+            ...opts,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+    }
+
+    function renderEffective(info) {
+        const line = $('mcp-effective-line');
+        const badge = $('mcp-effective-badge');
+        if (info.source === 'none') {
+            line.innerHTML = '⚠️ 当前生效：<span class="text-red-400">未配置任何 MCP Token</span>（本页/模式/本地均为空，无法生成图片）';
+            badge.textContent = '⚠️ 未配置 Token';
+            badge.className = 'text-[10px] text-red-400 font-normal';
+        } else {
+            const masked = (info.masked || []).join('、');
+            const src = info.source === 'page' ? `本页专属 ×${info.effective_count}`
+                : info.source === 'mode' ? `模式配置(${info.mode}) ×${info.effective_count}`
+                : '本地检测 ×1';
+            line.innerHTML = `当前生效：<span class="text-emerald-300">${src}</span> <span class="text-slate-400 font-mono">${masked}</span>`;
+            badge.textContent = `生效: ${src}`;
+            badge.className = 'text-[10px] text-emerald-400 font-normal';
+        }
+    }
+
+    async function loadPanel() {
+        try {
+            const data = await api('/api/mcp/page_tokens');
+            const info = (data.pages || {})[PAGE_KEY];
+            if (!info) return;
+            const ta = $('mcp-page-tokens');
+            ta.value = info.tokens_text || '';
+            ta.dataset.loaded = '1';
+            renderEffective(info);
+        } catch (e) { /* 静默：面板折叠时也只影响 badge */ }
+    }
+
+    window.mcpPanelToggle = function () {
+        const body = $('mcp-panel-body');
+        const arrow = $('mcp-panel-arrow');
+        const hidden = body.classList.toggle('hidden');
+        arrow.style.transform = hidden ? '' : 'rotate(90deg)';
+        if (!hidden) loadPanel();  // 每次展开刷新（模式配置可能已变）
+    };
+
+    window.mcpPanelSave = async function () {
+        const btn = $('mcp-save-btn');
+        btn.disabled = true;
+        try {
+            const r = await api('/api/mcp/page_tokens', {
+                method: 'POST',
+                body: JSON.stringify({page: PAGE_KEY, tokens: $('mcp-page-tokens').value})
+            });
+            toast(r.count ? `已保存本页专属 Token ×${r.count}（本页生成将优先使用）`
+                          : '已清空本页专属，将回落使用当前激活模式的 MCP Tokens');
+            $('mcp-panel-msg').textContent = '';
+            await loadPanel();
+        } catch (e) { toast(e.message, false); }
+        btn.disabled = false;
+    };
+
+    window.mcpPanelDetect = async function () {
+        try {
+            const data = await api('/api/mcp/detect_token');
+            const ta = $('mcp-page-tokens');
+            const existing = ta.value;
+            if (existing && !existing.includes(data.token)) {
+                ta.value = existing + '\n' + data.token;
+            } else if (!existing) {
+                ta.value = data.token;
+            } else {
+                toast('Token 已存在');
+                return;
+            }
+            toast('已填入本地检测 Token（记得点保存）');
+        } catch (e) { toast(e.message, false); }
+    };
+
+    window.mcpPanelTest = async function () {
+        const btn = $('mcp-test-btn');
+        const msg = $('mcp-panel-msg');
+        btn.disabled = true;
+        msg.textContent = '测试中…';
+        try {
+            const r = await api('/api/mcp/page_tokens/test', {
+                method: 'POST',
+                body: JSON.stringify({page: PAGE_KEY})
+            });
+            if (r.ok) {
+                msg.innerHTML = `<span class="text-emerald-400">✅ 连接成功（${r.source_label} ×${r.token_count}，可用工具 ${r.tools} 个）</span>`;
+            } else {
+                msg.innerHTML = `<span class="text-red-400">❌ ${r.error || '失败'}</span>`;
+            }
+        } catch (e) {
+            msg.innerHTML = `<span class="text-red-400">❌ ${e.message}</span>`;
+        }
+        btn.disabled = false;
+    };
+
+    loadPanel();  // 折叠状态下也加载（标题旁 badge 显示生效来源）
+})();
+</script>

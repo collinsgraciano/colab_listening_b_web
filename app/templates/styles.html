@@ -52,6 +52,8 @@
         <button onclick="showStyleForm()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">+ 新建风格</button>
     </div>
 
+    {% with page_key = 'styles' %}{% include "partials/mcp_token_panel.html" %}{% endwith %}
+
     <!-- 当前风格横幅 -->
     <div class="rounded-xl p-5 mb-6 border border-indigo-500/60 bg-gradient-to-r from-indigo-900/40 to-slate-800">
         <div class="flex items-start gap-5">

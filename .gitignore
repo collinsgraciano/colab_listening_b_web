@@ -7,6 +7,8 @@ venv/
 
 # Config with secrets (keep default but ignore user presets with keys)
 configs/*.local.json
+configs/llm_providers.json
+configs/page_mcp_tokens.json
 
 # Generated audio previews / voice assets
 configs/voice_previews/
