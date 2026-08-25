@@ -668,6 +668,7 @@ class PipelineService:
             render_fps=int(config.get("render_fps", 8)),
             workers=int(config.get("workers", 1)),
             subtitle_font_size=int(config.get("subtitle_font_size", 60)),
+            subtitle_style=str(config.get("subtitle_style", "") or ""),
             no_zh_subtitle=bool(config.get("no_zh_subtitle", False)),
             no_4k=bool(config.get("no_4k", False)),
             lip_sync=bool(config.get("lip_sync", True)),

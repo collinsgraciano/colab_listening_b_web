@@ -310,6 +310,7 @@ def compose_listening(
     group_info: list[dict] | None = None,
     line_to_group: dict | None = None,
     subtitle_font_size: int = 60,
+    subtitle_style: dict | None = None,
 ) -> str:
     """Compose final listening practice video.
 
@@ -328,6 +329,8 @@ def compose_listening(
         progress_cb: callback(percent, message).
         group_info: [{clip_path, audio_path, total_dur, lines}] per group.
         line_to_group: {line_idx: group_idx} mapping for group-based dialogue.
+        subtitle_font_size: Legacy EN subtitle font size (used when subtitle_style is None).
+        subtitle_style: 字幕样式 dict（字幕样式设计器）；None → 历史行为。
 
     Returns:
         Path to final video.
@@ -679,7 +682,7 @@ def compose_listening(
 
     # --- Burn subtitles via Pillow overlay ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85))
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
 
     # Cleanup
     shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -709,6 +712,7 @@ def compose_image(
     progress_cb=None,
     animation: str = "landing",
     subtitle_font_size: int = 60,
+    subtitle_style: dict | None = None,
     target_w: int = TARGET_W,
     target_h: int = TARGET_H,
 ) -> str:
@@ -1117,7 +1121,7 @@ def compose_image(
 
     # --- Burn subtitles via Pillow overlay (same as compose_listening) ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85))
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
 
     # Cleanup
     shutil.rmtree(tmp_dir, ignore_errors=True)

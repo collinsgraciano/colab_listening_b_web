@@ -1,3 +1,16 @@
 {
-  "sets": []
+  "sets": [
+    {
+      "id": "set_1787590450468",
+      "name": "1",
+      "structure": "quest",
+      "created": 1787590450.468516,
+      "character_source": "",
+      "character_reuse": "",
+      "character_fixes": "",
+      "character_library": "{\"char_a\":\"char_1787494155_char_a\",\"char_b\":\"char_1787494136_char_a\",\"char_c\":\"char_1787398038_char_a\",\"host\":\"char_1787494036_host\"}",
+      "character_voices": "",
+      "_ui_descs": {}
+    }
+  ]
 }

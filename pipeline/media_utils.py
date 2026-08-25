@@ -43,6 +43,192 @@ else:
         FONT_PH = FONT_EN
 
 # ---------------------------------------------------------------------------
+# 字幕样式字体注册表（字幕样式设计器可选字体；渲染时缺失自动回退）
+# key: (显示名, 字体文件路径)。仅英文字体只建议用于 EN 行（ZH 行仍用中文字体）。
+# ---------------------------------------------------------------------------
+SUBTITLE_FONT_CHOICES: dict[str, tuple[str, str]] = {
+    "msyhbd": ("微软雅黑 Bold", r"C:\Windows\Fonts\msyhbd.ttc"),
+    "msyh": ("微软雅黑", r"C:\Windows\Fonts\msyh.ttc"),
+    "msyhl": ("微软雅黑 Light", r"C:\Windows\Fonts\msyhl.ttc"),
+    "simhei": ("黑体", r"C:\Windows\Fonts\simhei.ttf"),
+    "dengb": ("等线 Bold", r"C:\Windows\Fonts\dengb.ttf"),
+    "deng": ("等线", r"C:\Windows\Fonts\deng.ttf"),
+    "simkai": ("楷体", r"C:\Windows\Fonts\simkai.ttf"),
+    "simsun": ("宋体", r"C:\Windows\Fonts\simsun.ttc"),
+    "ariblk": ("Arial Black（仅英文）", r"C:\Windows\Fonts\ariblk.ttf"),
+    "segoeuib": ("Segoe UI Bold（仅英文）", r"C:\Windows\Fonts\segoeuib.ttf"),
+    "impact": ("Impact（仅英文）", r"C:\Windows\Fonts\impact.ttf"),
+}
+
+
+def _resolve_subtitle_font(key: str, fallback: str) -> str:
+    """样式字体 key → 字体文件路径；key 未知或文件不存在时回退 fallback。"""
+    entry = SUBTITLE_FONT_CHOICES.get(key)
+    if entry and os.path.exists(entry[1]):
+        return entry[1]
+    return fallback
+
+
+# 字幕样式 legacy 默认值（= burn_subtitles 历史硬编码行为，样式缺 key 时兜底）
+SUBTITLE_STYLE_LEGACY_DEFAULTS: dict = {
+    "en_size": 60,
+    "zh_size": 50,
+    "en_color": "#FFFFFF",
+    "zh_color": "#FFD700",
+    "stroke_color": "#000000",
+    "en_stroke": 5,
+    "zh_stroke": 4,
+    "bottom_margin": 36,
+    "line_gap": 6,
+    "en_zh_gap": 15,
+    "font_en": "msyhbd",
+    "font_zh": "msyh",
+    "box": False,
+    "box_opacity": 55,
+}
+
+
+def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
+                                 style: dict | None = None) -> "Image.Image":
+    """渲染单条双语字幕（EN 白字在上 + ZH 金字在下）到透明 RGBA overlay。
+
+    burn_subtitles（成片烧录）与字幕样式设计器的实时预览共用本函数，
+    保证所见即所得。style 缺失的 key 用 SUBTITLE_STYLE_LEGACY_DEFAULTS 兜底，
+    style=None 时与历史渲染行为逐像素一致（默认字号 60/50）。
+
+    style 可用 key: en_size/zh_size/en_color/zh_color/stroke_color/
+    en_stroke/zh_stroke/bottom_margin/line_gap/en_zh_gap/font_en/font_zh/
+    box/box_opacity（box=True 时在文字块后画圆角半透明黑条）。
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    st = dict(SUBTITLE_STYLE_LEGACY_DEFAULTS)
+    if style:
+        for k in st:
+            if k in style and style[k] is not None:
+                st[k] = style[k]
+
+    def _hex_rgb(value, default):
+        try:
+            v = str(value).lstrip("#")
+            if len(v) == 6:
+                return tuple(int(v[i:i + 2], 16) for i in (0, 2, 4))
+        except (ValueError, TypeError):
+            pass
+        return default
+
+    en_rgb = _hex_rgb(st["en_color"], (255, 255, 255))
+    zh_rgb = _hex_rgb(st["zh_color"], (255, 215, 0))
+    stroke_rgb = _hex_rgb(st["stroke_color"], (0, 0, 0))
+
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    BOTTOM_MARGIN = int(st["bottom_margin"])
+    EN_SIZE = int(st["en_size"])
+    ZH_SIZE = int(st["zh_size"])
+    MAX_SUB_W = w - 80
+    LINE_GAP = int(st["line_gap"])
+    EN_ZH_GAP = int(st["en_zh_gap"])
+
+    def _wrap_fixed(text, font, max_w, is_cjk=False):
+        """按固定字号换行：中文逐字、英文逐词。返回 [(行文本, 行宽, 行高)]。"""
+        lines = []
+        if is_cjk:
+            cur = ""
+            for ch in text:
+                test = cur + ch
+                bbox = draw.textbbox((0, 0), test, font=font)
+                if bbox[2] - bbox[0] <= max_w or not cur:
+                    cur = test
+                else:
+                    lines.append(cur)
+                    cur = ch
+            if cur:
+                lines.append(cur)
+        else:
+            words = text.split()
+            cur = ""
+            for word in words:
+                test = (cur + " " + word).strip()
+                bbox = draw.textbbox((0, 0), test, font=font)
+                if bbox[2] - bbox[0] <= max_w or not cur:
+                    cur = test
+                else:
+                    lines.append(cur)
+                    cur = word
+            if cur:
+                lines.append(cur)
+        result = []
+        for ln in lines:
+            bbox = draw.textbbox((0, 0), ln, font=font)
+            result.append((ln, bbox[2] - bbox[0], bbox[3] - bbox[1]))
+        return result
+
+    en_font = zh_font = None
+    en_lines = []
+    if en_text:
+        en_font = ImageFont.truetype(
+            _resolve_subtitle_font(st["font_en"], FONT_EN), EN_SIZE)
+        en_lines = _wrap_fixed(en_text, en_font, MAX_SUB_W, is_cjk=False)
+
+    zh_lines = []
+    if zh_text:
+        zh_font = ImageFont.truetype(
+            _resolve_subtitle_font(st["font_zh"], FONT_ZH), ZH_SIZE)
+        zh_lines = _wrap_fixed(zh_text, zh_font, MAX_SUB_W, is_cjk=True)
+
+    en_total_h = (sum(lh for _, _, lh in en_lines)
+                  + LINE_GAP * max(0, len(en_lines) - 1)) if en_lines else 0
+    zh_total_h = (sum(lh for _, _, lh in zh_lines)
+                  + LINE_GAP * max(0, len(zh_lines) - 1)) if zh_lines else 0
+
+    # Stack bottom-up: ZH lowest, EN above it
+    if en_lines and zh_lines:
+        zh_block_y = h - BOTTOM_MARGIN - zh_total_h
+        en_block_y = zh_block_y - EN_ZH_GAP - en_total_h
+    elif en_lines:
+        en_block_y = h - BOTTOM_MARGIN - en_total_h
+        zh_block_y = 0
+    else:
+        en_block_y = 0
+        zh_block_y = h - BOTTOM_MARGIN - zh_total_h
+
+    # 半透明圆角背景条（可选）：包住整个字幕文字块
+    if st.get("box") and (en_lines or zh_lines):
+        box_opacity = max(0, min(95, int(st.get("box_opacity", 55))))
+        if box_opacity > 0:
+            pad_h, pad_v = 28, 14
+            text_w = max(
+                [lw for _, lw, _ in en_lines] + [lw for _, lw, _ in zh_lines])
+            x0 = max(0, (w - text_w) // 2 - pad_h)
+            x1 = min(w, (w + text_w) // 2 + pad_h)
+            y0 = max(0, min(en_block_y, zh_block_y) - pad_v)
+            y1 = min(h, h - BOTTOM_MARGIN + pad_v)
+            draw.rounded_rectangle(
+                [x0, y0, x1, y1], radius=12,
+                fill=(0, 0, 0, int(255 * box_opacity / 100)))
+
+    # Render EN lines
+    cur_y = en_block_y
+    for ln_text, ln_w, ln_h in en_lines:
+        draw.text(((w - ln_w) // 2, cur_y), ln_text, font=en_font,
+                  fill=(*en_rgb, 255), stroke_width=int(st["en_stroke"]),
+                  stroke_fill=(*stroke_rgb, 255))
+        cur_y += ln_h + LINE_GAP
+
+    # Render ZH lines
+    cur_y = zh_block_y
+    for ln_text, ln_w, ln_h in zh_lines:
+        draw.text(((w - ln_w) // 2, cur_y), ln_text, font=zh_font,
+                  fill=(*zh_rgb, 255), stroke_width=int(st["zh_stroke"]),
+                  stroke_fill=(*stroke_rgb, 255))
+        cur_y += ln_h + LINE_GAP
+
+    return overlay
+
+
+# ---------------------------------------------------------------------------
 # Target canvas — every segment is normalized to this size for concat safety
 # ---------------------------------------------------------------------------
 TARGET_W, TARGET_H = 1280, 720
@@ -327,7 +513,8 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
                    subtitle_seg_types: tuple[str, ...] = ("dialogue", "welcome", "hook_intro", "outro"),
                    en_font_size: int = 60, zh_font_size: int = 50,
                    pause_hints: list[tuple[float, float]] | None = None,
-                   out_fps: int = 24) -> str:
+                   out_fps: int = 24,
+                   style: dict | None = None) -> str:
     """Render dialogue subtitles via Pillow and burn them onto the video.
 
     Extracts subtitle entries from timeline segments whose type is in
@@ -342,6 +529,8 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
             to the measured speech onsets (precise sync). Pass [] to disable.
         out_fps: output fps for the re-encode pass. Should match the
             concatenated video's fps (25 for quest, 24 for original).
+        style: 字幕样式 dict（字幕样式设计器产出）。None 或缺 key 时回退
+            en_font_size/zh_font_size 及历史默认样式，与旧行为一致。
 
     Returns the final video path with subtitles burned in.
     """
@@ -463,106 +652,27 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
         shutil.copy2(no_sub_path, final_path)
         return final_path
 
-    from PIL import Image, ImageDraw, ImageFont
-
     w, h = probe_resolution(no_sub_path)
     sub_overlay_dir = tmp_dir / "subtitles"
     sub_overlay_dir.mkdir(parents=True, exist_ok=True)
 
-    BOTTOM_MARGIN = 36  # clear of frame edge + YouTube player UI
-    EN_SIZE = en_font_size
-    ZH_SIZE = zh_font_size
-    MAX_SUB_W = w - 80
-    LINE_GAP = 6
-
-    def _wrap_fixed(text, font, max_w, is_cjk=False):
-        """Wrap text into lines at a fixed font size (no shrinking).
-
-        For CJK text, wrap per-character; for Latin, wrap per-word.
-        Returns list of (line_text, line_width, line_height).
-        """
-        lines = []
-        if is_cjk:
-            cur = ""
-            for ch in text:
-                test = cur + ch
-                bbox = draw.textbbox((0, 0), test, font=font)
-                if bbox[2] - bbox[0] <= max_w or not cur:
-                    cur = test
-                else:
-                    lines.append(cur)
-                    cur = ch
-            if cur:
-                lines.append(cur)
-        else:
-            words = text.split()
-            cur = ""
-            for word in words:
-                test = (cur + " " + word).strip()
-                bbox = draw.textbbox((0, 0), test, font=font)
-                if bbox[2] - bbox[0] <= max_w or not cur:
-                    cur = test
-                else:
-                    lines.append(cur)
-                    cur = word
-            if cur:
-                lines.append(cur)
-        result = []
-        for ln in lines:
-            bbox = draw.textbbox((0, 0), ln, font=font)
-            result.append((ln, bbox[2] - bbox[0], bbox[3] - bbox[1]))
-        return result
+    # 合并样式：legacy 默认（字号来自 en_font_size/zh_font_size 参数）→ 样式 key 覆盖。
+    # style=None 时与历史行为逐像素一致（白EN/金ZH、描边5/4、底边距36、行距6、间隔15）。
+    effective_style = dict(SUBTITLE_STYLE_LEGACY_DEFAULTS)
+    effective_style["en_size"] = en_font_size
+    effective_style["zh_size"] = zh_font_size
+    if style:
+        for k in effective_style:
+            if k in style and style[k] is not None:
+                effective_style[k] = style[k]
 
     for i, entry in enumerate(subtitle_entries):
         overlay_path = str(sub_overlay_dir / f"sub_{i:03d}.png")
-        bg = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(bg)
-
         en_text = entry["en"]
         zh_text = entry["zh"] if show_zh else ""
-
-        # Fixed font size with word wrapping
-        en_lines = []
-        if en_text:
-            en_font = ImageFont.truetype(FONT_EN, EN_SIZE)
-            en_lines = _wrap_fixed(en_text, en_font, MAX_SUB_W, is_cjk=False)
-
-        zh_lines = []
-        if zh_text:
-            zh_font = ImageFont.truetype(FONT_ZH, ZH_SIZE)
-            zh_lines = _wrap_fixed(zh_text, zh_font, MAX_SUB_W, is_cjk=True)
-
-        en_total_h = sum(lh for _, _, lh in en_lines) + LINE_GAP * max(0, len(en_lines) - 1) if en_lines else 0
-        zh_total_h = sum(lh for _, _, lh in zh_lines) + LINE_GAP * max(0, len(zh_lines) - 1) if zh_lines else 0
-
-        # Stack bottom-up: ZH lowest, EN above it
-        if en_lines and zh_lines:
-            zh_block_y = h - BOTTOM_MARGIN - zh_total_h
-            en_block_y = zh_block_y - 15 - en_total_h
-        elif en_lines:
-            en_block_y = h - BOTTOM_MARGIN - en_total_h
-            zh_block_y = 0
-        else:
-            en_block_y = 0
-            zh_block_y = h - BOTTOM_MARGIN - zh_total_h
-
-        # Render EN lines
-        cur_y = en_block_y
-        for ln_text, ln_w, ln_h in en_lines:
-            draw.text(((w - ln_w) // 2, cur_y), ln_text, font=en_font,
-                      fill=(255, 255, 255, 255), stroke_width=5,
-                      stroke_fill=(0, 0, 0, 255))
-            cur_y += ln_h + LINE_GAP
-
-        # Render ZH lines
-        cur_y = zh_block_y
-        for ln_text, ln_w, ln_h in zh_lines:
-            draw.text(((w - ln_w) // 2, cur_y), ln_text, font=zh_font,
-                      fill=(255, 215, 0, 255), stroke_width=4,
-                      stroke_fill=(0, 0, 0, 255))
-            cur_y += ln_h + LINE_GAP
-
-        bg.save(overlay_path, "PNG")
+        overlay = render_subtitle_text_overlay(en_text, zh_text, w, h,
+                                               effective_style)
+        overlay.save(overlay_path, "PNG")
         entry["overlay_path"] = overlay_path
 
     # Burn subtitles in batches to avoid Windows command-line length limit

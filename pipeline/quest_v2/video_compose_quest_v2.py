@@ -531,6 +531,7 @@ def compose_quest_v2(
     show_zh: bool = True,
     workers: int = 1,
     subtitle_font_size: int = 60,
+    subtitle_style: dict | None = None,
     progress_cb=None,
     stop_check=None,
     lip_sync: bool = True,
@@ -701,7 +702,8 @@ def compose_quest_v2(
     final_path = burn_subtitles(
         no_sub, timeline, script, str(work), srt_dir, pad, _cb,
         show_zh=show_zh, en_font_size=subtitle_font_size,
-        zh_font_size=int(subtitle_font_size * 0.85), out_fps=25)
+        zh_font_size=int(subtitle_font_size * 0.85), out_fps=25,
+        style=subtitle_style)
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 

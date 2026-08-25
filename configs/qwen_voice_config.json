@@ -13,5 +13,112 @@
       "created": 1787447029.1379085
     }
   ],
-  "designed_voices": []
+  "designed_voices": [
+    {
+      "name": "Elena",
+      "description": "温柔知性美式女声",
+      "gender": "female",
+      "language": "en",
+      "instruct": "Speak in a warm, gentle young adult American female voice with a mid-to-high pitch and soft texture. Deliver at a measured, calm pace with exceptionally clear articulation. Keep the intonation patient and comforting, making complex language concepts easy to follow for learners.",
+      "created": 1787639765.7920468
+    },
+    {
+      "name": "Nora",
+      "description": "干练专业美式女声",
+      "gender": "female",
+      "language": "en",
+      "instruct": "Speak in a confident, polished middle-aged female voice with a crisp General American accent. Maintain a professional yet accessible energy at a steady, rhythmic pace. Stress key vocabulary naturally while keeping speech clean and easy to follow.",
+      "created": 1787639813.5727468
+    },
+    {
+      "name": "Grace",
+      "description": "舒缓亲切美式女声",
+      "gender": "female",
+      "language": "en",
+      "instruct": "Speak in a soothing, supportive young adult female voice with a low-to-mid pitch and soft, airy texture. Keep the delivery calm and encouraging with a slightly slower pace. Place slight emphasis on sentence stress to help ESL students grasp rhythm effortlessly.",
+      "created": 1787639829.4609313
+    },
+    {
+      "name": "Oliver",
+      "description": "沉稳清晰英音男声",
+      "gender": "male",
+      "language": "en",
+      "instruct": "Speak in a mature, crisp middle-aged male voice with a classic British RP accent. Pitch is balanced in the mid-range with an authoritative yet encouraging tone. Maintain a steady, deliberate pace with subtle pauses after key target vocabulary to aid listening comprehension.",
+      "created": 1787639846.3818045
+    },
+    {
+      "name": "Julian",
+      "description": "低沉磁性美式男声",
+      "gender": "male",
+      "language": "en",
+      "instruct": "Speak in a deep, warm male voice with a smooth, resonant timbre and a General American accent. Deliver content with a calm, confident style at a relaxed pace. Ensure pristine articulation and deliberate timing so learners can hear subtle phonetic details effortlessly.",
+      "created": 1787639867.5192297
+    },
+    {
+      "name": "Ethan",
+      "description": "阳光平易美音青年",
+      "gender": "male",
+      "language": "en",
+      "instruct": "Speak in a friendly, conversational American male voice with a balanced mid-range pitch and a relaxed texture. Sound like an approachable study buddy chatting casually over coffee. Keep your pace steady and your speech completely unhurried and clear.",
+      "created": 1787640768.9166152
+    }
+  ],
+  "candidate_voices": [
+    {
+      "name": "Audrey",
+      "gender": "female",
+      "language": "en",
+      "description": "优雅亲切英音女声",
+      "instruct": "Speak in a warm, refined young adult British RP female voice with a clear, mid-range pitch. Sound friendly, patient, and conversational, perfect for explaining daily scenarios to language learners. Maintain a steady pace with crisp articulation and natural pauses between key phrases."
+    },
+    {
+      "name": "Caleb",
+      "gender": "male",
+      "language": "en",
+      "description": "活力热情美音男声",
+      "instruct": "Speak in a lively, upbeat young adult American male voice with a bright, mid-high pitch and energetic tone. Deliver words with clear pronunciation and expressiveness, like an enthusiastic podcast host guiding a student. Keep the tempo dynamic yet easy to follow."
+    },
+    {
+      "name": "Beatrice",
+      "gender": "female",
+      "language": "en",
+      "description": "慈祥温和美音老妇",
+      "instruct": "Speak in a gentle, warm senior American female voice with a soft, lower-mid pitch and a cozy texture. Use a slow, reassuring pace that gives English learners time to absorb every sentence. Prioritize smooth, precise articulation with a comforting bedtime storyteller vibe."
+    },
+    {
+      "name": "Marcus",
+      "gender": "male",
+      "language": "en",
+      "description": "沉稳专业美音旁白",
+      "instruct": "Speak in a deep, authoritative middle-aged American male voice with a rich timbre and calm demeanor. Maintain a measured, deliberate pace suitable for formal vocabulary lessons and educational narration. Ensure crystal-clear enunciation with subtle emphasis on key terms."
+    },
+    {
+      "name": "Graham",
+      "gender": "male",
+      "language": "en",
+      "description": "绅士知性英音男声",
+      "instruct": "Speak in a mature, polished British RP male voice with a smooth, lower-mid pitch and crisp tone. Sound educated, confident, and patient, ideal for advanced grammar breakdowns. Deliver sentences with natural rhythm, excellent clarity, and distinct pauses."
+    },
+    {
+      "name": "Sophia",
+      "gender": "female",
+      "language": "en",
+      "description": "温柔耐心美音教师",
+      "instruct": "Speak in a calm, highly empathetic young adult American female voice with a soft, mid-range pitch. Maintain a relaxed pace with gentle inflection, making complex sentences feel approachable. Focus on clean enunciation and learner-friendly breathing pauses."
+    },
+    {
+      "name": "Hannah",
+      "gender": "female",
+      "language": "en",
+      "description": "干练自信美音导播",
+      "instruct": "Speak in a confident, clear middle-aged American female voice with a resonant, crisp mid-range pitch. Project a professional news-anchor energy that remains engaging and approachable for international listeners. Use precise articulation with well-spaced, rhythmic phrasing."
+    },
+    {
+      "name": "Silas",
+      "gender": "male",
+      "language": "en",
+      "description": "磁性低沉美音男声",
+      "instruct": "Speak in a warm, slightly husky senior American male voice with a deep pitch and reflective tone. Sound like a friendly grandfather sharing memorable life lessons. Deliver speech at an easygoing, deliberate pace with pronounced clarity on every word."
+    }
+  ]
 }

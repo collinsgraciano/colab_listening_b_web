@@ -31,6 +31,11 @@ from .config_manager import (
 )
 from .pipeline_service import get_service, STEP_ORDER
 from .config_manager import detect_local_mcp_token
+from .page_mcp import (
+    PAGES as MCP_PAGES, SOURCE_LABELS as MCP_SOURCE_LABELS,
+    PageMcpSession, resolve_page_tokens, load_page_tokens, save_page_tokens,
+    mask_token,
+)
 from . import topics_ai
 from . import script_library
 import style_manager as style_lib
@@ -868,32 +873,38 @@ async def api_styles_preview_get(style_id: str):
 
 
 def _generate_preview_worker(style_id: str, style_prompt: str):
-    """后台线程：用 MCP 生成标准测试图（咖啡店双人场景）作为风格预览。"""
-    import urllib.request
+    """后台线程：用页面级独立 MCP 会话生成标准测试图（咖啡店双人场景）作为风格预览。
+
+    独立于 pipeline 的全局 MCP 会话——pipeline 运行中也可安全生成。
+    Token 来源：本页专属 → 激活模式 mcp_tokens → 本地检测。
+    """
     try:
-        from mcp_client import ensure_initialized as mcp_ensure_init, call_tool, parse_task_id, poll_task
+        resolved = resolve_page_tokens("styles")
+        if not resolved["tokens"]:
+            raise RuntimeError("未配置 MCP Token（本页专属 / 模式配置 / 本地检测均为空）")
+        print(f"  [StylePreview] MCP token: {MCP_SOURCE_LABELS[resolved['source']]} "
+              f"×{len(resolved['tokens'])} ({mask_token(resolved['tokens'][0])})")
+        mcp = PageMcpSession(resolved["tokens"]).initialize()
         prompt = (f"a friendly young woman barista in a green apron and a young man "
                   f"customer talking at a coffee shop counter, warm daylight, "
                   f"{style_prompt}, 16:9")
-        mcp_ensure_init()  # 幂等：未初始化才初始化，绝不动运行中 pipeline 的会话
-        result = call_tool("generate_image", {
+        result = mcp.call_tool("generate_image", {
             "prompt": prompt,
             "provider": "frontier",
             "quality": "medium",
             "image_size": {"width": 1280, "height": 720},
             "output_format": "png",
         })
-        task_id = parse_task_id(result)
-        data = poll_task(task_id, interval=10, max_wait=600)
+        task_id = mcp.parse_task_id(result)
+        if not task_id:
+            raise RuntimeError("MCP 返回无 task_id")
+        data = mcp.poll_task(task_id, interval=10, max_wait=600)
         url = data.get("url", "")
         if not url:
             raise RuntimeError("未获取到图片 URL")
         out = style_lib.preview_path(style_id)
         out.parent.mkdir(parents=True, exist_ok=True)
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=120) as resp, open(out, "wb") as f:
-            f.write(resp.read())
-        if out.stat().st_size < 10000:
+        if not mcp.download_file(url, str(out)) or out.stat().st_size < 10000:
             out.unlink(missing_ok=True)
             raise RuntimeError("下载文件过小，疑似失败")
         _PREVIEW_JOBS[style_id] = "done"
@@ -1520,6 +1531,71 @@ async def api_detect_token():
         # Mask for display but return full for use
         return {"ok": True, "token": token}
     return {"ok": False, "error": "未检测到本地 MCP Token"}
+
+
+# --- 页面专属 MCP Tokens（🎨画面风格 / 👥人物素材库 独立设置）---
+
+@app.get("/api/mcp/page_tokens")
+async def api_page_tokens_get():
+    """页面专属 MCP Token 设置 + 当前生效来源。
+
+    tokens_text 为本页存储的原文（供编辑回填）；masked 仅掩码（供生效来源展示）。
+    """
+    saved = load_page_tokens()
+    pages: dict[str, dict] = {}
+    for page in MCP_PAGES:
+        resolved = resolve_page_tokens(page)
+        saved_tokens = saved.get(page, [])
+        pages[page] = {
+            "tokens_text": "\n".join(saved_tokens),
+            "saved_count": len(saved_tokens),
+            "source": resolved["source"],
+            "source_label": MCP_SOURCE_LABELS[resolved["source"]],
+            "mode": resolved["mode"],
+            "effective_count": len(resolved["tokens"]),
+            "masked": [mask_token(t) for t in resolved["tokens"][:5]],
+        }
+    return {"pages": pages}
+
+
+@app.post("/api/mcp/page_tokens")
+async def api_page_tokens_save(request: Request):
+    """保存页面专属 MCP Tokens（多行文本，每行一个）。留空 = 回落模式配置。"""
+    data = await request.json()
+    page = str(data.get("page", "")).strip()
+    if page not in MCP_PAGES:
+        return JSONResponse({"ok": False, "error": f"未知页面: {page}"}, status_code=400)
+    tokens_text = str(data.get("tokens", ""))
+    try:
+        tokens = await asyncio.to_thread(save_page_tokens, page, tokens_text)
+    except (OSError, ValueError) as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    return {"ok": True, "page": page, "count": len(tokens)}
+
+
+@app.post("/api/mcp/page_tokens/test")
+async def api_page_tokens_test(request: Request):
+    """用解析后的 token 建独立会话 + tools/list（0 积分）验证可用性。"""
+    data = await request.json()
+    page = str(data.get("page", "")).strip()
+    if page not in MCP_PAGES:
+        return JSONResponse({"ok": False, "error": f"未知页面: {page}"}, status_code=400)
+
+    def _do_test() -> dict:
+        resolved = resolve_page_tokens(page)
+        if not resolved["tokens"]:
+            return {"ok": False, "source": resolved["source"],
+                    "error": "未配置 MCP Token（本页专属 / 模式配置 / 本地检测均为空）"}
+        mcp = PageMcpSession(resolved["tokens"]).initialize()
+        tools = mcp.list_tools()
+        return {"ok": True, "source": resolved["source"],
+                "source_label": MCP_SOURCE_LABELS[resolved["source"]],
+                "token_count": len(resolved["tokens"]), "tools": len(tools)}
+
+    try:
+        return await asyncio.to_thread(_do_test)
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
 
 
 # ===========================================================================
@@ -2909,8 +2985,12 @@ async def api_ai_test_chat(request: Request):
 _gen_status: dict[str, dict] = {}  # lib_id → {status, poses, error, started_at}
 
 
-def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tokens: str):
-    """Background thread: generate pose atlas via MCP, download, split into poses."""
+def _generate_char_images(lib_id: str, description: str, structure: str):
+    """Background thread: generate pose atlas via MCP, download, split into poses.
+
+    用页面级独立 MCP 会话（人物素材库页专属 token → 激活模式 mcp_tokens →
+    本地检测），与 pipeline 全局会话完全隔离，pipeline 运行中也可安全生成。
+    """
     import shutil
     lib_dir = LIBRARY_DIR / lib_id
     if not lib_dir.exists():
@@ -2920,19 +3000,22 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
     _gen_status[lib_id] = {"status": "generating", "error": "", "poses": [], "started_at": time.time()}
 
     try:
-        # Add pipeline to sys.path for MCP imports
+        # Add pipeline to sys.path for atlas_split imports
         _pipeline = str(PIPELINE_DIR)
         if _pipeline not in sys.path:
             sys.path.insert(0, _pipeline)
-        from mcp_client import ensure_initialized as mcp_ensure_init, call_tool, parse_task_id, poll_task, download_file
         from atlas_split import split_atlas
 
-        # 幂等初始化 MCP（token 集与当前一致时不动会话，避免打断运行中的 pipeline）
-        if mcp_tokens:
-            tokens = [t.strip() for t in mcp_tokens.split("\n") if t.strip()]
-            mcp_ensure_init(tokens=tokens)
-        else:
-            mcp_ensure_init()
+        # 独立 MCP 会话（不动 pipeline 全局会话）
+        resolved = resolve_page_tokens("characters")
+        if not resolved["tokens"]:
+            _gen_status[lib_id] = {"status": "error",
+                                   "error": "未配置 MCP Token（本页专属 / 模式配置 / 本地检测均为空）",
+                                   "poses": []}
+            return
+        print(f"  [CharGen] MCP token: {MCP_SOURCE_LABELS[resolved['source']]} "
+              f"×{len(resolved['tokens'])} ({mask_token(resolved['tokens'][0])})")
+        mcp = PageMcpSession(resolved["tokens"]).initialize()
 
         _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
                   "cel-shaded with thin clean black outline, "
@@ -2983,13 +3066,13 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
             }
 
         print(f"  [CharGen] Generating atlas for {lib_id}...")
-        result = call_tool("generate_image", gen_params)
-        task_id = parse_task_id(result)
+        result = mcp.call_tool("generate_image", gen_params)
+        task_id = mcp.parse_task_id(result)
         if not task_id:
             _gen_status[lib_id] = {"status": "error", "error": "MCP 返回无 task_id", "poses": []}
             return
 
-        data = poll_task(task_id, interval=10, max_wait=600)
+        data = mcp.poll_task(task_id, interval=10, max_wait=600)
         url = data.get("url", "")
         if not url:
             _gen_status[lib_id] = {"status": "error", "error": "MCP 生成失败：无图片 URL", "poses": []}
@@ -2998,7 +3081,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
         if structure in ("quest", "quest_v2"):
             # Download atlas, split into 8 poses（分隔线检测 + 残边修剪，无缝时回退等分）
             atlas_path = str(lib_dir / f"pose_atlas_{src_key}.png")
-            download_file(url, atlas_path)
+            mcp.download_file(url, atlas_path)
             print(f"  [CharGen] Downloaded atlas for {lib_id}")
 
             pose_files = [f"pose_{src_key}_{idx}.png" for idx in range(8)]
@@ -3009,7 +3092,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str, mcp_tok
         else:
             # Original: save as char_scene.png
             atlas_path = str(lib_dir / "char_scene.png")
-            download_file(url, atlas_path)
+            mcp.download_file(url, atlas_path)
             pose_files = ["char_scene.png"]
             print(f"  [CharGen] Saved char_scene.png for {lib_id}")
 
@@ -3163,13 +3246,12 @@ async def api_library_generate_images(lib_id: str):
         return JSONResponse({"ok": False, "error": "角色描述为空，无法生成图片"}, status_code=400)
 
     structure = meta.get("structure", "quest")
-    config = load_config()
-    mcp_tokens = config.get("mcp_tokens", "").strip()
 
-    # Start background thread
+    # Start background thread (token 由 worker 内 resolve_page_tokens 解析:
+    # 本页专属 → 激活模式 mcp_tokens → 本地检测)
     thread = threading.Thread(
         target=_generate_char_images,
-        args=(lib_id, description, structure, mcp_tokens),
+        args=(lib_id, description, structure),
         daemon=True,
     )
     thread.start()

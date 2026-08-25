@@ -684,6 +684,7 @@ def compose_quest(
     show_zh: bool = True,
     workers: int = 1,
     subtitle_font_size: int = 60,
+    subtitle_style: dict | None = None,
     progress_cb=None,
     stop_check=None,
 ) -> str:
@@ -844,7 +845,7 @@ def compose_quest(
 
     # --- Burn subtitles via Pillow overlay (dialogue entries only) ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), out_fps=25)
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), out_fps=25, style=subtitle_style)
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 

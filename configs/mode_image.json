@@ -4,6 +4,7 @@
   "num_lines": "",
   "structure": "image",
   "animation": "landing",
+  "visual_style": "pixar3d",
   "character_source": "H:\\2026_main_project\\colab_listening_b\\output\\",
   "character_reuse": "",
   "character_fixes": "",
@@ -25,6 +26,7 @@
   "voxcpm_api_key": "",
   "qwen_model_path": "H:\\models\\Qwen3-TTS-12Hz-0.6B-CustomVoice",
   "qwen_base_model_path": "H:\\models\\Qwen3-TTS-12Hz-1.7B-Base",
+  "qwen_voicedesign_model_path": "H:\\models\\Qwen3-TTS-12Hz-1.7B-VoiceDesign",
   "qwen_device": "cuda:0",
   "mcp_tokens": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzODI1NyIsInVzZXJuYW1lIjoid2VjaGF0X29zX1F5MDU5eHUtaENKeENaNl9FVUc1Nlhua2ciLCJlbWFpbCI6ImVhcmwxOTc4MDYwN0Bob3RtYWlsLmNvbSIsInJvbGUiOiJ1c2VyIiwidW5pdHlfaWQiOiIzMzI2NDA2MjQ2ODM2NiIsInR5cGUiOiJhY2Nlc3MiLCJ0b2tlbl9raW5kIjoic2Vzc2lvbiIsImV4cCI6MTgxNjEzNDgxNCwiaWF0IjoxNzg0NTk4ODE0fQ.YJG8Vin0gSbdTM4jePr1_5QWZ2byFOjvAMC1JKIUihE",
   "image_concurrency": 4,
@@ -38,8 +40,10 @@
   "pad": "",
   "render_fps": 8,
   "workers": 2,
+  "subtitle_style": "",
   "subtitle_font_size": 60,
   "no_zh_subtitle": false,
+  "lip_sync": true,
   "no_4k": false,
   "upscale_timeout": 3600
 }

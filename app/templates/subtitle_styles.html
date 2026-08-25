@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+{% block content %}
+{% macro style_card(s) %}
+<div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col"
+     id="card-{{ s.id }}">
+    <img src="/api/subtitle-styles/preview/{{ s.id }}?bg=pixar3d&canvas=16:9&t={{ range(1, 9999) | random }}"
+         class="w-full aspect-video object-cover bg-slate-900" loading="lazy"
+         onerror="this.src='/api/subtitle-styles/preview/{{ s.id }}?canvas=16:9'">
+    <div class="p-4 flex-1 flex flex-col gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-white text-sm">{{ s.name }}</span>
+            {% if s.id == current_id %}
+            <span class="px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 text-[10px]">当前使用</span>
+            {% endif %}
+            {% if s.builtin %}
+            <span class="px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 text-[10px]">内置</span>
+            {% endif %}
+        </div>
+        <p class="text-[11px] text-slate-500">{{ s.id }} · EN {{ s.en_size }}px / ZH {{ s.zh_size }}px · 描边 {{ s.en_stroke }}/{{ s.zh_stroke }}{% if s.box %} · 背景条 {{ s.box_opacity }}%{% endif %}</p>
+        <p class="text-xs text-slate-400 leading-relaxed flex-1">{{ s.description }}</p>
+        <div class="flex items-center gap-2 flex-wrap mt-1">
+            {% if s.id == current_id %}
+            <button disabled class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-400 cursor-not-allowed">使用中</button>
+            {% else %}
+            <button onclick="selectStyle('{{ s.id }}')" class="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white">使用此样式</button>
+            {% endif %}
+            <button onclick="editStyle('{{ s.id }}')" class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">复制编辑</button>
+            {% if not s.builtin %}
+            <button onclick="editStyle('{{ s.id }}', true)" class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">编辑</button>
+            <button onclick="deleteStyle('{{ s.id }}')" class="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 hover:bg-red-800 text-red-300">删除</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<div class="p-6 max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">🔠 字幕样式</h2>
+            <p class="text-sm text-slate-400 mt-1">
+                设计对话字幕的字体、字号、颜色、描边与背景条。预览与成片烧录用同一套渲染代码，所见即所得。
+                当前应用于模式：<span class="text-indigo-300 font-medium">{{ mode_labels[active_mode] }}</span>
+            </p>
+        </div>
+        <button onclick="showForm()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">+ 新建样式</button>
+    </div>
+
+    <!-- 当前样式横幅 -->
+    <div class="rounded-xl p-5 mb-6 border border-indigo-500/60 bg-gradient-to-r from-indigo-900/40 to-slate-800">
+        <div class="flex items-start gap-5">
+            <img src="/api/subtitle-styles/preview/current?bg=pixar3d&canvas=16:9&t={{ range(1, 9999) | random }}"
+                 onerror="this.src='/api/subtitle-styles/preview/current?canvas=16:9'"
+                 class="w-64 rounded-lg border border-slate-600 object-cover aspect-video bg-slate-900">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 text-xs font-medium">✓ 当前使用</span>
+                    <h3 class="text-lg font-bold text-white">{% if current_style %}{{ current_style.name }}{% else %}跟随参数配置{% endif %}</h3>
+                    {% if current_style %}<span class="text-xs text-slate-400">{{ current_style.id }}</span>{% endif %}
+                </div>
+                <p class="text-sm text-slate-300 mb-2">
+                    {% if current_style %}{{ current_style.description }}{% else %}
+                    未选择字幕样式 —— 使用「参数配置 → 字幕字体大小」的传统行为（EN {{ config_font_size }}px / ZH {{ (config_font_size * 0.85) | int }}px 白字金译）。{% endif %}
+                </p>
+                <p class="text-xs text-slate-500 mt-2">切换只影响新生成的视频；shorts 模式为竖屏 9:16 画布，预览可切换画布查看效果。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建/编辑表单 + 实时预览 (hidden) -->
+    <div id="style-form" class="hidden bg-slate-800 rounded-xl p-5 mb-6 border border-indigo-700/60">
+        <h3 id="form-title" class="text-sm font-semibold text-white mb-4">新建字幕样式</h3>
+        <div class="flex gap-6 flex-col lg:flex-row">
+            <!-- 左：参数设计 -->
+            <div class="flex-1 min-w-0 space-y-4">
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">样式 ID *（小写字母/数字/下划线）</label>
+                        <input type="text" id="sf-id" placeholder="如 my_big_subs"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">名称 *</label>
+                        <input type="text" id="sf-name" placeholder="如 我的大字幕"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">描述</label>
+                        <input type="text" id="sf-desc" placeholder="一句话说明特点"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">英文字体</label>
+                        <select id="sf-font-en" onchange="refreshPreview()"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">中文字体</label>
+                        <select id="sf-font-zh" onchange="refreshPreview()"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>英文字号</span><span id="sf-en-size-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-en-size" min="28" max="120" step="1"
+                            oninput="onEnSize()" class="w-full accent-indigo-500">
+                        <div class="flex justify-between text-[10px] text-slate-600 mt-0.5"><span>28</span><span>120</span></div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>中文字号
+                                <button onclick="syncZhFromEn()" class="ml-1 text-[10px] text-indigo-400 hover:text-indigo-300 underline">ZH=85%EN</button>
+                            </span><span id="sf-zh-size-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-zh-size" min="24" max="100" step="1"
+                            oninput="onZhSize()" class="w-full accent-indigo-500">
+                        <div class="flex justify-between text-[10px] text-slate-600 mt-0.5"><span>24</span><span>100</span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">英文颜色</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="sf-en-color" oninput="onColorHex('en', true)"
+                                class="h-9 w-12 rounded bg-slate-900 border border-slate-600 cursor-pointer p-0.5">
+                            <input type="text" id="sf-en-color-hex" onchange="onColorHex('en')"
+                                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">中文颜色</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="sf-zh-color" oninput="onColorHex('zh', true)"
+                                class="h-9 w-12 rounded bg-slate-900 border border-slate-600 cursor-pointer p-0.5">
+                            <input type="text" id="sf-zh-color-hex" onchange="onColorHex('zh')"
+                                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">描边颜色</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="sf-stroke-color" oninput="onColorHex('stroke', true)"
+                                class="h-9 w-12 rounded bg-slate-900 border border-slate-600 cursor-pointer p-0.5">
+                            <input type="text" id="sf-stroke-color-hex" onchange="onColorHex('stroke')"
+                                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>英文描边</span><span id="sf-en-stroke-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-en-stroke" min="0" max="12" step="1"
+                            oninput="onParam('en-stroke')" class="w-full accent-indigo-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>中文描边</span><span id="sf-zh-stroke-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-zh-stroke" min="0" max="12" step="1"
+                            oninput="onParam('zh-stroke')" class="w-full accent-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>底部边距</span><span id="sf-bottom-margin-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-bottom-margin" min="0" max="200" step="1"
+                            oninput="onParam('bottom-margin')" class="w-full accent-indigo-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>多行行距</span><span id="sf-line-gap-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-line-gap" min="0" max="30" step="1"
+                            oninput="onParam('line-gap')" class="w-full accent-indigo-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 flex justify-between mb-1">
+                            <span>EN/ZH 间距</span><span id="sf-en-zh-gap-v" class="text-indigo-300 font-mono"></span>
+                        </label>
+                        <input type="range" id="sf-en-zh-gap" min="0" max="60" step="1"
+                            oninput="onParam('en-zh-gap')" class="w-full accent-indigo-500">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 flex-wrap bg-slate-900/50 rounded-lg px-4 py-3">
+                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="sf-box" onchange="onBoxToggle()"
+                            class="w-4 h-4 accent-indigo-500">
+                        半透明背景条
+                    </label>
+                    <div class="flex items-center gap-2 flex-1 min-w-[180px]">
+                        <span class="text-xs text-slate-400">透明度</span>
+                        <input type="range" id="sf-box-opacity" min="20" max="90" step="1" disabled
+                            oninput="onParam('box-opacity')" class="flex-1 accent-indigo-500">
+                        <span id="sf-box-opacity-v" class="text-xs text-indigo-300 font-mono w-8 text-right"></span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs text-slate-500">快捷字号：</span>
+                    <button onclick="applySizePreset(48, 41, 4, 3)" class="px-2.5 py-1 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">紧凑</button>
+                    <button onclick="applySizePreset(60, 51, 5, 4)" class="px-2.5 py-1 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">标准</button>
+                    <button onclick="applySizePreset(72, 61, 7, 6)" class="px-2.5 py-1 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">大</button>
+                    <button onclick="applySizePreset(84, 71, 8, 7)" class="px-2.5 py-1 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-300">特大</button>
+                </div>
+            </div>
+
+            <!-- 右：实时预览 -->
+            <div class="lg:w-[430px] shrink-0">
+                <div class="lg:sticky lg:top-4 space-y-3">
+                    <div class="rounded-xl overflow-hidden border border-slate-600 bg-slate-900">
+                        <img id="live-preview" class="w-full block" alt="字幕预览">
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="pv-canvas" onchange="refreshPreview()"
+                            class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                            <option value="16:9">画布 16:9 (1280×720)</option>
+                            <option value="9:16">画布 9:16 (1080×1920, shorts)</option>
+                        </select>
+                        <select id="pv-bg" onchange="refreshPreview()"
+                            class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                            <option value="gradient">测试渐变</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <input type="text" id="pv-sample-en" placeholder="英文样例文本"
+                            oninput="refreshPreview()"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white">
+                        <input type="text" id="pv-sample-zh" placeholder="中文样例文本（繁体）"
+                            oninput="refreshPreview()"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mt-5 pt-4 border-t border-slate-700">
+            <button onclick="saveStyle()" id="sf-save" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存</button>
+            <button onclick="hideForm()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">取消</button>
+        </div>
+    </div>
+
+    <!-- 内置样式 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>📦</span> 内置样式（{{ styles | selectattr('builtin') | list | length }} 个）
+        </h3>
+        <div class="grid grid-cols-3 gap-4">
+            {% for s in styles if s.builtin %}
+            {{ style_card(s) }}
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- 自定义样式 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>✏️</span> 自定义样式（{{ styles | rejectattr('builtin') | list | length }} 个）
+        </h3>
+        <div id="custom-grid" class="grid grid-cols-3 gap-4">
+            {% for s in styles if not s.builtin %}
+            {{ style_card(s) }}
+            {% endfor %}
+        </div>
+        {% if styles | rejectattr('builtin') | list | length == 0 %}
+        <p class="text-xs text-slate-500">暂无自定义样式。点击右上角「+ 新建样式」或对内置样式「复制编辑」创建自己的字幕样式。</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CURRENT_ID = {{ current_id | tojson }};
+const STYLE_DATA = {};
+{% for s in styles %}
+STYLE_DATA[{{ s.id | tojson }}] = {{ s | tojson }};
+{% endfor %}
+const FONTS = {{ fonts | tojson }};
+const BACKGROUNDS = {{ backgrounds | tojson }};
+const DEFAULT_SAMPLE_EN = "Could I get a large iced latte, please?";
+const DEFAULT_SAMPLE_ZH = "我可以要一杯大杯冰拿鐵嗎？";
+
+let previewTimer = null;
+let previewSeq = 0;
+let editingExisting = false;
+
+function toast(msg, ok = true) {
+    const t = document.createElement('div');
+    t.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-sm text-white shadow-lg ${ok ? 'bg-green-600' : 'bg-red-600'}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+async function api(url, opts = {}) {
+    const res = await fetch(url, {
+        headers: {'Content-Type': 'application/json'},
+        ...opts,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+}
+
+// --- 表单值读写 -------------------------------------------------------------
+const PARAM_IDS = ['en-size', 'zh-size', 'en-stroke', 'zh-stroke',
+                   'bottom-margin', 'line-gap', 'en-zh-gap', 'box-opacity'];
+const PARAM_KEYS = {'en-size': 'en_size', 'zh-size': 'zh_size', 'en-stroke': 'en_stroke',
+                    'zh-stroke': 'zh_stroke', 'bottom-margin': 'bottom_margin',
+                    'line-gap': 'line_gap', 'en-zh-gap': 'en_zh_gap', 'box-opacity': 'box_opacity'};
+
+function val(id) { return document.getElementById('sf-' + id).value; }
+function setVal(id, v) { document.getElementById('sf-' + id).value = v; }
+
+function collectStyle() {
+    return {
+        id: document.getElementById('sf-id').value.trim(),
+        name: document.getElementById('sf-name').value.trim(),
+        description: document.getElementById('sf-desc').value.trim(),
+        font_en: val('font-en'), font_zh: val('font-zh'),
+        en_size: +val('en-size'), zh_size: +val('zh-size'),
+        en_color: document.getElementById('sf-en-color').value.toUpperCase(),
+        zh_color: document.getElementById('sf-zh-color').value.toUpperCase(),
+        stroke_color: document.getElementById('sf-stroke-color').value.toUpperCase(),
+        en_stroke: +val('en-stroke'), zh_stroke: +val('zh-stroke'),
+        bottom_margin: +val('bottom-margin'), line_gap: +val('line-gap'),
+        en_zh_gap: +val('en-zh-gap'),
+        box: document.getElementById('sf-box').checked,
+        box_opacity: +val('box-opacity'),
+    };
+}
+
+function fillForm(style) {
+    document.getElementById('sf-id').value = style ? style.id : '';
+    document.getElementById('sf-id').disabled = editingExisting;
+    document.getElementById('sf-name').value = style ? style.name : '';
+    document.getElementById('sf-desc').value = style ? (style.description || '') : '';
+    document.getElementById('sf-font-en').value = style ? style.font_en : 'msyhbd';
+    document.getElementById('sf-font-zh').value = style ? style.font_zh : 'msyh';
+    setVal('en-size', style ? style.en_size : 60);
+    setVal('zh-size', style ? style.zh_size : 51);
+    setVal('en-stroke', style ? style.en_stroke : 5);
+    setVal('zh-stroke', style ? style.zh_stroke : 4);
+    setVal('bottom-margin', style ? style.bottom_margin : 36);
+    setVal('line-gap', style ? style.line_gap : 6);
+    setVal('en-zh-gap', style ? style.en_zh_gap : 15);
+    setVal('box-opacity', style ? style.box_opacity : 55);
+    document.getElementById('sf-box').checked = style ? !!style.box : false;
+    for (const [id, key] of Object.entries({en: 'en_color', zh: 'zh_color', stroke: 'stroke_color'})) {
+        const v = (style && style[key]) || (key === 'en_color' ? '#FFFFFF' : key === 'zh_color' ? '#FFD700' : '#000000');
+        document.getElementById(`sf-${id}-color`).value = v;
+        document.getElementById(`sf-${id}-color-hex`).value = v.toUpperCase();
+    }
+    syncLabels();
+    onBoxToggle();
+}
+
+function syncLabels() {
+    for (const id of PARAM_IDS) {
+        const el = document.getElementById(`sf-${id}-v`);
+        if (el) el.textContent = val(id);
+    }
+}
+
+// --- 事件处理 ---------------------------------------------------------------
+function onParam(id) { syncLabels(); refreshPreview(); }
+
+function onEnSize() {
+    syncLabels();
+    // ZH 滑杆跟随 85% 比例（可手动再调）
+    const zh = Math.round(+val('en-size') * 0.85);
+    setVal('zh-size', Math.max(24, Math.min(100, zh)));
+    syncLabels();
+    refreshPreview();
+}
+function onZhSize() { syncLabels(); refreshPreview(); }
+
+function onColorHex(which, fromPicker = false) {
+    const picker = document.getElementById(`sf-${which}-color`);
+    const hex = document.getElementById(`sf-${which}-color-hex`);
+    if (fromPicker) hex.value = picker.value.toUpperCase();
+    else {
+        let v = hex.value.trim();
+        if (!v.startsWith('#')) v = '#' + v;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) picker.value = v;
+        else hex.value = picker.value.toUpperCase();
+    }
+    refreshPreview();
+}
+
+function onBoxToggle() {
+    const box = document.getElementById('sf-box').checked;
+    document.getElementById('sf-box-opacity').disabled = !box;
+    syncLabels();
+    refreshPreview();
+}
+
+function syncZhFromEn() {
+    const zh = Math.max(24, Math.min(100, Math.round(+val('en-size') * 0.85)));
+    setVal('zh-size', zh);
+    syncLabels();
+    refreshPreview();
+}
+
+function applySizePreset(en, zh, enStroke, zhStroke) {
+    setVal('en-size', en); setVal('zh-size', zh);
+    setVal('en-stroke', enStroke); setVal('zh-stroke', zhStroke);
+    syncLabels();
+    refreshPreview();
+}
+
+// --- 实时预览（防抖 350ms） ---------------------------------------------------
+function refreshPreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+        const seq = ++previewSeq;
+        try {
+            const res = await fetch('/api/subtitle-styles/preview/render', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    style: collectStyle(),
+                    bg: document.getElementById('pv-bg').value,
+                    canvas: document.getElementById('pv-canvas').value,
+                    sample_en: document.getElementById('pv-sample-en').value,
+                    sample_zh: document.getElementById('pv-sample-zh').value,
+                }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            if (seq !== previewSeq) return;  // 过期响应丢弃
+            document.getElementById('live-preview').src = URL.createObjectURL(blob);
+        } catch (e) {
+            document.getElementById('live-preview').alt = '预览失败: ' + e.message;
+        }
+    }, 350);
+}
+
+// --- 表单显隐 ----------------------------------------------------------------
+function showForm() {
+    editingExisting = false;
+    fillForm(null);
+    document.getElementById('form-title').textContent = '新建字幕样式';
+    document.getElementById('style-form').classList.remove('hidden');
+    document.getElementById('style-form').scrollIntoView({behavior: 'smooth'});
+    refreshPreview();
+}
+
+function editStyle(id, inplace = false) {
+    const s = STYLE_DATA[id];
+    if (!s) return;
+    editingExisting = inplace;
+    if (!inplace) {
+        // 复制编辑：清空 id 让用户另存为新样式
+        const copy = {...s, id: '', name: s.name + ' 副本'};
+        fillForm(copy);
+        document.getElementById('form-title').textContent = `复制自: ${s.name}（保存为新样式）`;
+    } else {
+        fillForm(s);
+        document.getElementById('form-title').textContent = `编辑样式: ${s.name}`;
+    }
+    document.getElementById('style-form').classList.remove('hidden');
+    document.getElementById('style-form').scrollIntoView({behavior: 'smooth'});
+    refreshPreview();
+}
+
+function hideForm() {
+    document.getElementById('style-form').classList.add('hidden');
+    document.getElementById('sf-id').disabled = false;
+}
+
+// --- 保存 / 选择 / 删除 -------------------------------------------------------
+async function saveStyle() {
+    const style = collectStyle();
+    if (!style.id || !style.name) { toast('ID 和名称必填', false); return; }
+    try {
+        await api(editingExisting ? '/api/subtitle-styles/update' : '/api/subtitle-styles/create',
+                  {method: 'POST', body: JSON.stringify(style)});
+        toast('已保存');
+        setTimeout(() => location.reload(), 500);
+    } catch (e) { toast(e.message, false); }
+}
+
+async function selectStyle(id) {
+    try {
+        await api('/api/subtitle-styles/select', {method: 'POST', body: JSON.stringify({style_id: id})});
+        toast('已设为当前字幕样式（跟随当前模式）');
+        setTimeout(() => location.reload(), 600);
+    } catch (e) { toast(e.message, false); }
+}
+
+async function deleteStyle(id) {
+    if (!confirm(`确定删除自定义字幕样式「${id}」？使用它的模式将回落「跟随参数配置」。`)) return;
+    try {
+        const r = await api(`/api/subtitle-styles/${id}`, {method: 'DELETE'});
+        toast(r.reset_modes?.length ? `已删除（${r.reset_modes.length} 个模式配置已回落默认）` : '已删除');
+        setTimeout(() => location.reload(), 600);
+    } catch (e) { toast(e.message, false); }
+}
+
+// --- 初始化 -------------------------------------------------------------------
+(function init() {
+    // 字体下拉（不可用字体标注提示）
+    for (const selId of ['sf-font-en', 'sf-font-zh']) {
+        const sel = document.getElementById(selId);
+        sel.innerHTML = FONTS.map(f =>
+            `<option value="${f.key}">${f.label}${f.available ? '' : '（不可用，回退默认）'}</option>`).join('');
+    }
+    // 背景下拉
+    document.getElementById('pv-bg').innerHTML = BACKGROUNDS.map(b =>
+        `<option value="${b.id}">${b.name}</option>`).join('');
+    // 样例文本
+    document.getElementById('pv-sample-en').value = DEFAULT_SAMPLE_EN;
+    document.getElementById('pv-sample-zh').value = DEFAULT_SAMPLE_ZH;
+})();
+</script>
+{% endblock %}

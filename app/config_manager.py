@@ -133,6 +133,10 @@ PARAM_SPEC = {
                    "label": "渲染帧率 (stop_motion)"},
     "workers": {"default": 1, "type": "number", "group": "video",
                 "label": "渲染线程数", "help": "0=自动(CPU核数)"},
+    "subtitle_style": {"default": "", "type": "select", "group": "video",
+                       "label": "字幕样式",
+                       "options": {"": "跟随参数配置（默认）"},
+                       "help": "「字幕样式」页设计并选择；跟随参数配置时使用下方字幕字体大小"},
     "subtitle_font_size": {"default": 60, "type": "number", "group": "video",
                           "label": "字幕字体大小"},
     "no_zh_subtitle": {"default": False, "type": "checkbox", "group": "video",
@@ -446,6 +450,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
             pass
     args += ["--render-fps", str(config.get("render_fps", 8))]
     args += ["--workers", str(config.get("workers", 1))]
+    if config.get("subtitle_style"):
+        args += ["--subtitle-style", str(config["subtitle_style"])]
     args += ["--subtitle-font-size", str(config.get("subtitle_font_size", 60))]
     if config.get("no_zh_subtitle"):
         args.append("--no-zh-subtitle")
@@ -461,8 +467,28 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     return args
 
 
+def _extract_token(entry: dict) -> str | None:
+    """从单条 token 文件条目中提取 accessToken（兼容多种字段布局）。"""
+    tok = entry.get("token")
+    if isinstance(tok, dict):
+        at = tok.get("accessToken") or tok.get("access_token")
+        if at and isinstance(at, str) and len(at) > 10:
+            return at
+    elif isinstance(tok, str) and len(tok) > 10:
+        return tok
+    for key in ("access_token", "accessToken"):
+        val = entry.get(key)
+        if val and isinstance(val, str) and len(val) > 10:
+            return val
+    return None
+
+
 def detect_local_mcp_token() -> str | None:
-    """Try to read MCP OAuth token from Codely CLI config."""
+    """Try to read MCP OAuth token from Codely CLI config.
+
+    优先精确匹配 TJGenerators server（本项目唯一的 MCP 图片生成服务），
+    避免将来配置其他 MCP server 后误取别家 token；找不到再宽松兜底。
+    """
     home = Path.home()
     token_file = home / ".codely-cli" / "mcp-oauth-tokens.json"
     if not token_file.exists():
@@ -471,20 +497,20 @@ def detect_local_mcp_token() -> str | None:
         data = json.loads(token_file.read_text(encoding="utf-8"))
         # Format: [{"serverName": "...", "token": {"accessToken": "...", ...}, ...}]
         if isinstance(data, list):
+            # 1. 优先 TJGenerators
+            for entry in data:
+                if (isinstance(entry, dict)
+                        and entry.get("serverName") == "TJGenerators"):
+                    at = _extract_token(entry)
+                    if at:
+                        return at
+            # 2. 宽松兜底：任意条目的 token
             for entry in data:
                 if not isinstance(entry, dict):
                     continue
-                tok = entry.get("token")
-                if isinstance(tok, dict):
-                    at = tok.get("accessToken") or tok.get("access_token")
-                    if at and isinstance(at, str) and len(at) > 10:
-                        return at
-                elif isinstance(tok, str) and len(tok) > 10:
-                    return tok
-                for key in ("access_token", "accessToken"):
-                    val = entry.get(key)
-                    if val and isinstance(val, str) and len(val) > 10:
-                        return val
+                at = _extract_token(entry)
+                if at:
+                    return at
         # Format: {"serverName": {"token": "..."}, ...} or {"token": "..."}
         if isinstance(data, dict):
             for key in ("access_token", "token", "accessToken"):

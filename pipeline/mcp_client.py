@@ -230,13 +230,17 @@ def parse_task_id(result):
     return ""
 
 
-def poll_task(task_id, interval=40, max_wait=600):
+def poll_task(task_id, interval=40, max_wait=600, stop_check=None):
     """Poll check_task until completed or failed. Returns dict containing:
     - status, url (success)
     - status, raw (full raw check_task response + error message on failure)
+    - status="stopped" if stop_check() returns True
     """
     elapsed = 0
     while elapsed < max_wait:
+        if stop_check and stop_check():
+            print(f"  [STOP] Polling interrupted for task {task_id[:16]}...")
+            return {"status": "stopped"}
         try:
             result = call_tool("check_task", {"task_id": task_id})
         except Exception as e:
@@ -325,8 +329,16 @@ def poll_task(task_id, interval=40, max_wait=600):
             print(f"  FAILED: {json.dumps(task_data, ensure_ascii=False)[:1000]}")
             return task_data
 
+        # Sleep in small increments so stop_check responds quickly
+        remaining = interval
+        while remaining > 0:
+            if stop_check and stop_check():
+                print(f"  [STOP] Polling interrupted for task {task_id[:16]}...")
+                return {"status": "stopped"}
+            sleep_step = min(remaining, 5)
+            time.sleep(sleep_step)
+            remaining -= sleep_step
         elapsed += interval
-        time.sleep(interval)
 
     print(f"  TIMEOUT after {max_wait}s for task {task_id}")
     return {}

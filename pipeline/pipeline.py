@@ -206,6 +206,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-4k", dest="no_4k", action="store_true", help="Skip the final 4K upscaling step")
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
     parser.add_argument("--subtitle-font-size", type=int, default=60, help="English subtitle font size in pixels (default 60). ZH subtitle is auto-scaled to 85%% of EN size.")
+    parser.add_argument("--subtitle-style", default="", help="Subtitle style id from subtitle_style_manager (web 字幕样式页). Empty = legacy behavior driven by --subtitle-font-size.")
     parser.add_argument("--tts-rate", default=None, help="Override dialogue English TTS rate (e.g. '-15%%', '0%%'). Default: mode-dependent (quest '0%%', others '-15%%')")
     parser.add_argument("--tts-engine", default="kokoro", choices=["kokoro", "voxcpm", "qwen"],
                         help="TTS engine: 'kokoro' (default, local) or 'voxcpm' (VoxCPM via Cloudflare Worker, LLM-designed voices) or 'qwen' (Qwen3-TTS local GPU)")
@@ -711,6 +712,17 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             scene_img = str(_s0)
     sub_dir = dirs["subtitles"]
 
+    # 字幕样式：style_id → 样式 dict（"" → None，走 --subtitle-font-size 历史行为）
+    sub_style: dict | None = None
+    if getattr(args, "subtitle_style", ""):
+        try:
+            from subtitle_style_manager import get_style as _get_sub_style
+            sub_style = _get_sub_style(args.subtitle_style)
+        except ImportError:
+            sub_style = None
+        if sub_style is None:
+            print(f"  [SubtitleStyle] 未找到样式 '{args.subtitle_style}'，回退默认字幕参数")
+
     def progress_cb(pct, msg):
         print(f"  [{pct}%] {msg}")
 
@@ -783,6 +795,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             pad=args.pad,
             show_zh=not getattr(args, "no_zh_subtitle", False),
             subtitle_font_size=args.subtitle_font_size,
+            subtitle_style=sub_style,
             progress_cb=progress_cb,
             stop_check=stop_check,
             lip_sync=getattr(args, "lip_sync", True),
@@ -844,6 +857,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             pad=args.pad,
             show_zh=not getattr(args, "no_zh_subtitle", False),
             subtitle_font_size=args.subtitle_font_size,
+            subtitle_style=sub_style,
             progress_cb=progress_cb,
             stop_check=stop_check,
         )
@@ -878,6 +892,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             progress_cb=progress_cb,
             animation=args.animation,
             subtitle_font_size=args.subtitle_font_size,
+            subtitle_style=sub_style,
         )
     elif args.structure == "shorts":
         # Vertical 9:16 Shorts — reuse the image compose path at 1080x1920.
@@ -904,6 +919,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             progress_cb=progress_cb,
             animation=args.animation,
             subtitle_font_size=args.subtitle_font_size,
+            subtitle_style=sub_style,
             target_w=1080,
             target_h=1920,
         )
@@ -923,6 +939,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             group_info=group_info,
             line_to_group=line_to_group,
             subtitle_font_size=args.subtitle_font_size,
+            subtitle_style=sub_style,
         )
     if not final_path:
         print("  [Compose] Interrupted or no output, skipping checkpoint save.")
