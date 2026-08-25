@@ -49,7 +49,18 @@ PIPELINE_DIR = WEB_ROOT / "pipeline"
 
 # FastAPI app
 app = FastAPI(title="Listening Video Generator")
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+class _NoCacheStaticFiles(StaticFiles):
+    """静态文件禁用浏览器缓存（本地开发工具，CSS/JS 迭代频繁，防止改版后浏览器继续用旧缓存）。"""
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
+app.mount("/static", _NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 

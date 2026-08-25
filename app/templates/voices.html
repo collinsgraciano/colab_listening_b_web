@@ -30,7 +30,7 @@
             <span>📋</span> 预设音色 (9 个)
             <span id="preset-arrow" class="text-slate-500 text-xs">▸</span>
         </h3>
-        <div id="preset-grid" class="vc-grid hidden">
+        <div id="preset-grid" class="vc-grid grid hidden">
             <!-- Cards rendered by JS -->
         </div>
     </section>
@@ -141,13 +141,13 @@
                 <span id="cand-preview-status" class="text-xs text-slate-400"></span>
             </div>
 
-            <div id="candidate-grid" class="vc-grid">
+            <div id="candidate-grid" class="vc-grid grid">
                 <!-- Candidate cards rendered by JS -->
             </div>
         </div>
 
         <!-- Custom voice list -->
-        <div id="custom-grid" class="vc-grid">
+        <div id="custom-grid" class="vc-grid grid">
             <!-- Cards rendered by JS -->
         </div>
     </section>
@@ -157,14 +157,14 @@
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>🔗</span> 角色素材库音色绑定
         </h3>
-        <div id="binding-grid" class="vc-grid vc-grid-wide">
+        <div id="binding-grid" class="vc-grid vc-grid-wide grid">
             {% if not library_chars %}
             <p class="text-xs text-slate-500 col-span-full">素材库为空。请先在控制台收藏角色。</p>
             {% endif %}
             {% for char in library_chars %}
             <div class="bcard bg-slate-800 border border-slate-700">
                 {% if char.image_url %}
-                <img src="{{ char.image_url }}" class="bcard-img object-cover bg-slate-800" onerror="this.style.opacity='0.3'">
+                <img src="{{ char.image_url }}" class="bcard-img max-w-full object-cover bg-slate-800" onerror="this.style.opacity='0.3'">
                 {% else %}
                 <div class="bcard-img bg-slate-700 flex items-center justify-center" style="font-size: max(14px, calc(28px * var(--vc)));">👤</div>
                 {% endif %}
@@ -226,7 +226,7 @@ const CARD_SCALE_KEY = 'voices_card_scale_v1';
 
 function applyCardScale(pct) {
     const v = Math.min(150, Math.max(40, Number(pct) || 50)) / 100;
-    document.querySelector('.voices-page').style.setProperty('--vc', v);
+    document.querySelector('.voices-page').style.setProperty('--vc', String(v));
     const slider = document.getElementById('card-scale');
     slider.value = Math.round(v * 100);
     document.getElementById('card-scale-label').textContent = Math.round(v * 100) + '%';

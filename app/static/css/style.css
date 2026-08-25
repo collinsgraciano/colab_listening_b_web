@@ -54,9 +54,9 @@ input:not(:checked) + div > div {
 /* --vc 为缩放系数：0.5 = 卡片缩小一半（约 5-6 列/行），1.0 = 原始大小（3 列/行） */
 .voices-page { --vc: 0.5; }
 
-/* 卡片网格：列宽随缩放变化，auto-fill 自动增减列数 */
+/* 卡片网格：列宽随缩放变化，auto-fill 自动增减列数
+   （display 由 Tailwind grid 类提供，避免与 hidden 折叠类层叠冲突） */
 .vc-grid {
-    display: grid;
     grid-template-columns: repeat(auto-fill, minmax(calc(360px * var(--vc)), 1fr));
     gap: calc(12px * var(--vc));
 }
