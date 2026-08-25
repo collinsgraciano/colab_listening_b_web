@@ -232,7 +232,9 @@ class PipelineService:
 
         Sources (priority: library > run reuse > fixes):
           - character_library: {char_a: "lib_id"} → description + gender from library
-          - character_reuse: {char_a: "image"|"desc"} → description + gender from run
+            (仅音色+性别角色 description 为空 → 只注入 gender + qwen_speaker)
+          - character_reuse: {char_a: "image"|"desc"|"voice"} → description + gender from run
+            ("voice" → 只取 gender + qwen_speaker，外观每次由 LLM 按主题新创作)
           - character_fixes: {char_a: "custom desc"} → custom description
 
         role is NEVER injected — LLM always generates role based on topic.
@@ -321,6 +323,12 @@ class PipelineService:
                         val = source_script.get(f"{key}_{suffix}", "")
                         if val:
                             char_info[suffix] = val
+                elif mode == "voice" and source_script:
+                    # voice 模式：只固定音色+性别，外观由 LLM 按主题重新生成
+                    for suffix in ["gender", "qwen_speaker"]:
+                        val = source_script.get(f"{key}_{suffix}", "")
+                        if val:
+                            char_info[suffix] = val
 
             # Priority 3: custom fix (overrides description only)
             fix_desc = (fixes_map.get(key, "") or "").strip()
@@ -345,7 +353,12 @@ class PipelineService:
 
         Mode "image": copy images + override description + gender (NOT role)
         Mode "desc":  override description only (NOT gender, NOT role, no images)
+        Mode "voice": override gender + qwen_speaker only (no description, no images
+                      — appearance is re-created by the LLM for every topic)
         character_fixes: override description (no source needed)
+
+        Library characters with empty description (仅音色+性别) naturally inject
+        gender + qwen_speaker only (empty values are skipped below).
 
         Called after step0 but before step2. Pipeline skips existing images.
         """
@@ -458,6 +471,17 @@ class PipelineService:
                                 script[f"{key}_{suffix}"] = val
                                 overridden.append(f"{key}_{suffix}")
 
+                    # --- Mode "voice": override gender + qwen_speaker only
+                    #     (fresh appearance every run — description stays LLM-generated) ---
+                    for key in all_char_keys:
+                        if reuse_map.get(key) != "voice":
+                            continue
+                        for suffix in ["gender", "qwen_speaker"]:
+                            val = source_script.get(f"{key}_{suffix}", "")
+                            if val:
+                                script[f"{key}_{suffix}"] = val
+                                overridden.append(f"{key}_{suffix}")
+
         # --- Library characters: copy images + override desc + gender (NOT role) ---
         lib_raw = self.config.get("character_library", "")
         lib_map: dict[str, str] = {}
@@ -478,7 +502,8 @@ class PipelineService:
                     self._on_log_line(f"  [Library] {lib_id} not found")
                     continue
                 lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
-                # Override description + gender
+                # Override description + gender（仅音色+性别角色 description 为空
+                # → 只注入 gender + qwen_speaker，外观每次由 LLM 重新生成）
                 for suffix in ["description", "gender", "qwen_speaker"]:
                     val = lib_meta.get(suffix, "")
                     if val:

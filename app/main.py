@@ -2431,11 +2431,13 @@ async def api_library_create(
     qwen_speaker: str = Form(""),
     image: UploadFile | None = File(None),
 ):
-    """Manually create a new character in the library."""
+    """Manually create a new character in the library.
+
+    Empty description = 仅音色+性别角色 (voice+gender only — appearance is
+    re-created by the LLM for every video; no images stored).
+    """
     if not name.strip():
         return JSONResponse({"ok": False, "error": "名称不能为空"}, status_code=400)
-    if not description.strip():
-        return JSONResponse({"ok": False, "error": "描述不能为空"}, status_code=400)
 
     lib_id = f"char_{int(time.time())}_{gender or 'custom'}"
     lib_dir = LIBRARY_DIR / lib_id

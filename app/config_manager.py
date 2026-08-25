@@ -44,7 +44,7 @@ PARAM_SPEC = {
     "character_source": {"default": "", "type": "text", "group": "content",
                          "label": "复用角色来源", "help": "留空=全部新生成。选择之前运行可复用其角色"},
     "character_reuse": {"default": "", "type": "text", "group": "content",
-                        "label": "复用角色选择", "help": "选择哪些角色从来源复用 (JSON)"},
+                        "label": "复用角色选择", "help": "JSON: {char_a: 'image'|'desc'|'voice'} — image=图片+描述+性别, desc=描述+性别, voice=仅音色+性别(外观每次重新生成)"},
     "character_fixes": {"default": "", "type": "text", "group": "content",
                         "label": "固定角色描述", "help": "手动指定角色外观描述 (JSON)"},
     "character_library": {"default": "", "type": "text", "group": "content",

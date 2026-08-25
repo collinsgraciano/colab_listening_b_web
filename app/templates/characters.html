@@ -38,12 +38,22 @@
             <span>✨</span> 新建角色
         </h3>
         <div id="create-form" class="bg-slate-800 rounded-xl p-5 border border-slate-700">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">名称 *</label>
-                    <input type="text" id="new-name" placeholder="如：咖啡馆店员 Sarah"
+                    <input type="text" id="new-name" placeholder="如：咖啡馆店员 Sarah / 男声播客 Ryan"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
                 </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">角色类型</label>
+                    <select id="new-type" onchange="onNewTypeChange()"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="full">完整角色 (固定外观)</option>
+                        <option value="voice">仅音色+性别 (外观每次按内容重新生成)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">性别 *</label>
                     <select id="new-gender" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
@@ -59,7 +69,7 @@
                     </select>
                 </div>
             </div>
-            <div class="mb-4">
+            <div id="new-desc-wrap" class="mb-4">
                 <label class="block text-xs text-slate-400 mb-1">外观描述 (英文) *</label>
                 <textarea id="new-description" rows="3"
                     placeholder="a young woman with long brown hair, wearing a red dress and carrying a handbag"
@@ -70,22 +80,25 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">Qwen 音色 (可选)</label>
+                    <label class="block text-xs text-slate-400 mb-1">Qwen 音色 *</label>
                     <select id="new-voice" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                         <option value="">不绑定 (按性别默认)</option>
                     </select>
                 </div>
-                <div>
+                <div id="new-image-wrap">
                     <label class="block text-xs text-slate-400 mb-1">参考图片 (可选)</label>
                     <input type="file" id="new-image" accept="image/*"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                 </div>
             </div>
+            <p id="new-voice-hint" class="hidden text-[10px] text-indigo-300 mb-4">
+                🎤 仅音色+性别角色：只有音色和性别固定，不保存外观描述和图片 —— 每次生成视频时 LLM 会按主题内容重新设计外观
+            </p>
             <div class="flex gap-3">
-                <button onclick="createCharacter()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium text-sm">
+                <button onclick="createCharacter(false)" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium text-sm">
                     ✨ 创建角色
                 </button>
-                <button onclick="createAndGenerate()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium text-sm">
+                <button id="btn-create-generate" onclick="createAndGenerate()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium text-sm">
                     🚀 创建并生成图片
                 </button>
             </div>
@@ -174,6 +187,7 @@ function renderCharGrid() {
 }
 
 function createCharCard(char) {
+    const voiceOnly = !char.description;
     const div = document.createElement('div');
     div.id = `card-${char.id}`;
     div.className = 'bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col gap-3';
@@ -182,10 +196,20 @@ function createCharCard(char) {
     const header = document.createElement('div');
     header.className = 'flex gap-3';
 
-    const img = document.createElement('img');
-    img.src = char.image_url || '';
-    img.className = 'w-20 h-20 rounded-lg object-cover bg-slate-700 shrink-0';
-    img.onerror = function() { this.style.opacity = '0.3'; this.alt = '👤'; };
+    if (voiceOnly) {
+        // 仅音色+性别角色：无外观图，用 🎤 占位
+        const ph = document.createElement('div');
+        ph.className = 'w-20 h-20 rounded-lg bg-indigo-900/40 border border-indigo-700 flex items-center justify-center text-3xl shrink-0';
+        ph.textContent = '🎤';
+        ph.title = '仅音色+性别 · 外观每次按内容重新生成';
+        header.appendChild(ph);
+    } else {
+        const img = document.createElement('img');
+        img.src = char.image_url || '';
+        img.className = 'w-20 h-20 rounded-lg object-cover bg-slate-700 shrink-0';
+        img.onerror = function() { this.style.opacity = '0.3'; this.alt = '👤'; };
+        header.appendChild(img);
+    }
 
     const info = document.createElement('div');
     info.className = 'flex-1 min-w-0';
@@ -200,20 +224,27 @@ function createCharCard(char) {
     const genderColor = char.gender === 'female' ? 'bg-pink-900/50 text-pink-300' : 'bg-blue-900/50 text-blue-300';
     badges.innerHTML = `
         <span class="text-[10px] px-2 py-0.5 rounded-full ${genderColor}">${char.gender || '?'}</span>
-        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">${char.structure || '?'}</span>
+        ${voiceOnly
+            ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">仅音色+性别</span>`
+            : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">${char.structure || '?'}</span>`}
         ${char.qwen_speaker ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">🎤 ${char.qwen_speaker}</span>` : ''}
-        ${char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
+        ${!voiceOnly && char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
     `;
 
     const desc = document.createElement('div');
-    desc.className = 'text-xs text-slate-400 mt-1 line-clamp-2';
-    desc.textContent = char.description || '';
-    desc.title = char.description || '';
+    desc.className = 'text-xs mt-1 line-clamp-2';
+    if (voiceOnly) {
+        desc.className += ' text-slate-500 italic';
+        desc.textContent = '外观每次按内容重新生成';
+    } else {
+        desc.className += ' text-slate-400';
+        desc.textContent = char.description || '';
+    }
+    desc.title = char.description || '仅音色+性别 · 外观每次按内容重新生成';
 
     info.appendChild(name);
     info.appendChild(badges);
     info.appendChild(desc);
-    header.appendChild(img);
     header.appendChild(info);
     div.appendChild(header);
 
@@ -247,7 +278,7 @@ function createCharCard(char) {
                 <option value="original" ${char.structure === 'original' ? 'selected' : ''}>Original</option>
             </select>
         </div>
-        <textarea id="edit-desc-${char.id}" rows="3" placeholder="英文外观描述"
+        <textarea id="edit-desc-${char.id}" rows="3" placeholder="英文外观描述（清空 = 转为仅音色+性别角色）"
             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white resize-y">${char.description || ''}</textarea>
         <select id="edit-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
             <option value="">不绑定音色</option>
@@ -266,7 +297,7 @@ function createCharCard(char) {
     actions.className = 'flex flex-wrap gap-2 mt-auto';
     actions.innerHTML = `
         <button onclick="toggleEdit('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">✏️ 编辑</button>
-        <button onclick="generateImages('${char.id}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">🎨 生成图片</button>
+        ${voiceOnly ? '' : `<button onclick="generateImages('${char.id}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">🎨 生成图片</button>`}
         <button onclick="deleteCharacter('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-[11px] text-red-300">🗑 删除</button>
     `;
 
@@ -356,16 +387,25 @@ function saveEdit(libId) {
 }
 
 // --- Create character ---
+function onNewTypeChange() {
+    const isVoice = document.getElementById('new-type').value === 'voice';
+    document.getElementById('new-desc-wrap').classList.toggle('hidden', isVoice);
+    document.getElementById('new-image-wrap').classList.toggle('hidden', isVoice);
+    document.getElementById('new-voice-hint').classList.toggle('hidden', !isVoice);
+    document.getElementById('btn-create-generate').classList.toggle('hidden', isVoice);
+}
+
 function createCharacter(autoGenerate) {
     const name = document.getElementById('new-name').value.trim();
-    const description = document.getElementById('new-description').value.trim();
+    const isVoice = document.getElementById('new-type').value === 'voice';
+    const description = isVoice ? '' : document.getElementById('new-description').value.trim();
     const gender = document.getElementById('new-gender').value;
     const structure = document.getElementById('new-structure').value;
     const qwen_speaker = document.getElementById('new-voice').value;
     const imageInput = document.getElementById('new-image');
 
     if (!name) { alert('请填写名称'); return; }
-    if (!description) { alert('请填写外观描述'); return; }
+    if (!isVoice && !description) { alert('请填写外观描述'); return; }
 
     const formData = new FormData();
     formData.append('name', name);
@@ -373,7 +413,7 @@ function createCharacter(autoGenerate) {
     formData.append('gender', gender);
     formData.append('structure', structure);
     formData.append('qwen_speaker', qwen_speaker);
-    if (imageInput.files[0]) {
+    if (!isVoice && imageInput.files[0]) {
         formData.append('image', imageInput.files[0]);
     }
 

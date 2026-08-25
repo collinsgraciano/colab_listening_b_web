@@ -116,7 +116,7 @@
             <div id="char-cards" class="hidden mt-3 grid grid-cols-2 md:grid-cols-4 gap-3"></div>
             <!-- Character description editor (always shown) -->
             <div id="char-editor" class="mt-3 space-y-2">
-                <p class="text-xs text-slate-500">「图片+性别」复用源角色图片+描述+性别；「描述+性别」只复用描述+性别(重新生成图片)；不选=LLM自动生成。角色名(role)永远由LLM按主题生成。可绑定 Qwen 音色（需 TTS 引擎选 Qwen）。<span class="text-indigo-400">在下方「人物素材库」点 分配→ 即可把素材库角色绑定到 角色A/B/C/主持（复用图片+描述+性别，优先级最高）</span>。<span class="text-emerald-400">「💾 存为套装」可将当前整套角色配置命名保存，下次从上方下拉一键应用。</span></p>
+                <p class="text-xs text-slate-500">「图片+性别」复用源角色图片+描述+性别；「描述+性别」只复用描述+性别(重新生成图片)；「音色+性别」只复用音色+性别，外观每次按主题重新生成；不选=LLM自动生成。角色名(role)永远由LLM按主题生成。可绑定 Qwen 音色（需 TTS 引擎选 Qwen）。<span class="text-indigo-400">在下方「人物素材库」点 分配→ 即可把素材库角色绑定到 角色A/B/C/主持（复用图片+描述+性别，优先级最高；仅音色角色只复用音色+性别）</span>。<span class="text-emerald-400">「💾 存为套装」可将当前整套角色配置命名保存，下次从上方下拉一键应用。</span></p>
                 <div id="char-editor-fields"></div>
             </div>
         </div>
@@ -455,6 +455,7 @@ function onCharSourceChange() {
             <option value="">不复用</option>
             <option value="image">图片+性别</option>
             <option value="desc" selected>描述+性别</option>
+            <option value="voice">音色+性别</option>
         `;
 
         // Qwen voice binding dropdown
@@ -530,9 +531,10 @@ function saveCharState() {
         const val = ta.value.trim();
         if (val) descs[ta.dataset.charDesc] = val;
     });
-    // fixes 语义与 collectCharacterConfig 一致：仅无复用模式的手填描述
+    // fixes 语义与 collectCharacterConfig 一致：无复用模式或 voice 模式的手填描述
+    // （voice 模式手填描述 = 自定义外观；留空 = 外观每次按主题重新生成）
     const fixes = {};
-    Object.entries(descs).forEach(([k, v]) => { if (!reuse[k]) fixes[k] = v; });
+    Object.entries(descs).forEach(([k, v]) => { if (!reuse[k] || reuse[k] === 'voice') fixes[k] = v; });
 
     const cfg = MODE_CONFIGS[ACTIVE_MODE];
     cfg.character_source = source;
@@ -659,8 +661,9 @@ function collectCharacterConfig() {
         if (val) {
             // If mode is "image", description comes from source (not a fix)
             // If mode is "desc", description comes from source (not a fix)
-            // If no mode or source, it's a custom fix
-            if (!mode) {
+            // If mode is "voice" or no mode, typed description is a custom fix
+            // (voice 模式留空 = 外观每次按主题重新生成)
+            if (!mode || mode === 'voice') {
                 fixesMap[key] = val;
             }
         }
@@ -772,22 +775,35 @@ function renderLibrary() {
 
     const charKeys = getCharKeys();
     _libraryChars.forEach(char => {
+        const voiceOnly = !char.description;
         const card = document.createElement('div');
         card.className = 'bg-slate-900/50 border border-slate-700 rounded-lg p-2 flex flex-col items-center gap-1.5';
 
-        const img = document.createElement('img');
-        img.src = char.image_url || '';
-        img.className = 'w-14 h-14 rounded-lg object-cover bg-slate-800';
-        img.onerror = function() { this.style.opacity = '0.3'; };
+        if (voiceOnly) {
+            // 仅音色+性别角色：无外观图，用 🎤 占位
+            const ph = document.createElement('div');
+            ph.className = 'w-14 h-14 rounded-lg bg-indigo-900/40 border border-indigo-700 flex items-center justify-center text-2xl';
+            ph.textContent = '🎤';
+            ph.title = '仅音色+性别 · 外观每次按内容重新生成';
+            card.appendChild(ph);
+        } else {
+            const img = document.createElement('img');
+            img.src = char.image_url || '';
+            img.className = 'w-14 h-14 rounded-lg object-cover bg-slate-800';
+            img.onerror = function() { this.style.opacity = '0.3'; };
+            card.appendChild(img);
+        }
 
         const name = document.createElement('div');
         name.className = 'text-[11px] font-medium text-slate-300 text-center truncate w-full';
         name.textContent = char.name || char.id;
-        name.title = char.description || '';
+        name.title = char.description || '仅音色+性别 · 外观每次按内容重新生成';
 
         const meta = document.createElement('div');
         meta.className = 'text-[10px] text-slate-500';
-        meta.textContent = `${char.gender || '?'} · ${char.structure || '?'}`;
+        meta.textContent = voiceOnly
+            ? `${char.gender || '?'} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}`
+            : `${char.gender || '?'} · ${char.structure || '?'}`;
 
         // Assign dropdown (绑定状态持久化，回显当前绑定)
         const assignDiv = document.createElement('div');
@@ -818,7 +834,6 @@ function renderLibrary() {
         voiceSel.innerHTML = '<option value="">🎤 音色→</option>' + _qwenVoiceOptions;
         if (char.qwen_speaker) voiceSel.value = char.qwen_speaker;
 
-        card.appendChild(img);
         card.appendChild(name);
         card.appendChild(meta);
         card.appendChild(assignDiv);

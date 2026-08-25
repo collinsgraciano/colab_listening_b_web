@@ -336,17 +336,20 @@ def _build_character_override_prompt(quest: bool = False) -> str:
             meta.append(f"gender: {gender}")
         if role:
             meta.append(f"role: {role}")
+        if not desc and gender:
+            # voice 模式：外观不预定，LLM 按主题新创作（仅性别/音色固定）
+            meta.append("appearance: NOT predefined — create a fresh one")
         if meta:
             parts.append(f"({', '.join(meta)})")
         lines.append(f"- {label}: {' '.join(parts)}")
 
     lines.append("")
     lines.append("You MUST follow these rules for pre-defined characters:")
-    lines.append("1. Use the EXACT description text as the char_{key}_description value.")
+    lines.append("1. If a description is given for a character, use the EXACT description text as the char_{key}_description value. If the description is marked \"appearance: NOT predefined\", CREATE a brand-new appearance description for this character that fits the topic naturally — only the gender is fixed.")
     lines.append("2. Set char_{key}_gender to the specified gender. If gender is not given, infer it from the description.")
     lines.append("3. Set char_{key}_role to the specified role. If role is not given, generate one that fits the description.")
     lines.append("4. Write ALL dialogue for this character to match their role — the story scenario MUST fit these characters' roles (e.g. if role is 'dentist', the conversation should be about a dental visit).")
-    lines.append("5. Use the EXACT same description text in ALL image_prompt, video_prompt, and poses entries for this character.")
+    lines.append("5. If a description is given, use the EXACT same description text in ALL image_prompt, video_prompt, and poses entries for this character. If you created a new description, use YOUR new description consistently in ALL entries.")
     lines.append("6. If host is pre-defined, host_description and host_gender MUST match the provided values.")
     return "\n".join(lines) + "\n\n"
 
