@@ -190,12 +190,11 @@ def run_quality_gate(script: dict, num_lines: int | None = None) -> dict:
                 add("fields", "warning",
                     f"line {i} on_screen 顺序/重复不规范: {os_}（可程序化修复）", [i])
 
-    env_shots = sum(1 for l in dialogue if l.get("on_screen") == [])
-    env_min = max(2, round(num_lines / 50)) if num_lines else 2
-    env_max = max(4, round(num_lines / 25)) if num_lines else 6
-    if not (env_min <= env_shots <= env_max):
-        add("fields", "warning",
-            f"环境镜头（on_screen=[]）{env_shots} 个，建议 {env_min}-{env_max}")
+    # 环境镜头（on_screen=[]）已废弃：每行画面必须至少有说话人
+    empty_os = [i for i, l in enumerate(dialogue) if l.get("on_screen") == []]
+    if empty_os:
+        add("fields", "error",
+            f"on_screen 为空（不允许环境镜头）: lines {empty_os[:10]}", empty_os[:10])
 
     # ── 3. 自然度 ────────────────────────────────────────────────────
     texts = [l.get("text", "") for l in dialogue]
@@ -384,7 +383,7 @@ def run_quality_gate(script: dict, num_lines: int | None = None) -> dict:
             "avg_words": round(sum(wc) / len(wc), 2) if wc else 0,
             "fillers": filler_total,
             "back_channels": back_total,
-            "env_shots": env_shots,
+            "empty_on_screen": len(empty_os),
             "consecutive_same_speaker": consecutive,
             "simplified_zh_lines": len(simp_lines),
             "cefr": cefr,
@@ -404,7 +403,7 @@ def format_report(report: dict) -> str:
     lines.append(f"  summary: {s['lines']} lines "
                  f"(req {s['num_lines_requested']}), phases={s['phase_counts']}, "
                  f"avg {s['avg_words']} words, fillers={s['fillers']}, "
-                 f"env_shots={s['env_shots']}, simp_zh={s['simplified_zh_lines']}")
+                 f"empty_os={s['empty_on_screen']}, simp_zh={s['simplified_zh_lines']}")
     return "\n".join(lines)
 
 

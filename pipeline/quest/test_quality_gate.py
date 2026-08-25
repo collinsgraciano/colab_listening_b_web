@@ -56,7 +56,7 @@ def _clean_script():
         _line("char_b", "Okay, actually I am very curious now.", "buildup",
               "好，其實我現在很好奇了。", ["char_a", "char_b"]),
         _line("char_c", "Welcome! This is our menu board today.", "core",
-              "歡迎！這是今天 的菜單看板。", []),
+              "歡迎！這是今天 的菜單看板。", ["char_a", "char_c"]),
         _line("char_a", "Wow, there are so many flavors here.", "core",
               "哇，這裡有好多口味。", ["char_a", "char_c"]),
         _line("char_c", "You can choose your tea and sweetness level.", "core",
@@ -70,7 +70,7 @@ def _clean_script():
         _line("char_b", "You know, the staff here are friendly.", "core",
               "你知道嗎，這裡的店員很友善。", ["char_b"]),
         _line("char_a", "Yeah, and the shop smells like fresh tea.", "core",
-              "是啊，而且店裡有新鮮茶香。", []),
+              "是啊，而且店裡有新鮮茶香。", ["char_a", "char_b"]),
         _line("char_b", "They brew the leaves every morning, I think.", "core",
               "我想他們每天早上都會煮茶。", ["char_a", "char_b"]),
         _line("char_a", "Kind of amazing. My drink is ready already.", "core",
@@ -106,7 +106,7 @@ def _defect_script():
     # 先做定点变异（基于 clean 的 20 行索引）
     dlg[1]["zh"] = "当然。它到底是什么？"                      # 简体字
     dlg[3]["zh"] = ""                                           # 空 zh
-    dlg[6]["on_screen"] = ["char_c"]                            # 失去一个环境镜头
+    dlg[6]["on_screen"] = []                                      # 空 on_screen（环境镜头已废弃）
     dlg[8]["on_screen"] = ["char_c", "char_a"]                  # 顺序不规范
     dlg[12]["text"] = "Because shaking the tea makes foam, you know."  # 答案泄露
     dlg[13]["text"] = dlg[2]["text"]                            # 完全重复行
@@ -192,10 +192,10 @@ class TestDefectFixture(unittest.TestCase):
         warns = self._issues("translation", "warning")
         self.assertTrue(any("简体" in i["detail"] for i in warns))
 
-    def test_env_shots_warning(self):
-        # 缺陷夹具环境镜头 1 个（clean 有 2 个，menu 行被改为 ["char_c"]），低于下限 2
-        warns = self._issues("fields", "warning")
-        self.assertTrue(any("环境镜头" in i["detail"] for i in warns))
+    def test_empty_on_screen_error(self):
+        # 缺陷夹具 dlg[6] on_screen=[]（环境镜头已废弃，空值即错误）
+        errs = self._issues("fields", "error")
+        self.assertTrue(any("on_screen 为空" in i["detail"] for i in errs))
 
     def test_report_shape(self):
         self.assertIn("passed", self.report)
@@ -225,7 +225,6 @@ class TestRealProductionScript(unittest.TestCase):
     def test_known_warnings_detected(self):
         details = " | ".join(i["detail"] for i in self.report["issues"]
                              if i["severity"] == "warning")
-        self.assertIn("环境镜头", details)
         self.assertIn("hook_intro_en", details)
         self.assertIn("outro", details)
         self.assertIn("youtube_tags", details)

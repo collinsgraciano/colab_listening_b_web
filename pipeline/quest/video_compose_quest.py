@@ -614,7 +614,8 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
 
         line_data = dialogue[audio_idx] if audio_idx < len(dialogue) else {}
         speaker = line_data.get("speaker", "char_a")
-        on_screen = line_data.get("on_screen", [speaker])
+        # 环境镜头已废弃：空/缺失 on_screen 回退为说话人（兼容旧脚本库）
+        on_screen = line_data.get("on_screen") or [speaker]
 
         if char_pose_map:
             char_layers = []

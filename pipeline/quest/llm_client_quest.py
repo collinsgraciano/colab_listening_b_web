@@ -600,11 +600,12 @@ Key words: {key_words}
     if "core" in phases:
         kw_hint = ('on_screen rules:\n'
                    '- mix of ["char_a","char_c"], ["char_b","char_c"], ["char_a","char_b"]\n'
-                   '- Use [] (empty, environment/menu/object shot) for 1-2 lines in this batch\n')
+                   '- NEVER empty: every line shows at least the speaker on screen\n')
     else:
         kw_hint = ('on_screen rules:\n'
-                   '- mostly ["char_a","char_b"]\n'
-                   '- Use [] (empty) for at most 1 line (environment shot)\n')
+                   '- mostly ["char_a","char_b"], occasional single-character '
+                   'close-ups like ["char_a"]\n'
+                   '- NEVER empty: every line shows at least the speaker on screen\n')
 
     phase_field = phases[0]
     return f"""{head}{prev_hint}
@@ -879,41 +880,12 @@ def _apply_programmatic_fixes(script: dict, num_lines: int):
                 if k in os_ and k not in seen:
                     seen.append(k)
             line["on_screen"] = seen or [line["speaker"]]
-        elif not os_:
-            line["on_screen"] = [] if os_ == [] else [line["speaker"]]
+        else:
+            # 空/缺失/非法 on_screen 一律回填说话人（环境镜头已废弃）
+            line["on_screen"] = [line["speaker"]]
 
     _fix_zh_traditional(script)
-    _ensure_env_shots(script, num_lines)
     _enforce_line_counts(script, num_lines)
-
-
-def _ensure_env_shots(script: dict, num_lines: int):
-    """LLM 很少输出空 on_screen；不足下限时从各阶段中段程序化补齐。
-
-    纯视觉决策（画面拍环境而非人物），不影响台词/字幕/音频，避开每阶段
-    首尾 3 行（故事衔接处）以降低风险。
-    """
-    dialogue = script.get("dialogue", [])
-    env = sum(1 for l in dialogue if l.get("on_screen") == [])
-    env_min = max(2, round(num_lines / 50)) if num_lines else 2
-    if env >= env_min or len(dialogue) < 10:
-        return
-    need = env_min - env
-    phases: dict[str, list[int]] = {}
-    for i, l in enumerate(dialogue):
-        phases.setdefault(l.get("phase", ""), []).append(i)
-    candidates = []
-    for idxs in phases.values():
-        if len(idxs) > 8:
-            candidates.extend(idxs[3:-3])
-    if not candidates:
-        return
-    candidates.sort()
-    step = max(1, len(candidates) // need)
-    chosen = candidates[step // 2::step][:need]
-    for i in chosen:
-        dialogue[i]["on_screen"] = []
-    print(f"  [Fix] padded {len(chosen)} env shots (on_screen=[])")
 
 
 def _fix_zh_traditional(script: dict):
@@ -944,8 +916,8 @@ def _fix_zh_traditional(script: dict):
 def _enforce_line_counts(script: dict, num_lines: int):
     """Trim/expand dialogue to exactly num_lines with phase ratios intact.
 
-    Trim: env shots first, then from tail of over-budget phases (keeping each
-    phase's first 2 / last 2 lines so story joints stay intact).
+    Trim: from the tail of over-budget phases (keeping each phase's
+    first 2 / last 2 lines so story joints stay intact).
     Expand: one LLM call inserting lines into the longest phase's middle.
     """
     dialogue = script.get("dialogue", [])
@@ -969,11 +941,8 @@ def _enforce_line_counts(script: dict, num_lines: int):
             idxs = [i for i, l in enumerate(dialogue) if l.get("phase") == ph]
             # protect first 2 and last 2 lines of the phase
             protected = set(idxs[:2] + idxs[-2:])
-            # prefer env shots, then latest lines
             pool = [i for i in idxs if i not in protected]
-            env_first = [i for i in pool if dialogue[i].get("on_screen") == []]
-            rest = [i for i in pool if dialogue[i].get("on_screen") != []]
-            for i in (env_first + rest[::-1])[:excess]:
+            for i in pool[::-1][:excess]:
                 drops.add(i)
         if drops:
             script["dialogue"] = [l for i, l in enumerate(dialogue)
