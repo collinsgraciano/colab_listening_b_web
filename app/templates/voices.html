@@ -198,16 +198,28 @@ function renderPresets() {
             (v.lang === 'en' ? 'bg-green-900/50 text-green-300' : 'bg-amber-900/50 text-amber-300');
         lang.textContent = langMap[v.lang] || v.lang;
 
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-1';
+
         const btn = document.createElement('button');
         btn.className = 'px-3 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
         btn.textContent = '▶ 试听';
-        btn.onclick = () => previewVoice(v.name, v.lang === 'zh' ? 'chinese' : 'english');
+        btn.onclick = () => previewVoice(v.name, voiceLanguage(v));
+
+        const regenBtn = document.createElement('button');
+        regenBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-amber-600 rounded text-xs text-amber-300 transition';
+        regenBtn.textContent = '🔄';
+        regenBtn.title = '重新生成试听';
+        regenBtn.onclick = () => previewVoice(v.name, voiceLanguage(v), true);
+
+        btnRow.appendChild(btn);
+        btnRow.appendChild(regenBtn);
 
         card.appendChild(icon);
         card.appendChild(name);
         card.appendChild(desc);
         card.appendChild(lang);
-        card.appendChild(btn);
+        card.appendChild(btnRow);
         grid.appendChild(card);
     });
 }
@@ -249,9 +261,16 @@ function renderDesignedVoices() {
         const previewBtn = document.createElement('button');
         previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
         previewBtn.textContent = '▶ 试听';
-        previewBtn.onclick = () => previewVoice(v.name, v.lang === 'zh' ? 'chinese' : 'english');
+        previewBtn.onclick = () => previewVoice(v.name, voiceLanguage(v));
+
+        const regenBtn = document.createElement('button');
+        regenBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-amber-600 rounded text-xs text-amber-300 transition';
+        regenBtn.textContent = '🔄';
+        regenBtn.title = '重新生成试听';
+        regenBtn.onclick = () => previewVoice(v.name, voiceLanguage(v), true);
 
         btnRow.appendChild(previewBtn);
+        btnRow.appendChild(regenBtn);
         if (!v.builtin) {
             const delBtn = document.createElement('button');
             delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
@@ -304,7 +323,13 @@ function renderCustomVoices() {
         const previewBtn = document.createElement('button');
         previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
         previewBtn.textContent = '▶ 试听';
-        previewBtn.onclick = () => previewVoice(v.name, v.lang === 'zh' ? 'chinese' : 'english');
+        previewBtn.onclick = () => previewVoice(v.name, voiceLanguage(v));
+
+        const regenBtn = document.createElement('button');
+        regenBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-amber-600 rounded text-xs text-amber-300 transition';
+        regenBtn.textContent = '🔄';
+        regenBtn.title = '重新生成试听';
+        regenBtn.onclick = () => previewVoice(v.name, voiceLanguage(v), true);
 
         const delBtn = document.createElement('button');
         delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
@@ -312,6 +337,7 @@ function renderCustomVoices() {
         delBtn.onclick = () => deleteCustomVoice(v.name);
 
         btnRow.appendChild(previewBtn);
+        btnRow.appendChild(regenBtn);
         btnRow.appendChild(delBtn);
 
         card.appendChild(icon);
@@ -384,33 +410,48 @@ function saveDefaults() {
     });
 }
 
-// --- Preview voice ---
-function previewVoice(speaker, language) {
+// --- Preview voice (cached first; regenerate only when asked) ---
+function previewVoice(speaker, language, regenerate = false) {
     const text = language === 'chinese' ?
         '你好，这是音色试听测试。' :
         'Hello, this is a voice preview test.';
     const btn = event.target;
     btn.disabled = true;
-    btn.textContent = '⏳ 生成中...';
+    const origText = btn.textContent;
+    btn.textContent = regenerate ? '⏳ 重新生成中...' : '⏳ 加载中...';
 
-    fetch('/api/qwen_voices/preview', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({speaker, language, text})
-    }).then(r => {
-        if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
-        return r.blob();
-    }).then(blob => {
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.play();
-        btn.disabled = false;
-        btn.textContent = '▶ 试听';
-    }).catch(err => {
-        alert('试听失败: ' + err.message);
-        btn.disabled = false;
-        btn.textContent = '▶ 试听';
-    });
+    // Try cached preview first (instant) unless regenerating
+    const cacheFetch = regenerate
+        ? Promise.reject(new Error('regenerate'))
+        : fetch(`/api/qwen_voices/preview/${encodeURIComponent(speaker)}?language=${language}`, {cache: 'no-store'})
+            .then(r => { if (!r.ok) throw new Error('no cache'); return r.blob(); });
+
+    cacheFetch
+        .catch(() => fetch('/api/qwen_voices/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({speaker, language, text, regenerate})
+        }).then(r => {
+            if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
+            return r.blob();
+        }))
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.play();
+            btn.disabled = false;
+            btn.textContent = origText;
+        })
+        .catch(err => {
+            alert('试听失败: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = origText;
+        });
+}
+
+// --- Map voice lang field ('zh'/'en'/'chinese'/'english') to preview language ---
+function voiceLanguage(v) {
+    return (v.lang === 'zh' || v.lang === 'chinese') ? 'chinese' : 'english';
 }
 
 // --- Create designed voice (VoiceDesign) ---

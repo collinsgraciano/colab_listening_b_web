@@ -1711,6 +1711,30 @@ async def api_library_image(lib_id: str):
 
 QWEN_VOICE_CONFIG_PATH = WEB_ROOT / "configs" / "qwen_voice_config.json"
 CUSTOM_VOICES_DIR = WEB_ROOT / "configs" / "custom_voices"
+VOICE_PREVIEWS_DIR = WEB_ROOT / "configs" / "voice_previews"
+
+# Must match the defaults used in voices.html JS
+_PREVIEW_TEXTS = {
+    "english": "Hello, this is a voice preview test.",
+    "chinese": "你好，这是音色试听测试。",
+}
+
+
+def _preview_cache_path(speaker: str, language: str, text: str) -> Path:
+    """Deterministic cache path for a voice preview (speaker+language+text)."""
+    import hashlib
+    safe = "".join(c for c in speaker if c.isalnum() or c in "-_") or "voice"
+    h = hashlib.md5(f"{speaker}|{language}|{text}".encode("utf-8")).hexdigest()[:8]
+    return VOICE_PREVIEWS_DIR / f"{safe}__{language}__{h}.mp3"
+
+
+def _purge_preview_cache(speaker: str) -> None:
+    """Remove all cached previews of a voice (on voice deletion)."""
+    if not VOICE_PREVIEWS_DIR.exists():
+        return
+    safe = "".join(c for c in speaker if c.isalnum() or c in "-_") or "voice"
+    for p in VOICE_PREVIEWS_DIR.glob(f"{safe}__*.mp3"):
+        p.unlink(missing_ok=True)
 
 
 def _load_qwen_voice_config() -> dict:
@@ -1795,9 +1819,8 @@ async def api_library_set_voice(lib_id: str, request: Request):
 
 @app.post("/api/qwen_voices/preview")
 async def api_qwen_preview(request: Request):
-    """Preview a voice by generating a short sample audio."""
+    """Preview a voice: serve cached audio if available, else generate & cache."""
     import sys as _sys
-    import tempfile
     _pipeline = str(PIPELINE_DIR)
     if _pipeline not in _sys.path:
         _sys.path.insert(0, _pipeline)
@@ -1805,7 +1828,12 @@ async def api_qwen_preview(request: Request):
     data = await request.json()
     speaker = data.get("speaker", "Vivian")
     language = data.get("language", "english")
-    text = data.get("text", "Hello, this is a voice test.")
+    text = data.get("text", "") or _PREVIEW_TEXTS.get(language, _PREVIEW_TEXTS["english"])
+    regenerate = bool(data.get("regenerate", False))
+
+    cache_path = _preview_cache_path(speaker, language, text)
+    if cache_path.exists() and not regenerate:
+        return FileResponse(str(cache_path), media_type="audio/mpeg")
 
     config = load_config()
     model_path = config.get("qwen_model_path", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
@@ -1816,9 +1844,8 @@ async def api_qwen_preview(request: Request):
     try:
         from qwen_tts_engine import QwenTTSEngine
         engine = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
-        # Use a temp file for the preview
-        tmp_dir = Path(tempfile.mkdtemp())
-        out_path = str(tmp_dir / "preview.mp3")
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path = str(cache_path)
         if language == "chinese":
             engine.synth_chinese(text, speaker, out_path, rate="+0%")
         else:
@@ -1828,6 +1855,16 @@ async def api_qwen_preview(request: Request):
                             headers={"Content-Disposition": "attachment; filename=preview.mp3"})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/qwen_voices/preview/{voice}")
+async def api_qwen_preview_cached(voice: str, language: str = "english"):
+    """Serve a cached preview if it exists (instant playback), 404 otherwise."""
+    text = _PREVIEW_TEXTS.get(language, _PREVIEW_TEXTS["english"])
+    p = _preview_cache_path(voice, language, text)
+    if not p.exists():
+        return JSONResponse({"ok": False, "error": "no cached preview"}, status_code=404)
+    return FileResponse(str(p), media_type="audio/mpeg")
 
 
 @app.get("/api/qwen_voices/defaults")
@@ -1898,6 +1935,8 @@ async def api_qwen_custom_delete(name: str):
     audio_path = Path(target.get("ref_audio", ""))
     if audio_path.exists():
         audio_path.unlink()
+    # Remove cached previews of this voice
+    _purge_preview_cache(name)
     # Remove from config
     config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
     _save_qwen_voice_config(config)
@@ -1964,6 +2003,8 @@ async def api_qwen_designed_delete(name: str):
         return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
     config["designed_voices"] = [v for v in config.get("designed_voices", []) if v["name"] != name]
     _save_qwen_voice_config(config)
+    # Remove cached previews of this voice
+    _purge_preview_cache(name)
     return {"ok": True}
 
 
