@@ -9,6 +9,9 @@
     <div class="p-4 flex-1 flex flex-col gap-2">
         <div class="flex items-center gap-2 flex-wrap">
             <span class="font-semibold text-white text-sm">{{ s.name }}</span>
+            {% if not s.show_zh %}
+            <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">纯英文</span>
+            {% endif %}
             {% if s.id == current_id %}
             <span class="px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 text-[10px]">当前使用</span>
             {% endif %}
@@ -16,7 +19,7 @@
             <span class="px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 text-[10px]">内置</span>
             {% endif %}
         </div>
-        <p class="text-[11px] text-slate-500">{{ s.id }} · EN {{ s.en_size }}px / ZH {{ s.zh_size }}px · 描边 {{ s.en_stroke }}/{{ s.zh_stroke }}{% if s.box %} · 背景条 {{ s.box_opacity }}%{% endif %}</p>
+        <p class="text-[11px] text-slate-500">{{ s.id }} · EN {{ s.en_size }}px{% if s.show_zh %} / ZH {{ s.zh_size }}px{% else %} · <span class="text-emerald-400 font-medium">纯英文</span>{% endif %} · 描边 {{ s.en_stroke }}/{{ s.zh_stroke }}{% if s.box %} · 背景条 {{ s.box_opacity }}%{% endif %}</p>
         <p class="text-xs text-slate-400 leading-relaxed flex-1">{{ s.description }}</p>
         <div class="flex items-center gap-2 flex-wrap mt-1">
             {% if s.id == current_id %}
@@ -197,6 +200,12 @@
                 </div>
 
                 <div class="flex items-center gap-4 flex-wrap bg-slate-900/50 rounded-lg px-4 py-3">
+                    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer"
+                           title="隐藏中文翻译行，只渲染英文字幕（沉浸式听力训练）">
+                        <input type="checkbox" id="sf-hide-zh" onchange="refreshPreview()"
+                            class="w-4 h-4 accent-indigo-500">
+                        纯英文（隐藏中文）
+                    </label>
                     <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
                         <input type="checkbox" id="sf-box" onchange="onBoxToggle()"
                             class="w-4 h-4 accent-indigo-500">
@@ -342,6 +351,7 @@ function collectStyle() {
         en_zh_gap: +val('en-zh-gap'),
         box: document.getElementById('sf-box').checked,
         box_opacity: +val('box-opacity'),
+        show_zh: !document.getElementById('sf-hide-zh').checked,
     };
 }
 
@@ -361,6 +371,8 @@ function fillForm(style) {
     setVal('en-zh-gap', style ? style.en_zh_gap : 15);
     setVal('box-opacity', style ? style.box_opacity : 55);
     document.getElementById('sf-box').checked = style ? !!style.box : false;
+    // 老样式无 show_zh 字段 → 视为显示中文（未勾选纯英文）
+    document.getElementById('sf-hide-zh').checked = style ? (style.show_zh === false) : false;
     for (const [id, key] of Object.entries({en: 'en_color', zh: 'zh_color', stroke: 'stroke_color'})) {
         const v = (style && style[key]) || (key === 'en_color' ? '#FFFFFF' : key === 'zh_color' ? '#FFD700' : '#000000');
         document.getElementById(`sf-${id}-color`).value = v;

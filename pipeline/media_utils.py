@@ -85,6 +85,7 @@ SUBTITLE_STYLE_LEGACY_DEFAULTS: dict = {
     "font_zh": "msyh",
     "box": False,
     "box_opacity": 55,
+    "show_zh": True,
 }
 
 
@@ -98,7 +99,8 @@ def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
 
     style 可用 key: en_size/zh_size/en_color/zh_color/stroke_color/
     en_stroke/zh_stroke/bottom_margin/line_gap/en_zh_gap/font_en/font_zh/
-    box/box_opacity（box=True 时在文字块后画圆角半透明黑条）。
+    box/box_opacity（box=True 时在文字块后画圆角半透明黑条）/
+    show_zh（False 时隐藏中文行 → 纯英文字幕）。
     """
     from PIL import Image, ImageDraw, ImageFont
 
@@ -107,6 +109,8 @@ def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
         for k in st:
             if k in style and style[k] is not None:
                 st[k] = style[k]
+    if not st.get("show_zh", True):
+        zh_text = ""
 
     def _hex_rgb(value, default):
         try:

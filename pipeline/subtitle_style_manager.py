@@ -48,6 +48,19 @@ BUILTIN_STYLES: list[dict[str, Any]] = [
         "builtin": True,
     },
     {
+        "id": "english_only",
+        "name": "纯英文字幕",
+        "description": "只显示英文字幕、隐藏中文翻译 —— 沉浸式听力训练用，逼观众靠耳朵；需要中文时可看 YouTube CC 字幕文件。",
+        "en_size": 60, "zh_size": 51,
+        "en_color": "#FFFFFF", "zh_color": "#FFD700", "stroke_color": "#000000",
+        "en_stroke": 5, "zh_stroke": 4,
+        "bottom_margin": 36, "line_gap": 6, "en_zh_gap": 15,
+        "font_en": "msyhbd", "font_zh": "msyh",
+        "box": False, "box_opacity": 55,
+        "show_zh": False,
+        "builtin": True,
+    },
+    {
         "id": "big_bold",
         "name": "大字幕（粗描边）",
         "description": "ESL 学习者友好：字号加大、描边加粗，画面繁忙时依然清晰易读，适合 YouTube 手机端观看。",
@@ -155,12 +168,20 @@ def _normalize_params(data: dict[str, Any]) -> dict[str, Any]:
             params[key] = val or ("msyhbd" if key == "font_en" else "msyh")
     if "box" in data:
         params["box"] = bool(data["box"])
+    if "show_zh" in data and data["show_zh"] is not None:
+        params["show_zh"] = bool(data["show_zh"])
     return params
 
 
 def list_styles() -> list[dict[str, Any]]:
-    """内置 + 自定义样式（每项附 builtin 标记）。"""
-    result = [dict(s, builtin=True) for s in BUILTIN_STYLES]
+    """内置 + 自定义样式（每项附 builtin 标记；缺省参数补齐）。"""
+    result = []
+    for s in BUILTIN_STYLES:
+        item = dict(s, builtin=True)
+        # 补齐缺失参数（新增参数的老内置条目兼容）
+        for k, v in media_utils.SUBTITLE_STYLE_LEGACY_DEFAULTS.items():
+            item.setdefault(k, v)
+        result.append(item)
     for s in _read_custom():
         item = dict(s)
         item["builtin"] = False
