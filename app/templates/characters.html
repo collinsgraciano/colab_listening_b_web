@@ -154,6 +154,48 @@ function loadQwenVoices() {
         .catch(() => {});
 }
 
+// --- 试听绑定音色 ---
+function previewBoundVoice(libId, btn) {
+    const char = _libraryChars.find(c => c.id === libId);
+    if (!char || !char.qwen_speaker) { alert('该角色未绑定音色'); return; }
+    const v = ALL_VOICES.find(x => x.name === char.qwen_speaker);
+    const language = (v && (v.lang === 'zh' || v.lang === 'chinese')) ? 'chinese' : 'english';
+    previewVoice(char.qwen_speaker, language, false, btn);
+}
+
+// --- Voice preview (cached first, then generate) ---
+function previewVoice(speaker, language, regenerate = false, btn = null) {
+    const text = language === 'chinese' ?
+        '你好，这是音色试听测试。' :
+        'Hello, this is a voice preview test.';
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = regenerate ? '⏳ 生成中...' : '⏳ 加载中...'; }
+
+    const cacheFetch = regenerate
+        ? Promise.reject(new Error('regenerate'))
+        : fetch(`/api/qwen_voices/preview/${encodeURIComponent(speaker)}?language=${language}`, {cache: 'no-store'})
+            .then(r => { if (!r.ok) throw new Error('no cache'); return r.blob(); });
+
+    cacheFetch
+        .catch(() => fetch('/api/qwen_voices/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({speaker, language, text, regenerate})
+        }).then(r => {
+            if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
+            return r.blob();
+        }))
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            new Audio(url).play();
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        })
+        .catch(err => {
+            alert('试听失败: ' + err.message);
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        });
+}
+
 // --- Load library characters ---
 function loadLibrary() {
     fetch('/api/character_library')
@@ -297,6 +339,7 @@ function createCharCard(char) {
     actions.className = 'flex flex-wrap gap-2 mt-auto';
     actions.innerHTML = `
         <button onclick="toggleEdit('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">✏️ 编辑</button>
+        ${char.qwen_speaker ? `<button onclick="previewBoundVoice('${char.id}', this)" class="px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-[11px] text-white">▶ 试听音色</button>` : ''}
         ${voiceOnly ? '' : `<button onclick="generateImages('${char.id}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">🎨 生成图片</button>`}
         <button onclick="deleteCharacter('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-[11px] text-red-300">🗑 删除</button>
     `;

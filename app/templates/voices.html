@@ -119,6 +119,8 @@
                     data-lib-id="{{ char.id }}">
                     <option value="">音色→</option>
                 </select>
+                <button class="lib-preview-btn w-full px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-[10px] text-white transition"
+                    data-lib-id="{{ char.id }}">▶ 试听音色</button>
             </div>
             {% endfor %}
         </div>
@@ -381,6 +383,17 @@ function populateDropdowns() {
         const sel = document.getElementById(id);
         sel.innerHTML = options;
     });
+
+    // 素材库绑定试听按钮：试听当前下拉选择的音色
+    document.querySelectorAll('.lib-preview-btn').forEach(btn => {
+        btn.onclick = function() {
+            const sel = document.querySelector('.voice-bind[data-lib-id="' + btn.dataset.libId + '"]');
+            const speaker = sel ? sel.value : '';
+            if (!speaker) { alert('该角色尚未绑定音色，请先在下拉框选择'); return; }
+            const v = ALL_VOICES.find(x => x.name === speaker);
+            previewVoice(speaker, v ? voiceLanguage(v) : 'english', false, btn);
+        };
+    });
 }
 
 // --- Load default config ---
@@ -411,14 +424,13 @@ function saveDefaults() {
 }
 
 // --- Preview voice (cached first; regenerate only when asked) ---
-function previewVoice(speaker, language, regenerate = false) {
+function previewVoice(speaker, language, regenerate = false, btnEl = null) {
     const text = language === 'chinese' ?
         '你好，这是音色试听测试。' :
         'Hello, this is a voice preview test.';
-    const btn = event.target;
-    btn.disabled = true;
-    const origText = btn.textContent;
-    btn.textContent = regenerate ? '⏳ 重新生成中...' : '⏳ 加载中...';
+    const btn = btnEl || (window.event ? window.event.target : null);
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = regenerate ? '⏳ 重新生成中...' : '⏳ 加载中...'; }
 
     // Try cached preview first (instant) unless regenerating
     const cacheFetch = regenerate
@@ -439,13 +451,11 @@ function previewVoice(speaker, language, regenerate = false) {
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audio.play();
-            btn.disabled = false;
-            btn.textContent = origText;
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
         })
         .catch(err => {
             alert('试听失败: ' + err.message);
-            btn.disabled = false;
-            btn.textContent = origText;
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
         });
 }
 

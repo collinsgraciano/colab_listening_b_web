@@ -306,12 +306,14 @@ function onQuickInput(field, value) {
 
 // --- Qwen voices (for voice binding dropdowns) ---
 let _qwenVoiceOptions = '';
+let _qwenVoices = [];
 
 function loadQwenVoices() {
     fetch('/api/qwen_voices/speakers')
         .then(r => r.json())
         .then(data => {
             const voices = data.speakers || [];
+            _qwenVoices = voices;
             _qwenVoiceOptions = voices.map(v =>
                 `<option value="${v.name}">${v.name}${v.custom ? ' (克隆)' : ''} · ${v.desc || ''}</option>`
             ).join('');
@@ -321,6 +323,39 @@ function loadQwenVoices() {
             renderLibrary();
         })
         .catch(() => {});
+}
+
+// --- 试听绑定音色（素材库卡片） ---
+function previewVoice(speaker, language, regenerate = false, btn = null) {
+    const text = language === 'chinese' ?
+        '你好，这是音色试听测试。' :
+        'Hello, this is a voice preview test.';
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = regenerate ? '⏳ 生成中...' : '⏳ 加载中...'; }
+
+    const cacheFetch = regenerate
+        ? Promise.reject(new Error('regenerate'))
+        : fetch(`/api/qwen_voices/preview/${encodeURIComponent(speaker)}?language=${language}`, {cache: 'no-store'})
+            .then(r => { if (!r.ok) throw new Error('no cache'); return r.blob(); });
+
+    cacheFetch
+        .catch(() => fetch('/api/qwen_voices/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({speaker, language, text, regenerate})
+        }).then(r => {
+            if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
+            return r.blob();
+        }))
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            new Audio(url).play();
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        })
+        .catch(err => {
+            alert('试听失败: ' + err.message);
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        });
 }
 
 // --- Script library (脚本库直接使用) ---
@@ -828,16 +863,32 @@ function renderLibrary() {
         assignDiv.appendChild(delBtn);
 
         // Qwen voice binding dropdown
+        // Qwen voice binding dropdown + 试听按钮
+        const voiceRow = document.createElement('div');
+        voiceRow.className = 'flex gap-1 w-full';
         const voiceSel = document.createElement('select');
-        voiceSel.className = 'lib-voice w-full bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white';
+        voiceSel.className = 'lib-voice flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white';
         voiceSel.dataset.libId = char.id;
         voiceSel.innerHTML = '<option value="">🎤 音色→</option>' + _qwenVoiceOptions;
         if (char.qwen_speaker) voiceSel.value = char.qwen_speaker;
+        voiceRow.appendChild(voiceSel);
+
+        const pvBtn = document.createElement('button');
+        pvBtn.className = 'px-1.5 py-0.5 bg-slate-700 hover:bg-indigo-600 rounded text-[10px] text-white transition shrink-0';
+        pvBtn.textContent = '▶';
+        pvBtn.title = '试听绑定音色';
+        pvBtn.onclick = function() {
+            const speaker = voiceSel.value;
+            if (!speaker) { alert('该角色尚未绑定音色，请先在下拉框选择'); return; }
+            const v = _qwenVoices.find(x => x.name === speaker);
+            previewVoice(speaker, (v && (v.lang === 'zh' || v.lang === 'chinese')) ? 'chinese' : 'english', false, pvBtn);
+        };
+        voiceRow.appendChild(pvBtn);
 
         card.appendChild(name);
         card.appendChild(meta);
         card.appendChild(assignDiv);
-        card.appendChild(voiceSel);
+        card.appendChild(voiceRow);
         grid.appendChild(card);
     });
 
