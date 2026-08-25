@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from .config_manager import resolve_provider
+from .config_manager import resolve_provider, load_config
 
 # Add pipeline source to path (local copy — fully independent)
 PIPELINE_DIR = Path(__file__).parent.parent / "pipeline"
@@ -961,6 +961,163 @@ class PipelineService:
             self.error = msg
             self.finished_at = time.time()
         self._on_log_line(f"\nFATAL: {msg}")
+
+    # ------------------------------------------------------------------
+    # Recompose: re-burn subtitles with a new style on a finished run
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _probe_fps(path: str) -> int:
+        """ffprobe 视频帧率（quest=25 / 其余=24），失败回退 24。"""
+        import subprocess as _sp
+        try:
+            r = _sp.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=r_frame_rate",
+                 "-of", "default=nw=1:nk=1", path],
+                capture_output=True, text=True, timeout=30)
+            s = (r.stdout or "").strip().splitlines()[0] if r.stdout else ""
+            val = 0.0
+            if "/" in s:
+                num, den = s.split("/", 1)
+                val = float(num) / float(den) if float(den) else 0.0
+            elif s:
+                val = float(s)
+            if val > 0:
+                return int(round(val))
+        except Exception:
+            pass
+        return 24
+
+    def recompose(self, run_name: str, subtitle_style: str = "", font_size: int = 60,
+                  show_zh: bool = True, regen_4k: bool = False) -> tuple[bool, str]:
+        """对已完成运行重选字幕样式重渲视频（仅字幕烧录 + 音量归一，本地渲染）。
+
+        复用 videos/final_no_sub.mp4 + subtitles/meta.json + script.json，
+        不消耗 MCP / LLM / TTS 积分。返回 (ok, message)。
+        """
+        if self.is_running:
+            return False, "Pipeline 正在运行中，请等待完成后再重渲"
+
+        output_dir = Path(load_config().get("output_dir", "./output"))
+        run_dir = output_dir / run_name
+        if not run_dir.is_dir():
+            return False, f"运行不存在: {run_name}"
+        no_sub = run_dir / "videos" / "final_no_sub.mp4"
+        meta_path = run_dir / "subtitles" / "meta.json"
+        script_path = run_dir / "script.json"
+        if not no_sub.exists() or no_sub.stat().st_size < 1_000_000:
+            return False, "缺少 videos/final_no_sub.mp4（旧运行或已清理，无法仅重渲字幕）"
+        if not meta_path.exists():
+            return False, "缺少 subtitles/meta.json（时间轴数据缺失）"
+        if not script_path.exists():
+            return False, "缺少 script.json"
+
+        self._stop_flag.clear()
+        self._step_mode = False
+        self._paused_after_step = ""
+        with self._lock:
+            self.log_lines = []
+            self.status = "running"
+            self.current_step = ""
+            self.current_step_label = "字幕样式重渲（仅本地渲染）"
+            self.started_at = time.time()
+            self.finished_at = 0
+            self.error = ""
+            self.work_dir = str(run_dir)
+            self.final_path = ""
+
+        self._thread = threading.Thread(
+            target=self._recompose_run,
+            args=(run_dir, subtitle_style, int(font_size), bool(show_zh), bool(regen_4k)),
+            daemon=True)
+        self._thread.start()
+        return True, "重渲已启动"
+
+    def _recompose_run(self, run_dir: Path, subtitle_style_id: str,
+                       font_size: int, show_zh: bool, regen_4k: bool):
+        """后台线程：从 final_no_sub 重烧字幕 → loudnorm → 处理 4K。"""
+        import subprocess as _sp
+        from media_utils import burn_subtitles, apply_final_loudnorm
+
+        old_stdout = sys.stdout
+        buf = _LineBuffer(self._on_log_line)
+        sys.stdout = buf
+        try:
+            print("=" * 60)
+            print(f"Recompose: 字幕样式重渲 — {run_dir.name}")
+            style = None
+            if subtitle_style_id:
+                from subtitle_style_manager import get_style as _get_sub_style
+                style = _get_sub_style(subtitle_style_id)
+                if style is None:
+                    print(f"  [Recompose] 未找到样式 '{subtitle_style_id}'，回退 legacy 字号参数")
+                else:
+                    print(f"  [Recompose] 字幕样式: {style.get('name', subtitle_style_id)}")
+            if style is None:
+                print(f"  [Recompose] 跟随参数配置（legacy 字号 {font_size}）")
+
+            script = json.loads((run_dir / "script.json").read_text(encoding="utf-8"))
+            meta = json.loads((run_dir / "subtitles" / "meta.json").read_text(encoding="utf-8"))
+            timeline = meta["timeline"]
+            pad = float(meta.get("pad", 0.4))
+            no_sub = str(run_dir / "videos" / "final_no_sub.mp4")
+            out_fps = self._probe_fps(no_sub)
+            print(f"  [Recompose] timeline {len(timeline)} 段, pad={pad}, fps={out_fps}")
+
+            def progress_cb(pct, msg):
+                print(f"  [{pct}%] {msg}")
+
+            final_path = burn_subtitles(
+                no_sub, timeline, script, str(run_dir), str(run_dir / "subtitles"),
+                pad, progress_cb,
+                show_zh=show_zh, en_font_size=font_size,
+                zh_font_size=int(font_size * 0.85),
+                out_fps=out_fps, style=style)
+            self.final_path = final_path
+
+            print("  [Recompose] 音量归一化 (loudnorm)...")
+            apply_final_loudnorm(final_path, str(run_dir / "videos"))
+
+            # 旧 4K 的字幕已过期：删除；按需用新片重新生成
+            old_4k = sorted(run_dir.glob("*_4K.mp4"))
+            for p in old_4k:
+                p.unlink(missing_ok=True)
+                print(f"  [Recompose] 已删除过期 4K: {p.name}")
+            if regen_4k:
+                four_k = run_dir / f"{Path(final_path).stem}_4K.mp4"
+                print("  [Recompose] 重新生成 4K (本地 ffmpeg scale)...")
+                r = _sp.run(
+                    ["ffmpeg", "-i", final_path,
+                     "-vf", "scale=3840:2160:flags=lanczos",
+                     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-threads", "0",
+                     "-c:a", "copy", str(four_k), "-y"],
+                    capture_output=True, timeout=3600)
+                if r.returncode == 0 and four_k.exists():
+                    print(f"  [Recompose] 4K 完成: {four_k.name}")
+                else:
+                    print("  [Recompose] 4K 生成失败（720p 版本仍可用）")
+                    four_k.unlink(missing_ok=True)
+
+            with self._lock:
+                self.status = "done"
+                self.finished_at = time.time()
+            size_mb = Path(final_path).stat().st_size / (1024 * 1024)
+            print("=" * 60)
+            print(f"Recompose DONE! {final_path} ({size_mb:.1f}MB)")
+        except Exception as e:
+            self._fail(f"Recompose {type(e).__name__}: {e}")
+            import traceback
+            for line in traceback.format_exc().split("\n"):
+                self._on_log_line(line)
+        finally:
+            sys.stdout = old_stdout
+            buf.flush()
+            with self._lock:
+                if self.status == "running":
+                    self.status = "done"
+                self.finished_at = time.time()
+
 
     def _set_stopped(self):
         with self._lock:

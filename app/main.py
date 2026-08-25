@@ -248,6 +248,12 @@ async def runs_page(request: Request):
             script_path = d / "script.json"
             videos_dir = d / "videos"
             thumbnail = d / "thumbnail.jpg"
+            no_sub = videos_dir / "final_no_sub.mp4"
+            meta_path = d / "subtitles" / "meta.json"
+            has_4k = any(d.glob("*_4K.mp4"))
+            # 重渲条件：无字幕底片 + 时间轴元数据 + 脚本齐备（仅重跑字幕烧录环节）
+            recomposable = (no_sub.exists() and no_sub.stat().st_size >= 1_000_000
+                            and meta_path.exists() and script_path.exists())
             run_info = {
                 "name": d.name,
                 "path": str(d),
@@ -256,6 +262,8 @@ async def runs_page(request: Request):
                 "has_thumbnail": thumbnail.exists(),
                 "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
                 "uploaded": (d / "uploaded.flag").exists(),
+                "has_4k": has_4k,
+                "recomposable": recomposable,
             }
             # Find video files — final videos are in work_dir root, not videos/
             video_files = []
@@ -285,6 +293,9 @@ async def runs_page(request: Request):
 
     return templates.TemplateResponse(request, "runs.html", {
         "runs": runs,
+        "pending_runs": [r for r in runs if not r["uploaded"]],
+        "uploaded_runs": [r for r in runs if r["uploaded"]],
+        "subtitle_style_options": subtitle_style_lib.get_style_options(),
         "active_page": "runs",
     })
 
@@ -1498,6 +1509,27 @@ async def api_mark_uploaded(name: str):
         return {"ok": True, "uploaded": False}
     flag.touch()
     return {"ok": True, "uploaded": True}
+
+
+@app.post("/api/runs/{name}/recompose")
+async def api_recompose(name: str, request: Request):
+    """重选字幕样式重渲视频（复用 final_no_sub 底片，仅本地渲染）。"""
+    data = await request.json()
+    service = get_service()
+    style_id = str(data.get("subtitle_style", "")).strip()
+    if style_id and not subtitle_style_lib.get_style(style_id):
+        return JSONResponse({"ok": False, "error": f"字幕样式不存在: {style_id}"}, status_code=400)
+    try:
+        font_size = max(20, min(int(data.get("font_size", 60) or 60), 200))
+    except (TypeError, ValueError):
+        font_size = 60
+    ok, msg = service.recompose(
+        name, subtitle_style=style_id, font_size=font_size,
+        show_zh=bool(data.get("show_zh", True)),
+        regen_4k=bool(data.get("regen_4k", False)))
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg, "status": service.status}
 
 
 @app.post("/api/runs/{name}/open_folder")
