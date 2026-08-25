@@ -1,0 +1,496 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">🎤 QwenTTS 音色管理</h2>
+            <p class="text-sm text-slate-400 mt-1">
+                当前 TTS 引擎:
+                {% if config.tts_engine == 'qwen' %}
+                    <span class="text-green-400 font-medium">Qwen3-TTS ✓</span>
+                {% else %}
+                    <span class="text-amber-400">{{ config.tts_engine }}</span>
+                    <a href="/config" class="text-indigo-400 hover:underline ml-2">→ 去切换</a>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- 区域 A: 预设音色 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>📋</span> 预设音色 (9 个)
+        </h3>
+        <div id="preset-grid" class="grid grid-cols-3 gap-3">
+            <!-- Cards rendered by JS -->
+        </div>
+    </section>
+
+    <!-- 区域 A2: 设计音色 (VoiceDesign) -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>✨</span> 设计音色 (VoiceDesign)
+            <span class="text-[10px] text-slate-500 font-normal">用文字描述生成音色 · 内置 4 个英语女声 · 需要 VoiceDesign 模型</span>
+        </h3>
+
+        <!-- Create form -->
+        <div class="bg-slate-800 rounded-xl p-4 mb-3 border border-slate-700">
+            <div class="grid grid-cols-3 gap-3 mb-3">
+                <input type="text" id="dv-name" placeholder="音色名称 (如 Luna)"
+                    class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <select id="dv-gender" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="female">女声</option>
+                    <option value="male">男声</option>
+                </select>
+                <select id="dv-language" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="english">English</option>
+                    <option value="chinese">中文</option>
+                </select>
+            </div>
+            <textarea id="dv-instruct" placeholder="音色描述 instruct (必填)，如: Speak in a warm, friendly young American female voice with a mid-range pitch and a relaxed pace."
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3 h-20 resize-none"></textarea>
+            <button onclick="createDesignedVoice()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">
+                创建设计音色
+            </button>
+        </div>
+
+        <!-- Designed voice list -->
+        <div id="designed-grid" class="grid grid-cols-3 gap-3">
+            <!-- Cards rendered by JS -->
+        </div>
+    </section>
+
+    <!-- 区域 A3: 自定义音色 (Voice Clone) -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>🎭</span> 自定义音色 (Voice Clone)
+        </h3>
+
+        <!-- Upload form -->
+        <div class="bg-slate-800 rounded-xl p-4 mb-3 border border-slate-700">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <input type="text" id="cv-name" placeholder="音色名称 (如 MyVoice1)"
+                    class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <select id="cv-gender" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="male">男声</option>
+                    <option value="female">女声</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <select id="cv-language" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="english">English</option>
+                    <option value="chinese">中文</option>
+                </select>
+                <input type="file" id="cv-audio" accept="audio/*" placeholder="参考音频"
+                    class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+            <textarea id="cv-reftext" placeholder="参考音频对应的文字内容 (必填)"
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3 h-20 resize-none"></textarea>
+            <button onclick="createCustomVoice()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">
+                创建克隆音色
+            </button>
+        </div>
+
+        <!-- Custom voice list -->
+        <div id="custom-grid" class="grid grid-cols-3 gap-3">
+            <!-- Cards rendered by JS -->
+        </div>
+    </section>
+
+    <!-- 区域 B: 角色素材库音色绑定 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>🔗</span> 角色素材库音色绑定
+        </h3>
+        <div id="binding-grid" class="grid grid-cols-4 gap-3">
+            {% if not library_chars %}
+            <p class="text-xs text-slate-500 col-span-full">素材库为空。请先在控制台收藏角色。</p>
+            {% endif %}
+            {% for char in library_chars %}
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2">
+                {% if char.image_url %}
+                <img src="{{ char.image_url }}" class="w-16 h-16 rounded-lg object-cover bg-slate-800" onerror="this.style.opacity='0.3'">
+                {% else %}
+                <div class="w-16 h-16 rounded-lg bg-slate-700 flex items-center justify-center text-2xl">👤</div>
+                {% endif %}
+                <div class="text-xs font-medium text-slate-300 text-center truncate w-full" title="{{ char.description }}">{{ char.name }}</div>
+                <div class="text-[10px] text-slate-500">{{ char.gender or '?' }} · {{ char.structure or '?' }}</div>
+                <select class="voice-bind w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-[10px] text-white"
+                    data-lib-id="{{ char.id }}">
+                    <option value="">音色→</option>
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- 区域 C: 默认音色配置 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>⚙️</span> 默认音色配置
+        </h3>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <p class="text-xs text-slate-400 mb-4">非库角色按性别自动分配以下默认音色：</p>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">默认男声</label>
+                    <select id="default-male" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">默认女声</label>
+                    <select id="default-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">默认旁白女声</label>
+                    <select id="default-host-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+            </div>
+            <button onclick="saveDefaults()" class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存默认配置</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ALL_VOICES = [];
+let PRESET_VOICES = [];
+
+// --- Load voices ---
+function loadVoices() {
+    fetch('/api/qwen_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            ALL_VOICES = data.speakers || [];
+            PRESET_VOICES = data.presets || [];
+            renderPresets();
+            renderDesignedVoices();
+            renderCustomVoices();
+            populateDropdowns();
+            loadDefaults();
+        });
+}
+
+// --- Render preset voice cards ---
+function renderPresets() {
+    const grid = document.getElementById('preset-grid');
+    grid.innerHTML = '';
+    PRESET_VOICES.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+
+        const icon = document.createElement('div');
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+            (v.gender === 'female' ? 'bg-pink-900/50' : 'bg-blue-900/50');
+        icon.textContent = v.gender === 'female' ? '♀' : '♂';
+
+        const name = document.createElement('div');
+        name.className = 'text-sm font-medium text-white';
+        name.textContent = v.name;
+
+        const desc = document.createElement('div');
+        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.textContent = v.desc;
+
+        const lang = document.createElement('div');
+        const langMap = {zh: '中文', en: '英文', ja: '日语', ko: '韩语'};
+        lang.className = 'text-[10px] px-2 py-0.5 rounded-full ' +
+            (v.lang === 'en' ? 'bg-green-900/50 text-green-300' : 'bg-amber-900/50 text-amber-300');
+        lang.textContent = langMap[v.lang] || v.lang;
+
+        const btn = document.createElement('button');
+        btn.className = 'px-3 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        btn.textContent = '▶ 试听';
+        btn.onclick = () => previewVoice(v.name, v.lang === 'zh' ? 'chinese' : 'english');
+
+        card.appendChild(icon);
+        card.appendChild(name);
+        card.appendChild(desc);
+        card.appendChild(lang);
+        card.appendChild(btn);
+        grid.appendChild(card);
+    });
+}
+
+// --- Render designed voices (VoiceDesign) ---
+function renderDesignedVoices() {
+    const grid = document.getElementById('designed-grid');
+    const designedVoices = ALL_VOICES.filter(v => v.designed);
+    grid.innerHTML = '';
+    if (!designedVoices.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无设计音色。</p>';
+        return;
+    }
+    designedVoices.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+
+        const icon = document.createElement('div');
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+            (v.builtin ? 'bg-pink-900/50' : 'bg-fuchsia-900/50');
+        icon.textContent = v.builtin ? '✨' : '💫';
+
+        const name = document.createElement('div');
+        name.className = 'text-sm font-medium text-white';
+        name.textContent = v.name + (v.builtin ? ' (内置)' : '');
+
+        const desc = document.createElement('div');
+        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.textContent = v.desc || '设计音色';
+
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] text-slate-500';
+        const langNames = {en: '英文', zh: '中文'};
+        meta.textContent = `${v.gender || '?'} · ${langNames[v.lang] || v.lang}`;
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-1';
+
+        const previewBtn = document.createElement('button');
+        previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        previewBtn.textContent = '▶ 试听';
+        previewBtn.onclick = () => previewVoice(v.name, v.lang === 'zh' ? 'chinese' : 'english');
+
+        btnRow.appendChild(previewBtn);
+        if (!v.builtin) {
+            const delBtn = document.createElement('button');
+            delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
+            delBtn.textContent = '✕';
+            delBtn.onclick = () => deleteDesignedVoice(v.name);
+            btnRow.appendChild(delBtn);
+        }
+
+        card.appendChild(icon);
+        card.appendChild(name);
+        card.appendChild(desc);
+        card.appendChild(meta);
+        card.appendChild(btnRow);
+        grid.appendChild(card);
+    });
+}
+
+// --- Render custom voices ---
+function renderCustomVoices() {
+    const grid = document.getElementById('custom-grid');
+    const customVoices = ALL_VOICES.filter(v => v.custom);
+    grid.innerHTML = '';
+    if (!customVoices.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无自定义音色。上传参考音频创建克隆音色。</p>';
+        return;
+    }
+    customVoices.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+
+        const icon = document.createElement('div');
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-purple-900/50';
+        icon.textContent = '🎭';
+
+        const name = document.createElement('div');
+        name.className = 'text-sm font-medium text-white';
+        name.textContent = v.name;
+
+        const desc = document.createElement('div');
+        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.textContent = v.desc || '自定义克隆音色';
+
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] text-slate-500';
+        meta.textContent = `${v.gender || '?'} · ${v.lang || '?'}`;
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-1';
+
+        const previewBtn = document.createElement('button');
+        previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        previewBtn.textContent = '▶ 试听';
+        previewBtn.onclick = () => previewVoice(v.name, v.lang === 'zh' ? 'chinese' : 'english');
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
+        delBtn.textContent = '✕';
+        delBtn.onclick = () => deleteCustomVoice(v.name);
+
+        btnRow.appendChild(previewBtn);
+        btnRow.appendChild(delBtn);
+
+        card.appendChild(icon);
+        card.appendChild(name);
+        card.appendChild(desc);
+        card.appendChild(meta);
+        card.appendChild(btnRow);
+        grid.appendChild(card);
+    });
+}
+
+// --- Populate dropdowns (binding + defaults) ---
+function populateDropdowns() {
+    const options = ALL_VOICES.map(v =>
+        `<option value="${v.name}">${v.name}${v.designed ? ' (设计)' : (v.custom ? ' (克隆)' : '')} · ${v.desc || ''}</option>`
+    ).join('');
+
+    // Binding dropdowns
+    document.querySelectorAll('.voice-bind').forEach(sel => {
+        const libId = sel.dataset.libId;
+        sel.innerHTML = '<option value="">音色→</option>' + options;
+        // Load current binding from library char meta
+        {% for char in library_chars %}
+        if (libId === '{{ char.id }}' && '{{ char.qwen_speaker }}') {
+            sel.value = '{{ char.qwen_speaker }}';
+        }
+        {% endfor %}
+        sel.onchange = function() {
+            fetch('/api/character_library/' + libId + '/voice', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({qwen_speaker: this.value})
+            }).then(r => r.json()).then(d => {
+                if (d.ok) { /* saved */ }
+            });
+        };
+    });
+
+    // Default dropdowns
+    ['default-male', 'default-female', 'default-host-female'].forEach(id => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = options;
+    });
+}
+
+// --- Load default config ---
+function loadDefaults() {
+    fetch('/api/qwen_voices/defaults')
+        .then(r => r.json())
+        .then(config => {
+            if (config.default_male) document.getElementById('default-male').value = config.default_male;
+            if (config.default_female) document.getElementById('default-female').value = config.default_female;
+            if (config.default_host_female) document.getElementById('default-host-female').value = config.default_host_female;
+        });
+}
+
+// --- Save defaults ---
+function saveDefaults() {
+    const data = {
+        default_male: document.getElementById('default-male').value,
+        default_female: document.getElementById('default-female').value,
+        default_host_female: document.getElementById('default-host-female').value,
+    };
+    fetch('/api/qwen_voices/defaults', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.ok) alert('默认音色配置已保存');
+    });
+}
+
+// --- Preview voice ---
+function previewVoice(speaker, language) {
+    const text = language === 'chinese' ?
+        '你好，这是音色试听测试。' :
+        'Hello, this is a voice preview test.';
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ 生成中...';
+
+    fetch('/api/qwen_voices/preview', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({speaker, language, text})
+    }).then(r => {
+        if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
+        return r.blob();
+    }).then(blob => {
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play();
+        btn.disabled = false;
+        btn.textContent = '▶ 试听';
+    }).catch(err => {
+        alert('试听失败: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '▶ 试听';
+    });
+}
+
+// --- Create designed voice (VoiceDesign) ---
+function createDesignedVoice() {
+    const name = document.getElementById('dv-name').value.trim();
+    const gender = document.getElementById('dv-gender').value;
+    const language = document.getElementById('dv-language').value;
+    const instruct = document.getElementById('dv-instruct').value.trim();
+    if (!name || !instruct) { alert('请填写名称和音色描述'); return; }
+
+    fetch('/api/qwen_voices/designed', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, gender, language, instruct})
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert('设计音色已创建: ' + name);
+                document.getElementById('dv-name').value = '';
+                document.getElementById('dv-instruct').value = '';
+                loadVoices();
+            } else {
+                alert('创建失败: ' + (data.error || ''));
+            }
+        });
+}
+
+// --- Delete designed voice ---
+function deleteDesignedVoice(name) {
+    if (!confirm('删除设计音色 "' + name + '"?')) return;
+    fetch('/api/qwen_voices/designed/' + encodeURIComponent(name), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) { loadVoices(); }
+            else { alert(data.error || '删除失败'); }
+        });
+}
+
+// --- Create custom voice ---
+function createCustomVoice() {
+    const name = document.getElementById('cv-name').value.trim();
+    const gender = document.getElementById('cv-gender').value;
+    const language = document.getElementById('cv-language').value;
+    const refText = document.getElementById('cv-reftext').value.trim();
+    const audioInput = document.getElementById('cv-audio');
+    if (!name || !refText) { alert('请填写名称和参考文字'); return; }
+    if (!audioInput.files[0]) { alert('请上传参考音频'); return; }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('gender', gender);
+    formData.append('language', language);
+    formData.append('ref_text', refText);
+    formData.append('ref_audio', audioInput.files[0]);
+
+    fetch('/api/qwen_voices/custom', {method: 'POST', body: formData})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert('克隆音色已创建: ' + name);
+                document.getElementById('cv-name').value = '';
+                document.getElementById('cv-reftext').value = '';
+                document.getElementById('cv-audio').value = '';
+                loadVoices();
+            } else {
+                alert('创建失败: ' + (data.error || ''));
+            }
+        });
+}
+
+// --- Delete custom voice ---
+function deleteCustomVoice(name) {
+    if (!confirm('删除自定义音色 "' + name + '"?')) return;
+    fetch('/api/qwen_voices/custom/' + encodeURIComponent(name), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) loadVoices(); });
+}
+
+// --- Init ---
+window.addEventListener('load', loadVoices);
+</script>
+{% endblock %}

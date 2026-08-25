@@ -212,6 +212,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Qwen3-TTS CustomVoice model path (preset speakers)")
     parser.add_argument("--qwen-base-model-path", default=r"H:\models\Qwen3-TTS-12Hz-1.7B-Base",
                         help="Qwen3-TTS Base model path (for voice clone)")
+    parser.add_argument("--qwen-voicedesign-model-path", default=r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+                        help="Qwen3-TTS VoiceDesign model path (for designed voices, e.g. English female)")
     parser.add_argument("--qwen-device", default="cuda:0",
                         help="Device for Qwen3-TTS (e.g. cuda:0, cpu)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
@@ -934,6 +936,8 @@ def main():
         os.environ["QWEN_MODEL_PATH"] = args.qwen_model_path
     if args.qwen_base_model_path:
         os.environ["QWEN_BASE_MODEL_PATH"] = args.qwen_base_model_path
+    if args.qwen_voicedesign_model_path:
+        os.environ["QWEN_VOICEDSIGN_MODEL_PATH"] = args.qwen_voicedesign_model_path
     if args.qwen_device:
         os.environ["QWEN_DEVICE"] = args.qwen_device
 

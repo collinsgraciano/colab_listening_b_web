@@ -1,0 +1,17 @@
+{
+  "default_male": "Ryan",
+  "default_female": "Vivian",
+  "default_host_female": "Serena",
+  "custom_voices": [
+    {
+      "name": "host11",
+      "description": "自定义克隆音色 (male)",
+      "gender": "male",
+      "language": "english",
+      "ref_audio": "H:\\2026_main_project\\colab_listening_b_web\\configs\\custom_voices\\host11.wav",
+      "ref_text": "Welcome to English listening channel.",
+      "created": 1787447029.1379085
+    }
+  ],
+  "designed_voices": []
+}

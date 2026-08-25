@@ -56,8 +56,10 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
 
         model_path = os.environ.get("QWEN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
         base_model_path = os.environ.get("QWEN_BASE_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
+        voicedesign_model_path = os.environ.get(
+            "QWEN_VOICEDSIGN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign")
         device = os.environ.get("QWEN_DEVICE", "cuda:0")
-        tts = QwenTTSEngine(model_path, device, base_model_path)
+        tts = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
         voice_map = build_qwen_voice_map(script)
         narration_voice = voice_map.get("host", "Serena")
         voice_label = "qwen"

@@ -1720,6 +1720,7 @@ def _load_qwen_voice_config() -> dict:
         "default_female": "Vivian",
         "default_host_female": "Serena",
         "custom_voices": [],
+        "designed_voices": [],
     }
     if QWEN_VOICE_CONFIG_PATH.exists():
         try:
@@ -1809,11 +1810,12 @@ async def api_qwen_preview(request: Request):
     config = load_config()
     model_path = config.get("qwen_model_path", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
     base_model_path = config.get("qwen_base_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
+    voicedesign_model_path = config.get("qwen_voicedesign_model_path", r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign")
     device = config.get("qwen_device", "cuda:0")
 
     try:
         from qwen_tts_engine import QwenTTSEngine
-        engine = QwenTTSEngine(model_path, device, base_model_path)
+        engine = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
         # Use a temp file for the preview
         tmp_dir = Path(tempfile.mkdtemp())
         out_path = str(tmp_dir / "preview.mp3")
@@ -1898,6 +1900,69 @@ async def api_qwen_custom_delete(name: str):
         audio_path.unlink()
     # Remove from config
     config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
+    _save_qwen_voice_config(config)
+    return {"ok": True}
+
+
+@app.post("/api/qwen_voices/designed")
+async def api_qwen_designed_create(request: Request):
+    """Create a VoiceDesign voice from a natural-language instruct description."""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    data = await request.json()
+    name = (data.get("name", "") or "").strip()
+    gender = (data.get("gender", "") or "").strip()
+    language = (data.get("language", "english") or "english").strip()
+    instruct = (data.get("instruct", "") or "").strip()
+
+    if not name or not instruct:
+        return JSONResponse({"ok": False, "error": "缺少名称或音色描述"}, status_code=400)
+
+    # Name conflicts: presets / builtin designed / existing designed & custom
+    from qwen_tts_engine import QWEN_SPEAKERS, DESIGNED_VOICES_BUILTIN
+    if name in {s["name"] for s in QWEN_SPEAKERS}:
+        return JSONResponse({"ok": False, "error": f"名称与预设音色冲突: {name}"}, status_code=400)
+    if name in {v["name"] for v in DESIGNED_VOICES_BUILTIN}:
+        return JSONResponse({"ok": False, "error": f"名称与内置设计音色冲突: {name}"}, status_code=400)
+
+    config = _load_qwen_voice_config()
+    if any(v["name"] == name for v in config.get("designed_voices", [])):
+        return JSONResponse({"ok": False, "error": f"设计音色已存在: {name}"}, status_code=400)
+    if any(v["name"] == name for v in config.get("custom_voices", [])):
+        return JSONResponse({"ok": False, "error": f"名称与克隆音色冲突: {name}"}, status_code=400)
+
+    lang_short = "zh" if language == "chinese" else "en"
+    config.setdefault("designed_voices", []).append({
+        "name": name,
+        "description": data.get("description", "") or f"设计音色 ({gender or '?'})",
+        "gender": gender,
+        "language": lang_short,
+        "instruct": instruct,
+        "created": time.time(),
+    })
+    _save_qwen_voice_config(config)
+    return {"ok": True, "name": name}
+
+
+@app.delete("/api/qwen_voices/designed/{name}")
+async def api_qwen_designed_delete(name: str):
+    """Delete a user-created designed voice (builtin ones are protected)."""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
+    if name in {v["name"] for v in DESIGNED_VOICES_BUILTIN}:
+        return JSONResponse({"ok": False, "error": "内置设计音色不可删除"}, status_code=400)
+
+    config = _load_qwen_voice_config()
+    if not any(v["name"] == name for v in config.get("designed_voices", [])):
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    config["designed_voices"] = [v for v in config.get("designed_voices", []) if v["name"] != name]
     _save_qwen_voice_config(config)
     return {"ok": True}
 

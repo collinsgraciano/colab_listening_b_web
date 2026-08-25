@@ -98,6 +98,10 @@ PARAM_SPEC = {
                              "type": "text", "group": "tts",
                              "label": "Qwen3-TTS Base 模型路径",
                              "help": "Base 模型 (voice clone 需要)"},
+    "qwen_voicedesign_model_path": {"default": r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+                                    "type": "text", "group": "tts",
+                                    "label": "Qwen3-TTS VoiceDesign 模型路径",
+                                    "help": "VoiceDesign 模型 (设计音色/英语女声需要)"},
     "qwen_device": {"default": "cuda:0", "type": "text", "group": "tts",
                     "label": "Qwen3-TTS 设备", "help": "如 cuda:0, cpu"},
 
@@ -404,6 +408,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--qwen-model-path", config["qwen_model_path"]]
     if config.get("qwen_base_model_path"):
         args += ["--qwen-base-model-path", config["qwen_base_model_path"]]
+    if config.get("qwen_voicedesign_model_path"):
+        args += ["--qwen-voicedesign-model-path", config["qwen_voicedesign_model_path"]]
     if config.get("qwen_device"):
         args += ["--qwen-device", config["qwen_device"]]
 
