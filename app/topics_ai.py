@@ -7,6 +7,7 @@ Blocking work should be executed by callers via asyncio.to_thread.
 import json
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -21,9 +22,21 @@ if str(_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_PIPELINE_DIR))
 from llm_client import _extract_json  # noqa: E402
 
-# Rate limiting shared by all calls in this module (per-process, thread-safe enough
-# for sequential batch use; the review loop is the only multi-call path)
+# Rate limiting shared by all calls in this module (per-process, thread-safe
+# via reservation lock; the review loop is the only multi-call path)
 _LAST_CALL_TIME = 0.0
+_RATE_LOCK = threading.Lock()
+
+
+def _reserve_slot(min_interval: float) -> None:
+    """锁内预约调用槽位（start-to-start 间隔，对齐 llm_client 模式）。"""
+    global _LAST_CALL_TIME
+    with _RATE_LOCK:
+        now = time.time()
+        start_at = max(now, _LAST_CALL_TIME + min_interval)
+        _LAST_CALL_TIME = start_at
+    if start_at > now:
+        time.sleep(start_at - now)
 
 _REVIEW_BATCH_SIZE = 50
 _ISSUE_TYPES = {"duplicate", "similar", "grammar", "too_vague", "unsuitable", "other"}
@@ -43,11 +56,11 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
                max_tokens: int = 4096) -> Any:
     """Non-streaming LLM call → parsed JSON (dict or list).
 
-    Reads provider from web config each call. Retries on HTTP 429/524
-    (15/30/60s backoff) and on empty/invalid JSON output. Raises RuntimeError
-    with a Chinese message on final failure or missing API key.
+    Reads provider from web config each call. Retries on HTTP 429/gateway and
+    network errors (15/30/60s backoff) and on empty/invalid JSON output
+    (independent retry budget). Raises RuntimeError with a Chinese message on
+    final failure or missing API key.
     """
-    global _LAST_CALL_TIME
     config = load_config()
     p_type, base_url, api_key, model = resolve_provider(config)
     if not api_key:
@@ -56,11 +69,10 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
     min_interval = float(config.get("llm_min_interval") or 3)
 
     backoffs = [15, 30, 60]
-    attempt = 0
+    http_attempt = 0      # HTTP 429/网关/网络错误重试额度
+    content_attempt = 0   # 空内容/坏 JSON 重试额度（独立计数，互不挤占）
     while True:
-        elapsed = time.time() - _LAST_CALL_TIME
-        if elapsed < min_interval:
-            time.sleep(min_interval - elapsed)
+        _reserve_slot(min_interval)
         body = {
             "model": model,
             "messages": messages,
@@ -79,8 +91,14 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
         try:
             with urllib.request.urlopen(req, timeout=180) as resp:
                 raw = resp.read().decode("utf-8")
-            _LAST_CALL_TIME = time.time()
-            result = json.loads(raw)
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError as e:
+                # 网关可能返回 HTML 错误页等非 JSON 响应体 — 归入可重试
+                raise _RetryableError(
+                    f"LLM 返回非 JSON 响应（前 200 字符）: {raw[:200]}") from e
+            if not isinstance(result, dict):
+                raise _RetryableError(f"LLM 响应不是 JSON 对象: {str(result)[:200]}")
             choices = result.get("choices") or [{}]
             content = (choices[0].get("message") or {}).get("content", "")
             if not content or not content.strip():
@@ -92,21 +110,34 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
                     f"LLM 输出不是有效 JSON（前 200 字符）: {content[:200]}")
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")[:300]
-            if e.code in (429, 524) and attempt < len(backoffs):
-                wait = backoffs[attempt]
-                attempt += 1
-                print(f"  [TopicsAI] HTTP {e.code}, 等待 {wait}s 后重试 ({attempt}/{len(backoffs)})...")
+            if e.code in (429, 502, 503, 504, 524) and http_attempt < len(backoffs):
+                wait = backoffs[http_attempt]
+                http_attempt += 1
+                print(f"  [TopicsAI] HTTP {e.code}, 等待 {wait}s 后重试 "
+                      f"({http_attempt}/{len(backoffs)})...")
                 time.sleep(wait)
                 continue
             raise RuntimeError(f"LLM HTTP {e.code}: {err}") from e
-        except _RetryableError as e:
-            if attempt < len(backoffs):
-                wait = min(backoffs[attempt], 10)
-                attempt += 1
-                print(f"  [TopicsAI] {e}，{wait}s 后重试 ({attempt}/{len(backoffs)})...")
+        except OSError as e:
+            # 网络层瞬断（连接超时/拒绝/DNS/断连）— HTTPError 已在上面单独捕获
+            if http_attempt < len(backoffs):
+                wait = backoffs[http_attempt]
+                http_attempt += 1
+                print(f"  [TopicsAI] 网络错误 {type(e).__name__}，{wait}s 后重试 "
+                      f"({http_attempt}/{len(backoffs)})...")
                 time.sleep(wait)
                 continue
-            raise RuntimeError(f"LLM 调用失败（重试 {attempt} 次后）: {e}") from e
+            raise RuntimeError(
+                f"LLM 网络错误（重试后仍失败）: {type(e).__name__}: {e}") from e
+        except _RetryableError as e:
+            if content_attempt < len(backoffs):
+                wait = min(backoffs[content_attempt], 10)
+                content_attempt += 1
+                print(f"  [TopicsAI] {e}，{wait}s 后重试 "
+                      f"({content_attempt}/{len(backoffs)})...")
+                time.sleep(wait)
+                continue
+            raise RuntimeError(f"LLM 调用失败（重试 {content_attempt} 次后）: {e}") from e
 
 
 def _norm(topic: str) -> str:

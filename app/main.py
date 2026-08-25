@@ -2284,12 +2284,19 @@ async def api_ai_test_chat(request: Request):
     import urllib.error
 
     data = await request.json()
-    messages = data.get("messages", [])
+    messages = [m for m in data.get("messages", [])
+                if isinstance(m, dict) and m.get("role")]
     system_prompt = data.get("system_prompt", "")
     provider = data.get("provider", "sensenova")
     model = data.get("model", "")
-    temperature = float(data.get("temperature", 0.8))
-    max_tokens = int(data.get("max_tokens", 8192))
+    try:
+        temperature = float(data.get("temperature", 0.8))
+    except (TypeError, ValueError):
+        temperature = 0.8
+    try:
+        max_tokens = int(data.get("max_tokens", 8192))
+    except (TypeError, ValueError):
+        max_tokens = 8192
     reasoning_effort = data.get("reasoning_effort", "low")
     api_key_override = data.get("api_key", "").strip()
 
@@ -2310,6 +2317,10 @@ async def api_ai_test_chat(request: Request):
     if not api_key:
         return JSONResponse(
             {"error": f"未配置 {provider} 的 API Key，请在参数配置页面或左侧设置中填写"},
+            status_code=400)
+    if not model:
+        return JSONResponse(
+            {"error": "未指定模型（该 Provider 未配置模型列表，请在自定义 Provider 中添加）"},
             status_code=400)
 
     # Build messages with system prompt
@@ -2339,44 +2350,64 @@ async def api_ai_test_chat(request: Request):
     req.add_header("Content-Type", "application/json")
     req.add_header("User-Agent", "CodelyLLM/1.0")
 
-    async def event_stream():
+    import queue as _queue
+
+    def _produce(q: "_queue.Queue") -> None:
+        """工作线程：阻塞读取上游 SSE 流。
+
+        urllib 是同步 I/O，直接在 async generator（事件循环）里读会阻塞
+        整个 Web 服务（包括运行中 pipeline 的日志 SSE），故移到线程中转。
+        """
+        import time as _time
+        t0 = _time.time()
+        usage_data = None
         try:
-            import time as _time
-            t0 = _time.time()
-            usage_data = None
-            resp = urllib.request.urlopen(req, timeout=180)
-            for raw_line in resp:
-                line = raw_line.decode("utf-8", errors="replace").strip()
-                if not line:
-                    continue
-                if not line.startswith("data: "):
-                    continue
-                payload = line[6:].strip()
-                if payload == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
-                # Extract token
-                choices = chunk.get("choices", [])
-                if choices:
-                    delta = choices[0].get("delta", {})
-                    content = delta.get("content", "")
-                    if content:
-                        yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
-                # Extract usage (some APIs send it in the last chunk)
-                if chunk.get("usage"):
-                    usage_data = chunk["usage"]
-
-            elapsed = _time.time() - t0
-            yield f"data: {json.dumps({'type': 'done', 'elapsed': round(elapsed, 2), 'usage': usage_data})}\n\n"
-
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line or not line.startswith("data: "):
+                        continue
+                    payload = line[6:].strip()
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload)
+                    except json.JSONDecodeError:
+                        continue
+                    # Extract token
+                    choices = chunk.get("choices", [])
+                    if choices:
+                        delta = choices[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            q.put(("token", content))
+                    # Extract usage (some APIs send it in the last chunk)
+                    if chunk.get("usage"):
+                        usage_data = chunk["usage"]
+            q.put(("done", {"elapsed": round(_time.time() - t0, 2),
+                            "usage": usage_data}))
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")[:500]
-            yield f"data: {json.dumps({'type': 'error', 'error': f'HTTP {e.code}: {err}'})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)[:300]})}\n\n"
+            q.put(("error", f"HTTP {e.code}: {err}"))
+        except Exception as e:  # noqa: BLE001 — 错误信息原样转发给前端
+            q.put(("error", str(e)[:300]))
+        finally:
+            q.put(None)
+
+    async def event_stream():
+        q: _queue.Queue = _queue.Queue()
+        threading.Thread(target=_produce, args=(q,), daemon=True).start()
+        while True:
+            item = await asyncio.to_thread(q.get, True, None)
+            if item is None:
+                break
+            kind, payload = item
+            if kind == "token":
+                yield f"data: {json.dumps({'type': 'token', 'content': payload})}\n\n"
+            elif kind == "done":
+                yield f"data: {json.dumps({'type': 'done', 'elapsed': payload['elapsed'], 'usage': payload['usage']})}\n\n"
+            elif kind == "error":
+                yield f"data: {json.dumps({'type': 'error', 'error': payload})}\n\n"
 
     return StreamingResponse(
         event_stream(),

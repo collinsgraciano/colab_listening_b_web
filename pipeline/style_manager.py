@@ -230,13 +230,16 @@ def resolve_style_prompt(style_id: str | None) -> str:
 
 
 def get_active_style_prompt() -> str:
-    """读取 VISUAL_STYLE_PROMPT 环境变量（pipeline_service / CLI 注入）。"""
-    return os.environ.get("VISUAL_STYLE_PROMPT") or DEFAULT_STYLE_PROMPT
+    """读取 VISUAL_STYLE_PROMPT（pipeline_service / CLI 注入 os.environ；
+    批量生成等 Web 线程经 set_llm_env_override 注入线程局部覆盖）。"""
+    from llm_client import _env_get  # 延迟导入避免循环依赖（llm_client 顶层 import 本模块）
+    return _env_get("VISUAL_STYLE_PROMPT", "") or DEFAULT_STYLE_PROMPT
 
 
 def get_active_thumbnail_hint() -> str:
     """当前风格的缩略图提示短语（thumbnail 提示词用）。"""
-    style_id = os.environ.get("VISUAL_STYLE_ID")
+    from llm_client import _env_get  # 延迟导入避免循环依赖
+    style_id = _env_get("VISUAL_STYLE_ID", "")
     if style_id:
         s = get_style(style_id)
         if s:

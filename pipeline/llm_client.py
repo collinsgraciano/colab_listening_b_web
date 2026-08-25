@@ -143,8 +143,8 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
         api_key = _env_get("SENSENOVA_API_KEY", "")
         base_url = _env_get("SENSENOVA_BASE", "https://token.sensenova.cn/v1")
 
-    # Retry on 429 (rate limit) and 524 (Cloudflare gateway timeout)
-    _RETRY_CODES = [429, 524]
+    # Retry on 429 (rate limit), 502/503/504 (gateway), 524 (Cloudflare timeout)
+    _RETRY_CODES = [429, 502, 503, 504, 524]
     _RETRY_BACKOFFS = [15, 30, 60, 90, 120]
     # One-shot rescue for finish_reason=length empty content (reasoning burn)
     _length_retried = False
@@ -239,13 +239,30 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
             err = e.read().decode("utf-8", errors="replace")
             if e.code in _RETRY_CODES and _retry_attempt < len(_RETRY_BACKOFFS):
                 wait = _RETRY_BACKOFFS[_retry_attempt]
-                print(f"  [LLM] HTTP {e.code} ({'rate limited' if e.code == 429 else 'gateway timeout'}), "
+                reason = ("rate limited" if e.code == 429
+                          else "gateway error" if e.code in (502, 503, 504)
+                          else "gateway timeout")
+                print(f"  [LLM] HTTP {e.code} ({reason}), "
                       f"waiting {wait}s before retry "
                       f"({_retry_attempt+1}/{len(_RETRY_BACKOFFS)})... "
                       f"Model: {model}")
                 _time.sleep(wait)
                 continue
             raise RuntimeError(f"LLM HTTP {e.code}: {err}") from e
+        except OSError as e:
+            # 网络层瞬断（连接超时/拒绝/DNS/读超时/服务器断连）— HTTPError 的
+            # 父类也是 OSError，故放在其后；与 429 同样走 backoff 重试，
+            # 避免一次网络抖动报废整个 quest 会话（20+ 次调用）。
+            if _retry_attempt < len(_RETRY_BACKOFFS):
+                wait = _RETRY_BACKOFFS[_retry_attempt]
+                print(f"  [LLM] Network error ({type(e).__name__}: {e}), "
+                      f"waiting {wait}s before retry "
+                      f"({_retry_attempt+1}/{len(_RETRY_BACKOFFS)})... "
+                      f"Model: {model}")
+                _time.sleep(wait)
+                continue
+            raise RuntimeError(
+                f"LLM network error after retries: {type(e).__name__}: {e}") from e
 
 
 def _repair_truncated_json(text: str) -> str:

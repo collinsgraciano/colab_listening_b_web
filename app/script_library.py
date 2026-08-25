@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from .config_manager import load_mode_config, resolve_provider
+from style_manager import resolve_style_prompt
 
 WEB_ROOT = Path(__file__).parent.parent.resolve()
 SCRIPTS_DIR = WEB_ROOT / "configs" / "script_library"
@@ -331,6 +332,10 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
         "LLM_PROVIDER": p_type,
         "LLM_RETRIES": str(cfg.get("llm_retries", 10)),
         "CHARACTER_OVERRIDES": "",  # 批量脚本是通用脚本：不注入角色覆盖
+        # 画面风格线程隔离：脚本 prompt 里 get_active_style_prompt() 走
+        # _env_get 读这两个键，避免读到运行中 pipeline 写入 os.environ 的风格
+        "VISUAL_STYLE_ID": str(cfg.get("visual_style", "pixar3d")),
+        "VISUAL_STYLE_PROMPT": resolve_style_prompt(str(cfg.get("visual_style", "pixar3d"))),
     }
     if p_type == "sensenova":
         ov["SENSENOVA_API_KEY"] = api_key
@@ -541,6 +546,18 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
 # ===========================================================================
 
 _LAST_CALL_TIME = 0.0
+_RATE_LOCK = threading.Lock()
+
+
+def _reserve_slot(min_interval: float) -> None:
+    """锁内预约调用槽位（start-to-start 间隔，对齐 llm_client 模式）。"""
+    global _LAST_CALL_TIME
+    with _RATE_LOCK:
+        now = time.time()
+        start_at = max(now, _LAST_CALL_TIME + min_interval)
+        _LAST_CALL_TIME = start_at
+    if start_at > now:
+        time.sleep(start_at - now)
 
 
 class _RetryableError(Exception):
@@ -553,9 +570,9 @@ def _chat_json_provider(provider_id: str, model: str, structure: str,
     """Non-streaming LLM call with explicit provider → parsed JSON.
 
     Reads rate-limit config from the structure's mode config. Retries on
-    HTTP 429/524 and on invalid JSON output.
+    HTTP 429/gateway and network errors (15/30/60s backoff) and on invalid
+    JSON output (independent retry budget).
     """
-    global _LAST_CALL_TIME
     (p_type, base_url, api_key, resolved_model), cfg = _resolve_batch_provider(
         provider_id, model, structure)
     if not api_key:
@@ -565,11 +582,10 @@ def _chat_json_provider(provider_id: str, model: str, structure: str,
     min_interval = float(cfg.get("llm_min_interval") or 3)
 
     backoffs = [15, 30, 60]
-    attempt = 0
+    http_attempt = 0      # HTTP 429/网关/网络错误重试额度
+    content_attempt = 0   # 空内容/坏 JSON 重试额度（独立计数，互不挤占）
     while True:
-        elapsed = time.time() - _LAST_CALL_TIME
-        if elapsed < min_interval:
-            time.sleep(min_interval - elapsed)
+        _reserve_slot(min_interval)
         body = {
             "model": resolved_model,
             "messages": messages,
@@ -587,8 +603,14 @@ def _chat_json_provider(provider_id: str, model: str, structure: str,
         try:
             with urllib.request.urlopen(req, timeout=180) as resp:
                 raw = resp.read().decode("utf-8")
-            _LAST_CALL_TIME = time.time()
-            result = json.loads(raw)
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError as e:
+                # 网关可能返回 HTML 错误页等非 JSON 响应体 — 归入可重试
+                raise _RetryableError(
+                    f"LLM 返回非 JSON 响应（前 200 字符）: {raw[:200]}") from e
+            if not isinstance(result, dict):
+                raise _RetryableError(f"LLM 响应不是 JSON 对象: {str(result)[:200]}")
             choices = result.get("choices") or [{}]
             content = (choices[0].get("message") or {}).get("content", "")
             if not content or not content.strip():
@@ -600,23 +622,34 @@ def _chat_json_provider(provider_id: str, model: str, structure: str,
                     f"LLM 输出不是有效 JSON（前 200 字符）: {content[:200]}")
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")[:300]
-            if e.code in (429, 524) and attempt < len(backoffs):
-                wait = backoffs[attempt]
-                attempt += 1
+            if e.code in (429, 502, 503, 504, 524) and http_attempt < len(backoffs):
+                wait = backoffs[http_attempt]
+                http_attempt += 1
                 print(f"  [ScriptsAI] HTTP {e.code}, 等待 {wait}s 后重试 "
-                      f"({attempt}/{len(backoffs)})...")
+                      f"({http_attempt}/{len(backoffs)})...")
                 time.sleep(wait)
                 continue
             raise RuntimeError(f"LLM HTTP {e.code}: {err}") from e
-        except _RetryableError as e:
-            if attempt < len(backoffs):
-                wait = min(backoffs[attempt], 10)
-                attempt += 1
-                print(f"  [ScriptsAI] {e}，{wait}s 后重试 "
-                      f"({attempt}/{len(backoffs)})...")
+        except OSError as e:
+            # 网络层瞬断（连接超时/拒绝/DNS/断连）— HTTPError 已在上面单独捕获
+            if http_attempt < len(backoffs):
+                wait = backoffs[http_attempt]
+                http_attempt += 1
+                print(f"  [ScriptsAI] 网络错误 {type(e).__name__}，{wait}s 后重试 "
+                      f"({http_attempt}/{len(backoffs)})...")
                 time.sleep(wait)
                 continue
-            raise RuntimeError(f"LLM 调用失败（重试 {attempt} 次后）: {e}") from e
+            raise RuntimeError(
+                f"LLM 网络错误（重试后仍失败）: {type(e).__name__}: {e}") from e
+        except _RetryableError as e:
+            if content_attempt < len(backoffs):
+                wait = min(backoffs[content_attempt], 10)
+                content_attempt += 1
+                print(f"  [ScriptsAI] {e}，{wait}s 后重试 "
+                      f"({content_attempt}/{len(backoffs)})...")
+                time.sleep(wait)
+                continue
+            raise RuntimeError(f"LLM 调用失败（重试 {content_attempt} 次后）: {e}") from e
 
 
 def ai_review_script(sid: str, provider_id: str, model: str) -> dict | None:
