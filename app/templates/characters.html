@@ -85,7 +85,7 @@
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                         <option value="">不绑定 (按性别默认)</option>
                     </select>
-                    <p class="text-[10px] text-slate-500 mt-1">选择音色后会自动把音色描述填入「名称」，可手动修改</p>
+                    <p class="text-[10px] text-slate-500 mt-1">选择音色后会自动把音色描述填入「名称」、按音色同步「性别」，可手动修改</p>
                 </div>
                 <div id="new-image-wrap">
                     <label class="block text-xs text-slate-400 mb-1">参考图片 (可选)</label>
@@ -161,13 +161,20 @@ let _lastAutoName = '';
 
 function onNewVoiceChange() {
     const speaker = document.getElementById('new-voice').value;
-    const nameInput = document.getElementById('new-name');
     if (!speaker) return;
     const v = ALL_VOICES.find(x => x.name === speaker);
-    if (!v || !v.desc) return;
+    if (!v) return;
+
+    // 性别跟随音色（音色自带 gender，直接同步）
+    if (v.gender === 'female' || v.gender === 'male') {
+        document.getElementById('new-gender').value = v.gender;
+    }
+
     // 去掉尾随 "(英文)"/"(中文)" 等语言标注，作角色名更干净
+    if (!v.desc) return;
     const autoName = v.desc.replace(/\s*[（(][^)）]*[)）]\s*$/, '').trim();
     if (!autoName) return;
+    const nameInput = document.getElementById('new-name');
     // 名称为空或仍是上次自动填的值时才替换，不覆盖用户手动输入
     const cur = nameInput.value.trim();
     if (!cur || cur === _lastAutoName) {
