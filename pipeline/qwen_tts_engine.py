@@ -109,9 +109,18 @@ def _load_voice_config() -> dict:
 
 
 def get_all_voices() -> list[dict]:
-    """Return preset + designed + custom voices for UI dropdowns."""
+    """Return preset + designed + custom voices for UI dropdowns.
+
+    同名去重：设计音色冻结为克隆音色后（custom_voices 同名存在），
+    不再以设计音色身份重复出现（冻结版为准）。
+    """
+    config = _load_voice_config()
+    custom_names = {cv["name"] for cv in config.get("custom_voices", [])}
+
     voices = list(QWEN_SPEAKERS)
     for dv in DESIGNED_VOICES_BUILTIN:
+        if dv["name"] in custom_names:
+            continue
         voices.append({
             "name": dv["name"],
             "desc": dv["desc"],
@@ -120,8 +129,9 @@ def get_all_voices() -> list[dict]:
             "designed": True,
             "builtin": True,
         })
-    config = _load_voice_config()
     for dv in config.get("designed_voices", []):
+        if dv["name"] in custom_names:
+            continue
         voices.append({
             "name": dv["name"],
             "desc": dv.get("description", ""),
@@ -306,18 +316,20 @@ class QwenTTSEngine(TTSEngine):
 
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Determine synthesis mode
+        # Determine synthesis mode.
+        # 查找顺序 custom → designed：冻结后的音色以克隆（ref_audio 锚定）为准，
+        # 否则内置设计音色（如 Ella）冻结后仍会走设计模式，音色继续漂移。
         is_preset = voice in _PRESET_NAMES
         is_designed = False
         designed_meta = None
         custom_meta = None
         if not is_preset:
-            designed_meta = get_designed_voice_meta(voice)
-            if designed_meta:
-                is_designed = True
-            else:
-                custom_meta = get_custom_voice_meta(voice)
-                if not custom_meta:
+            custom_meta = get_custom_voice_meta(voice)
+            if not custom_meta:
+                designed_meta = get_designed_voice_meta(voice)
+                if designed_meta:
+                    is_designed = True
+                else:
                     print(f"  [QwenTTS] Unknown voice '{voice}', falling back to {_DEFAULT_MALE}")
                     voice = _DEFAULT_MALE
                     is_preset = True

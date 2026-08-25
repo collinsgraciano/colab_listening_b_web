@@ -2039,6 +2039,7 @@ def _load_qwen_voice_config() -> dict:
         "custom_voices": [],
         "designed_voices": [],
         "candidate_voices": [],  # LLM 随机生成、待试听挑选的候选设计音色
+        "builtin_voice_dismissed": [],  # 用户删除的冻结内置音色（启动时不再自动冻结复活）
     }
     if QWEN_VOICE_CONFIG_PATH.exists():
         try:
@@ -2243,6 +2244,17 @@ async def api_qwen_custom_delete(name: str):
     _purge_preview_cache(name)
     # Remove from config
     config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
+    # 删除冻结内置音色 → 记入 dismissed，防止下次启动自动冻结"复活"
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+    from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
+    if target.get("frozen_from") == "designed" and \
+            name in {v["name"] for v in DESIGNED_VOICES_BUILTIN}:
+        dismissed = config.setdefault("builtin_voice_dismissed", [])
+        if name not in dismissed:
+            dismissed.append(name)
     _save_qwen_voice_config(config)
     return {"ok": True}
 
@@ -2681,9 +2693,19 @@ def _freeze_voice_impl(name: str) -> None:
     config = _load_qwen_voice_config()
     meta = next((v for v in config.get("designed_voices", []) if v["name"] == name), None)
     if not meta:
+        # 内置设计音色（Ella/Maya/Chloe/Hazel）不在 designed_voices，从内置表回退查找
+        from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
+        meta = next((v for v in DESIGNED_VOICES_BUILTIN if v["name"] == name), None)
+    if not meta:
         raise RuntimeError("音色已不存在（可能被删除），冻结中止")
 
-    language = "chinese" if meta.get("language") == "zh" else "english"
+    # 键名兼容：内置条目用 desc/lang，用户条目用 description/language
+    description = meta.get("description", "") or meta.get("desc", "")
+    lang_short = meta.get("language", "") or meta.get("lang", "en")
+    gender = meta.get("gender", "")
+    instruct = meta.get("instruct", "")
+
+    language = "chinese" if lang_short == "zh" else "english"
     sample_text = _FREEZE_SAMPLE_TEXTS.get(language, _FREEZE_SAMPLE_TEXTS["english"])
 
     safe = "".join(c for c in name if c.isalnum() or c in "-_") or "voice"
@@ -2715,12 +2737,12 @@ def _freeze_voice_impl(name: str) -> None:
     config["custom_voices"] = [v for v in config.get("custom_voices", []) if v["name"] != name]
     config["custom_voices"].append({
         "name": name,
-        "description": meta.get("description", "") or f"设计音色 ({meta.get('gender', '?')})",
-        "gender": meta.get("gender", ""),
-        "language": meta.get("language", "en"),
+        "description": description or f"设计音色 ({gender or '?'})",
+        "gender": gender,
+        "language": lang_short,
         "ref_audio": str(wav_path),
         "ref_text": sample_text,
-        "instruct": meta.get("instruct", ""),  # 保留以便将来重新冻结
+        "instruct": instruct,  # 保留以便将来重新冻结
         "frozen_from": "designed",
         "created": time.time(),
     })
@@ -2734,6 +2756,35 @@ async def api_qwen_freeze_status():
     """冻结任务进度（前端轮询）。"""
     with _VOICE_FREEZE_LOCK:
         return {"jobs": {k: dict(v) for k, v in _VOICE_FREEZE_JOBS.items()}}
+
+
+def _auto_freeze_pending_designed_voices() -> None:
+    """启动时把尚未转换为克隆音色的设计音色入队后台冻结（一次性）。
+
+    覆盖：内置 4 个英文女声（Ella/Maya/Chloe/Hazel）+ designed_voices 中
+    残留的未冻结条目（此前冻结失败的会借此重试）。
+    已冻结（custom_voices 同名存在）或已删除（builtin_voice_dismissed）的跳过。
+    """
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+    from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
+
+    config = _load_qwen_voice_config()
+    custom_names = {v.get("name") for v in config.get("custom_voices", [])}
+    dismissed = set(config.get("builtin_voice_dismissed", []))
+    pending: list[str] = []
+    for dv in DESIGNED_VOICES_BUILTIN:
+        if dv["name"] not in custom_names and dv["name"] not in dismissed:
+            pending.append(dv["name"])
+    for dv in config.get("designed_voices", []):
+        if dv.get("name") and dv["name"] not in custom_names:
+            pending.append(dv["name"])
+    if pending:
+        print(f"[startup] 设计音色自动冻结入队: {', '.join(pending)}（后台生成样本约 30-60 秒/个）")
+        for n in pending:
+            _enqueue_voice_freeze(n)
 
 
 # ===========================================================================
@@ -3358,3 +3409,8 @@ async def startup():
     (WEB_ROOT / "configs" / "character_library").mkdir(parents=True, exist_ok=True)
     # 首次运行：从 legacy default.json 迁移生成 3 个模式配置文件
     load_all_mode_configs()
+    # 设计音色自动冻结：内置英文女声 + 残留未冻结的设计音色 → 后台转为克隆音色（一次性）
+    try:
+        _auto_freeze_pending_designed_voices()
+    except Exception as e:  # noqa: BLE001 — 冻结失败不阻塞启动，下次启动重试
+        print(f"[startup] 设计音色自动冻结入队失败: {e}")

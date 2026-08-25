@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="p-6 max-w-6xl mx-auto">
+<div class="voices-page p-6 max-w-6xl mx-auto">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-2xl font-bold text-white">🎤 QwenTTS 音色管理</h2>
@@ -14,6 +14,13 @@
                 {% endif %}
             </p>
         </div>
+        <!-- 卡片缩放控制（localStorage 记忆） -->
+        <div class="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+            <span class="text-xs text-slate-400 whitespace-nowrap">卡片大小</span>
+            <input type="range" id="card-scale" min="40" max="150" step="5" value="50"
+                class="w-28 accent-indigo-500 cursor-pointer" title="拖动调整所有卡片大小（双击恢复 50%）">
+            <span id="card-scale-label" class="text-xs text-slate-300 w-9 text-right">50%</span>
+        </div>
     </div>
 
     <!-- 区域 A: 预设音色 (默认折叠) -->
@@ -23,41 +30,7 @@
             <span>📋</span> 预设音色 (9 个)
             <span id="preset-arrow" class="text-slate-500 text-xs">▸</span>
         </h3>
-        <div id="preset-grid" class="grid grid-cols-3 gap-3 hidden">
-            <!-- Cards rendered by JS -->
-        </div>
-    </section>
-
-    <!-- 区域 A2: 设计音色 (VoiceDesign) -->
-    <section class="mb-8">
-        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-            <span>✨</span> 设计音色 (VoiceDesign)
-            <span class="text-[10px] text-slate-500 font-normal">用文字描述生成音色 · 保存后自动❄️冻结为克隆音色锁定音色 · 内置 4 个英语女声</span>
-        </h3>
-
-        <!-- Create form -->
-        <div class="bg-slate-800 rounded-xl p-4 mb-3 border border-slate-700">
-            <div class="grid grid-cols-3 gap-3 mb-3">
-                <input type="text" id="dv-name" placeholder="音色名称 (如 Luna)"
-                    class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                <select id="dv-gender" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                    <option value="female">女声</option>
-                    <option value="male">男声</option>
-                </select>
-                <select id="dv-language" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                    <option value="english">English</option>
-                    <option value="chinese">中文</option>
-                </select>
-            </div>
-            <textarea id="dv-instruct" placeholder="音色描述 instruct (必填)，如: Speak in a warm, friendly young American female voice with a mid-range pitch and a relaxed pace."
-                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3 h-20 resize-none"></textarea>
-            <button onclick="createDesignedVoice()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">
-                创建设计音色
-            </button>
-        </div>
-
-        <!-- Designed voice list -->
-        <div id="designed-grid" class="grid grid-cols-3 gap-3">
+        <div id="preset-grid" class="vc-grid hidden">
             <!-- Cards rendered by JS -->
         </div>
     </section>
@@ -66,7 +39,7 @@
     <section class="mb-8">
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>🎭</span> 自定义音色 (Voice Clone)
-            <span class="text-[10px] text-slate-500 font-normal">❄️ 标记 = 从设计音色自动冻结而来（音色已锁定，跨次生成不漂移）</span>
+            <span class="text-[10px] text-slate-500 font-normal">❄️ 标记 = 从设计音色自动冻结而来（音色已锁定，跨次生成不漂移）；设计音色保存或服务启动时均自动冻结为克隆音色</span>
         </h3>
 
         <!-- Upload form -->
@@ -94,12 +67,38 @@
             </button>
         </div>
 
+        <!-- 设计音色创建表单（原「设计音色」区，默认折叠；保存后自动冻结为克隆音色） -->
+        <details class="bg-slate-800/60 rounded-xl border border-slate-700 mb-3">
+            <summary class="cursor-pointer select-none px-4 py-3 text-sm text-slate-300 hover:text-white transition">
+                ✨ 用文字描述设计新音色（保存后自动 ❄️ 冻结为克隆音色）
+            </summary>
+            <div class="px-4 pb-4">
+                <div class="grid grid-cols-3 gap-3 mb-3">
+                    <input type="text" id="dv-name" placeholder="音色名称 (如 Luna)"
+                        class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <select id="dv-gender" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="female">女声</option>
+                        <option value="male">男声</option>
+                    </select>
+                    <select id="dv-language" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="english">English</option>
+                        <option value="chinese">中文</option>
+                    </select>
+                </div>
+                <textarea id="dv-instruct" placeholder="音色描述 instruct (必填)，如: Speak in a warm, friendly young American female voice with a mid-range pitch and a relaxed pace."
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3 h-20 resize-none"></textarea>
+                <button onclick="createDesignedVoice()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">
+                    创建设计音色
+                </button>
+            </div>
+        </details>
+
         <!-- LLM 随机生成候选音色 -->
         <div class="bg-slate-800/60 rounded-xl p-4 mb-3 border border-slate-700">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div class="text-xs text-slate-400">
                     🎲 LLM 随机生成音色 — 批量生成设计音色候选（可指定性别），试听后挑选喜欢的保存
-                    <span class="text-slate-500">（保存后出现在上方「设计音色」区；重新生成会替换当前候选）</span>
+                    <span class="text-slate-500">（保存后自动 ❄️ 冻结为克隆音色；重新生成会替换当前候选）</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <select id="cand-count" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
@@ -142,13 +141,13 @@
                 <span id="cand-preview-status" class="text-xs text-slate-400"></span>
             </div>
 
-            <div id="candidate-grid" class="grid grid-cols-3 gap-3">
+            <div id="candidate-grid" class="vc-grid">
                 <!-- Candidate cards rendered by JS -->
             </div>
         </div>
 
         <!-- Custom voice list -->
-        <div id="custom-grid" class="grid grid-cols-3 gap-3">
+        <div id="custom-grid" class="vc-grid">
             <!-- Cards rendered by JS -->
         </div>
     </section>
@@ -158,24 +157,24 @@
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>🔗</span> 角色素材库音色绑定
         </h3>
-        <div id="binding-grid" class="grid grid-cols-4 gap-3">
+        <div id="binding-grid" class="vc-grid vc-grid-wide">
             {% if not library_chars %}
             <p class="text-xs text-slate-500 col-span-full">素材库为空。请先在控制台收藏角色。</p>
             {% endif %}
             {% for char in library_chars %}
-            <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2">
+            <div class="bcard bg-slate-800 border border-slate-700">
                 {% if char.image_url %}
-                <img src="{{ char.image_url }}" class="w-16 h-16 rounded-lg object-cover bg-slate-800" onerror="this.style.opacity='0.3'">
+                <img src="{{ char.image_url }}" class="bcard-img object-cover bg-slate-800" onerror="this.style.opacity='0.3'">
                 {% else %}
-                <div class="w-16 h-16 rounded-lg bg-slate-700 flex items-center justify-center text-2xl">👤</div>
+                <div class="bcard-img bg-slate-700 flex items-center justify-center" style="font-size: max(14px, calc(28px * var(--vc)));">👤</div>
                 {% endif %}
-                <div class="text-xs font-medium text-slate-300 text-center truncate w-full" title="{{ char.description }}">{{ char.name }}</div>
-                <div class="text-[10px] text-slate-500">{{ char.gender or '?' }} · {{ char.structure or '?' }}</div>
-                <select class="voice-bind w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-[10px] text-white"
+                <div class="bcard-name font-medium text-slate-300 text-center truncate w-full" title="{{ char.description }}">{{ char.name }}</div>
+                <div class="bcard-meta text-slate-500">{{ char.gender or '?' }} · {{ char.structure or '?' }}</div>
+                <select class="bcard-select voice-bind w-full bg-slate-900 border border-slate-600 rounded text-white"
                     data-lib-id="{{ char.id }}">
                     <option value="">音色→</option>
                 </select>
-                <button class="lib-preview-btn w-full px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-[10px] text-white transition"
+                <button class="bcard-btn lib-preview-btn w-full bg-slate-700 hover:bg-indigo-600 text-white transition"
                     data-lib-id="{{ char.id }}">▶ 试听音色</button>
             </div>
             {% endfor %}
@@ -222,6 +221,25 @@ function togglePresetSection() {
     arrow.textContent = grid.classList.contains('hidden') ? '▸' : '▾';
 }
 
+// --- 卡片缩放（滑块 + localStorage 记忆） ---
+const CARD_SCALE_KEY = 'voices_card_scale_v1';
+
+function applyCardScale(pct) {
+    const v = Math.min(150, Math.max(40, Number(pct) || 50)) / 100;
+    document.querySelector('.voices-page').style.setProperty('--vc', v);
+    const slider = document.getElementById('card-scale');
+    slider.value = Math.round(v * 100);
+    document.getElementById('card-scale-label').textContent = Math.round(v * 100) + '%';
+    localStorage.setItem(CARD_SCALE_KEY, String(Math.round(v * 100)));
+}
+
+function initCardScale() {
+    const slider = document.getElementById('card-scale');
+    applyCardScale(localStorage.getItem(CARD_SCALE_KEY) || 50);
+    slider.addEventListener('input', () => applyCardScale(slider.value));
+    slider.addEventListener('dblclick', () => applyCardScale(50));
+}
+
 // --- Load voices ---
 function loadVoices() {
     fetch('/api/qwen_voices/speakers')
@@ -230,7 +248,6 @@ function loadVoices() {
             ALL_VOICES = data.speakers || [];
             PRESET_VOICES = data.presets || [];
             renderPresets();
-            renderDesignedVoices();
             renderCustomVoices();
             populateDropdowns();
             loadDefaults();
@@ -243,24 +260,24 @@ function renderPresets() {
     grid.innerHTML = '';
     PRESET_VOICES.forEach(v => {
         const card = document.createElement('div');
-        card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+        card.className = 'vcard bg-slate-800 border border-slate-700';
 
         const icon = document.createElement('div');
-        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+        icon.className = 'vcard-icon ' +
             (v.gender === 'female' ? 'bg-pink-900/50' : 'bg-blue-900/50');
         icon.textContent = v.gender === 'female' ? '♀' : '♂';
 
         const name = document.createElement('div');
-        name.className = 'text-sm font-medium text-white';
+        name.className = 'vcard-name font-medium text-white';
         name.textContent = v.name;
 
         const desc = document.createElement('div');
-        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.className = 'vcard-desc text-slate-400';
         desc.textContent = v.desc;
 
         const lang = document.createElement('div');
         const langMap = {zh: '中文', en: '英文', ja: '日语', ko: '韩语'};
-        lang.className = 'text-[10px] px-2 py-0.5 rounded-full ' +
+        lang.className = 'vcard-meta px-2 py-0.5 rounded-full ' +
             (v.lang === 'en' ? 'bg-green-900/50 text-green-300' : 'bg-amber-900/50 text-amber-300');
         lang.textContent = langMap[v.lang] || v.lang;
 
@@ -268,12 +285,12 @@ function renderPresets() {
         btnRow.className = 'flex gap-1';
 
         const btn = document.createElement('button');
-        btn.className = 'px-3 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        btn.className = 'vbtn bg-slate-700 hover:bg-indigo-600 text-white transition';
         btn.textContent = '▶ 试听';
         btn.onclick = () => previewVoice(v.name, voiceLanguage(v));
 
         const regenBtn = document.createElement('button');
-        regenBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-amber-600 rounded text-xs text-amber-300 transition';
+        regenBtn.className = 'vbtn bg-slate-700 hover:bg-amber-600 text-amber-300 transition';
         regenBtn.textContent = '🔄';
         regenBtn.title = '重新生成试听';
         regenBtn.onclick = () => previewVoice(v.name, voiceLanguage(v), true);
@@ -290,118 +307,54 @@ function renderPresets() {
     });
 }
 
-// --- Render designed voices (VoiceDesign) ---
-function renderDesignedVoices() {
-    const grid = document.getElementById('designed-grid');
-    const designedVoices = ALL_VOICES.filter(v => v.designed);
-    grid.innerHTML = '';
-    if (!designedVoices.length) {
-        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无设计音色。</p>';
-        return;
-    }
-    designedVoices.forEach(v => {
-        const card = document.createElement('div');
-        card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
-
-        const icon = document.createElement('div');
-        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
-            (v.builtin ? 'bg-pink-900/50' : 'bg-fuchsia-900/50');
-        icon.textContent = v.builtin ? '✨' : '💫';
-
-        const name = document.createElement('div');
-        name.className = 'text-sm font-medium text-white';
-        name.textContent = v.name + (v.builtin ? ' (内置)' : '');
-
-        const desc = document.createElement('div');
-        desc.className = 'text-[10px] text-slate-400 text-center';
-        desc.textContent = v.desc || '设计音色';
-
-        const meta = document.createElement('div');
-        meta.className = 'text-[10px] text-slate-500';
-        const langNames = {en: '英文', zh: '中文'};
-        meta.textContent = `${v.gender || '?'} · ${langNames[v.lang] || v.lang}`;
-
-        const btnRow = document.createElement('div');
-        btnRow.className = 'flex gap-1';
-
-        const previewBtn = document.createElement('button');
-        previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
-        previewBtn.textContent = '▶ 试听';
-        previewBtn.onclick = () => previewVoice(v.name, voiceLanguage(v));
-
-        const regenBtn = document.createElement('button');
-        regenBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-amber-600 rounded text-xs text-amber-300 transition';
-        regenBtn.textContent = '🔄';
-        regenBtn.title = '重新生成试听';
-        regenBtn.onclick = () => previewVoice(v.name, voiceLanguage(v), true);
-
-        btnRow.appendChild(previewBtn);
-        btnRow.appendChild(regenBtn);
-        if (!v.builtin) {
-            const delBtn = document.createElement('button');
-            delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
-            delBtn.textContent = '✕';
-            delBtn.onclick = () => deleteDesignedVoice(v.name);
-            btnRow.appendChild(delBtn);
-        }
-
-        card.appendChild(icon);
-        card.appendChild(name);
-        card.appendChild(desc);
-        card.appendChild(meta);
-        card.appendChild(btnRow);
-        grid.appendChild(card);
-    });
-}
-
 // --- Render custom voices ---
 function renderCustomVoices() {
     const grid = document.getElementById('custom-grid');
     const customVoices = ALL_VOICES.filter(v => v.custom);
     grid.innerHTML = '';
     if (!customVoices.length) {
-        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无自定义音色。上传参考音频创建克隆音色。</p>';
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">暂无自定义音色。上传参考音频创建克隆音色，或用上方「文字描述设计新音色」自动冻结生成。</p>';
         return;
     }
     customVoices.forEach(v => {
         const card = document.createElement('div');
-        card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center gap-2';
+        card.className = 'vcard bg-slate-800 border border-slate-700';
 
         const icon = document.createElement('div');
-        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+        icon.className = 'vcard-icon ' +
             (v.frozen ? 'bg-sky-900/50' : 'bg-purple-900/50');
         icon.textContent = v.frozen ? '❄️' : '🎭';
         icon.title = v.frozen ? '冻结自设计音色 — 音色已锁定，跨次生成不漂移' : '';
 
         const name = document.createElement('div');
-        name.className = 'text-sm font-medium text-white';
+        name.className = 'vcard-name font-medium text-white';
         name.textContent = v.name;
 
         const desc = document.createElement('div');
-        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.className = 'vcard-desc text-slate-400';
         desc.textContent = (v.frozen ? '❄️ ' : '') + (v.desc || (v.frozen ? '冻结设计音色' : '自定义克隆音色'));
         if (v.frozen) desc.title = 'instruct: ' + (v.instruct || '');
 
         const meta = document.createElement('div');
-        meta.className = 'text-[10px] text-slate-500';
+        meta.className = 'vcard-meta text-slate-500';
         meta.textContent = `${v.gender || '?'} · ${v.lang || '?'}${v.frozen ? ' · 已冻结' : ''}`;
 
         const btnRow = document.createElement('div');
         btnRow.className = 'flex gap-1';
 
         const previewBtn = document.createElement('button');
-        previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        previewBtn.className = 'vbtn bg-slate-700 hover:bg-indigo-600 text-white transition';
         previewBtn.textContent = '▶ 试听';
         previewBtn.onclick = () => previewVoice(v.name, voiceLanguage(v));
 
         const regenBtn = document.createElement('button');
-        regenBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-amber-600 rounded text-xs text-amber-300 transition';
+        regenBtn.className = 'vbtn bg-slate-700 hover:bg-amber-600 text-amber-300 transition';
         regenBtn.textContent = '🔄';
         regenBtn.title = '重新生成试听';
         regenBtn.onclick = () => previewVoice(v.name, voiceLanguage(v), true);
 
         const delBtn = document.createElement('button');
-        delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
+        delBtn.className = 'vbtn bg-slate-700 hover:bg-red-600 text-red-300 transition';
         delBtn.textContent = '✕';
         delBtn.onclick = () => deleteCustomVoice(v.name);
 
@@ -531,7 +484,7 @@ function voiceLanguage(v) {
     return (v.lang === 'zh' || v.lang === 'chinese') ? 'chinese' : 'english';
 }
 
-// --- Create designed voice (VoiceDesign) ---
+// --- Create designed voice (VoiceDesign，保存后自动冻结为克隆音色) ---
 function createDesignedVoice() {
     const name = document.getElementById('dv-name').value.trim();
     const gender = document.getElementById('dv-gender').value;
@@ -547,7 +500,7 @@ function createDesignedVoice() {
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
-                alert('设计音色已创建: ' + name + '\n\n正在自动❄️冻结为克隆音色（后台生成样本并锁定音色，约 30-60 秒），完成后出现在下方「自定义音色」区');
+                alert('设计音色已创建: ' + name + '\n\n正在自动❄️冻结为克隆音色（后台生成样本并锁定音色，约 30-60 秒），完成后出现在下方自定义音色列表');
                 document.getElementById('dv-name').value = '';
                 document.getElementById('dv-instruct').value = '';
                 loadVoices();
@@ -563,17 +516,6 @@ function createDesignedVoice() {
             } else {
                 alert('创建失败: ' + (data.error || ''));
             }
-        });
-}
-
-// --- Delete designed voice ---
-function deleteDesignedVoice(name) {
-    if (!confirm('删除设计音色 "' + name + '"?')) return;
-    fetch('/api/qwen_voices/designed/' + encodeURIComponent(name), {method: 'DELETE'})
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) { loadVoices(); }
-            else { alert(data.error || '删除失败'); }
         });
 }
 
@@ -649,7 +591,7 @@ function renderCandidates() {
         actionsRow.style.display = 'none';
         SELECTED.clear();
         updateActionButtons();
-        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无候选音色。点击「LLM 随机生成」创建一批，试听后保存喜欢的。</p>';
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">暂无候选音色。点击「LLM 随机生成」创建一批，试听后保存喜欢的。</p>';
         return;
     }
     // 清理已不存在的选中项（候选被保存/删除后）
@@ -657,55 +599,56 @@ function renderCandidates() {
     [...SELECTED].forEach(n => { if (!names.has(n)) SELECTED.delete(n); });
     actionsRow.style.display = 'flex';
 
+    const candCardCls = selected => 'vcard vcard-cand bg-slate-800 border transition ' +
+        (selected ? 'border-indigo-500 bg-slate-700/60' : 'border-slate-600');
+
     CANDIDATES.forEach(v => {
         const selected = SELECTED.has(v.name);
         const card = document.createElement('div');
-        card.className = 'relative bg-slate-800 border rounded-lg p-3 pt-7 flex flex-col items-center gap-2 transition ' +
-            (selected ? 'border-indigo-500 bg-slate-700/60' : 'border-slate-600');
+        card.className = candCardCls(selected);
 
         // 左上角选择框（勾选后可批量删除）
         const check = document.createElement('input');
         check.type = 'checkbox';
-        check.className = 'absolute top-2 left-2 w-4 h-4 accent-indigo-500 cursor-pointer';
+        check.className = 'vcard-check accent-indigo-500 cursor-pointer';
         check.checked = selected;
         check.title = '勾选不喜欢的，一键批量删除';
         check.onchange = (e) => {
             e.stopPropagation();
             toggleSelect(v.name, e.target.checked);
-            card.className = 'relative bg-slate-800 border rounded-lg p-3 pt-7 flex flex-col items-center gap-2 transition ' +
-                (e.target.checked ? 'border-indigo-500 bg-slate-700/60' : 'border-slate-600');
+            card.className = candCardCls(e.target.checked);
         };
 
         // 右上角已缓存徽章
         if (v.preview_cached) {
             const cached = document.createElement('div');
-            cached.className = 'absolute top-1.5 right-2 text-[10px] text-emerald-400';
+            cached.className = 'vcard-badge text-emerald-400';
             cached.textContent = '✓ 已缓存';
             card.appendChild(cached);
         }
 
         const icon = document.createElement('div');
-        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+        icon.className = 'vcard-icon ' +
             (v.gender === 'female' ? 'bg-fuchsia-900/50' : 'bg-indigo-900/50');
         icon.textContent = v.gender === 'female' ? '♀' : '♂';
 
         const name = document.createElement('div');
-        name.className = 'text-sm font-medium text-white';
+        name.className = 'vcard-name font-medium text-white';
         name.textContent = v.name;
 
         const desc = document.createElement('div');
-        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.className = 'vcard-desc text-slate-400';
         desc.textContent = v.description || '随机设计音色';
 
         const instruct = document.createElement('div');
-        instruct.className = 'text-[10px] text-slate-500 text-left w-full overflow-hidden';
+        instruct.className = 'vcard-instruct text-slate-500 text-left w-full overflow-hidden';
         instruct.style.maxHeight = '3em';
         instruct.title = v.instruct;
         instruct.textContent = v.instruct;
 
         const langNames = {en: '英文', zh: '中文'};
         const meta = document.createElement('div');
-        meta.className = 'text-[10px] px-2 py-0.5 rounded-full ' +
+        meta.className = 'vcard-meta px-2 py-0.5 rounded-full ' +
             ((v.language === 'en') ? 'bg-green-900/50 text-green-300' : 'bg-amber-900/50 text-amber-300');
         meta.textContent = langNames[v.language] || v.language;
 
@@ -713,18 +656,18 @@ function renderCandidates() {
         btnRow.className = 'flex gap-1';
 
         const previewBtn = document.createElement('button');
-        previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        previewBtn.className = 'vbtn bg-slate-700 hover:bg-indigo-600 text-white transition';
         previewBtn.textContent = '▶ 试听';
         previewBtn.onclick = () => previewVoice(v.name, voiceLanguage({lang: v.language}));
 
         const saveBtn = document.createElement('button');
-        saveBtn.className = 'px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-xs text-white transition';
+        saveBtn.className = 'vbtn bg-emerald-700 hover:bg-emerald-600 text-white transition';
         saveBtn.textContent = '💾 保存';
-        saveBtn.title = '保存为设计音色';
+        saveBtn.title = '保存后自动冻结为克隆音色';
         saveBtn.onclick = () => saveCandidate(v.name);
 
         const delBtn = document.createElement('button');
-        delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
+        delBtn.className = 'vbtn bg-slate-700 hover:bg-red-600 text-red-300 transition';
         delBtn.textContent = '✕';
         delBtn.title = '丢弃该候选';
         delBtn.onclick = () => discardCandidate(v.name);
@@ -939,6 +882,7 @@ function discardCandidate(name) {
 
 // --- Init ---
 window.addEventListener('load', () => {
+    initCardScale();
     loadVoices();
     loadCandidates();
 });

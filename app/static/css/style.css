@@ -49,3 +49,84 @@ input:checked + div {
 input:not(:checked) + div > div {
     transition: transform 0.2s;
 }
+
+/* ===== QwenTTS 音色页：卡片缩放（滑块控制，localStorage 记忆） ===== */
+/* --vc 为缩放系数：0.5 = 卡片缩小一半（约 5-6 列/行），1.0 = 原始大小（3 列/行） */
+.voices-page { --vc: 0.5; }
+
+/* 卡片网格：列宽随缩放变化，auto-fill 自动增减列数 */
+.vc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(calc(360px * var(--vc)), 1fr));
+    gap: calc(12px * var(--vc));
+}
+/* 素材库绑定卡片（原图 grid-cols-4，基础列宽不同） */
+.vc-grid-wide {
+    grid-template-columns: repeat(auto-fill, minmax(calc(300px * var(--vc)), 1fr));
+}
+
+/* 音色卡片：结构尺寸线性缩放，字号用 max() 设下限防止过小不可读 */
+.vcard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(6px * var(--vc));
+    padding: calc(10px * var(--vc));
+    border-radius: calc(8px * var(--vc));
+}
+/* 候选卡：左上角留勾选框空间 */
+.vcard-cand { position: relative; padding-top: calc(26px * var(--vc)); }
+.vcard-icon {
+    width: calc(48px * var(--vc));
+    height: calc(48px * var(--vc));
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(22px * var(--vc));
+    flex-shrink: 0;
+}
+.vcard-name { font-size: max(9px, calc(14px * var(--vc))); }
+.vcard-desc { font-size: max(8px, calc(11px * var(--vc))); text-align: center; }
+.vcard-meta { font-size: max(8px, calc(10px * var(--vc))); }
+.vcard-instruct { font-size: max(8px, calc(10px * var(--vc))); }
+.vbtn {
+    font-size: max(9px, calc(12px * var(--vc)));
+    padding: calc(4px * var(--vc)) calc(8px * var(--vc));
+    border-radius: calc(6px * var(--vc));
+}
+.vcard-check {
+    position: absolute;
+    top: calc(6px * var(--vc));
+    left: calc(6px * var(--vc));
+    width: max(12px, calc(16px * var(--vc)));
+    height: max(12px, calc(16px * var(--vc)));
+}
+.vcard-badge {
+    position: absolute;
+    top: calc(4px * var(--vc));
+    right: calc(6px * var(--vc));
+    font-size: max(8px, calc(10px * var(--vc)));
+}
+
+/* 素材库绑定卡片 */
+.bcard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(6px * var(--vc));
+    padding: calc(10px * var(--vc));
+    border-radius: calc(8px * var(--vc));
+}
+.bcard-img {
+    width: calc(64px * var(--vc));
+    height: calc(64px * var(--vc));
+    border-radius: calc(8px * var(--vc));
+}
+.bcard-name { font-size: max(9px, calc(12px * var(--vc))); }
+.bcard-meta { font-size: max(8px, calc(10px * var(--vc))); }
+.bcard-select, .bcard-btn { font-size: max(9px, calc(11px * var(--vc))); }
+.bcard-btn {
+    padding: calc(3px * var(--vc)) calc(8px * var(--vc));
+    border-radius: calc(6px * var(--vc));
+}
