@@ -16,12 +16,14 @@
         </div>
     </div>
 
-    <!-- 区域 A: 预设音色 -->
+    <!-- 区域 A: 预设音色 (默认折叠) -->
     <section class="mb-8">
-        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+        <h3 id="preset-header" onclick="togglePresetSection()"
+            class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2 cursor-pointer select-none hover:text-white transition">
             <span>📋</span> 预设音色 (9 个)
+            <span id="preset-arrow" class="text-slate-500 text-xs">▸</span>
         </h3>
-        <div id="preset-grid" class="grid grid-cols-3 gap-3">
+        <div id="preset-grid" class="grid grid-cols-3 gap-3 hidden">
             <!-- Cards rendered by JS -->
         </div>
     </section>
@@ -91,6 +93,36 @@
             </button>
         </div>
 
+        <!-- LLM 随机生成候选音色 -->
+        <div class="bg-slate-800/60 rounded-xl p-4 mb-3 border border-slate-700">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div class="text-xs text-slate-400">
+                    🎲 LLM 随机生成音色 — 批量生成设计音色候选，试听后挑选喜欢的保存
+                    <span class="text-slate-500">（保存后出现在上方「设计音色」区；重新生成会替换当前候选）</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="cand-count" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                        <option value="5">5 个</option>
+                        <option value="10" selected>10 个</option>
+                        <option value="15">15 个</option>
+                        <option value="20">20 个</option>
+                    </select>
+                    <select id="cand-lang" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+                        <option value="english" selected>英文</option>
+                        <option value="chinese">中文</option>
+                        <option value="mixed">混合</option>
+                    </select>
+                    <button id="cand-gen-btn" onclick="generateCandidates()"
+                        class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs text-white transition">
+                        🎲 LLM 随机生成
+                    </button>
+                </div>
+            </div>
+            <div id="candidate-grid" class="grid grid-cols-3 gap-3">
+                <!-- Candidate cards rendered by JS -->
+            </div>
+        </div>
+
         <!-- Custom voice list -->
         <div id="custom-grid" class="grid grid-cols-3 gap-3">
             <!-- Cards rendered by JS -->
@@ -157,6 +189,14 @@
 <script>
 let ALL_VOICES = [];
 let PRESET_VOICES = [];
+
+// --- Toggle preset section (collapsed by default) ---
+function togglePresetSection() {
+    const grid = document.getElementById('preset-grid');
+    const arrow = document.getElementById('preset-arrow');
+    grid.classList.toggle('hidden');
+    arrow.textContent = grid.classList.contains('hidden') ? '▸' : '▾';
+}
 
 // --- Load voices ---
 function loadVoices() {
@@ -541,7 +581,141 @@ function deleteCustomVoice(name) {
         .then(data => { if (data.ok) loadVoices(); });
 }
 
+// --- LLM random voice candidates ---
+let CANDIDATES = [];
+
+function loadCandidates() {
+    fetch('/api/qwen_voices/candidates')
+        .then(r => r.json())
+        .then(data => {
+            CANDIDATES = data.candidates || [];
+            renderCandidates();
+        });
+}
+
+function renderCandidates() {
+    const grid = document.getElementById('candidate-grid');
+    grid.innerHTML = '';
+    if (!CANDIDATES.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">暂无候选音色。点击「LLM 随机生成」创建一批，试听后保存喜欢的。</p>';
+        return;
+    }
+    CANDIDATES.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800 border border-slate-600 rounded-lg p-3 flex flex-col items-center gap-2';
+
+        const icon = document.createElement('div');
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl ' +
+            (v.gender === 'female' ? 'bg-fuchsia-900/50' : 'bg-indigo-900/50');
+        icon.textContent = v.gender === 'female' ? '♀' : '♂';
+
+        const name = document.createElement('div');
+        name.className = 'text-sm font-medium text-white';
+        name.textContent = v.name;
+
+        const desc = document.createElement('div');
+        desc.className = 'text-[10px] text-slate-400 text-center';
+        desc.textContent = v.description || '随机设计音色';
+
+        const instruct = document.createElement('div');
+        instruct.className = 'text-[10px] text-slate-500 text-left w-full overflow-hidden';
+        instruct.style.maxHeight = '3em';
+        instruct.title = v.instruct;
+        instruct.textContent = v.instruct;
+
+        const langNames = {en: '英文', zh: '中文'};
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] px-2 py-0.5 rounded-full ' +
+            ((v.language === 'en') ? 'bg-green-900/50 text-green-300' : 'bg-amber-900/50 text-amber-300');
+        meta.textContent = langNames[v.language] || v.language;
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-1';
+
+        const previewBtn = document.createElement('button');
+        previewBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-xs text-white transition';
+        previewBtn.textContent = '▶ 试听';
+        previewBtn.onclick = () => previewVoice(v.name, voiceLanguage({lang: v.language}));
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-xs text-white transition';
+        saveBtn.textContent = '💾 保存';
+        saveBtn.title = '保存为设计音色';
+        saveBtn.onclick = () => saveCandidate(v.name);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-xs text-red-300 transition';
+        delBtn.textContent = '✕';
+        delBtn.title = '丢弃该候选';
+        delBtn.onclick = () => discardCandidate(v.name);
+
+        btnRow.appendChild(previewBtn);
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(delBtn);
+
+        card.appendChild(icon);
+        card.appendChild(name);
+        card.appendChild(desc);
+        card.appendChild(instruct);
+        card.appendChild(meta);
+        card.appendChild(btnRow);
+        grid.appendChild(card);
+    });
+}
+
+function generateCandidates() {
+    const btn = document.getElementById('cand-gen-btn');
+    const count = document.getElementById('cand-count').value;
+    const language = document.getElementById('cand-lang').value;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ LLM 生成中...（可能需要 1-2 分钟）';
+
+    fetch('/api/qwen_voices/candidates/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({count: parseInt(count, 10), language})
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                CANDIDATES = data.candidates || [];
+                renderCandidates();
+            } else {
+                alert('生成失败: ' + (data.error || '未知错误'));
+            }
+        })
+        .catch(err => alert('生成失败: ' + err.message))
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = orig;
+        });
+}
+
+function saveCandidate(name) {
+    fetch('/api/qwen_voices/candidates/' + encodeURIComponent(name) + '/save', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                loadCandidates();   // 刷新候选列表
+                loadVoices();       // 刷新设计音色区 + 下拉框
+            } else {
+                alert('保存失败: ' + (data.error || '未知错误'));
+            }
+        });
+}
+
+function discardCandidate(name) {
+    if (!confirm('丢弃候选音色 "' + name + '"?')) return;
+    fetch('/api/qwen_voices/candidates/' + encodeURIComponent(name), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) loadCandidates(); });
+}
+
 // --- Init ---
-window.addEventListener('load', loadVoices);
+window.addEventListener('load', () => {
+    loadVoices();
+    loadCandidates();
+});
 </script>
 {% endblock %}

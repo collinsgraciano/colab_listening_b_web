@@ -889,6 +889,103 @@ Output JSON ONLY (no markdown):
     return voices
 
 
+def generate_random_voice_designs(count: int = 10,
+                                  avoid_names: list[str] | None = None,
+                                  language: str = "english") -> list[dict]:
+    """Generate diverse random VoiceDesign voice specs via LLM.
+
+    用于 Web 端「自定义音色 → LLM 随机生成」：LLM 批量产出音色设计候选，
+    用户试听后挑选喜欢的保存为设计音色。
+
+    Returns:
+        list[dict]: 每项 {name, gender, language("en"/"zh"), description, instruct}
+    """
+    avoid = ", ".join(sorted(n for n in (avoid_names or []) if n)) or "(none)"
+
+    lang_req = {
+        "english": 'All voices speak ENGLISH. Set every "language" field to "en".',
+        "chinese": 'All voices speak CHINESE (Mandarin). Set every "language" field to "zh".',
+        "mixed": 'Mix languages: roughly half English ("en") and half Chinese ("zh"). '
+                 'Set each "language" field individually.',
+    }.get(language, 'All voices speak ENGLISH. Set every "language" field to "en".')
+
+    prompt = f"""You are a creative voice director designing voices for Qwen3-TTS VoiceDesign.
+Generate {count} DIVERSE, DISTINCT voice designs for language learning videos.
+
+{lang_req}
+
+Each voice design MUST include these fields:
+- "name": a short English given name (3-10 letters, capitalized, e.g. "Luna", "Jasper"). Unique within the list.
+- "gender": "female" or "male"
+- "language": "en" or "zh" (as required above)
+- "description": a short Chinese summary of the voice character, ≤14 chars (e.g. "温柔知性美式女声")
+- "instruct": an English description for the VoiceDesign model (2-4 sentences). Must cover:
+  (1) timbre: age feel, pitch (high/mid/low), texture (bright/warm/husky/crisp/deep/soft)
+  (2) accent (e.g. General American, British RP)
+  (3) style: pace, energy, intonation, personality
+  (4) learner-friendly delivery: clear articulation, natural pauses
+
+Example instructs (follow this style):
+- "Speak in a warm, friendly young American female voice with a mid-range pitch and a relaxed, moderate pace. Sound conversational and expressive, like a native speaker talking with a student."
+- "Speak in a mature, confident American female voice with clear articulation, suitable for narration. Keep a steady, engaging pace with gentle emphasis on key phrases."
+
+DIVERSITY requirements — cover a wide spectrum:
+- Mix genders and age feels (youthful / young adult / middle-aged / senior)
+- Mix pitches: high, mid, low
+- Mix energies: calm, warm, lively, energetic, playful, gentle, husky, crisp, confident
+- Vary use cases: conversation partner, narrator, cheerful host, storyteller
+- For English voices, mostly General American; optionally 1-2 British RP
+
+CONSTRAINTS:
+- Every voice must be CLEAR and easy for ESL learners to understand — no mumbling, no extreme speed, no heavy regional accents
+- Names MUST NOT duplicate any of these existing voice names: {avoid}
+- Do not duplicate names within the list
+
+Output JSON ONLY (no markdown fences):
+{{"voices": [{{"name": "...", "gender": "...", "language": "...", "description": "...", "instruct": "..."}}, ...]}}"""
+
+    content = _chat(
+        [{"role": "user", "content": prompt}],
+        temperature=1.0,
+        max_tokens=8192,
+        reasoning_effort="low",
+    )
+    data = _extract_json(content)
+    raw = data.get("voices", []) if isinstance(data, dict) else (
+        data if isinstance(data, list) else [])
+
+    # Normalize + validate: drop empty entries and name collisions
+    seen = set(avoid_names or [])
+    result: list[dict] = []
+    for v in raw:
+        if not isinstance(v, dict):
+            continue
+        name = str(v.get("name", "")).strip()
+        gender = str(v.get("gender", "")).strip().lower()
+        lang = str(v.get("language", "")).strip().lower()
+        instruct = str(v.get("instruct", "")).strip()
+        desc = str(v.get("description", "")).strip()
+        if not name or not instruct or name in seen:
+            continue
+        if gender not in ("female", "male"):
+            gender = "female"
+        if lang not in ("en", "zh"):
+            lang = "en"
+        seen.add(name)
+        result.append({
+            "name": name,
+            "gender": gender,
+            "language": lang,
+            "description": desc or f"随机设计音色 ({'女声' if gender == 'female' else '男声'})",
+            "instruct": instruct,
+        })
+        if len(result) >= count:
+            break
+    if not result:
+        raise RuntimeError("LLM 未返回有效的音色设计")
+    return result
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate listening script")

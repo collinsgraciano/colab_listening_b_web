@@ -94,6 +94,7 @@ def _load_voice_config() -> dict:
         "default_host_female": _DEFAULT_HOST_FEMALE,
         "custom_voices": [],
         "designed_voices": [],
+        "candidate_voices": [],  # LLM 随机生成、待试听挑选的候选设计音色
     }
     path = _voice_config_path()
     if path.exists():
@@ -141,7 +142,11 @@ def get_all_voices() -> list[dict]:
 
 
 def get_designed_voice_meta(name: str) -> dict | None:
-    """Look up a designed voice (builtin first, then user-created). None if not found."""
+    """Look up a designed voice (builtin → user-designed → candidate). None if not found.
+
+    候选音色（candidate_voices，LLM 随机生成待挑选）与设计音色同构，
+    也走 VoiceDesign 模型合成，故一并在此解析（试听端点无需注册即可用）。
+    """
     for dv in DESIGNED_VOICES_BUILTIN:
         if dv["name"] == name:
             return dv
@@ -149,6 +154,9 @@ def get_designed_voice_meta(name: str) -> dict | None:
     for dv in config.get("designed_voices", []):
         if dv["name"] == name:
             return dv
+    for cv in config.get("candidate_voices", []):
+        if cv["name"] == name:
+            return cv
     return None
 
 

@@ -1745,6 +1745,7 @@ def _load_qwen_voice_config() -> dict:
         "default_host_female": "Serena",
         "custom_voices": [],
         "designed_voices": [],
+        "candidate_voices": [],  # LLM 随机生成、待试听挑选的候选设计音色
     }
     if QWEN_VOICE_CONFIG_PATH.exists():
         try:
@@ -1907,6 +1908,10 @@ async def api_qwen_custom_create(
     config = _load_qwen_voice_config()
     # Remove existing entry with same name
     config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
+    # 同名候选音色清理（避免旧候选的试听缓存命中新音色）
+    if any(c["name"] == name for c in config.get("candidate_voices", [])):
+        config["candidate_voices"] = [c for c in config["candidate_voices"] if c["name"] != name]
+        _purge_preview_cache(name)
     config["custom_voices"].append({
         "name": name,
         "description": f"自定义克隆音色 ({gender})",
@@ -1982,6 +1987,10 @@ async def api_qwen_designed_create(request: Request):
         "instruct": instruct,
         "created": time.time(),
     })
+    # 同名候选音色清理（避免旧候选的试听缓存命中新音色）
+    if any(c["name"] == name for c in config.get("candidate_voices", [])):
+        config["candidate_voices"] = [c for c in config["candidate_voices"] if c["name"] != name]
+        _purge_preview_cache(name)
     _save_qwen_voice_config(config)
     return {"ok": True, "name": name}
 
@@ -2004,6 +2013,133 @@ async def api_qwen_designed_delete(name: str):
     config["designed_voices"] = [v for v in config.get("designed_voices", []) if v["name"] != name]
     _save_qwen_voice_config(config)
     # Remove cached previews of this voice
+    _purge_preview_cache(name)
+    return {"ok": True}
+
+
+# --- LLM 随机生成候选音色（试听 → 挑选保存）---
+
+def _build_voice_llm_override() -> dict:
+    """构建音色生成用的线程局部 LLM 配置（不改 os.environ，与运行中 pipeline 互不干扰）。"""
+    cfg = load_config()
+    p_type, base_url, api_key, model = resolve_provider(cfg)
+    if not api_key:
+        raise RuntimeError(
+            "未配置 LLM API Key — 请先在「参数配置」页面填写当前模式的大模型配置")
+    ov: dict[str, str] = {
+        "LLM_PROVIDER": p_type,
+        "LLM_RETRIES": str(cfg.get("llm_retries", 10)),
+    }
+    if p_type == "sensenova":
+        ov["SENSENOVA_API_KEY"] = api_key
+        ov["SENSENOVA_MODEL"] = model or "deepseek-v4-flash"
+    else:
+        ov["OPENAI_BASE_URL"] = base_url
+        ov["OPENAI_API_KEY"] = api_key
+        ov["OPENAI_MODEL"] = model or "grok-4.6"
+    if cfg.get("llm_min_interval"):
+        ov["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
+    return ov
+
+
+@app.get("/api/qwen_voices/candidates")
+async def api_qwen_candidates_list():
+    """List current LLM-generated candidate voices."""
+    config = _load_qwen_voice_config()
+    return {"candidates": config.get("candidate_voices", [])}
+
+
+@app.post("/api/qwen_voices/candidates/generate")
+async def api_qwen_candidates_generate(request: Request):
+    """Generate a batch of random voice designs via LLM (replaces current candidates)."""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    data = await request.json()
+    try:
+        count = int(data.get("count", 10))
+    except (TypeError, ValueError):
+        count = 10
+    count = max(1, min(count, 20))
+    language = (data.get("language", "english") or "english").strip()
+
+    def _run() -> list[dict]:
+        from llm_client import generate_random_voice_designs, set_llm_env_override
+        from qwen_tts_engine import get_all_voices
+
+        override = _build_voice_llm_override()
+        avoid = {v.get("name", "") for v in get_all_voices()}
+        for c in _load_qwen_voice_config().get("candidate_voices", []):
+            avoid.add(c.get("name", ""))
+
+        set_llm_env_override(override)
+        try:
+            return generate_random_voice_designs(count, sorted(avoid), language)
+        finally:
+            set_llm_env_override(None)
+
+    try:
+        voices = await asyncio.to_thread(_run)
+    except Exception as e:  # noqa: BLE001 — 前端展示错误信息
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+    config = _load_qwen_voice_config()
+    # 清理被替换掉的旧候选的试听缓存（新一批名字不重，避免陈旧缓存命中）
+    new_names = {v["name"] for v in voices}
+    for old in config.get("candidate_voices", []):
+        if old.get("name") and old["name"] not in new_names:
+            _purge_preview_cache(old["name"])
+    config["candidate_voices"] = voices
+    _save_qwen_voice_config(config)
+    return {"ok": True, "candidates": voices}
+
+
+@app.post("/api/qwen_voices/candidates/{name}/save")
+async def api_qwen_candidate_save(name: str):
+    """Save a candidate voice as a user-designed voice."""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    config = _load_qwen_voice_config()
+    target = next((c for c in config.get("candidate_voices", []) if c["name"] == name), None)
+    if not target:
+        return JSONResponse({"ok": False, "error": "未找到候选音色"}, status_code=404)
+
+    from qwen_tts_engine import QWEN_SPEAKERS, DESIGNED_VOICES_BUILTIN
+    if name in {s["name"] for s in QWEN_SPEAKERS}:
+        return JSONResponse({"ok": False, "error": f"名称与预设音色冲突: {name}"}, status_code=400)
+    if name in {v["name"] for v in DESIGNED_VOICES_BUILTIN}:
+        return JSONResponse({"ok": False, "error": f"名称与内置设计音色冲突: {name}"}, status_code=400)
+    if any(v["name"] == name for v in config.get("designed_voices", [])):
+        return JSONResponse({"ok": False, "error": f"设计音色已存在: {name}"}, status_code=400)
+    if any(v["name"] == name for v in config.get("custom_voices", [])):
+        return JSONResponse({"ok": False, "error": f"名称与克隆音色冲突: {name}"}, status_code=400)
+
+    config.setdefault("designed_voices", []).append({
+        "name": name,
+        "description": target.get("description", ""),
+        "gender": target.get("gender", ""),
+        "language": target.get("language", "en"),
+        "instruct": target.get("instruct", ""),
+        "created": time.time(),
+    })
+    config["candidate_voices"] = [c for c in config.get("candidate_voices", []) if c["name"] != name]
+    _save_qwen_voice_config(config)
+    return {"ok": True}
+
+
+@app.delete("/api/qwen_voices/candidates/{name}")
+async def api_qwen_candidate_delete(name: str):
+    """Discard a candidate voice."""
+    config = _load_qwen_voice_config()
+    if not any(c["name"] == name for c in config.get("candidate_voices", [])):
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    config["candidate_voices"] = [c for c in config.get("candidate_voices", []) if c["name"] != name]
+    _save_qwen_voice_config(config)
     _purge_preview_cache(name)
     return {"ok": True}
 
