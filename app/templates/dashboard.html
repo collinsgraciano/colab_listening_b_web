@@ -325,21 +325,43 @@ function loadQwenVoices() {
         .catch(() => {});
 }
 
+// --- MOSS voices (for voice binding dropdowns) ---
+let _mossVoiceOptions = '';
+let _mossVoices = [];
+
+function loadMossVoices() {
+    fetch('/api/moss_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            const voices = data.speakers || [];
+            _mossVoices = voices;
+            _mossVoiceOptions = voices.map(v =>
+                `<option value="${v.name}">${v.name}${v.preset ? ' (预设)' : (v.custom ? ' (克隆)' : '')} · ${v.desc || ''}</option>`
+            ).join('');
+            const sel = document.getElementById('char-source');
+            if (sel && sel.value) onCharSourceChange();
+            renderLibrary();
+        })
+        .catch(() => {});
+}
+
 // --- 试听绑定音色（素材库卡片） ---
-function previewVoice(speaker, language, regenerate = false, btn = null) {
+// engine: 'qwen' or 'moss' — selects which preview API to call
+function previewVoice(speaker, language, regenerate = false, btn = null, engine = 'qwen') {
     const text = language === 'chinese' ?
         '你好，这是音色试听测试。' :
         'Hello, this is a voice preview test.';
     const origText = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = regenerate ? '⏳ 生成中...' : '⏳ 加载中...'; }
 
+    const apiBase = engine === 'moss' ? '/api/moss_voices' : '/api/qwen_voices';
     const cacheFetch = regenerate
         ? Promise.reject(new Error('regenerate'))
-        : fetch(`/api/qwen_voices/preview/${encodeURIComponent(speaker)}?language=${language}`, {cache: 'no-store'})
+        : fetch(`${apiBase}/preview/${encodeURIComponent(speaker)}?language=${language}`, {cache: 'no-store'})
             .then(r => { if (!r.ok) throw new Error('no cache'); return r.blob(); });
 
     cacheFetch
-        .catch(() => fetch('/api/qwen_voices/preview', {
+        .catch(() => fetch(`${apiBase}/preview`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({speaker, language, text, regenerate})
@@ -500,6 +522,13 @@ function onCharSourceChange() {
         voiceSelect.innerHTML = '<option value="">🎤 Qwen音色→</option>' + _qwenVoiceOptions;
         if (char.qwen_speaker) voiceSelect.value = char.qwen_speaker;
 
+        // MOSS voice binding dropdown
+        const mossVoiceSelect = document.createElement('select');
+        mossVoiceSelect.className = 'char-moss-voice w-full bg-slate-900 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-white';
+        mossVoiceSelect.dataset.charKey = char.key;
+        mossVoiceSelect.innerHTML = '<option value="">🔊 MOSS音色→</option>' + _mossVoiceOptions;
+        if (char.moss_voice) mossVoiceSelect.value = char.moss_voice;
+
         // Save to library button
         const saveBtn = document.createElement('button');
         saveBtn.className = 'text-[10px] text-indigo-400 hover:text-indigo-300';
@@ -511,6 +540,7 @@ function onCharSourceChange() {
         card.appendChild(meta);
         card.appendChild(modeSelect);
         card.appendChild(voiceSelect);
+        card.appendChild(mossVoiceSelect);
         card.appendChild(saveBtn);
         cardsContainer.appendChild(card);
     });
@@ -523,9 +553,10 @@ function onCharSourceChange() {
 // 回显当前模式持久化的复用模式/音色/描述，并挂接变更保存
 function applySavedCharBindings() {
     const cfg = MODE_CONFIGS[ACTIVE_MODE];
-    let reuse = {}; let voices = {};
+    let reuse = {}; let voices = {}; let mossVoices = {};
     try { reuse = cfg.character_reuse ? JSON.parse(cfg.character_reuse) : {}; } catch (e) {}
     try { voices = cfg.character_voices ? JSON.parse(cfg.character_voices) : {}; } catch (e) {}
+    try { mossVoices = cfg.character_moss_voices ? JSON.parse(cfg.character_moss_voices) : {}; } catch (e) {}
     const descs = cfg._ui_descs || {};
 
     document.querySelectorAll('.char-reuse-mode').forEach(dd => {
@@ -535,6 +566,11 @@ function applySavedCharBindings() {
     });
     document.querySelectorAll('.char-voice').forEach(dd => {
         const v = voices[dd.dataset.charKey];
+        if (v) dd.value = v;
+        dd.addEventListener('change', saveCharState);
+    });
+    document.querySelectorAll('.char-moss-voice').forEach(dd => {
+        const v = mossVoices[dd.dataset.charKey];
         if (v) dd.value = v;
         dd.addEventListener('change', saveCharState);
     });
@@ -555,12 +591,15 @@ function _debounceCharSave() {
 // 捕获角色区状态并持久化到当前模式配置
 function saveCharState() {
     const source = document.getElementById('char-source')?.value || '';
-    const reuse = {}; const descs = {}; const voices = {};
+    const reuse = {}; const descs = {}; const voices = {}; const mossVoices = {};
     document.querySelectorAll('.char-reuse-mode').forEach(dd => {
         if (dd.value) reuse[dd.dataset.charKey] = dd.value;
     });
     document.querySelectorAll('.char-voice').forEach(dd => {
         if (dd.value) voices[dd.dataset.charKey] = dd.value;
+    });
+    document.querySelectorAll('.char-moss-voice').forEach(dd => {
+        if (dd.value) mossVoices[dd.dataset.charKey] = dd.value;
     });
     document.querySelectorAll('[data-char-desc]').forEach(ta => {
         const val = ta.value.trim();
@@ -576,6 +615,7 @@ function saveCharState() {
     cfg.character_reuse = Object.keys(reuse).length ? JSON.stringify(reuse) : '';
     cfg.character_fixes = Object.keys(fixes).length ? JSON.stringify(fixes) : '';
     cfg.character_voices = Object.keys(voices).length ? JSON.stringify(voices) : '';
+    cfg.character_moss_voices = Object.keys(mossVoices).length ? JSON.stringify(mossVoices) : '';
     cfg._ui_descs = descs;
 
     const mode = ACTIVE_MODE;
@@ -585,6 +625,7 @@ function saveCharState() {
         character_reuse: cfg.character_reuse,
         character_fixes: cfg.character_fixes,
         character_voices: cfg.character_voices,
+        character_moss_voices: cfg.character_moss_voices,
         _ui_descs: cfg._ui_descs,
     };
     fetch('/api/config/save', {
@@ -666,7 +707,7 @@ function renderRoleBadges() {
                 <img src="${bound.image_url || ''}" class="w-5 h-5 rounded object-cover bg-slate-800"
                     onerror="this.style.opacity=0.3">
                 <span class="text-[11px] text-indigo-200 truncate max-w-[200px]">素材库 · ${escapeHtml(bound.name || bound.id)}</span>
-                <span class="text-[10px] text-slate-500">${escapeHtml(bound.gender || '')}${bound.qwen_speaker ? ' · 🎤' + escapeHtml(bound.qwen_speaker) : ''}</span>
+                <span class="text-[10px] text-slate-500">${escapeHtml(bound.gender || '')}${bound.qwen_speaker ? ' · 🎤' + escapeHtml(bound.qwen_speaker) : ''}${bound.moss_voice ? ' · 🔊' + escapeHtml(bound.moss_voice) : ''}</span>
                 <button onclick="unbindLibChar('${key}')" class="text-red-400 hover:text-red-300 text-xs px-0.5" title="解除绑定">✕</button>
             </div>`;
     });
@@ -710,6 +751,7 @@ function collectCharacterConfig() {
         character_fixes: Object.keys(fixesMap).length ? JSON.stringify(fixesMap) : '',
         character_library: collectLibraryAssignments(),
         character_voices: collectVoiceBindings(),
+        character_moss_voices: collectMossVoiceBindings(),
     };
 }
 
@@ -726,6 +768,27 @@ function collectVoiceBindings() {
         if (assignSel.value) {
             const libId = assignSel.dataset.libId;
             const voiceSel = document.querySelector('.lib-voice[data-lib-id="' + libId + '"]');
+            if (voiceSel && voiceSel.value) {
+                map[assignSel.value] = voiceSel.value;
+            }
+        }
+    });
+    return Object.keys(map).length ? JSON.stringify(map) : '';
+}
+
+function collectMossVoiceBindings() {
+    const map = {};
+    // From reuse cards (keyed by char key)
+    document.querySelectorAll('.char-moss-voice').forEach(sel => {
+        if (sel.value) {
+            map[sel.dataset.charKey] = sel.value;
+        }
+    });
+    // From library cards (keyed by assigned role)
+    document.querySelectorAll('.lib-assign').forEach(assignSel => {
+        if (assignSel.value) {
+            const libId = assignSel.dataset.libId;
+            const voiceSel = document.querySelector('.lib-moss-voice[data-lib-id="' + libId + '"]');
             if (voiceSel && voiceSel.value) {
                 map[assignSel.value] = voiceSel.value;
             }
@@ -837,7 +900,7 @@ function renderLibrary() {
         const meta = document.createElement('div');
         meta.className = 'text-[10px] text-slate-500';
         meta.textContent = voiceOnly
-            ? `${char.gender || '?'} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}`
+            ? `${char.gender || '?'} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}${char.moss_voice ? ' · 🔊' + char.moss_voice : ''}`
             : `${char.gender || '?'} · ${char.structure || '?'}`;
 
         // Assign dropdown (绑定状态持久化，回显当前绑定)
@@ -862,7 +925,6 @@ function renderLibrary() {
         delBtn.onclick = function() { deleteLibraryChar(char.id); };
         assignDiv.appendChild(delBtn);
 
-        // Qwen voice binding dropdown
         // Qwen voice binding dropdown + 试听按钮
         const voiceRow = document.createElement('div');
         voiceRow.className = 'flex gap-1 w-full';
@@ -876,19 +938,49 @@ function renderLibrary() {
         const pvBtn = document.createElement('button');
         pvBtn.className = 'px-1.5 py-0.5 bg-slate-700 hover:bg-indigo-600 rounded text-[10px] text-white transition shrink-0';
         pvBtn.textContent = '▶';
-        pvBtn.title = '试听绑定音色';
+        pvBtn.title = '试听 Qwen 音色';
         pvBtn.onclick = function() {
             const speaker = voiceSel.value;
-            if (!speaker) { alert('该角色尚未绑定音色，请先在下拉框选择'); return; }
+            if (!speaker) { alert('该角色尚未绑定 Qwen 音色，请先在下拉框选择'); return; }
             const v = _qwenVoices.find(x => x.name === speaker);
-            previewVoice(speaker, (v && (v.lang === 'zh' || v.lang === 'chinese')) ? 'chinese' : 'english', false, pvBtn);
+            previewVoice(speaker, (v && (v.lang === 'zh' || v.lang === 'chinese')) ? 'chinese' : 'english', false, pvBtn, 'qwen');
         };
         voiceRow.appendChild(pvBtn);
+
+        // MOSS voice binding dropdown + 试听按钮
+        const mossVoiceRow = document.createElement('div');
+        mossVoiceRow.className = 'flex gap-1 w-full';
+        const mossVoiceSel = document.createElement('select');
+        mossVoiceSel.className = 'lib-moss-voice flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white';
+        mossVoiceSel.dataset.libId = char.id;
+        mossVoiceSel.innerHTML = '<option value="">🔊 MOSS→</option>' + _mossVoiceOptions;
+        if (char.moss_voice) mossVoiceSel.value = char.moss_voice;
+        mossVoiceSel.onchange = function() {
+            fetch('/api/character_library/' + char.id + '/moss_voice', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({moss_voice: this.value})
+            }).then(r => r.json()).then(d => { if (d.ok) renderRoleBadges(); });
+        };
+        mossVoiceRow.appendChild(mossVoiceSel);
+
+        const mossPvBtn = document.createElement('button');
+        mossPvBtn.className = 'px-1.5 py-0.5 bg-slate-700 hover:bg-emerald-600 rounded text-[10px] text-white transition shrink-0';
+        mossPvBtn.textContent = '▶';
+        mossPvBtn.title = '试听 MOSS 音色';
+        mossPvBtn.onclick = function() {
+            const speaker = mossVoiceSel.value;
+            if (!speaker) { alert('该角色尚未绑定 MOSS 音色，请先在下拉框选择'); return; }
+            const v = _mossVoices.find(x => x.name === speaker);
+            previewVoice(speaker, (v && (v.lang === 'zh' || v.lang === 'chinese')) ? 'chinese' : 'english', false, mossPvBtn, 'moss');
+        };
+        mossVoiceRow.appendChild(mossPvBtn);
 
         card.appendChild(name);
         card.appendChild(meta);
         card.appendChild(assignDiv);
         card.appendChild(voiceRow);
+        card.appendChild(mossVoiceRow);
         grid.appendChild(card);
     });
 
@@ -990,6 +1082,7 @@ function saveCharSet() {
             character_reuse: cfg.character_reuse || '',
             character_fixes: cfg.character_fixes || '',
             character_voices: cfg.character_voices || '',
+            character_moss_voices: cfg.character_moss_voices || '',
             character_library: cfg.character_library || '',
             _ui_descs: cfg._ui_descs || {},
         })
@@ -1029,6 +1122,7 @@ function applyCharSet(set) {
     cfg.character_reuse = set.character_reuse || '';
     cfg.character_fixes = set.character_fixes || '';
     cfg.character_voices = set.character_voices || '';
+    cfg.character_moss_voices = set.character_moss_voices || '';
     cfg.character_library = set.character_library || '';
     cfg._ui_descs = set._ui_descs || {};
     // 持久化到当前模式配置
@@ -1042,6 +1136,7 @@ function applyCharSet(set) {
             character_reuse: cfg.character_reuse,
             character_fixes: cfg.character_fixes,
             character_voices: cfg.character_voices,
+            character_moss_voices: cfg.character_moss_voices,
             character_library: cfg.character_library,
             _ui_descs: cfg._ui_descs,
         })
@@ -1073,6 +1168,7 @@ window.addEventListener('load', function() {
     parseLibAssignments();
     renderCharEditor(null);
     loadQwenVoices();
+    loadMossVoices();
     loadCharSources();
     loadLibrary();
     loadCharSets();
