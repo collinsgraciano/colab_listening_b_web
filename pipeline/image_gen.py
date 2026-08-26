@@ -411,21 +411,24 @@ def generate_pose_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
 
 
 def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
-                           style_prompt: str = DEFAULT_STYLE_PROMPT):
+                           style_prompt: str = DEFAULT_STYLE_PROMPT,
+                           char_keys=None):
     """Generate character pose atlases for quest mode.
 
     All characters (char_a, char_b, char_c, host): 4×2 grid (8 poses each).
     Shared style prefix ensures visual consistency across all characters.
+    If char_keys is provided, only those characters are generated (e.g. original_cutout mode).
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     _STYLE = style_prompt
 
-    chars = [
+    all_chars = [
         ("char_a", script.get("char_a_description", "friendly young man"), 8),
         ("char_b", script.get("char_b_description", "friendly young woman"), 8),
         ("char_c", script.get("char_c_description", "friendly staff member"), 8),
         ("host", script.get("host_description", "friendly young woman with short brown hair, wearing a smart blue blazer, warm smile, professional TV host appearance"), 8),
     ]
+    chars = [c for c in all_chars if char_keys is None or c[0] in char_keys]
 
     # Generate atlases directly from text (no separate ref images needed)
     def _gen_one_char(char_key, char_desc, n_poses):
@@ -504,7 +507,8 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
         for fut in as_completed(futs):
             fut.result()
 
-    print(f"  [QuestAtlas] Done — 4 characters × 8 poses = 32 pose images.")
+    n = len(chars)
+    print(f"  [QuestAtlas] Done — {n} characters × 8 poses = {n * 8} pose images.")
     return {}
 
 
