@@ -33,10 +33,9 @@
                     <select id="gen-structure" onchange="onStructureChange()"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                         <option value="original">Original (4章视频片段)</option>
-                        <option value="image">Image (纯图片+动画)</option>
+                        <option value="original_static">Original Static (4章静态图片)</option>
+                        <option value="original_cutout">Original Cutout (4章+人物抠图)</option>
                         <option value="quest">Quest (任务听力 · 单个约5-10分钟)</option>
-                        <option value="quest_v2">Quest V2 (任务听力+口型同步 · 同 Quest 脚本)</option>
-                        <option value="shorts">Shorts (竖屏文化问答 · 10行约1分钟)</option>
                     </select>
                 </div>
                 <div>
@@ -49,7 +48,7 @@
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">对话行数</label>
-                    <input type="number" id="gen-numlines" min="4" max="80" placeholder="留空=默认 (18 / quest 48 / shorts 10)"
+                    <input type="number" id="gen-numlines" min="4" max="80" placeholder="留空=默认 (18 / quest 48)"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600">
                 </div>
                 <div>
@@ -100,10 +99,9 @@
                 class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                 <option value="">全部结构</option>
                 <option value="original">Original</option>
-                <option value="image">Image</option>
+                <option value="original_static">Original Static</option>
+                <option value="original_cutout">Original Cutout</option>
                 <option value="quest">Quest</option>
-                <option value="quest_v2">Quest V2</option>
-                <option value="shorts">Shorts</option>
             </select>
             <select id="filter-status" onchange="loadScripts()"
                 class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
@@ -156,7 +154,7 @@ let _selectedTopics = new Set();
 let _editingDoc = null;
 let _sseBusy = false;
 
-const STRUCT_LABEL = {original: 'Original', image: 'Image', quest: 'Quest', quest_v2: 'Quest V2'};
+const STRUCT_LABEL = {original: 'Original', original_static: 'Original Static', original_cutout: 'Original Cutout', quest: 'Quest'};
 const STATUS_BADGE = {
     draft:   ['草稿', 'bg-slate-600 text-white'],
     reviewed:['已审查', 'bg-blue-600 text-white'],

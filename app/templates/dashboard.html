@@ -47,7 +47,7 @@
             </div>
             <!-- CEFR + Animation -->
             <div class="grid grid-cols-2 gap-3">
-                <div id="cefr-cell" class="{% if active_mode != 'image' %}col-span-2{% endif %}">
+                <div id="cefr-cell" class="{% if active_mode != 'original_static' %}col-span-2{% endif %}">
                     <label class="block text-xs text-slate-400 mb-1">CEFR</label>
                     <select id="quick-cefr" onchange="onQuickInput('cefr', this.value)"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
@@ -56,7 +56,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div id="quick-anim-wrap" {% if active_mode != 'image' %}style="display:none"{% endif %}>
+                <div id="quick-anim-wrap" {% if active_mode != 'original_static' %}style="display:none"{% endif %}>
                     <label class="block text-xs text-slate-400 mb-1">动画类型</label>
                     <select id="quick-animation" onchange="onQuickInput('animation', this.value)"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
@@ -257,7 +257,7 @@ function applyQuickFields() {
     const cfg = MODE_CONFIGS[ACTIVE_MODE];
     document.getElementById('quick-topic').value = cfg.topic || '';
     document.getElementById('quick-cefr').value = cfg.cefr || 'A2';
-    const isImage = ACTIVE_MODE === 'image';
+    const isImage = ACTIVE_MODE === 'original_static';
     document.getElementById('quick-anim-wrap').style.display = isImage ? '' : 'none';
     document.getElementById('cefr-cell').className = isImage ? '' : 'col-span-2';
     if (isImage) document.getElementById('quick-animation').value = cfg.animation || 'landing';
@@ -433,7 +433,7 @@ function onScriptLibChange() {
 let _charSources = [];
 
 function getCharKeys() {
-    if (ACTIVE_MODE === 'quest' || ACTIVE_MODE === 'quest_v2') {
+    if (ACTIVE_MODE === 'quest') {
         return [
             {key: 'char_a', label: '角色A'},
             {key: 'char_b', label: '角色B'},

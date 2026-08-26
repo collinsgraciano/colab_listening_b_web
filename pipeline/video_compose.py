@@ -720,17 +720,15 @@ def compose_image(
 ) -> str:
     """Compose final listening practice video using images (no video clips).
 
-    Unified function merging compose_static + compose_stop_motion. The
-    *animation* parameter controls how dialogue segments are rendered:
+    Image-mode composition. The *animation* parameter controls how dialogue
+    segments are rendered:
 
-    - ``"none"``: static image per line, no movement (former ``static`` mode).
+    - ``"none"``: static image per line, no movement.
     - ``"landing"``: static image per line with FFmpeg landing-transform
-      micro-animation (scale decay + pan + sine bounce, 0.3s) (former
-      ``static_animated`` mode).
+      micro-animation (scale decay + pan + sine bounce, 0.3s).
     - ``"stop_motion"``: multi-pose character animation via PIL frame
-      rendering with optical-flow morphing and landing transforms
-      (former ``stop_motion`` mode). Requires *pose_images* and
-      *background_img*.
+      rendering with optical-flow morphing and landing transforms.
+      Requires *pose_images* and *background_img*.
 
     Non-dialogue segments (title_card, practice, outro, etc.) are identical
     across all animation modes.
@@ -754,7 +752,7 @@ def compose_image(
         progress_cb: callback(percent, message).
         animation: "none", "landing", or "stop_motion".
         target_w / target_h: Output canvas size. Defaults to 1280x720;
-            shorts mode passes 1080x1920 (vertical). stop_motion always
+            pass 1080x1920 for vertical output. stop_motion always
             renders at the default canvas.
 
     Returns:
@@ -780,7 +778,7 @@ def compose_image(
     is_stop_motion = (animation == "stop_motion")
 
     # Resolution-aware normalization filter + canvas for this compose call
-    # (defaults are the module constants; shorts passes 1080x1920)
+    # (defaults are the module constants)
     tw, th = target_w, target_h
     vf_norm = (
         f"scale={tw}:{th}:force_original_aspect_ratio=decrease,"
@@ -788,7 +786,7 @@ def compose_image(
     )
 
     # Skip Ch3 static frame rendering when the timeline has no listen
-    # segments (shorts timeline has none — saves n×2 Pillow renders)
+    # segments (saves n×2 Pillow renders)
     has_listen_segs = any(seg.get("type", "").startswith("listen_")
                           for seg in timeline)
 

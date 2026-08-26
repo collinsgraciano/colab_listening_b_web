@@ -67,7 +67,6 @@
                     <label class="block text-xs text-slate-400 mb-1">结构</label>
                     <select id="new-structure" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                         <option value="quest">Quest (8 姿势图集)</option>
-                        <option value="quest_v2">Quest V2 (8 姿势图集+口型)</option>
                         <option value="original">Original (单张场景图)</option>
                     </select>
                 </div>
@@ -375,7 +374,6 @@ function createCharCard(char) {
             </select>
             <select id="edit-structure-${char.id}" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
                 <option value="quest" ${char.structure === 'quest' ? 'selected' : ''}>Quest</option>
-                <option value="quest_v2" ${char.structure === 'quest_v2' ? 'selected' : ''}>Quest V2</option>
                 <option value="original" ${char.structure === 'original' ? 'selected' : ''}>Original</option>
             </select>
         </div>

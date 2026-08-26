@@ -21,8 +21,7 @@ colab_listening_b_web/
 │   └── static/                    # CSS (style.css) + JS (app.js)
 ├── pipeline/                     # 独立 Pipeline 代码（自包含，不依赖外部项目）
 │   ├── pipeline.py               # 主编排器：7 步流程 + argparse CLI 入口
-│   ├── structures.py             # 结构分发注册表（original/image/quest/shorts → LLM/timeline/SRT/compose 函数）
-│   ├── llm_client.py             # LLM 客户端（SenseNova / OpenAI 兼容 API；listening + shorts 文化问答脚本生成）
+│   ├── llm_client.py             # LLM 客户端（SenseNova / OpenAI 兼容 API；listening 脚本生成）
 │   ├── mcp_client.py             # TJGenerators MCP HTTP 客户端（多 Token 轮换，积分耗尽自动切换）
 │   ├── tts_engine.py             # Kokoro TTS 引擎（英文+中文，音量归一化，语音修复）
 │   ├── tts_pipeline.py           # 批量 TTS 生成（对话+旁白+词汇）
@@ -31,23 +30,20 @@ colab_listening_b_web/
 │   ├── clip_gen.py               # Seedance2 视频片段生成（任务构建+轮询+下载+重试）
 │   ├── grouping_b.py             # 对话行分组（连续行合并为一个视频片段）
 │   ├── group_audio.py            # 分组音频拼接
-│   ├── timeline.py               # 时间轴构建（listening 4章结构 / shorts 3段结构）+ SRT 生成
+│   ├── timeline.py               # 时间轴构建（listening 4章结构）+ SRT 生成
 │   ├── timeline_enrich.py        # 时间轴补全（audio_dur/duration）
-│   ├── video_compose.py          # FFmpeg + Pillow 视频合成（original/image 模式）
-│   ├── stop_motion.py             # 定格动画渲染（多姿势+光流插帧）
-│   ├── audio_envelope.py          # 逐帧音频 RMS 包络（quest_v2 唇同步/姿势调度共用）
+│   ├── video_compose.py          # FFmpeg + Pillow 视频合成（original/original_static 模式）
+│   ├── original_cutout_compose.py # Original Cutout 合成（人物抠图停格动画）
+│   ├── stop_motion.py            # 定格动画渲染（多姿势+光流插帧，quest/cutout 共用）
 │   ├── thumbnail_gen.py          # YouTube 缩略图 + 元数据生成
 │   ├── media_utils.py            # FFmpeg/Pillow 共享工具（concat/字幕烧录/loudnorm/分辨率探测）
 │   ├── topic_manager.py          # 主题随机选择 + 防重复（topics.json + used_topics.json）
 │   ├── checkpoint.py             # 断点续传（checkpoint.json 保存/加载/步骤完成检查）
 │   ├── topics.json                # 主题库（分类 JSON）
-│   ├── quest/                     # Quest 结构变体（任务听力模式）
-│   │   ├── llm_client_quest.py   # Quest 脚本生成（48行，4阶段：buildup→core→reveal→review）
-│   │   ├── timeline_quest.py     # Quest 时间轴 + SRT
-│   │   └── video_compose_quest.py # Quest 视频合成（定格动画，角色姿势图）
-│   └── quest_v2/                  # Quest V2（quest 内容管线全复用 + 唇形同步渲染）
-│       ├── video_compose_quest_v2.py # V2 合成（双态口型混合+站位稳定+去假眨眼+seed固定）
-│       └── test_lipsync_v2.py     # 唇同步独立验证脚本（合成音频+假姿势，免 MCP 积分）
+│   └── quest/                     # Quest 结构变体（任务听力模式）
+│       ├── llm_client_quest.py   # Quest 脚本生成（48行，4阶段：buildup→core→reveal→review）
+│       ├── timeline_quest.py     # Quest 时间轴 + SRT
+│       └── video_compose_quest.py # Quest 视频合成（定格动画，角色姿势图）
 ├── configs/                      # 配置文件 + 预设
 │   └── default.json              # 默认配置（含所有参数）
 ├── requirements.txt              # Python 依赖
@@ -57,7 +53,6 @@ colab_listening_b_web/
 ### 关键设计
 
 - **直接导入而非 subprocess：** `pipeline_service.py` 直接 `import` pipeline 模块，在后台线程中调用 `_step0_script()` ~ `_step6_4k()` 函数，实现实时进度追踪和中间结果访问。stdout 被 `_LineBuffer` 逐行捕获转发到 SSE 日志流。
-- **结构分发模式：** `structures.py` 定义 `STRUCTURES` 字典，将 `--structure` 参数映射到对应的 LLM/Timeline/SRT/Compose 函数集，避免散乱的 if/elif 链。
 - **单步模式：** `_step_mode` 在每步完成后暂停，等待用户点击"继续"，便于调试和检查中间产物。
 - **断点续传：** 每步完成后写 `checkpoint.json`，`--resume` 时跳过已完成步骤。完整运行后清除 checkpoint。
 - **角色复用：** 支持从之前的运行中复制角色图片和描述，或用自定义描述覆盖（`character_source` + `character_reuse` + `character_fixes`）。
@@ -71,19 +66,18 @@ colab_listening_b_web/
 | Step 0 | `_step0_script` | LLM 脚本生成（SenseNova / OpenAI 兼容 API），含验证+重试 |
 | Step 1 | `_step1_mcp` | TJGenerators MCP 初始化（多 Token 轮换） |
 | Step 2 | `_step2_images_tts` | 并发：AI 图片生成 + TTS 配音（后台线程） |
-| Step 3 | `_step3_clips` | Seedance2 视频片段生成（image/quest/shorts 模式跳过） |
+| Step 3 | `_step3_clips` | Seedance2 视频片段生成（original_static/original_cutout/quest 模式跳过） |
 | Step 4 | `_step4_timeline` | 时间轴 + SRT 字幕构建 |
-| Step 4.5 | `_step45_thumbnail` | YouTube 缩略图 + 元数据（shorts 跳过缩略图，仅存元数据） |
+| Step 4.5 | `_step45_thumbnail` | YouTube 缩略图 + 元数据生成 |
 | Step 5 | `_step5_compose` | FFmpeg + Pillow 最终视频合成 |
-| Step 6 | `_step6_4k` | 可选 4K 超分辨率（`--no-4k` 跳过；shorts 恒跳过） |
+| Step 6 | `_step6_4k` | 可选 4K 超分辨率（`--no-4k` 跳过） |
 
 ### 视频结构模式
 
 - **original** — 4 章视频片段模式（对话用 Seedance2 AI 视频，含跟读练习）
-- **image** — 纯图片模式（无视频生成，用动画类型控制：none/landing/stop_motion）
+- **original_static** — 静态图片模式（4 章、无视频生成、逐行对话配图，支持 none/landing/stop_motion 动画类型）
+- **original_cutout** — 人物抠图模式（原版 4 章 + quest 式角色抠图停格动画：char_a/b 各 8 姿势图集）
 - **quest** — 任务听力模式（48 行对话，4 阶段结构，定格动画，3+1 角色）
-- **quest_v2** — quest 全复用（脚本/时间轴/SRT 完全一致）+ 唇形同步渲染：每角色 8 姿势图集 + 闭嘴配对图集（图像编辑生成 `pose_{char}_{j}_c.png`，成本每角色 +1 次生成），说话人嘴型按逐帧音频 RMS 包络（`audio_envelope.py`）`Image.blend` 开合；站位按角色身份固定（修复换说话人左右横跳）；听者去假眨眼；seed 固定映射。`--no-lip-sync` / 配置项「口型同步」可关。原 quest 模式零改动，便于 A/B 对比
-- **shorts** — 竖屏文化问答短视频模式（1080×1920，10 行好友对话讲一个美国文化/语言知识点，问题片头→对话→CTA，无跟读章节；跳过视频片段/缩略图/4K；stop_motion 自动降级为 landing）
 
 ### 标题策略（title_quote 引语钩子）
 
@@ -162,7 +156,7 @@ python pipeline.py --resume  # 断点续传
 - IPA 音标用 `C:\Windows\Fonts\cambria.ttc`（msyh.ttc 渲染为方框）
 - Seedance2 视频最大并发 5 个任务，超出需分批创建
 - MCP 下载文件需验证大小 > 500KB（防止静默失败的小文件）
-- `probe_resolution` 解析 ffprobe csv 输出（`1080,1920` 逗号分隔，非 `x` 分隔）— 字幕叠加按实测画布渲染，shorts 竖屏自动适配
+- `probe_resolution` 解析 ffprobe csv 输出（`1080,1920` 逗号分隔，非 `x` 分隔）— 字幕叠加按实测画布渲染
 - 主题库矩阵策略：每个场景从多角度开采（顾客操作/员工POV/品牌具体/首次体验/小麻烦/文化问答），`pipeline/topics.json` 现 726 条 26 分类；topics_ai.py 生成 prompt 已内置矩阵思维
 
 ## Codely Structured Memories
@@ -172,6 +166,8 @@ python pipeline.py --resume  # 断点续传
 ### Feedback
 - [2026-08-26 20:02:43] User wants every code change committed and pushed to GitHub immediately after modification. **Why:** user explicitly asked to enforce this as a standing rule in CODELY.md. **How to apply:** after completing any code edit in this project, run git add + commit + push right away without being asked.
 ### Project
+- [2026-08-27 00:42:36] MOSS-TTS-Nano 引擎集成在 colab_listening_b_web 项目。模型路径：H:\models\MOSS-TTS-Nano-Model (checkpoint), H:\models\MOSS-Audio-Tokenizer-Nano (tokenizer), H:\models\MOSS-TTS-Nano (repo,含 moss_tts_nano_runtime.py)。API 入口：NanoTTSService.synthesize(text, voice, mode="voice_clone", output_audio_path)。16 个内置预设音色 (Ava/Adam/Bella 等)。**Why:** 用户已安装模型，需集成为第三 TTS 引擎选项。**How to apply:** moss_tts_engine.py 中 _get_service 必须在 import NanoTTSService 前先 import torchaudio_sf_patch（修复 Windows torchcodec DLL 缺失），否则合成报错 "TorchCodec is required"。CPU 生成一句英文约 15s，中文约 9s。2026-08-27 质量增强关键事实：①MOSS 会生成 1-3s 病态停顿（句中/句尾死寂），_clean_sentence_audio 用 20ms 帧级 RMS<0.008 检测压缩（句中>0.6s→0.25s，句首→30ms，句尾→80ms），时长校验必须在压缩之后做；②a.m./Dr./Mr. 等缩写句点不能触发分句（正则 lookbehind），过短碎片送模型会呓语；③中文台词默认中文预设音色 Junhao(男)/Xiaoyu(女)，英文参考音说中文带口音。
+
 
 ### Reference
 

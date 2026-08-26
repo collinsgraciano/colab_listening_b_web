@@ -123,23 +123,20 @@ DEFAULT_SAMPLE_EN = "Could I get a large iced latte, please?"
 DEFAULT_SAMPLE_ZH = "我可以要一杯大杯冰拿鐵嗎？"
 
 # 各模式预览参数：画布 + 代表性样例文本（对应各模式脚本的真实行长风格）。
-# 画布 = 该模式成片分辨率（shorts 1080x1920，其余 1280x720）。
+# 画布 = 该模式成片分辨率（16:9 → 1280x720；9:16 竖屏 → 1080x1920）。
 MODE_INFO: dict[str, dict[str, Any]] = {
     "original": {"label": "原版", "canvas": "16:9",
                  "sample_en": "Could I get a large iced latte, please?",
                  "sample_zh": "我可以要一杯大杯冰拿鐵嗎？"},
-    "image": {"label": "图片", "canvas": "16:9",
-              "sample_en": "I'd like to book a table for two tonight.",
-              "sample_zh": "我想預訂今晚兩個人的位子。"},
+    "original_static": {"label": "静态图片", "canvas": "16:9",
+                        "sample_en": "I'd like to book a table for two tonight.",
+                        "sample_zh": "我想預訂今晚兩個人的位子。"},
+    "original_cutout": {"label": "人物抠图", "canvas": "16:9",
+                        "sample_en": "I'd like to open a savings account, please.",
+                        "sample_zh": "我想開一個储蓄帳戶。"},
     "quest": {"label": "任务", "canvas": "16:9",
               "sample_en": "Your mission is to find the missing key before sunset.",
               "sample_zh": "你的任務是在日落前找到遺失的鑰匙。"},
-    "quest_v2": {"label": "任务V2", "canvas": "16:9",
-                 "sample_en": "Hurry! We only have ten minutes to find the exit.",
-                 "sample_zh": "快點！我們只有十分鐘找到出口。"},
-    "shorts": {"label": "Shorts", "canvas": "9:16",
-               "sample_en": "Why do Americans tip at restaurants?",
-               "sample_zh": "為什麼美國人在餐廳要給小費？"},
 }
 
 
@@ -367,7 +364,7 @@ def render_preview_png(style: dict[str, Any] | None, bg_id: str = "gradient",
                        sample_en: str = "", sample_zh: str = "") -> bytes:
     """渲染字幕样式预览图（背景 + 字幕 overlay 合成）→ PNG bytes。
 
-    canvas: "16:9" (1280x720) 或 "9:16" (1080x1920, shorts)。
+    canvas: "16:9" (1280x720) 或 "9:16" (1080x1920 竖屏)。
     """
     from PIL import Image
 
@@ -404,7 +401,7 @@ def render_mode_preview(style: dict[str, Any] | None, mode: str,
                         thumb: bool = False) -> tuple[bytes, str]:
     """按模式渲染字幕样式预览 → (image_bytes, media_type)。
 
-    画布（shorts 竖屏）、中文字幕可见性（各模式 no_zh_subtitle 配置）、
+    画布（16:9 / 竖屏）、中文字幕可见性（各模式 no_zh_subtitle 配置）、
     字号规则（跟随参数配置时取各模式 subtitle_font_size）全部与该模式
     成片行为一致 —— 预览即最终效果。thumb=True 输出缩略 JPEG。
     """

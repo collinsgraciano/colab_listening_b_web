@@ -9,7 +9,7 @@ Steps (each an independently resumable function):
   step1  MCP init (multi-token rotation)
   step2  Concurrent: image generation + TTS audio; clip_0 launched in parallel
   step3  Group consecutive dialogue lines, one Seedance2 clip per group
-         (skipped entirely in --structure image/quest mode)
+         (skipped entirely in original_static/quest/original_cutout mode)
   step4  Timeline + SRT building
   step4.5 YouTube metadata + thumbnail
   step5  Final video composition (FFmpeg + Pillow)
@@ -287,19 +287,6 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
     script_path = work_dir / "script.json"
     cp_structure = checkpoint.get("structure")
     cp_animation = checkpoint.get("animation", "")
-    # Backward compat: map old structure names to new "image" + animation
-    _OLD_STRUCTURE_MAP = {
-        "static": ("original_static", "none"),
-        "static_animated": ("original_static", "none"),
-        "stop_motion": ("original_static", "none"),
-        "image": ("original_static", "none"),
-    }
-    if cp_structure in _OLD_STRUCTURE_MAP:
-        old_struct = cp_structure
-        cp_structure, cp_animation = _OLD_STRUCTURE_MAP[old_struct]
-        print(f"  [Resume] Migrating old structure '{old_struct}' → image/{cp_animation}")
-        checkpoint["structure"] = cp_structure
-        checkpoint["animation"] = cp_animation
     if not cp_animation:
         cp_animation = args.animation
     structure_match = (cp_structure == args.structure)
@@ -993,14 +980,6 @@ def main():
         checkpoint = _load_checkpoint(parent_dir)
         if checkpoint:
             cp_struct = checkpoint.get("structure")
-            # Backward compat: map old structure names to new "image" + animation
-            _OLD_MAP = {"static": ("original_static", "none"), "static_animated": ("original_static", "none"), "stop_motion": ("original_static", "none"), "image": ("original_static", "none")}
-            if cp_struct in _OLD_MAP:
-                old = cp_struct
-                cp_struct, cp_anim = _OLD_MAP[old]
-                checkpoint["structure"] = cp_struct
-                checkpoint["animation"] = cp_anim
-                print(f"  [Resume] Migrating old structure '{old}' → image/{cp_anim}")
             cp_anim = checkpoint.get("animation", args.animation)
             struct_changed = (cp_struct != args.structure)
             if cp_struct and struct_changed:

@@ -14,12 +14,8 @@ from atlas_split import split_atlas
 from style_manager import DEFAULT_STYLE_PROMPT
 
 
-def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=False,
-                       quest_v2=False):
+def check_step2_resume(checkpoint, script, dirs, n, is_quest):
     """Check if Step 2 can be resumed from existing files. Returns (tts_results, image_urls) or None.
-
-    quest_v2=True 时额外校验 4 角色 × 8 张闭嘴配对图（pose_{char}_{j}_c.png），
-    缺失则返回 None 重走生成路径（generate_quest2_atlases 按文件存在断点续传）。
     """
     img_dir, audio_dir = dirs["images"], dirs["audio"]
     step2_done = step_done(checkpoint, "step2_images_tts")
@@ -35,34 +31,15 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=Fal
     narration_files = (["welcome.mp3", "hook.mp3", "outro.mp3"] if is_quest
                        else ["intro.mp3", "outro.mp3", "practice_intro.mp3"])
     narration_exist = all((audio_dir / f).exists() for f in narration_files)
-    # For image mode: need dialogue images unless stop_motion (which needs pose images)
-    struct_val = checkpoint.get("structure", "")
-    needs_dialogue_imgs = (struct_val not in ("image", "quest")) or (
-        struct_val == "image" and not is_stop_motion)
+    # Only original_static generates per-line dialogue images
+    needs_dialogue_imgs = (checkpoint.get("structure", "") == "original_static")
     all_dialogue_imgs_exist = (not needs_dialogue_imgs) or all(
         (img_dir / f"dialogue_img_{i}.png").exists() for i in range(n))
-    # For stop_motion: need pose images
-    if is_stop_motion:
-        all_pose_imgs_exist = all(
-            os.path.exists(str(img_dir / f"pose_{i}_{j}.png"))
-            for i in range(n) for j in range(4))
-    else:
-        all_pose_imgs_exist = True
 
     if not (step2_done and ref_file.exists() and scene_file.exists()
             and all_audio_exist and all_zh_exist
-            and narration_exist and all_dialogue_imgs_exist and all_pose_imgs_exist):
+            and narration_exist and all_dialogue_imgs_exist):
         return None
-
-    # quest_v2 额外校验闭嘴配对图（唇同步素材）
-    if quest_v2:
-        all_closed_exist = all(
-            (img_dir / f"pose_{ck}_{j}_c.png").exists()
-            for ck in ("char_a", "char_b", "char_c", "host") for j in range(8)
-        )
-        if not all_closed_exist:
-            print("  [Resume] quest_v2 closed-mouth poses incomplete, regenerating...")
-            return None
 
     print("  [Resume] Step 2 already done, loading existing images + audio...")
     # Quest mode re-uploads pose_char_a_0.png + scene_0.png; others re-upload char_scene.png + scene.png
@@ -157,7 +134,7 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
     """Generate character/scene images via MCP (concurrent). Returns image_urls dict.
 
     image_size: MCP generate_image size spec — "landscape_16_9" (default) or
-    "portrait_16_9" (shorts vertical mode).
+    "portrait_16_9" (9:16 vertical).
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     image_urls = {}
@@ -237,11 +214,11 @@ def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
     """Generate per-line dialogue images for static/quest modes (5 concurrent).
 
     image_size: size dict for MCP generate_image, e.g. {"width":1280,"height":720}
-    (default landscape) or {"width":720,"height":1280} (shorts vertical).
+    (default landscape) or {"width":720,"height":1280} (9:16 vertical).
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     n = len(dialogue)
-    mode_label = "quest" if is_quest else "image"
+    mode_label = "quest" if is_quest else "original_static"
     print(f"  [Image] Generating {n} dialogue line images ({mode_label} mode, {max_workers} concurrent)...")
     if image_size is None:
         image_size = {"width": 1280, "height": 720}
@@ -509,150 +486,6 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
 
     n = len(chars)
     print(f"  [QuestAtlas] Done — {n} characters × 8 poses = {n * 8} pose images.")
-    return {}
-
-
-def generate_quest2_atlases(script, img_dir, tts_thread, max_workers=4,
-                            style_prompt: str = DEFAULT_STYLE_PROMPT):
-    """Generate character pose atlases for quest_v2 mode (open + closed mouths).
-
-    每角色两步（quest_v2 唇同步素材）：
-      1. 原 4×2 图集（8 姿势）— prompt/参数与 quest 完全一致，
-         quest 已生成的运行可直接复用 open 姿势（按文件存在跳过）
-      2. 以原图集 CDN URL 为参考，编辑生成「闭嘴版」图集 → pose_{char}_{j}_c.png
-         （图像编辑模式：保持角色/姿势/布局不变，仅闭嘴）
-
-    断点续传：open / closed 分别按文件存在跳过；closed 生成失败仅降级
-    （无唇同步），不中断 pipeline。
-    """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    _STYLE = style_prompt
-
-    chars = [
-        ("char_a", script.get("char_a_description", "friendly young man"), 8),
-        ("char_b", script.get("char_b_description", "friendly young woman"), 8),
-        ("char_c", script.get("char_c_description", "friendly staff member"), 8),
-        ("host", script.get("host_description", "friendly young woman with short brown hair, wearing a smart blue blazer, warm smile, professional TV host appearance"), 8),
-    ]
-
-    def _gen_one_char(char_key, char_desc, n_poses):
-        grid_w, grid_h = 4, 2
-        open_paths = [str(img_dir / f"pose_{char_key}_{j}.png") for j in range(n_poses)]
-        closed_paths = [str(img_dir / f"pose_{char_key}_{j}_c.png") for j in range(n_poses)]
-        open_exists = all(os.path.exists(p) for p in open_paths)
-        closed_exists = all(os.path.exists(p) for p in closed_paths)
-        if open_exists and closed_exists:
-            print(f"  [Quest2Atlas] {char_key} open+closed poses already exist, skipping")
-            return
-
-        atlas_path = str(img_dir / f"pose_atlas_{char_key}.png")
-        atlas_cdn = ""
-
-        # --- Step 1: open atlas（与 quest 相同 prompt，保证产物可互通）---
-        if not open_exists:
-            atlas_prompt = (
-                f"4x2 grid character pose sheet, eight poses of the same character, "
-                f"{char_desc}, "
-                f"top row left to right: speaking with mouth open, listening with slight smile, "
-                f"thinking with hand on chin, surprised with raised eyebrows, "
-                f"bottom row left to right: nodding in agreement, waving right hand, "
-                f"pointing forward, laughing with eyes closed, "
-                f"half-body close-up, waist up, all eight poses same character same outfit, "
-                f"plain white background, {_STYLE}, "
-                f"no props, no objects, no scene, no text"
-            )
-            print(f"  [Quest2Atlas] Generating {grid_w}×{grid_h} atlas for {char_key} ({n_poses} poses)...")
-            try:
-                gen_params = {
-                    "prompt": atlas_prompt,
-                    "provider": "seedream",
-                    "image_size": "4992x3328",
-                    "output_format": "png",
-                    "is_segmentation": True,
-                }
-                result = call_tool("generate_image", gen_params)
-                task_id = parse_task_id(result)
-                data = poll_task(task_id, interval=10, max_wait=600)
-                url = data.get("url", "")
-                if not url:
-                    print(f"    [Quest2Atlas] WARNING: No URL for {char_key} open atlas")
-                    return  # 无 open 姿势则 closed 也无从谈起
-                atlas_cdn = url
-                download_file(url, atlas_path)
-                print(f"    [Quest2Atlas] Downloaded: pose_atlas_{char_key}.png")
-                split_atlas(atlas_path, grid_w, grid_h, open_paths,
-                            log_prefix="[Quest2Atlas]")
-            except RuntimeError as e:
-                if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
-                    if tts_thread:
-                        tts_thread.join(timeout=5)
-                    sys.exit(1)
-                print(f"    [Quest2Atlas] ERROR {char_key} open: {e}")
-                return
-            except Exception as e:
-                print(f"    [Quest2Atlas] ERROR {char_key} open: {e}")
-                return
-        else:
-            print(f"  [Quest2Atlas] {char_key} open poses already exist, skipping")
-
-        # --- Step 2: closed atlas（图像编辑：仅闭嘴，其余不变）---
-        if closed_exists:
-            print(f"  [Quest2Atlas] {char_key} closed poses already exist, skipping")
-            return
-        if not atlas_cdn:
-            # 断点续传场景：本地已有 atlas，重新上传换 CDN URL
-            if os.path.exists(atlas_path):
-                atlas_cdn = reupload_for_cdn(atlas_path, f"pose_atlas_{char_key}.png")
-        if not atlas_cdn:
-            print(f"    [Quest2Atlas] WARNING: no atlas CDN URL for {char_key}, "
-                  f"lipsync degraded (open poses kept)")
-            return
-
-        closed_prompt = (
-            "Edit this 4x2 character pose sheet: close every mouth — lips gently "
-            "pressed together, no teeth visible, no open mouth anywhere. "
-            "Keep the EXACT same character, same face, same hairstyle, same outfit, "
-            "same poses, same gestures, same expressions, same grid layout and panel "
-            "positions. The ONLY change: all open mouths become gently closed lips."
-        )
-        closed_atlas_path = str(img_dir / f"pose_atlas_{char_key}_closed.png")
-        print(f"  [Quest2Atlas] Generating closed-mouth atlas for {char_key} (edit)...")
-        try:
-            gen_params = {
-                "prompt": closed_prompt,
-                "provider": "seedream",
-                "image_size": "4992x3328",
-                "output_format": "png",
-                "is_segmentation": True,
-                "image_urls": atlas_cdn,
-            }
-            result = call_tool("generate_image", gen_params)
-            task_id = parse_task_id(result)
-            data = poll_task(task_id, interval=10, max_wait=600)
-            url = data.get("url", "")
-            if not url:
-                print(f"    [Quest2Atlas] WARNING: No URL for {char_key} closed atlas, "
-                      f"lipsync degraded")
-                return
-            download_file(url, closed_atlas_path)
-            print(f"    [Quest2Atlas] Downloaded: pose_atlas_{char_key}_closed.png")
-            split_atlas(closed_atlas_path, grid_w, grid_h, closed_paths,
-                        log_prefix="[Quest2Atlas]")
-        except RuntimeError as e:
-            if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
-                if tts_thread:
-                    tts_thread.join(timeout=5)
-                sys.exit(1)
-            print(f"    [Quest2Atlas] ERROR {char_key} closed: {e} (lipsync degraded)")
-        except Exception as e:
-            print(f"    [Quest2Atlas] ERROR {char_key} closed: {e} (lipsync degraded)")
-
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futs = [pool.submit(_gen_one_char, ck, cd, np) for ck, cd, np in chars]
-        for fut in as_completed(futs):
-            fut.result()
-
-    print(f"  [Quest2Atlas] Done — 4 characters × (8 open + 8 closed) = 64 pose images.")
     return {}
 
 

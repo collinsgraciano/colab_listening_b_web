@@ -1242,7 +1242,7 @@ async def api_scripts_generate(request: Request):
     """SSE: batch-generate scripts for the given topics."""
     data = await request.json()
     structure = data.get("structure", "original")
-    if structure not in ("original", "image", "quest", "quest_v2", "shorts"):
+    if structure not in ("original", "original_static", "original_cutout", "quest"):
         return JSONResponse({"error": f"未知模式: {structure}"}, status_code=400)
 
     topics = [str(t).strip() for t in data.get("topics", []) if str(t).strip()]
@@ -1668,15 +1668,14 @@ async def api_character_sources():
                 # Auto-detect structure by checking which image files exist
                 # (script.json does not store structure — it's a CLI arg)
                 if (img_dir / "pose_char_a_0.png").exists():
-                    # quest_v2 运行额外存在闭嘴配对图（pose_char_a_0_c.png）
-                    structure = "quest_v2" if (img_dir / "pose_char_a_0_c.png").exists() else "quest"
+                    structure = "quest"
                 elif (img_dir / "char_scene.png").exists():
                     structure = "original"
                 else:
                     continue  # no character images
 
                 # Build character list based on detected structure
-                if structure in ("quest", "quest_v2"):
+                if structure == "quest":
                     char_keys = ["char_a", "char_b", "char_c", "host"]
                     char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
                     img_name_for = lambda key: f"pose_{key}_0.png"
@@ -1944,15 +1943,9 @@ async def api_library_save(request: Request):
     # Copy images
     src_img_dir = run_dir / "images"
     copied_files = []
-    if structure in ("quest", "quest_v2"):
+    if structure == "quest":
         for j in range(8):
             src = src_img_dir / f"pose_{char_key}_{j}.png"
-            if src.exists():
-                shutil.copy2(str(src), str(lib_dir / src.name))
-                copied_files.append(src.name)
-        # 闭嘴配对（quest_v2 唇同步素材，quest 运行无此文件自动跳过）
-        for j in range(8):
-            src = src_img_dir / f"pose_{char_key}_{j}_c.png"
             if src.exists():
                 shutil.copy2(str(src), str(lib_dir / src.name))
                 copied_files.append(src.name)
@@ -1969,7 +1962,7 @@ async def api_library_save(request: Request):
             shutil.copy2(str(cs), str(lib_dir / "char_scene.png"))
 
     # Copy thumbnail (pose_0 or char_scene)
-    thumb_src = src_img_dir / f"pose_{char_key}_0.png" if structure in ("quest", "quest_v2") else src_img_dir / "char_scene.png"
+    thumb_src = src_img_dir / f"pose_{char_key}_0.png" if structure == "quest" else src_img_dir / "char_scene.png"
     if thumb_src.exists():
         shutil.copy2(str(thumb_src), str(lib_dir / "thumb.png"))
 
@@ -3363,7 +3356,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
         if old_atlas.exists():
             old_atlas.unlink()
 
-        if structure in ("quest", "quest_v2"):
+        if structure == "quest":
             # 4×2 grid atlas (8 poses)
             atlas_prompt = (
                 f"4x2 grid character pose sheet, eight poses of the same character, "
@@ -3410,7 +3403,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
             _gen_status[lib_id] = {"status": "error", "error": "MCP 生成失败：无图片 URL", "poses": []}
             return
 
-        if structure in ("quest", "quest_v2"):
+        if structure == "quest":
             # Download atlas, split into 8 poses（分隔线检测 + 残边修剪，无缝时回退等分）
             atlas_path = str(lib_dir / f"pose_atlas_{src_key}.png")
             mcp.download_file(url, atlas_path)
@@ -3429,7 +3422,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
             print(f"  [CharGen] Saved char_scene.png for {lib_id}")
 
         # Update thumbnail
-        if structure in ("quest", "quest_v2"):
+        if structure == "quest":
             thumb_src = lib_dir / f"pose_{src_key}_0.png"
         else:
             thumb_src = lib_dir / "char_scene.png"
@@ -3471,7 +3464,7 @@ async def characters_page(request: Request):
                 thumb = d / "thumb.png"
                 meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
                 # Count pose images
-                if meta.get("structure") in ("quest", "quest_v2"):
+                if meta.get("structure") == "quest":
                     meta["pose_count"] = sum(1 for p in d.glob("pose_char_a_*.png")
                                              if "_c" not in p.stem)
                 else:
@@ -3616,14 +3609,9 @@ async def api_library_poses(lib_id: str):
             pass
 
     poses = []
-    if structure in ("quest", "quest_v2"):
+    if structure == "quest":
         for i in range(8):
             p = lib_dir / f"pose_char_a_{i}.png"
-            if p.exists():
-                poses.append({"name": p.name, "url": f"/api/character_library/{lib_id}/poses/{p.name}"})
-        # 闭嘴配对图（quest_v2 唇同步素材）
-        for i in range(8):
-            p = lib_dir / f"pose_char_a_{i}_c.png"
             if p.exists():
                 poses.append({"name": p.name, "url": f"/api/character_library/{lib_id}/poses/{p.name}"})
     else:
