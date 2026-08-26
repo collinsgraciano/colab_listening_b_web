@@ -53,6 +53,10 @@ PARAM_SPEC = {
                           "label": "角色音色绑定", "help": "JSON: {char_a: 'Vivian', char_b: 'Ryan'} — 复用角色时绑定 Qwen TTS 音色"},
     "character_zh_voices": {"default": "", "type": "text", "group": "content",
                             "label": "中文声音绑定", "help": "JSON: {char_a: 'zh-CN-YunxiNeural', char_b: 'zh-CN-XiaoxiaoNeural'} — 绑定中文翻译旁白的 edge-tts 声音"},
+    "host_character": {"default": "", "type": "select", "group": "content",
+                       "label": "主持人形象绑定",
+                       "options": {"": "独立主持人（新生成）", "char_a": "角色 A", "char_b": "角色 B"},
+                       "help": "Original Cutout 模式生效：开场/结尾主持人复用所选角色的姿势图集与音色，不再单独生成主持人"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -396,6 +400,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--num-lines", str(config["num_lines"])]
     args += ["--structure", str(config.get("structure", "original"))]
     args += ["--animation", str(config.get("animation", "landing"))]
+    if config.get("host_character"):
+        args += ["--host-character", str(config["host_character"])]
     args += ["--visual-style", str(config.get("visual_style", "pixar3d"))]
 
     # LLM

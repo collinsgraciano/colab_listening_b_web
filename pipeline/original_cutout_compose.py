@@ -1,7 +1,8 @@
 """Original Cutout compose — 4-chapter timeline + quest-style character cutout rendering.
 
 Combines:
-- Original 4-chapter timeline (title_card → dialogue → practice_intro → Ch3 practice → outro)
+- Original 4-chapter timeline (host welcome/hook_intro → dialogue → practice_intro
+  → Ch3 practice → host outro)，开场/结尾为 quest 式主持人定格动画
 - Quest-style stop-motion character cutout animation for dialogue segments
   (rembg background removal, per-character pose atlas, audio-driven pose switching,
    optical flow morphing, landing transforms, multi-character on screen)
@@ -60,6 +61,33 @@ def _run_ffmpeg(cmd: list[str], label: str, out_path: str,
             pass
 
 
+def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | None,
+                         host_bg: str, audio_file: str | None, out_path: str,
+                         duration: float, sm_root: Path, render_fps: int,
+                         fade_af: str, stop_check=None) -> bool:
+    """Quest 式主持人段：姿势图集抠像定格动画（welcome/hook_intro/outro 出镜）。
+
+    Returns True if rendered successfully.
+    """
+    h_poses = host_poses or []
+    if not h_poses:
+        return False
+    char_layers = [{"poses": h_poses, "is_speaker": True}]
+    frames_dir = sm_root / f"{seg_type}_{seg_idx}"
+    direction = 1 if seg_idx % 2 == 0 else -1
+
+    from quest.video_compose_quest import _render_sm_segment
+
+    return _render_sm_segment(
+        char_layers, host_bg, audio_file, out_path, duration,
+        frames_dir, sm_root,
+        render_fps=render_fps,
+        seed=hash(seg_type) % 1000 + seg_idx,
+        direction=direction, fade_af=fade_af,
+        stop_check=stop_check,
+    )
+
+
 def _prepare_segment(
     seg_idx: int,
     seg: dict,
@@ -76,6 +104,8 @@ def _prepare_segment(
     tmp_dir: Path,
     sm_root: Path,
     static_dir: Path,
+    host_poses: list[str] | None = None,
+    host_bg: str = "",
     stop_check=None,
 ) -> tuple[str | None, str]:
     """Prepare params and render a single segment.
@@ -97,6 +127,8 @@ def _prepare_segment(
 
     if seg_type == "dialogue":
         audio_file = normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
+    elif seg_type in ("welcome", "hook_intro"):
+        audio_file = narration.get("welcome" if seg_type == "welcome" else "hook")
     elif seg_type == "listen_en":
         audio_file = normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
     elif seg_type == "listen_zh":
@@ -110,8 +142,34 @@ def _prepare_segment(
 
     fade_af = f"afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05"
 
+    # --- Quest-style host segments (Ch1 welcome / Ch2 hook) ---
+    if seg_type in ("welcome", "hook_intro"):
+        bg_for_host = host_bg or scene_img
+        if not _render_host_segment(seg_type, seg_idx, host_poses, bg_for_host,
+                                    audio_file, out_path, duration, sm_root,
+                                    render_fps, fade_af, stop_check=stop_check):
+            # 无图集或渲染失败 → 静态演播室底图回退
+            if audio_file and os.path.exists(audio_file):
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", bg_for_host,
+                       "-i", audio_file,
+                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                       "-vf", f"{VF_NORM},fps=25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
+                       out_path]
+            else:
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", bg_for_host,
+                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
+                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                       "-vf", f"{VF_NORM},fps=25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       out_path]
+            _run_ffmpeg(cmd, seg_type, out_path, scene_img, duration)
+
     # --- Dialogue segment: quest-style character cutout stop-motion ---
-    if seg_type == "dialogue":
+    elif seg_type == "dialogue":
         line_data = dialogue[audio_idx] if audio_idx < len(dialogue) else {}
         speaker = line_data.get("speaker", "char_a")
         other = "char_b" if speaker == "char_a" else "char_a"
@@ -256,34 +314,39 @@ def _prepare_segment(
 
     # --- Outro ---
     elif seg_type == "outro":
-        outro_en = seg.get("subtitle_en", "")
-        outro_zh = seg.get("subtitle_zh", "")
-        outro_overlay = str(static_dir / "outro_overlay.png")
-        _render_practice_intro(outro_en, outro_zh, scene_img, outro_overlay)
-        out_dur = audio_dur + pad
-        outro_audio = narration.get("outro")
-        if outro_audio and os.path.exists(outro_audio):
-            cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                   "-i", outro_audio, "-i", outro_overlay,
-                   "-t", f"{out_dur:.3f}",
-                   "-filter_complex",
-                   f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
-                   f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
-                   "-map", "[v]", "-map", "[a]",
-                   "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
-                   "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                   out_path]
-        else:
-            cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                   "-i", outro_overlay,
-                   "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                   "-t", f"{out_dur:.3f}",
-                   "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
-                   "-map", "[v]", "-map", "2:a",
-                   "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
-                   "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                   out_path]
-        _run_ffmpeg(cmd, "outro", out_path, scene_img, duration)
+        bg_for_host = host_bg or scene_img
+        if not _render_host_segment("outro", seg_idx, host_poses, bg_for_host,
+                                    audio_file, out_path, duration, sm_root,
+                                    render_fps, fade_af, stop_check=stop_check):
+            # 回退：静态场景图 + 文字叠加
+            outro_en = seg.get("subtitle_en", "")
+            outro_zh = seg.get("subtitle_zh", "")
+            outro_overlay = str(static_dir / "outro_overlay.png")
+            _render_practice_intro(outro_en, outro_zh, scene_img, outro_overlay)
+            out_dur = audio_dur + pad
+            outro_audio = narration.get("outro")
+            if outro_audio and os.path.exists(outro_audio):
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                       "-i", outro_audio, "-i", outro_overlay,
+                       "-t", f"{out_dur:.3f}",
+                       "-filter_complex",
+                       f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
+                       f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
+                       "-map", "[v]", "-map", "[a]",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       out_path]
+            else:
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                       "-i", outro_overlay,
+                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
+                       "-t", f"{duration:.3f}",
+                       "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
+                       "-map", "[v]", "-map", "2:a",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       out_path]
+            _run_ffmpeg(cmd, "outro", out_path, scene_img, duration)
 
     # --- Fallback: static scene image ---
     else:
@@ -312,6 +375,8 @@ def compose_original_cutout(
     work_dir: str,
     char_pose_map: dict[str, list[str]],
     scene_bg_list: list[str] | None = None,
+    host_poses: list[str] | None = None,
+    host_bg: str = "",
     timeline: list[dict] = None,
     script: dict = None,
     narration: dict = None,
@@ -334,9 +399,13 @@ def compose_original_cutout(
         work_dir: Working directory.
         char_pose_map: {"char_a": [pose_0..7 paths], "char_b": [...]}.
         scene_bg_list: Background images for dialogue segments. Falls back to [scene_img].
+        host_poses: Host pose atlas for welcome/hook_intro/outro segments
+                    (quest-style). Bound character poses or separate host atlas.
+        host_bg: TV-studio background for host segments. Falls back to scene_img.
         timeline: Timeline segments from build_listening_timeline.
         script: Lesson script dict.
-        narration: {"intro": path, "outro": path, "practice_intro": path}.
+        narration: {"welcome"/"hook"/"outro"/"practice_intro" paths} (host form)
+                   or legacy {"intro", "outro", "practice_intro"}.
         normal_paths: English TTS paths.
         zh_paths: Chinese TTS paths.
         scene_img: Scene background image path.
@@ -405,6 +474,7 @@ def compose_original_cutout(
         _all_pose_paths: set[str] = set()
         for poses in char_pose_map.values():
             _all_pose_paths.update(poses)
+        _all_pose_paths.update(host_poses or [])
 
         _rembg_count = 0
         for p_path in sorted(_all_pose_paths):
@@ -442,6 +512,7 @@ def compose_original_cutout(
                 seg_idx, seg, timeline, dialogue, narration,
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
+                host_poses=host_poses, host_bg=host_bg or scene_img,
                 stop_check=stop_check,
             )
             if out_path:
@@ -461,6 +532,7 @@ def compose_original_cutout(
                 seg_idx, seg, timeline, dialogue, narration,
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
+                host_poses, host_bg or scene_img,
                 stop_check,
             ): seg_idx
             for seg_idx, seg in enumerate(timeline)

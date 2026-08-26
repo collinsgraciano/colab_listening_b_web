@@ -46,14 +46,16 @@ def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, ex
     meta_path.write_text(current_sig, encoding="utf-8")
 
 
-def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=None,
-                 tts_engine="kokoro", stop_check=None):
+def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narration=False,
+                 tts_rate=None, tts_engine="kokoro", stop_check=None):
     """Generate all TTS audio. Runs in a thread.
 
     Produces narration and dialogue EN/ZH audio.
     Writes results into the *results* dict (shared with caller).
 
     Args:
+        host_narration: True 时按 quest 风格生成旁白 welcome/hook/outro
+                        （original_cutout 主持人开场/结尾用），但仍生成中文对话。
         tts_rate: Override dialogue English TTS rate (e.g. '-15%', '0%').
                   If None, uses mode default (quest: '0%', non-quest: '-15%').
         tts_engine: 'kokoro' (default, local Kokoro TTS) or 'qwen'
@@ -94,6 +96,9 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
     _narration_voice = script.get("narration_qwen_speaker", "").strip()
     if _narration_voice:
         narration_voice = _narration_voice
+    elif (script.get("host_character") or "").strip():
+        # 形象绑定角色出镜时，旁白音色联动该角色（显式旁白绑定仍最高优先）
+        narration_voice = voice_map.get(script["host_character"].strip(), narration_voice)
     narration_zh_voice = script.get("narration_zh_voice", "").strip() or narration_voice
 
     # 检测 tts_rate / 引擎参数变化，必要时清除旧缓存
@@ -102,17 +107,23 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         # MOSS 温度/句间停顿影响输出 — 参数变化时自动重新生成
         extra_sig = (f"{os.environ.get('MOSS_TTS_TEMPERATURE', '0.8')}"
                      f"|{os.environ.get('MOSS_TTS_GAP_MS', '120')}")
-    _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, extra_sig)
+    _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine,
+                                      f"{extra_sig}|host:{int(host_narration)}")
 
     narration = {}
-    if quest:
-        welcome_text = script.get("welcome_en", "")
-        hook_text = script.get("hook_intro_en", "")
-        outro_text = script.get("outro", "That's all for today. Keep practicing!")
+    if quest or host_narration:
+        texts = [
+            ("welcome", script.get("welcome_en", "")),
+            ("hook", script.get("hook_intro_en") or script.get("story_hook", "")),
+            ("outro", script.get("outro", "That's all for today. Keep practicing!")),
+        ]
+        if host_narration and not quest:
+            # original_cutout：主持人开场沿用 quest 三段旁白，但 Ch3 桥接词仍需要
+            texts.append(("practice_intro",
+                          script.get("practice_intro_en",
+                                     "Now let's practice. Listen and repeat each sentence.")))
         quest_narration_rate = tts_rate if tts_rate else "-10%"
-        for name, text in [("welcome", welcome_text),
-                           ("hook", hook_text),
-                           ("outro", outro_text)]:
+        for name, text in texts:
             if stop_check and stop_check():
                 print("  [TTS] Stop requested, aborting narration.", flush=True)
                 results["fatal_error"] = "stopped"

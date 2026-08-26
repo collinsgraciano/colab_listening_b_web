@@ -45,7 +45,8 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from mcp_client import initialize, call_tool, parse_task_id, poll_task, download_file
 from llm_client import generate_listening_script
 from tts_engine import TTSEngine
-from timeline import build_listening_timeline, build_srt_from_timeline
+from timeline import build_listening_timeline, build_srt_from_timeline, \
+    rewrite_title_card_as_host_segments
 from video_compose import compose_listening
 from grouping_b import build_dialogue_groups
 from topic_manager import pick_random_topic, mark_topic_used
@@ -193,6 +194,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
     parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout"],
                         help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation)")
+    parser.add_argument("--host-character", default="", choices=["", "char_a", "char_b"],
+                        help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
     parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
@@ -357,6 +360,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         os.environ["VISUAL_STYLE_PROMPT"] = style_prompt
     print(f"  [Style] Using style_prompt: {style_prompt[:80]}...")
 
+    if is_original_cutout:
+        # 主持人形象绑定写入脚本，供 TTS 音色联动读取（tts_pipeline）
+        script["host_character"] = getattr(args, "host_character", "") or ""
+
     image_prompts = []
     if not is_quest and not is_original_cutout:
         image_prompts.append(
@@ -372,6 +379,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         host_bg_prompt = script.get("host_bg_prompt", "a bright modern TV studio set with a large screen behind, warm lighting")
         image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
         # Scene backgrounds generated as 2×2 atlas in _generate_scene_atlas below
+    elif is_original_cutout:
+        # 主持人开场/结尾的演播室背景（quest 同款，listening 脚本无 host_bg_prompt 字段）
+        image_prompts.append((f"a bright modern TV studio set with a large screen behind, warm lighting, "
+                              f"{style_prompt}, no people, no text, 16:9", "host_bg.png"))
 
     # --- Resume check ---
     resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest)
@@ -384,7 +395,9 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         def _tts_worker():
             try:
                 _generate_tts(script, dialogue, audio_dir, tts_results,
-                              quest=is_quest, tts_rate=args.tts_rate,
+                              quest=is_quest,
+                              host_narration=is_original_cutout,
+                              tts_rate=args.tts_rate,
                               tts_engine=args.tts_engine,
                               stop_check=stop_check)
             except Exception as e:
@@ -415,11 +428,15 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
                                    style_prompt=style_prompt)
         elif is_original_cutout:
-            # original_cutout: per-character pose atlas (char_a + char_b only, 8 poses each)
+            # original_cutout: per-character pose atlas (char_a + char_b, 8 poses each)
+            # 主持人未绑定角色时额外生成独立主持人图集
+            _cutout_keys = ["char_a", "char_b"]
+            if not getattr(args, "host_character", ""):
+                _cutout_keys.append("host")
             _generate_quest_atlases(script, img_dir, tts_thread,
                                     max_workers=args.image_concurrency,
                                     style_prompt=style_prompt,
-                                    char_keys=["char_a", "char_b"])
+                                    char_keys=_cutout_keys)
 
         if is_quest or is_original_cutout:
             # 全新生成路径：姿势图集只落本地。此处把 char_a 参考图补传 CDN 写入
@@ -604,6 +621,9 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
             script, dialogue_durations,
             pad=args.pad, practice_duration=args.practice_duration,
         )
+        if args.structure == "original_cutout":
+            # 开头/结尾对齐 quest 主持人形式：移除标题卡，插入 welcome + hook_intro
+            rewrite_title_card_as_host_segments(timeline, script)
         _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration,
                          output_fps=25 if args.structure == "original_cutout" else None)
         srt = build_srt_from_timeline(timeline, gap=0.0)
@@ -798,11 +818,25 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
                 char_pose_map[ck] = poses
         if not char_pose_map:
             print("  [Cutout] WARNING: no pose images found, compose will use fallback statics")
+        # 主持人姿势：绑定角色时复用其图集，否则用独立主持人图集（8 姿势，缺则回退 4）
+        _host_bound = getattr(args, "host_character", "")
+        if _host_bound and _host_bound in char_pose_map:
+            host_poses = char_pose_map[_host_bound]
+        else:
+            host_poses = [str(dirs["images"] / f"pose_host_{j}.png") for j in range(8)]
+            if not all(os.path.exists(p) for p in host_poses):
+                host_poses = [str(dirs["images"] / f"pose_host_{j}.png") for j in range(4)]
+        # 演播室背景（quest 同款）；缺失时回退场景图
+        host_bg = str(dirs["images"] / "host_bg.png")
+        if not os.path.exists(host_bg):
+            host_bg = scene_img
         scene_bg_list = [scene_img]
         final_path = compose_original_cutout(
             work_dir=str(work_dir),
             char_pose_map=char_pose_map,
             scene_bg_list=scene_bg_list,
+            host_poses=host_poses,
+            host_bg=host_bg,
             timeline=timeline,
             script=script,
             narration=narration,

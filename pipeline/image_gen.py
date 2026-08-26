@@ -28,8 +28,15 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
         all_zh_exist = True
     else:
         all_zh_exist = all((audio_dir / f"zh_{i}.mp3").exists() for i in range(n))
-    narration_files = (["welcome.mp3", "hook.mp3", "outro.mp3"] if is_quest
-                       else ["intro.mp3", "outro.mp3", "practice_intro.mp3"])
+    # 旁白音频清单按结构区分：original_cutout 主持人开场沿用 quest 三段 + practice_intro
+    struct_val = checkpoint.get("structure", "")
+    if struct_val == "original_cutout":
+        narration_names = ["welcome", "hook", "outro", "practice_intro"]
+    elif is_quest:
+        narration_names = ["welcome", "hook", "outro"]
+    else:
+        narration_names = ["intro", "outro", "practice_intro"]
+    narration_files = [f"{name}.mp3" for name in narration_names]
     narration_exist = all((audio_dir / f).exists() for f in narration_files)
     # Only original_static generates per-line dialogue images
     needs_dialogue_imgs = (checkpoint.get("structure", "") == "original_static")
@@ -58,8 +65,7 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
         zh_paths = [str(audio_dir / f"zh_{i}.mp3") for i in range(n)]
     dialogue_durations = [_get_audio_duration(p) for p in normal_paths]
     narration = {}
-    for name in (["welcome", "hook", "outro"] if is_quest
-                 else ["intro", "outro", "practice_intro"]):
+    for name in narration_names:
         narration[name] = str(audio_dir / f"{name}.mp3")
     tts_results = {
         "narration": narration,

@@ -95,6 +95,43 @@ def build_listening_timeline(script: dict, dialogue_durations: list[float],
     return timeline
 
 
+def rewrite_title_card_as_host_segments(timeline: list[dict], script: dict) -> None:
+    """original_cutout 专用：移除 title_card，改为 quest 式主持人两段开场。
+
+    开场/结尾均为主持人出镜定格动画；welcome/hook_intro 的实际时长由
+    enrich_timeline 按 narration 音频自动补全，这里只放占位时长。
+    就地修改 timeline。
+    """
+    def _make(seg_type, dur, sub_en, sub_zh):
+        return {
+            "type": seg_type,
+            "duration": dur,
+            "subtitle_en": sub_en,
+            "subtitle_zh": sub_zh,
+            "speaker": "host",
+            "audio_index": -1,
+            "image_idx": 0,
+            "dialogue_idx": -1,
+        }
+
+    host_segs = []
+    welcome_en = (script.get("welcome_en") or "").strip()
+    if welcome_en:
+        host_segs.append(_make("welcome", 4.0, welcome_en, script.get("welcome_zh", "")))
+    hook_en = (script.get("story_hook") or "").strip()
+    if hook_en:
+        host_segs.append(_make("hook_intro", 10.0, hook_en, script.get("intro_zh", "")))
+
+    # 定位并移除 title_card；主持人段插在原位置（无标题卡则插到最前）
+    pos = 0
+    for i, seg in enumerate(timeline):
+        if seg.get("type") == "title_card":
+            pos = i
+            del timeline[i]
+            break
+    timeline[pos:pos] = host_segs
+
+
 def build_srt_from_timeline(timeline: list[dict], gap: float = 0.0) -> str:
     """Build SRT from a timeline list. Timestamps match video exactly.
 
