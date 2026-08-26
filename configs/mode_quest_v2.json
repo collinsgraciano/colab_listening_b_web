@@ -45,5 +45,9 @@
   "no_zh_subtitle": false,
   "lip_sync": true,
   "no_4k": false,
-  "upscale_timeout": 3600
+  "upscale_timeout": 3600,
+  "moss_model_path": "",
+  "moss_tokenizer_path": "",
+  "moss_device": "cpu",
+  "moss_repo_dir": ""
 }

@@ -164,3 +164,14 @@ python pipeline.py --resume  # 断点续传
 - MCP 下载文件需验证大小 > 500KB（防止静默失败的小文件）
 - `probe_resolution` 解析 ffprobe csv 输出（`1080,1920` 逗号分隔，非 `x` 分隔）— 字幕叠加按实测画布渲染，shorts 竖屏自动适配
 - 主题库矩阵策略：每个场景从多角度开采（顾客操作/员工POV/品牌具体/首次体验/小麻烦/文化问答），`pipeline/topics.json` 现 726 条 26 分类；topics_ai.py 生成 prompt 已内置矩阵思维
+
+## Codely Structured Memories
+
+### User
+
+### Feedback
+- [2026-08-26 20:02:43] User wants every code change committed and pushed to GitHub immediately after modification. **Why:** user explicitly asked to enforce this as a standing rule in CODELY.md. **How to apply:** after completing any code edit in this project, run git add + commit + push right away without being asked.
+### Project
+
+### Reference
+

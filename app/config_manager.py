@@ -25,16 +25,15 @@ PARAM_SPEC = {
     "cefr": {"default": "A2", "type": "select", "group": "content",
              "label": "CEFR 等级", "options": ["A1", "A2", "B1", "B2", "C1", "C2"]},
     "num_lines": {"default": "", "type": "number", "group": "content",
-                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48, shorts:10)"},
+                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48)"},
     "structure": {"default": "original", "type": "select", "group": "content",
                   "label": "视频结构", "options": {
                       "original": "Original (4章视频片段)",
-                      "image": "Image (纯图片+动画)",
-                      "quest": "Quest (任务听力)",
-                      "quest_v2": "Quest V2 (任务听力+口型同步)",
-                      "shorts": "Shorts (竖屏文化问答)"}},
+                      "original_static": "Original Static (4章静态图片)",
+                      "original_cutout": "Original Cutout (4章+人物抠图)",
+                      "quest": "Quest (任务听力)"}},
     "animation": {"default": "landing", "type": "select", "group": "content",
-                  "label": "动画类型 (image模式)", "options": {
+                  "label": "动画类型", "options": {
                       "none": "None (静态)",
                       "landing": "Landing (降落变换)",
                       "stop_motion": "Stop Motion (定格动画)"}},
@@ -52,6 +51,8 @@ PARAM_SPEC = {
                            "label": "素材库分配", "help": "JSON: {char_a: 'lib_id', char_b: 'lib_id'}"},
     "character_voices": {"default": "", "type": "text", "group": "content",
                           "label": "角色音色绑定", "help": "JSON: {char_a: 'Vivian', char_b: 'Ryan'} — 复用角色时绑定 Qwen TTS 音色"},
+    "character_zh_voices": {"default": "", "type": "text", "group": "content",
+                            "label": "中文声音绑定", "help": "JSON: {char_a: 'zh-CN-YunxiNeural', char_b: 'zh-CN-XiaoxiaoNeural'} — 绑定中文翻译旁白的 edge-tts 声音"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -83,14 +84,10 @@ PARAM_SPEC = {
     "tts_engine": {"default": "kokoro", "type": "select", "group": "tts",
                    "label": "TTS 引擎", "options": {
                        "kokoro": "Kokoro (本地)",
-                       "voxcpm": "VoxCPM (Cloudflare Worker)",
-                       "qwen": "Qwen3-TTS (本地 GPU)"}},
+                       "qwen": "Qwen3-TTS (本地 GPU)",
+                       "moss": "MOSS-TTS-Nano (本地 CPU)"}},
     "tts_rate": {"default": "", "type": "text", "group": "tts",
                  "label": "TTS 语速", "help": "如 -15%, 0% (留空=模式默认)"},
-    "voxcpm_worker_url": {"default": "https://curly-grass-9b8c.caimeifeng3.workers.dev",
-                          "type": "text", "group": "tts", "label": "VoxCPM Worker URL"},
-    "voxcpm_api_key": {"default": "", "type": "password", "group": "tts",
-                       "label": "VoxCPM API Key"},
     "qwen_model_path": {"default": r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
                         "type": "text", "group": "tts",
                         "label": "Qwen3-TTS 模型路径",
@@ -105,6 +102,18 @@ PARAM_SPEC = {
                                     "help": "VoiceDesign 模型 (设计音色/英语女声需要)"},
     "qwen_device": {"default": "cuda:0", "type": "text", "group": "tts",
                     "label": "Qwen3-TTS 设备", "help": "如 cuda:0, cpu"},
+
+    "moss_model_path": {"default": r"H:\models\MOSS-TTS-Nano-Model", "type": "text", "group": "tts",
+                        "label": "MOSS-TTS-Nano 模型路径",
+                        "help": "模型 checkpoint 目录"},
+    "moss_tokenizer_path": {"default": r"H:\models\MOSS-Audio-Tokenizer-Nano", "type": "text", "group": "tts",
+                            "label": "MOSS Audio Tokenizer 路径",
+                            "help": "音频 Tokenizer 目录"},
+    "moss_device": {"default": "cpu", "type": "text", "group": "tts",
+                    "label": "MOSS-TTS 设备", "help": "如 cpu, cuda:0 (默认 CPU)"},
+    "moss_repo_dir": {"default": r"H:\models\MOSS-TTS-Nano", "type": "text", "group": "tts",
+                      "label": "MOSS-TTS-Nano 仓库目录",
+                      "help": "包含 infer.py / moss_tts_nano_runtime.py 的仓库路径"},
 
     # --- MCP / Image ---
     "mcp_tokens": {"default": "", "type": "textarea", "group": "mcp",
@@ -141,9 +150,6 @@ PARAM_SPEC = {
                           "label": "字幕字体大小"},
     "no_zh_subtitle": {"default": False, "type": "checkbox", "group": "video",
                        "label": "隐藏中文字幕"},
-    "lip_sync": {"default": True, "type": "checkbox", "group": "video",
-                 "label": "口型同步 (quest_v2)",
-                 "help": "说话人嘴型随音频开合（需闭嘴配对图集，缺失自动降级）"},
     "no_4k": {"default": False, "type": "checkbox", "group": "video",
               "label": "跳过4K"},
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
@@ -164,13 +170,12 @@ GROUP_META = {
 # 每种视频结构模式各一份完整独立配置，切换互不覆盖。
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
 
-MODES = ["original", "image", "quest", "quest_v2", "shorts"]
+MODES = ["original", "original_static", "original_cutout", "quest"]
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
-    "image": "Image (纯图片+动画)",
+    "original_static": "Original Static (4章静态图片)",
+    "original_cutout": "Original Cutout (4章+人物抠图)",
     "quest": "Quest (任务听力)",
-    "quest_v2": "Quest V2 (任务听力+口型同步)",
-    "shorts": "Shorts (竖屏文化问答)",
 }
 ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
 
@@ -409,10 +414,6 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--tts-engine", str(config.get("tts_engine", "kokoro"))]
     if config.get("tts_rate"):
         args += ["--tts-rate", config["tts_rate"]]
-    if config.get("voxcpm_worker_url"):
-        args += ["--voxcpm-worker-url", config["voxcpm_worker_url"]]
-    if config.get("voxcpm_api_key"):
-        args += ["--voxcpm-api-key", config["voxcpm_api_key"]]
     if config.get("qwen_model_path"):
         args += ["--qwen-model-path", config["qwen_model_path"]]
     if config.get("qwen_base_model_path"):
@@ -421,6 +422,14 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--qwen-voicedesign-model-path", config["qwen_voicedesign_model_path"]]
     if config.get("qwen_device"):
         args += ["--qwen-device", config["qwen_device"]]
+    if config.get("moss_model_path"):
+        args += ["--moss-model-path", config["moss_model_path"]]
+    if config.get("moss_tokenizer_path"):
+        args += ["--moss-tokenizer-path", config["moss_tokenizer_path"]]
+    if config.get("moss_device"):
+        args += ["--moss-device", config["moss_device"]]
+    if config.get("moss_repo_dir"):
+        args += ["--moss-repo-dir", config["moss_repo_dir"]]
 
     # MCP
     tokens_raw = config.get("mcp_tokens", "").strip()
@@ -455,8 +464,6 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--subtitle-font-size", str(config.get("subtitle_font_size", 60))]
     if config.get("no_zh_subtitle"):
         args.append("--no-zh-subtitle")
-    if not config.get("lip_sync", True):
-        args.append("--no-lip-sync")
     if config.get("no_4k"):
         args.append("--no-4k")
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]

@@ -210,11 +210,6 @@ class PipelineService:
             if p_model:
                 os.environ["OPENAI_MODEL"] = p_model
 
-        if config.get("voxcpm_worker_url"):
-            os.environ["VOXCPM_WORKER_URL"] = config["voxcpm_worker_url"]
-        if config.get("voxcpm_api_key"):
-            os.environ["VOXCPM_API_KEY"] = config["voxcpm_api_key"]
-
         if sys.platform == "win32" and "HF_ENDPOINT" not in os.environ:
             os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -223,6 +218,16 @@ class PipelineService:
             os.environ["QUEST_BEAT_LINES"] = str(config["quest_beat_lines"])
         if config.get("quest_qa_rounds"):
             os.environ["QUEST_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
+
+        # MOSS-TTS env vars (read by generate_tts -> MossTTSEngine)
+        if config.get("moss_model_path"):
+            os.environ["MOSS_MODEL_PATH"] = str(config["moss_model_path"])
+        if config.get("moss_tokenizer_path"):
+            os.environ["MOSS_TOKENIZER_PATH"] = str(config["moss_tokenizer_path"])
+        if config.get("moss_device"):
+            os.environ["MOSS_DEVICE"] = str(config["moss_device"])
+        if config.get("moss_repo_dir"):
+            os.environ["MOSS_REPO_DIR"] = str(config["moss_repo_dir"])
 
     # Character image file patterns per structure
     _CHAR_FILES_ORIGINAL = ["char_scene.png", "char_a_ref.png", "char_b_ref.png"]
@@ -244,6 +249,7 @@ class PipelineService:
         fixes_raw = config.get("character_fixes", "")
         lib_raw = config.get("character_library", "")
         voices_raw = config.get("character_voices", "")
+        moss_voices_raw = config.get("character_moss_voices", "")
 
         reuse_map: dict = {}
         fixes_map: dict[str, str] = {}
@@ -270,12 +276,18 @@ class PipelineService:
                 voices_map = json.loads(voices_raw) if isinstance(voices_raw, str) else voices_raw
             except (json.JSONDecodeError, TypeError):
                 pass
+        moss_voices_map: dict[str, str] = {}
+        if moss_voices_raw:
+            try:
+                moss_voices_map = json.loads(moss_voices_raw) if isinstance(moss_voices_raw, str) else moss_voices_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         structure = config.get("structure", "original")
-        if structure in ("quest", "quest_v2"):
+        if structure == "quest":
             all_keys = ["char_a", "char_b", "char_c", "host"]
         else:
-            all_keys = ["char_a", "char_b"]
+            all_keys = ["char_a", "char_b", "narration"]
 
         for k, v in list(reuse_map.items()):
             if v is True:
@@ -308,7 +320,7 @@ class PipelineService:
                 if lib_meta_path.exists():
                     try:
                         lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
-                        for suffix in ["description", "gender", "qwen_speaker"]:
+                        for suffix in ["description", "gender", "qwen_speaker", "moss_voice"]:
                             val = lib_meta.get(suffix, "")
                             if val:
                                 char_info[suffix] = val
@@ -325,7 +337,7 @@ class PipelineService:
                             char_info[suffix] = val
                 elif mode == "voice" and source_script:
                     # voice 模式：只固定音色+性别，外观由 LLM 按主题重新生成
-                    for suffix in ["gender", "qwen_speaker"]:
+                    for suffix in ["gender", "qwen_speaker", "moss_voice"]:
                         val = source_script.get(f"{key}_{suffix}", "")
                         if val:
                             char_info[suffix] = val
@@ -344,6 +356,13 @@ class PipelineService:
                 if key not in overrides:
                     overrides[key] = {}
                 overrides[key]["qwen_speaker"] = voice
+
+            # Priority 5: explicit MOSS voice binding
+            moss_voice = moss_voices_map.get(key, "").strip()
+            if moss_voice:
+                if key not in overrides:
+                    overrides[key] = {}
+                overrides[key]["moss_voice"] = moss_voice
 
         return overrides
 
@@ -381,10 +400,10 @@ class PipelineService:
                 pass
 
         structure = self.config.get("structure", "original")
-        if structure in ("quest", "quest_v2"):
+        if structure == "quest":
             all_char_keys = ["char_a", "char_b", "char_c", "host"]
         else:
-            all_char_keys = ["char_a", "char_b"]
+            all_char_keys = ["char_a", "char_b", "narration"]
 
         for k, v in list(reuse_map.items()):
             if v is True:
@@ -412,13 +431,13 @@ class PipelineService:
                     # --- Mode "image": copy images + override desc + gender (NOT role) ---
                     image_keys = [k for k in all_char_keys if reuse_map.get(k) == "image"]
                     for key in image_keys:
-                        for suffix in ["description", "gender", "qwen_speaker"]:
+                        for suffix in ["description", "gender", "qwen_speaker", "moss_voice"]:
                             field = f"{key}_{suffix}"
                             val = source_script.get(field, "")
                             if val:
                                 script[field] = val
                                 overridden.append(field)
-                        if structure in ("quest", "quest_v2"):
+                        if structure in ("quest", "original_cutout"):
                             for j in range(8):
                                 src = src_img_dir / f"pose_{key}_{j}.png"
                                 if src.exists():
@@ -426,7 +445,7 @@ class PipelineService:
                                     if not dst.exists():
                                         shutil.copy2(str(src), str(dst))
                                         copied.append(src.name)
-                            # 闭嘴配对（quest_v2 唇同步素材；quest 源运行无此文件自动跳过）
+                            # 闭嘴配对（quest 运行无此文件自动跳过）
                             for j in range(8):
                                 src = src_img_dir / f"pose_{key}_{j}_c.png"
                                 if src.exists():
@@ -473,18 +492,18 @@ class PipelineService:
                     for key in all_char_keys:
                         if reuse_map.get(key) != "desc":
                             continue
-                        for suffix in ["description", "gender", "qwen_speaker"]:
+                        for suffix in ["description", "gender", "qwen_speaker", "moss_voice"]:
                             val = source_script.get(f"{key}_{suffix}", "")
                             if val:
                                 script[f"{key}_{suffix}"] = val
                                 overridden.append(f"{key}_{suffix}")
 
-                    # --- Mode "voice": override gender + qwen_speaker only
+                    # --- Mode "voice": override gender + qwen_speaker + moss_voice only
                     #     (fresh appearance every run — description stays LLM-generated) ---
                     for key in all_char_keys:
                         if reuse_map.get(key) != "voice":
                             continue
-                        for suffix in ["gender", "qwen_speaker"]:
+                        for suffix in ["gender", "qwen_speaker", "moss_voice", "zh_voice"]:
                             val = source_script.get(f"{key}_{suffix}", "")
                             if val:
                                 script[f"{key}_{suffix}"] = val
@@ -512,7 +531,7 @@ class PipelineService:
                 lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
                 # Override description + gender（仅音色+性别角色 description 为空
                 # → 只注入 gender + qwen_speaker，外观每次由 LLM 重新生成）
-                for suffix in ["description", "gender", "qwen_speaker"]:
+                for suffix in ["description", "gender", "qwen_speaker", "zh_voice", "moss_voice"]:
                     val = lib_meta.get(suffix, "")
                     if val:
                         script[f"{key}_{suffix}"] = val
@@ -522,7 +541,7 @@ class PipelineService:
                 src_key = lib_meta.get("source_key", key)
                 lib_structure = lib_meta.get("structure", structure)
                 dst_img_dir = dirs["images"]
-                if lib_structure in ("quest", "quest_v2"):
+                if lib_structure in ("quest", "original_cutout"):
                     for j in range(8):
                         src = lib_char_dir / f"pose_{src_key}_{j}.png"
                         if src.exists():
@@ -531,8 +550,7 @@ class PipelineService:
                             if not dst.exists():
                                 shutil.copy2(str(src), str(dst))
                                 copied.append(dst_name)
-                    # 闭嘴配对（quest_v2 唇同步素材；quest 素材库无此文件自动跳过，
-                    # 运行时由 generate_quest2_atlases 以 atlas 编辑补齐）
+                    # 闭嘴配对（quest 素材库无此文件自动跳过）
                     for j in range(8):
                         src = lib_char_dir / f"pose_{src_key}_{j}_c.png"
                         if src.exists():
@@ -601,6 +619,34 @@ class PipelineService:
                 script[f"{key}_qwen_speaker"] = voice
                 overridden.append(f"{key}_qwen_speaker")
 
+        # --- character_zh_voices: override zh_voice (Chinese TTS voice binding) ---
+        zh_voices_raw = self.config.get("character_zh_voices", "")
+        zh_voices_map: dict[str, str] = {}
+        if zh_voices_raw:
+            try:
+                zh_voices_map = json.loads(zh_voices_raw) if isinstance(zh_voices_raw, str) else zh_voices_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        for key in all_char_keys:
+            zh_voice = zh_voices_map.get(key, "").strip()
+            if zh_voice:
+                script[f"{key}_zh_voice"] = zh_voice
+                overridden.append(f"{key}_zh_voice")
+
+        # --- character_moss_voices: override moss_voice (MOSS TTS voice binding) ---
+        moss_voices_raw = self.config.get("character_moss_voices", "")
+        moss_voices_map: dict[str, str] = {}
+        if moss_voices_raw:
+            try:
+                moss_voices_map = json.loads(moss_voices_raw) if isinstance(moss_voices_raw, str) else moss_voices_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        for key in all_char_keys:
+            moss_voice = moss_voices_map.get(key, "").strip()
+            if moss_voice:
+                script[f"{key}_moss_voice"] = moss_voice
+                overridden.append(f"{key}_moss_voice")
+
         script_path = work_dir / "script.json"
         script_path.write_text(
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -629,9 +675,19 @@ class PipelineService:
 
         structure = config.get("structure", "original")
         if num_lines is None:
-            num_lines = 48 if structure in ("quest", "quest_v2") else 10 if structure == "shorts" else 18
+            num_lines = 48 if structure == "quest" else 18
         if pad is None:
             pad = 0.4
+
+        # original_static: always use static images (no landing/stop_motion)
+        animation = config.get("animation", "landing")
+        if structure == "original_static":
+            animation = "none"
+
+        # original_cutout: quest-style TTS rate (0% = normal speed)
+        tts_rate = config.get("tts_rate", "") or None
+        if tts_rate is None and structure == "original_cutout":
+            tts_rate = "0%"
 
         tokens_raw = config.get("mcp_tokens", "").strip()
         mcp_tokens = ",".join(
@@ -643,7 +699,7 @@ class PipelineService:
             cefr=config.get("cefr", "A2"),
             num_lines=num_lines,
             structure=structure,
-            animation=config.get("animation", "landing"),
+            animation=animation,
             visual_style=str(config.get("visual_style", "pixar3d")),
             llm_provider=config.get("llm_provider", "sensenova"),
             sensenova_api_key=p_api_key if p_type == "sensenova" else "",
@@ -671,11 +727,12 @@ class PipelineService:
             subtitle_style=str(config.get("subtitle_style", "") or ""),
             no_zh_subtitle=bool(config.get("no_zh_subtitle", False)),
             no_4k=bool(config.get("no_4k", False)),
-            lip_sync=bool(config.get("lip_sync", True)),
             tts_engine=config.get("tts_engine", "kokoro"),
-            tts_rate=config.get("tts_rate", "") or None,
-            voxcpm_worker_url=config.get("voxcpm_worker_url", ""),
-            voxcpm_api_key=config.get("voxcpm_api_key", ""),
+            tts_rate=tts_rate,
+            moss_model_path=config.get("moss_model_path", ""),
+            moss_tokenizer_path=config.get("moss_tokenizer_path", ""),
+            moss_device=config.get("moss_device", "cpu"),
+            moss_repo_dir=config.get("moss_repo_dir", ""),
             upscale_timeout=int(config.get("upscale_timeout", 3600)),
             resume=False,
         )
@@ -717,6 +774,7 @@ class PipelineService:
         for d in dirs.values():
             d.mkdir(parents=True, exist_ok=True)
         script_path = work_dir / "script.json"
+        script["structure"] = args.structure
         script_path.write_text(
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
         _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,

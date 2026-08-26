@@ -1,5 +1,7 @@
 """Batch TTS generation for all dialogue/narration audio."""
+import json
 import os
+from pathlib import Path
 
 from tts_engine import TTSEngine, build_voice_map, get_zh_voice
 from media_utils import get_duration
@@ -10,8 +12,39 @@ def _audio_exists(path: str) -> bool:
     return bool(path) and os.path.exists(path) and os.path.getsize(path) > 100
 
 
+def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine):
+    """如果 tts_rate 配置变化，清除 audio_dir 中所有 .mp3 缓存文件。"""
+    audio_path = Path(audio_dir)
+    meta_path = audio_path / ".tts_meta.json"
+    current_sig = json.dumps({
+        "tts_rate": tts_rate or "",
+        "quest": quest,
+        "engine": tts_engine,
+    })
+    if meta_path.exists():
+        try:
+            saved = meta_path.read_text(encoding="utf-8")
+            if saved == current_sig:
+                return  # 签名一致，缓存有效
+        except OSError:
+            pass
+    # 签名不同或首次运行 — 清除旧缓存
+    if audio_path.exists():
+        cleared = 0
+        for f in audio_path.glob("*.mp3"):
+            try:
+                f.unlink()
+                cleared += 1
+            except OSError:
+                pass
+        if cleared:
+            print(f"  [TTS] Rate config changed, cleared {cleared} cached audio files.")
+    audio_path.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(current_sig, encoding="utf-8")
+
+
 def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=None,
-                 tts_engine="kokoro", shorts=False):
+                 tts_engine="kokoro", stop_check=None):
     """Generate all TTS audio. Runs in a thread.
 
     Produces narration and dialogue EN/ZH audio.
@@ -20,38 +53,12 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
     Args:
         tts_rate: Override dialogue English TTS rate (e.g. '-15%', '0%').
                   If None, uses mode default (quest: '0%', non-quest: '-15%').
-        tts_engine: 'kokoro' (default, local Kokoro TTS) or 'voxcpm'
-                    (VoxCPM via Cloudflare Worker, LLM-designed voices).
-        shorts: Shorts mode — narration is outro CTA only, no Chinese dialogue.
+        tts_engine: 'kokoro' (default, local Kokoro TTS) or 'qwen'
+                    (Qwen3-TTS local GPU).
+        stop_check: Optional callable returning True to abort early.
     """
     # --- Engine + voice map setup ---
-    if tts_engine == "voxcpm":
-        from voxcpm_tts import VoxCPMEngine
-        from llm_client import design_voxcpm_voices
-
-        worker_url = os.environ.get("VOXCPM_WORKER_URL", "")
-        api_key = os.environ.get("VOXCPM_API_KEY", "")
-        if not worker_url:
-            raise RuntimeError(
-                "VOXCPM_WORKER_URL not set. Pass --voxcpm-worker-url or set env var."
-            )
-
-        # Reuse cached voice descriptions if present (resume support)
-        cached_voices = script.get("voxcpm_voices")
-        if cached_voices and isinstance(cached_voices, dict) and cached_voices.get("char_a"):
-            print("  [TTS] Reusing cached VoxCPM voice descriptions from script.")
-            voice_map = cached_voices
-        else:
-            print("  [TTS] Designing VoxCPM voices via LLM...")
-            voice_map = design_voxcpm_voices(script)
-            script["voxcpm_voices"] = voice_map  # persist for resume
-
-        tts = VoxCPMEngine(worker_url, api_key)
-        if not tts.test_connection():
-            raise RuntimeError("VoxCPM Worker health check failed. Check VOXCPM_WORKER_URL.")
-        narration_voice = voice_map.get("host", voice_map.get("narrator", "Warm narrator voice, clear, moderate pace."))
-        voice_label = "voxcpm"
-    elif tts_engine == "qwen":
+    if tts_engine == "qwen":
         from qwen_tts_engine import QwenTTSEngine, build_qwen_voice_map
 
         model_path = os.environ.get("QWEN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
@@ -61,22 +68,47 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         device = os.environ.get("QWEN_DEVICE", "cuda:0")
         tts = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
         voice_map = build_qwen_voice_map(script)
-        narration_voice = voice_map.get("host", "Serena")
+        narration_voice = voice_map.get("narration", voice_map.get("host", "Serena"))
         voice_label = "qwen"
+    elif tts_engine == "moss":
+        from moss_tts_engine import MossTTSEngine, build_moss_voice_map
+
+        model_path = os.environ.get("MOSS_MODEL_PATH", r"H:\models\MOSS-TTS-Nano-Model")
+        tokenizer_path = os.environ.get("MOSS_TOKENIZER_PATH", r"H:\models\MOSS-Audio-Tokenizer-Nano")
+        device = os.environ.get("MOSS_DEVICE", "cpu")
+        repo_dir = os.environ.get("MOSS_REPO_DIR", r"H:\models\MOSS-TTS-Nano")
+        tts = MossTTSEngine(model_path, device, tokenizer_path, repo_dir)
+        voice_map = build_moss_voice_map(script)
+        narration_voice = voice_map.get("narration", voice_map.get("host", "Bella"))
+        voice_label = "moss"
     else:
         tts = TTSEngine()
         voice_map = build_voice_map(script)
-        narration_voice = voice_map.get("host", "af_sky")
+        narration_voice = voice_map.get("narration", voice_map.get("host", "af_sky"))
         voice_label = "kokoro"
+
+    # Narration voice: check script for custom binding (from character_voices UI)
+    _narration_voice = script.get("narration_qwen_speaker", "").strip()
+    if _narration_voice:
+        narration_voice = _narration_voice
+    narration_zh_voice = script.get("narration_zh_voice", "").strip() or narration_voice
+
+    # 检测 tts_rate 变化，必要时清除旧缓存
+    _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine)
 
     narration = {}
     if quest:
         welcome_text = script.get("welcome_en", "")
         hook_text = script.get("hook_intro_en", "")
         outro_text = script.get("outro", "That's all for today. Keep practicing!")
-        for name, text, rate in [("welcome", welcome_text, "-10%"),
-                                 ("hook", hook_text, "-10%"),
-                                 ("outro", outro_text, "-10%")]:
+        quest_narration_rate = tts_rate if tts_rate else "-10%"
+        for name, text in [("welcome", welcome_text),
+                           ("hook", hook_text),
+                           ("outro", outro_text)]:
+            if stop_check and stop_check():
+                print("  [TTS] Stop requested, aborting narration.", flush=True)
+                results["fatal_error"] = "stopped"
+                return
             if text:
                 path = str(audio_dir / f"{name}.mp3")
                 if _audio_exists(path):
@@ -84,27 +116,20 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
                     narration[name] = path
                     print(f"  [TTS] {name}: {dur:.1f}s (cached)")
                     continue
-                dur = tts.synth_english(text, narration_voice, path, rate=rate)
+                dur = tts.synth_english(text, narration_voice, path, rate=quest_narration_rate)
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
-    elif shorts:
-        # Shorts: only the outro CTA is narrated (title card is silent)
-        outro_text = script.get("outro", "Follow for more easy English every day!")
-        path = str(audio_dir / "outro.mp3")
-        if _audio_exists(path):
-            dur = get_duration(path)
-            narration["outro"] = path
-            print(f"  [TTS] outro: {dur:.1f}s (cached)")
-        else:
-            dur = tts.synth_english(outro_text, narration_voice, path, rate="+0%")
-            narration["outro"] = path
-            print(f"  [TTS] outro: {dur:.1f}s")
     else:
         intro_text = script.get("story_hook", "")
         outro_text = script.get("outro", "That's all for today. Keep practicing!")
         practice_intro_text = script.get("practice_intro_en", "Now let's practice. Listen and repeat each sentence.")
 
+        narration_rate = tts_rate if tts_rate else "+0%"
         for name, text in [("intro", intro_text), ("outro", outro_text), ("practice_intro", practice_intro_text)]:
+            if stop_check and stop_check():
+                print("  [TTS] Stop requested, aborting narration.", flush=True)
+                results["fatal_error"] = "stopped"
+                return
             if text:
                 path = str(audio_dir / f"{name}.mp3")
                 if _audio_exists(path):
@@ -112,7 +137,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
                     narration[name] = path
                     print(f"  [TTS] {name}: {dur:.1f}s (cached)")
                     continue
-                dur = tts.synth_english(text, narration_voice, path, rate="+0%")
+                dur = tts.synth_english(text, narration_voice, path, rate=narration_rate)
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
 
@@ -121,6 +146,10 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
     normal_paths = []
     dialogue_durations = []
     for i, line in enumerate(dialogue):
+        if stop_check and stop_check():
+            print("  [TTS] Stop requested, aborting dialogue EN.", flush=True)
+            results["fatal_error"] = "stopped"
+            return
         text = line.get("text", "")
         speaker = line.get("speaker", "char_a")
         voice = voice_map.get(speaker, voice_map.get("char_a", "af_sarah"))
@@ -136,26 +165,38 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         dialogue_durations.append(dur)
         print(f"  [TTS] dialogue_{i}: {dur:.1f}s ({voice_label})")
 
-    # Dialogue Chinese (quest/shorts skip entirely)
+    # Dialogue Chinese (quest skips entirely)
     zh_paths = []
-    if not quest and not shorts:
+    if not quest:
+        zh_rate = tts_rate if tts_rate else "-10%"
         for i, line in enumerate(dialogue):
+            if stop_check and stop_check():
+                print("  [TTS] Stop requested, aborting dialogue ZH.", flush=True)
+                results["fatal_error"] = "stopped"
+                return
             text = line.get("zh", "")
             if not text:
                 zh_paths.append("")
                 continue
             speaker = line.get("speaker", "char_a")
+            # 中文音频音色选择：
+            # Qwen 引擎 → 优先 zh_voice 绑定，回退 voice_map（角色英文音色）
+            # Kokoro 引擎 → get_zh_voice（优先 zh_voice 绑定，回退性别 edge-tts 默认）
+            zh_bind = script.get(f"{speaker}_zh_voice", "").strip()
             if tts_engine == "qwen":
-                voice = voice_map.get(speaker, voice_map.get("char_a", "Vivian"))
+                voice = zh_bind or voice_map.get(speaker, voice_map.get("char_a", "Vivian"))
+            elif tts_engine == "moss":
+                moss_bind = script.get(f"{speaker}_moss_voice", "").strip()
+                voice = moss_bind or voice_map.get(speaker, voice_map.get("char_a", "Ava"))
             else:
-                voice = get_zh_voice(speaker, script)
+                voice = zh_bind or get_zh_voice(speaker, script)
             path = str(audio_dir / f"zh_{i}.mp3")
             if _audio_exists(path):
                 dur = get_duration(path)
                 zh_paths.append(path)
                 print(f"  [TTS] zh_{i}: {dur:.1f}s (cached)")
                 continue
-            dur = tts.synth_chinese(text, voice, path, rate="-10%")
+            dur = tts.synth_chinese(text, voice, path, rate=zh_rate)
             zh_paths.append(path)
             print(f"  [TTS] zh_{i}: {dur:.1f}s")
 
