@@ -6,8 +6,8 @@ background layers with Pillow, using alpha-aware bidirectional optical flow
 for flow-safe pose transitions.
 
 Architecture:
-  1. Character pose images (white-bg removed → RGBA) are normalized to a
-     shared canvas with bottom anchoring.
+  1. Character pose images (generated as cutouts, transparent) are normalized
+     to a shared canvas with center anchoring.
   2. For each dialogue segment, poses switch at semantic boundaries with
      a landing transform (scale/pan/bounce decay).
   3. Adjacent poses of the same speaker/framing are classified flow-safe
@@ -70,16 +70,8 @@ SHADOW_OFFSET_Y = 10
 
 
 # ---------------------------------------------------------------------------
-# Phase 2: AI background removal (rembg U2-Net) + pose normalization
+# Phase 2: background handling (images are pre-cutout at generation time) + pose normalization
 # ---------------------------------------------------------------------------
-
-# Try importing rembg for AI-based background removal. Falls back to
-# threshold-based white-bg removal if rembg is not installed.
-try:
-    from rembg import remove as _rembg_remove
-    _HAS_REMBG = True
-except ImportError:
-    _HAS_REMBG = False
 
 
 def _has_transparency(img: Image.Image, threshold: float = 0.05) -> bool:
@@ -100,24 +92,20 @@ def _has_transparency(img: Image.Image, threshold: float = 0.05) -> bool:
 
 
 def remove_bg(img: Image.Image) -> Image.Image:
-    """Remove background from a PIL image → RGBA with transparency.
+    """Return the image as RGBA with transparency.
 
-    If the image already has transparency (e.g. generated with
-    is_segmentation=true), returns the RGBA conversion directly without
-    calling rembg. Otherwise uses rembg (U2-Net) or falls back to
+    Pose images are generated as cutouts (is_segmentation=true), so the fast
+    path is a plain RGBA conversion. For legacy opaque inputs falls back to
     luminance-threshold white removal.
     """
     # Fast path: image already has transparency (from is_segmentation=true)
     if _has_transparency(img):
         return img.convert("RGBA")
-    if _HAS_REMBG:
-        result = _rembg_remove(img)
-        return result.convert("RGBA")
     return _remove_white_bg_fallback(img)
 
 
 def _remove_white_bg_fallback(img: Image.Image, threshold: int = 238) -> Image.Image:
-    """Threshold-based white background removal (fallback when rembg unavailable)."""
+    """Threshold-based white background removal (legacy opaque inputs)."""
     rgba = img.convert("RGBA")
     data = rgba.load()
     w, h = rgba.size

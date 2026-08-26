@@ -4,7 +4,7 @@ Combines:
 - Original 4-chapter timeline (host welcome/hook_intro → dialogue → practice_intro
   → Ch3 practice → host outro)，开场/结尾为 quest 式主持人定格动画
 - Quest-style stop-motion character cutout animation for dialogue segments
-  (rembg background removal, per-character pose atlas, audio-driven pose switching,
+  (per-character pose atlas, audio-driven pose switching,
    optical flow morphing, landing transforms, multi-character on screen)
 - Original static Pillow frames for Ch3 practice segments (listen_en/listen_zh)
 
@@ -466,36 +466,6 @@ def compose_original_cutout(
                 line.get("text", ""), line.get("phonetic", ""),
                 line.get("zh", ""), scene_img, p, i, n)
         _cb(10, "Static frames done.")
-
-    # --- Pre-process all rembg cutouts single-threaded (avoids onnxruntime concurrency issues) ---
-    if workers > 1:
-        from stop_motion import remove_bg, normalize_pose
-        from PIL import Image as _PIL
-        _all_pose_paths: set[str] = set()
-        for poses in char_pose_map.values():
-            _all_pose_paths.update(poses)
-        _all_pose_paths.update(host_poses or [])
-
-        _rembg_count = 0
-        for p_path in sorted(_all_pose_paths):
-            if stop_check and stop_check():
-                print("  [Cutout] Stop requested during rembg pre-processing...")
-                return ""
-            if not os.path.exists(p_path):
-                continue
-            cache_path = sm_root / f"cutout_{Path(p_path).stem}.png"
-            if cache_path.exists():
-                continue
-            try:
-                raw = _PIL.open(p_path)
-                alpha = remove_bg(raw)
-                norm = normalize_pose(alpha)
-                norm.save(str(cache_path))
-                _rembg_count += 1
-            except Exception as e:
-                print(f"  [Cutout] rembg error for {p_path}: {e}")
-        if _rembg_count:
-            print(f"  [Cutout] Pre-processed {_rembg_count} pose cutouts (single-thread rembg)")
 
     # --- Resolve workers ---
     if workers == 0:

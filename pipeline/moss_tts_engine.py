@@ -32,10 +32,6 @@ from tts_engine import TTSEngine, _rate_to_speed
 
 # ---------------------------------------------------------------------------
 # Built-in voice presets (from moss_tts_nano_runtime._DEFAULT_VOICE_FILES)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Built-in voice presets (from moss_tts_nano_runtime._DEFAULT_VOICE_FILES)
 # Filtered at import time to only include voices whose audio files exist.
 # ---------------------------------------------------------------------------
 
@@ -66,14 +62,18 @@ def _get_preset_audio_dir() -> Path:
 
 
 def _filter_available_presets() -> list[dict]:
-    """Return only presets whose audio files exist on disk."""
+    """Return only presets whose audio files exist on disk (one summary line)."""
     audio_dir = _get_preset_audio_dir()
     result = []
+    missing = []
     for v in _ALL_PRESET_VOICES:
         if (audio_dir / v["file"]).exists():
             result.append({k: v[k] for k in ("name", "desc", "gender", "lang")})
         else:
-            print(f"  [MOSS-TTS] Preset '{v['name']}' skipped (audio not found: {v['file']})")
+            missing.append(v["name"])
+    if missing:
+        print(f"  [MOSS-TTS] {len(result)} preset voices available "
+              f"({len(missing)} skipped, ref audio not installed)")
     return result
 
 
