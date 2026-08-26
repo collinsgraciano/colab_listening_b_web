@@ -279,6 +279,7 @@ def _render_sm_segment(
     seed: int = 0,
     direction: int = 1,
     fade_af: str = "",
+    stop_check=None,
 ) -> bool:
     """Render a stop-motion video segment with multi-character support.
 
@@ -411,6 +412,9 @@ def _render_sm_segment(
     cy = POSE_CENTER_Y
 
     for fidx in range(total_frames):
+        if stop_check and stop_check():
+            print("    [SM] Stop requested, aborting frame render...", flush=True)
+            return False
         if fidx % 10 == 0:
             print(f"    frame {fidx}/{total_frames}", flush=True)
         t = fidx / render_fps
