@@ -48,8 +48,6 @@
   "no_zh_subtitle": false,
   "no_4k": false,
   "upscale_timeout": 3600,
-  "voxcpm_worker_url": "https://curly-grass-9b8c.caimeifeng3.workers.dev",
-  "voxcpm_api_key": "",
   "lip_sync": true,
   "_ui_descs": {}
 }

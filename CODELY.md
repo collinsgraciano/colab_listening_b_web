@@ -25,7 +25,6 @@ colab_listening_b_web/
 │   ├── mcp_client.py             # TJGenerators MCP HTTP 客户端（多 Token 轮换，积分耗尽自动切换）
 │   ├── tts_engine.py             # Kokoro TTS 引擎（英文+中文，音量归一化，语音修复）
 │   ├── tts_pipeline.py           # 批量 TTS 生成（对话+旁白+词汇）
-│   ├── voxcpm_tts.py             # VoxCPM TTS 适配器（Cloudflare Worker）
 │   ├── image_gen.py              # AI 图片生成（角色/场景/对话图/姿势图，含断点续传检查）
 │   ├── clip_gen.py               # Seedance2 视频片段生成（任务构建+轮询+下载+重试）
 │   ├── grouping_b.py             # 对话行分组（连续行合并为一个视频片段）
@@ -165,9 +164,11 @@ python pipeline.py --resume  # 断点续传
 
 ### Feedback
 - [2026-08-26 20:02:43] User wants every code change committed and pushed to GitHub immediately after modification. **Why:** user explicitly asked to enforce this as a standing rule in CODELY.md. **How to apply:** after completing any code edit in this project, run git add + commit + push right away without being asked.
+- [2026-08-27 01:48:36] CODELY.md 正文无法用 replace/write_file 直接编辑（工具报 "memory file" 错误），须走 Python 脚本字节级替换；本项目及多数仓库文件为 CRLF 换行，search 输出看不出 \r，模式串要先 python repr 探针确认行尾，并把 pattern 中 \n 统一转为 \r\n，且每处替换加 assert count==1 防静默错位。 
+
 ### Project
 - [2026-08-27 00:42:36] MOSS-TTS-Nano 引擎集成在 colab_listening_b_web 项目。模型路径：H:\models\MOSS-TTS-Nano-Model (checkpoint), H:\models\MOSS-Audio-Tokenizer-Nano (tokenizer), H:\models\MOSS-TTS-Nano (repo,含 moss_tts_nano_runtime.py)。API 入口：NanoTTSService.synthesize(text, voice, mode="voice_clone", output_audio_path)。16 个内置预设音色 (Ava/Adam/Bella 等)。**Why:** 用户已安装模型，需集成为第三 TTS 引擎选项。**How to apply:** moss_tts_engine.py 中 _get_service 必须在 import NanoTTSService 前先 import torchaudio_sf_patch（修复 Windows torchcodec DLL 缺失），否则合成报错 "TorchCodec is required"。CPU 生成一句英文约 15s，中文约 9s。2026-08-27 质量增强关键事实：①MOSS 会生成 1-3s 病态停顿（句中/句尾死寂），_clean_sentence_audio 用 20ms 帧级 RMS<0.008 检测压缩（句中>0.6s→0.25s，句首→30ms，句尾→80ms），时长校验必须在压缩之后做；②a.m./Dr./Mr. 等缩写句点不能触发分句（正则 lookbehind），过短碎片送模型会呓语；③中文台词默认中文预设音色 Junhao(男)/Xiaoyu(女)，英文参考音说中文带口音。
-
+- [2026-08-27 01:48:36] [2026-08-27] 视频结构模式仅保留4种：original / original_static / original_cutout / quest。quest_v2 与 shorts 已于 2026-08-27 应用户要求彻底删除（连 structures.py/audio_envelope.py 一起清掉），旧结构名 image/static/checkpoint 迁移垫片也已移除。**Why:** 用户原话"其他的模式删除，相关代码脚本全部清理干净，不要有一点残留"。**How to apply:** 后续会话不要再引用或恢复 quest_v2/shorts/唇同步管线；若见到含这些名字的历史产物/checkpoint 属已废弃数据；新增模式建议需先向用户确认。 
 
 ### Reference
 

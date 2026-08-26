@@ -14,8 +14,6 @@
   "llm_min_interval": 10,
   "tts_engine": "kokoro",
   "tts_rate": "",
-  "voxcpm_worker_url": "https://curly-grass-9b8c.caimeifeng3.workers.dev",
-  "voxcpm_api_key": "",
   "mcp_tokens": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzODI1NyIsInVzZXJuYW1lIjoid2VjaGF0X29zX1F5MDU5eHUtaENKeENaNl9FVUc1Nlhua2ciLCJlbWFpbCI6ImVhcmwxOTc4MDYwN0Bob3RtYWlsLmNvbSIsInJvbGUiOiJ1c2VyIiwidW5pdHlfaWQiOiIzMzI2NDA2MjQ2ODM2NiIsInR5cGUiOiJhY2Nlc3MiLCJ0b2tlbl9raW5kIjoic2Vzc2lvbiIsImV4cCI6MTgxNjEzNDgxNCwiaWF0IjoxNzg0NTk4ODE0fQ.YJG8Vin0gSbdTM4jePr1_5QWZ2byFOjvAMC1JKIUihE",
   "clip_duration": 15,
   "output_dir": "H:/2026_main_project/colab_listening_b/output",

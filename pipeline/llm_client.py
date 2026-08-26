@@ -446,6 +446,8 @@ TECHNICAL REQUIREMENTS:
 - "scene_zh": Traditional Chinese scene description (e.g. "餐廳 · 點餐")
 - "story_hook": a compelling 1-sentence intro that sets the scene
 - "intro_zh": Traditional Chinese translation of the intro
+- "welcome_en": a warm YouTube-host greeting opening the video (1-2 sentences), welcoming viewers and hinting at today's topic (e.g. "Hi friends! Welcome back! Today we're checking out at a pharmacy.")
+- "welcome_zh": Traditional Chinese translation of the welcome greeting
 - "outro": a short closing line
 - "outro_zh": Traditional Chinese translation of the outro
 - "practice_intro_en": English instruction before the 跟讀 section
@@ -468,6 +470,8 @@ JSON schema:
   "lesson_type": "listening",
   "story_hook": string,
   "intro_zh": string,
+  "welcome_en": string,
+  "welcome_zh": string,
   "outro": string,
   "outro_zh": string,
   "practice_intro_en": string,
@@ -577,6 +581,8 @@ def generate_listening_script(topic: str, cefr: str = "A2",
     # Ensure all required fields exist
     script.setdefault("story_hook", "")
     script.setdefault("intro_zh", "")
+    script.setdefault("welcome_en", "")
+    script.setdefault("welcome_zh", "")
     script.setdefault("outro", "That's all for today. Keep practicing!")
     script.setdefault("outro_zh", "")
     script.setdefault("title", "")
@@ -612,103 +618,6 @@ def generate_listening_script(topic: str, cefr: str = "A2",
         line.setdefault("poses", [])
 
     return script
-
-
-def design_voxcpm_voices(script: dict) -> dict:
-    """Design VoxCPM voice descriptions for each character via LLM.
-
-    The LLM analyses character descriptions / roles / genders from the script
-    and produces natural-language voice descriptions suitable for the VoxCPM
-    ``control`` parameter.
-
-    Top priority: suitability for English teaching — clear articulation,
-    moderate pace, warm and engaging tone.
-
-    Returns:
-        dict mapping character keys to voice-description strings::
-
-            {"char_a": "...", "char_b": "...", "narrator": "..."}
-
-        Includes ``char_c`` and ``host`` when the script has them (quest mode).
-    """
-    # Collect characters that need voices
-    chars = []
-    for key in ("char_a", "char_b", "char_c", "host"):
-        desc = script.get(f"{key}_description", "")
-        gender = script.get(f"{key}_gender", "")
-        role = script.get(f"{key}_role", "")
-        if desc or key in ("char_a", "char_b"):
-            chars.append(f"- {key}: {desc} (gender: {gender}, role: {role})")
-    char_block = "\n".join(chars)
-
-    # Build output schema dynamically
-    schema_keys = [c for c in ("char_a", "char_b", "char_c", "host")
-                   if script.get(f"{c}_description") or c in ("char_a", "char_b")]
-    schema_pairs = ", ".join(f'"{c}": string' for c in schema_keys)
-    schema_pairs += ', "narrator": string'
-
-    prompt = f"""You are an expert voice director for an English learning YouTube channel.
-Design VoxCPM voice descriptions for each character.
-
-CRITICAL PRIORITIES (in order):
-1. SUITABLE FOR ENGLISH TEACHING — crystal-clear articulation, every word distinguishable, moderate conversational pace (not too fast, not too slow). ESL learners must be able to follow along effortlessly.
-2. NATURAL AND ENGAGING — warm, friendly, encouraging tone that keeps learners interested and motivated.
-3. CHARACTER-APPROPRIATE — match the character's gender, approximate age, and personality from the description below.
-4. DISTINCT VOICES — each character should sound noticeably different so learners can easily tell speakers apart.
-
-Characters:
-{char_block}
-
-Rules for each voice description:
-- Include: gender, age range, voice quality (pitch/tone), speaking style, pace.
-- Keep each description under 25 words. Be specific and concrete.
-- Use "standard American English" pronunciation. Do NOT use celebrity names.
-- Avoid extreme or unusual voice qualities that might reduce clarity.
-- The "narrator" voice is for intro/outro segments — it should be a warm, professional, radio-host quality voice, very clear and easy to understand.
-
-Output JSON ONLY (no markdown):
-{{{schema_pairs}}}"""
-
-    try:
-        content = _chat(
-            [{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=2048,
-            reasoning_effort="low",
-        )
-        voices = _extract_json(content)
-    except Exception as e:
-        print(f"  [VoxCPM] Voice design failed ({e}), using fallback descriptions")
-        # Fallback: generic descriptions based on gender
-        voices = {}
-        for key in schema_keys:
-            gender = script.get(f"{key}_gender", "male").lower()
-            if gender == "female":
-                voices[key] = "Warm female voice, clear articulation, friendly and encouraging, moderate pace."
-            else:
-                voices[key] = "Warm male voice, clear articulation, friendly and encouraging, moderate pace."
-        voices["narrator"] = "Professional female narrator voice, warm and clear, radio-host quality, moderate pace."
-
-    # Ensure narrator exists — respect host_gender in quest mode
-    if "narrator" not in voices or not voices["narrator"]:
-        host_gender = script.get("host_gender", "").lower()
-        if host_gender == "male":
-            voices["narrator"] = "Professional male narrator voice, warm and clear, radio-host quality, moderate pace."
-        elif host_gender == "female":
-            voices["narrator"] = "Professional female narrator voice, warm and clear, radio-host quality, moderate pace."
-        else:
-            voices["narrator"] = "Professional narrator voice, warm and clear, radio-host quality, moderate pace."
-
-    # Ensure all expected keys exist
-    for key in ("char_a", "char_b"):
-        if key not in voices or not voices[key]:
-            gender = script.get(f"{key}_gender", "male").lower()
-            if gender == "female":
-                voices[key] = "Warm female voice, clear articulation, friendly, moderate pace."
-            else:
-                voices[key] = "Warm male voice, clear articulation, friendly, moderate pace."
-
-    return voices
 
 
 def generate_random_voice_designs(count: int = 10,
