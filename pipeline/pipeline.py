@@ -65,6 +65,7 @@ from image_gen import (
     generate_pose_images as _generate_pose_images,
     generate_quest_atlases as _generate_quest_atlases,
     generate_scene_atlas as _generate_scene_atlas,
+    reupload_for_cdn as _reupload_for_cdn,
 )
 from timeline_enrich import enrich_timeline as _enrich_timeline
 from group_audio import build_group_info as _build_group_info
@@ -432,6 +433,15 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                                     max_workers=args.image_concurrency,
                                     style_prompt=style_prompt,
                                     char_keys=["char_a", "char_b"])
+
+        if is_quest or is_original_cutout:
+            # 全新生成路径：姿势图集只落本地。此处把 char_a 参考图补传 CDN 写入
+            # image_urls，供 Step 4.5 缩略图做角色参考（与 --resume 路径行为一致）。
+            _ref_path = img_dir / "pose_char_a_0.png"
+            if _ref_path.exists():
+                _ref_url = _reupload_for_cdn(str(_ref_path), "pose_char_a_0.png")
+                if _ref_url:
+                    image_urls["pose_char_a_0.png"] = _ref_url
 
         print("  [Image] All images done. Waiting for TTS...")
 

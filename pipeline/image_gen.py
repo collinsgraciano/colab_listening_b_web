@@ -70,7 +70,7 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=Fal
     image_urls = {}
     for filename in reupload_files:
         filepath = str(img_dir / filename)
-        url = _reupload_for_cdn(filepath, filename)
+        url = reupload_for_cdn(filepath, filename)
         if url:
             image_urls[filename] = url
 
@@ -98,7 +98,7 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, is_stop_motion=Fal
     return tts_results, image_urls
 
 
-def _reupload_for_cdn(filepath, filename):
+def reupload_for_cdn(filepath, filename):
     """Re-upload an existing local image to TOS and return the CDN URL.
 
     file_upload MCP tool only returns presigned URLs — the actual PUT upload
@@ -169,7 +169,7 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
     for _, filename in image_prompts:
         if os.path.exists(str(img_dir / filename)):
             print(f"  [Image] {filename} already exists, re-uploading for CDN URL...")
-            url = _reupload_for_cdn(str(img_dir / filename), filename)
+            url = reupload_for_cdn(str(img_dir / filename), filename)
             if url:
                 image_urls[filename] = url
 
@@ -602,7 +602,7 @@ def generate_quest2_atlases(script, img_dir, tts_thread, max_workers=4,
         if not atlas_cdn:
             # 断点续传场景：本地已有 atlas，重新上传换 CDN URL
             if os.path.exists(atlas_path):
-                atlas_cdn = _reupload_for_cdn(atlas_path, f"pose_atlas_{char_key}.png")
+                atlas_cdn = reupload_for_cdn(atlas_path, f"pose_atlas_{char_key}.png")
         if not atlas_cdn:
             print(f"    [Quest2Atlas] WARNING: no atlas CDN URL for {char_key}, "
                   f"lipsync degraded (open poses kept)")
