@@ -73,10 +73,10 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
     elif tts_engine == "moss":
         from moss_tts_engine import MossTTSEngine, build_moss_voice_map
 
-        model_path = os.environ.get("MOSS_MODEL_PATH", r"H:\models\MOSS-TTS-Nano-Model")
-        tokenizer_path = os.environ.get("MOSS_TOKENIZER_PATH", r"H:\models\MOSS-Audio-Tokenizer-Nano")
-        device = os.environ.get("MOSS_DEVICE", "cpu")
-        repo_dir = os.environ.get("MOSS_REPO_DIR", r"H:\models\MOSS-TTS-Nano")
+        model_path = os.environ.get("MOSS_MODEL_PATH") or r"H:\models\MOSS-TTS-Nano-Model"
+        tokenizer_path = os.environ.get("MOSS_TOKENIZER_PATH") or r"H:\models\MOSS-Audio-Tokenizer-Nano"
+        device = os.environ.get("MOSS_DEVICE") or "cpu"
+        repo_dir = os.environ.get("MOSS_REPO_DIR") or r"H:\models\MOSS-TTS-Nano"
         tts = MossTTSEngine(model_path, device, tokenizer_path, repo_dir)
         voice_map = build_moss_voice_map(script)
         narration_voice = voice_map.get("narration", voice_map.get("host", "Bella"))

@@ -2900,10 +2900,10 @@ async def api_moss_preview(request: Request):
         return FileResponse(str(cache_path), media_type="audio/mpeg")
 
     config = load_config()
-    model_path = config.get("moss_model_path", r"H:\models\MOSS-TTS-Nano-Model")
-    tokenizer_path = config.get("moss_tokenizer_path", r"H:\models\MOSS-Audio-Tokenizer-Nano")
-    device = config.get("moss_device", "cpu")
-    repo_dir = config.get("moss_repo_dir", r"H:\models\MOSS-TTS-Nano")
+    model_path = config.get("moss_model_path") or r"H:\models\MOSS-TTS-Nano-Model"
+    tokenizer_path = config.get("moss_tokenizer_path") or r"H:\models\MOSS-Audio-Tokenizer-Nano"
+    device = config.get("moss_device") or "cpu"
+    repo_dir = config.get("moss_repo_dir") or r"H:\models\MOSS-TTS-Nano"
 
     try:
         from moss_tts_engine import MossTTSEngine

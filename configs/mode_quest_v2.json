@@ -46,8 +46,8 @@
   "lip_sync": true,
   "no_4k": false,
   "upscale_timeout": 3600,
-  "moss_model_path": "",
-  "moss_tokenizer_path": "",
+  "moss_model_path": "H:\\models\\MOSS-TTS-Nano-Model",
+  "moss_tokenizer_path": "H:\\models\\MOSS-Audio-Tokenizer-Nano",
   "moss_device": "cpu",
-  "moss_repo_dir": ""
+  "moss_repo_dir": "H:\\models\\MOSS-TTS-Nano"
 }
