@@ -22,11 +22,22 @@
         </div>
     </div>
 
-    <!-- 区域 A: 克隆音色管理 -->
+    <!-- 区域 A: 预设音色 (默认折叠) -->
+    <section class="mb-8">
+        <h3 id="preset-header" onclick="togglePresetSection()"
+            class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2 cursor-pointer select-none hover:text-white transition">
+            <span>📋</span> 预设音色
+            <span id="preset-arrow" class="text-slate-500 text-xs">▸</span>
+        </h3>
+        <div id="preset-grid" class="vc-grid grid hidden">
+        </div>
+    </section>
+
+    <!-- 区域 A2: 克隆音色管理 -->
     <section class="mb-8">
         <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
             <span>🎭</span> 克隆音色管理
-            <span class="text-[10px] text-slate-500 font-normal">上传参考音频创建自定义克隆音色；内置预设音色也可直接试听</span>
+            <span class="text-[10px] text-slate-500 font-normal">上传参考音频创建自定义克隆音色</span>
         </h3>
 
         <!-- 上传表单 -->
@@ -120,6 +131,13 @@
 let ALL_VOICES = [];
 let PRESET_VOICES = [];
 
+function togglePresetSection() {
+    const grid = document.getElementById('preset-grid');
+    const arrow = document.getElementById('preset-arrow');
+    grid.classList.toggle('hidden');
+    arrow.textContent = grid.classList.contains('hidden') ? '▸' : '▾';
+}
+
 const CARD_SCALE_KEY = 'moss_voices_card_scale_v1';
 
 function applyCardScale(pct) {
@@ -151,10 +169,9 @@ function loadVoices() {
 }
 
 function renderVoices() {
-    const grid = document.getElementById('custom-grid');
-    grid.innerHTML = '';
-
-    // 预设音色卡片
+    // Render presets (collapsible section)
+    const presetGrid = document.getElementById('preset-grid');
+    presetGrid.innerHTML = '';
     PRESET_VOICES.forEach(v => {
         const card = document.createElement('div');
         card.className = 'vcard bg-slate-800 border border-slate-700';
@@ -200,13 +217,15 @@ function renderVoices() {
         card.appendChild(desc);
         card.appendChild(lang);
         card.appendChild(btnRow);
-        grid.appendChild(card);
+        presetGrid.appendChild(card);
     });
 
-    // 自定义克隆音色卡片
+    // Render custom cloned voices
+    const grid = document.getElementById('custom-grid');
     const customVoices = ALL_VOICES.filter(v => v.custom);
+    grid.innerHTML = '';
     if (!customVoices.length) {
-        grid.innerHTML += '<p class="text-xs text-slate-500 col-span-full mt-2">暂无自定义克隆音色。上传参考音频创建。</p>';
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">暂无自定义克隆音色。上传参考音频创建。</p>';
         return;
     }
     customVoices.forEach(v => {

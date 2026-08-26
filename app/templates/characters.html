@@ -90,7 +90,15 @@
                     </select>
                     <p class="text-[10px] text-slate-500 mt-1">选择音色后会自动把音色描述填入「名称」、按音色同步「性别」，可手动修改</p>
                 </div>
-                <div id="new-image-wrap">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">MOSS 音色</label>
+                    <select id="new-moss-voice"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="">不绑定 (按性别默认)</option>
+                    </select>
+                </div>
+            </div>
+            <div id="new-image-wrap" class="mb-4">
                     <label class="block text-xs text-slate-400 mb-1">参考图片 (可选)</label>
                     <input type="file" id="new-image" accept="image/*"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
@@ -133,6 +141,7 @@
 {% block scripts %}
 <script>
 let ALL_VOICES = [];
+let ALL_MOSS_VOICES = [];
 let _libraryChars = [];
 let _charSources = [];
 let _editingId = null;
@@ -140,6 +149,7 @@ let _editingId = null;
 // --- Init ---
 window.addEventListener('load', function() {
     loadQwenVoices();
+    loadMossVoices();
     loadLibrary();
     loadCharSources();
 });
@@ -155,6 +165,21 @@ function loadQwenVoices() {
             ).join('');
             document.getElementById('new-voice').innerHTML =
                 '<option value="">不绑定 (按性别默认)</option>' + opts;
+        })
+        .catch(() => {});
+}
+
+// --- Load MOSS voices for dropdowns ---
+function loadMossVoices() {
+    fetch('/api/moss_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            ALL_MOSS_VOICES = data.speakers || [];
+            const opts = ALL_MOSS_VOICES.map(v =>
+                `<option value="${v.name}">${v.name}${v.preset ? ' (预设)' : (v.custom ? ' (克隆)' : '')} · ${v.desc || ''}</option>`
+            ).join('');
+            const sel = document.getElementById('new-moss-voice');
+            if (sel) sel.innerHTML = '<option value="">不绑定 (按性别默认)</option>' + opts;
         })
         .catch(() => {});
 }
@@ -302,6 +327,7 @@ function createCharCard(char) {
             ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">仅音色+性别</span>`
             : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">${char.structure || '?'}</span>`}
         ${char.qwen_speaker ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">🎤 ${char.qwen_speaker}</span>` : ''}
+        ${char.moss_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">🔊 ${char.moss_voice}</span>` : ''}
         ${!voiceOnly && char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
     `;
 
@@ -356,7 +382,10 @@ function createCharCard(char) {
         <textarea id="edit-desc-${char.id}" rows="3" placeholder="英文外观描述（清空 = 转为仅音色+性别角色）"
             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white resize-y">${char.description || ''}</textarea>
         <select id="edit-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
-            <option value="">不绑定音色</option>
+            <option value="">不绑定 Qwen 音色</option>
+        </select>
+        <select id="edit-moss-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+            <option value="">不绑定 MOSS 音色</option>
         </select>
         <div class="flex gap-2">
             <input type="file" id="edit-image-${char.id}" accept="image/*"
@@ -417,11 +446,18 @@ function toggleEdit(libId) {
         view.style.opacity = '0.5';
         // Populate voice dropdown
         const voiceSel = document.getElementById(`edit-voice-${libId}`);
-        voiceSel.innerHTML = '<option value="">不绑定音色</option>' +
+        voiceSel.innerHTML = '<option value="">不绑定 Qwen 音色</option>' +
             ALL_VOICES.map(v => `<option value="${v.name}">${v.name}${v.custom ? ' (克隆)' : ''} · ${v.desc || ''}</option>`).join('');
         // Set current voice
         const char = _libraryChars.find(c => c.id === libId);
         if (char && char.qwen_speaker) voiceSel.value = char.qwen_speaker;
+        // Populate MOSS voice dropdown
+        const mossSel = document.getElementById(`edit-moss-voice-${libId}`);
+        if (mossSel) {
+            mossSel.innerHTML = '<option value="">不绑定 MOSS 音色</option>' +
+                ALL_MOSS_VOICES.map(v => `<option value="${v.name}">${v.name}${v.preset ? ' (预设)' : (v.custom ? ' (克隆)' : '')} · ${v.desc || ''}</option>`).join('');
+            if (char && char.moss_voice) mossSel.value = char.moss_voice;
+        }
     } else {
         cancelEdit(libId);
     }
@@ -439,6 +475,7 @@ function saveEdit(libId) {
         structure: document.getElementById(`edit-structure-${libId}`).value,
         description: document.getElementById(`edit-desc-${libId}`).value.trim(),
         qwen_speaker: document.getElementById(`edit-voice-${libId}`).value,
+        moss_voice: document.getElementById(`edit-moss-voice-${libId}`).value,
     };
     fetch(`/api/character_library/${libId}`, {
         method: 'PUT',
@@ -478,6 +515,7 @@ function createCharacter(autoGenerate) {
     const gender = document.getElementById('new-gender').value;
     const structure = document.getElementById('new-structure').value;
     const qwen_speaker = document.getElementById('new-voice').value;
+    const moss_voice = document.getElementById('new-moss-voice').value;
     const imageInput = document.getElementById('new-image');
 
     if (!name) { alert('请填写名称'); return; }
@@ -489,6 +527,7 @@ function createCharacter(autoGenerate) {
     formData.append('gender', gender);
     formData.append('structure', structure);
     formData.append('qwen_speaker', qwen_speaker);
+    formData.append('moss_voice', moss_voice);
     if (!isVoice && imageInput.files[0]) {
         formData.append('image', imageInput.files[0]);
     }

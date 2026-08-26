@@ -28,24 +28,50 @@ from tts_engine import TTSEngine, _split_sentences, _rate_to_speed
 # Built-in voice presets (from moss_tts_nano_runtime._DEFAULT_VOICE_FILES)
 # ---------------------------------------------------------------------------
 
-MOSS_PRESET_VOICES = [
-    {"name": "Junhao",  "desc": "中文男声 A",   "gender": "male",   "lang": "zh"},
-    {"name": "Zhiming", "desc": "中文男声 B",   "gender": "male",   "lang": "zh"},
-    {"name": "Weiguo",  "desc": "中文男声 C",   "gender": "male",   "lang": "zh"},
-    {"name": "Xiaoyu",  "desc": "中文女声 A",   "gender": "female", "lang": "zh"},
-    {"name": "Yuewen",  "desc": "中文女声 B",   "gender": "female", "lang": "zh"},
-    {"name": "Lingyu",  "desc": "中文女声 C",   "gender": "female", "lang": "zh"},
-    {"name": "Trump",   "desc": "Trump 参考音色", "gender": "male",   "lang": "en"},
-    {"name": "Ava",     "desc": "英文女声 A",   "gender": "female", "lang": "en"},
-    {"name": "Bella",   "desc": "英文女声 B",   "gender": "female", "lang": "en"},
-    {"name": "Adam",    "desc": "英文男声 A",   "gender": "male",   "lang": "en"},
-    {"name": "Nathan",  "desc": "英文男声 B",   "gender": "male",   "lang": "en"},
-    {"name": "Sakura",  "desc": "日语女声 A",   "gender": "female", "lang": "ja"},
-    {"name": "Yui",     "desc": "日语女声 B",   "gender": "female", "lang": "ja"},
-    {"name": "Aoi",     "desc": "日语女声 C",   "gender": "female", "lang": "ja"},
-    {"name": "Hina",    "desc": "日语女声 D",   "gender": "female", "lang": "ja"},
-    {"name": "Mei",     "desc": "日语女声 E",   "gender": "female", "lang": "ja"},
+# ---------------------------------------------------------------------------
+# Built-in voice presets (from moss_tts_nano_runtime._DEFAULT_VOICE_FILES)
+# Filtered at import time to only include voices whose audio files exist.
+# ---------------------------------------------------------------------------
+
+_ALL_PRESET_VOICES = [
+    {"name": "Junhao",  "file": "zh_1.wav",  "desc": "中文男声 A",   "gender": "male",   "lang": "zh"},
+    {"name": "Zhiming", "file": "zh_2.wav",  "desc": "中文男声 B",   "gender": "male",   "lang": "zh"},
+    {"name": "Weiguo",  "file": "zh_5.wav",  "desc": "中文男声 C",   "gender": "male",   "lang": "zh"},
+    {"name": "Xiaoyu",  "file": "zh_3.wav",  "desc": "中文女声 A",   "gender": "female", "lang": "zh"},
+    {"name": "Yuewen",  "file": "zh_4.wav",  "desc": "中文女声 B",   "gender": "female", "lang": "zh"},
+    {"name": "Lingyu",  "file": "zh_6.wav",  "desc": "中文女声 C",   "gender": "female", "lang": "zh"},
+    {"name": "Trump",   "file": "en_1.wav",  "desc": "Trump 参考音色", "gender": "male",   "lang": "en"},
+    {"name": "Ava",     "file": "en_2.wav",  "desc": "英文女声 A",   "gender": "female", "lang": "en"},
+    {"name": "Bella",   "file": "en_3.wav",  "desc": "英文女声 B",   "gender": "female", "lang": "en"},
+    {"name": "Adam",    "file": "en_4.wav",  "desc": "英文男声 A",   "gender": "male",   "lang": "en"},
+    {"name": "Nathan",  "file": "en_5.wav",  "desc": "英文男声 B",   "gender": "male",   "lang": "en"},
+    {"name": "Sakura",  "file": "jp_1.mp3",  "desc": "日语女声 A",   "gender": "female", "lang": "ja"},
+    {"name": "Yui",     "file": "jp_2.wav",  "desc": "日语女声 B",   "gender": "female", "lang": "ja"},
+    {"name": "Aoi",     "file": "jp_3.wav",  "desc": "日语女声 C",   "gender": "female", "lang": "ja"},
+    {"name": "Hina",    "file": "jp_4.wav",  "desc": "日语女声 D",   "gender": "female", "lang": "ja"},
+    {"name": "Mei",     "file": "jp_5.wav",  "desc": "日语女声 E",   "gender": "female", "lang": "ja"},
 ]
+
+
+def _get_preset_audio_dir() -> Path:
+    """Resolve the assets/audio directory from MOSS_REPO_DIR env var."""
+    repo_dir = os.environ.get("MOSS_REPO_DIR", r"H:\models\MOSS-TTS-Nano")
+    return Path(repo_dir) / "assets" / "audio"
+
+
+def _filter_available_presets() -> list[dict]:
+    """Return only presets whose audio files exist on disk."""
+    audio_dir = _get_preset_audio_dir()
+    result = []
+    for v in _ALL_PRESET_VOICES:
+        if (audio_dir / v["file"]).exists():
+            result.append({k: v[k] for k in ("name", "desc", "gender", "lang")})
+        else:
+            print(f"  [MOSS-TTS] Preset '{v['name']}' skipped (audio not found: {v['file']})")
+    return result
+
+
+MOSS_PRESET_VOICES = _filter_available_presets()
 
 _PRESET_NAMES = {s["name"] for s in MOSS_PRESET_VOICES}
 

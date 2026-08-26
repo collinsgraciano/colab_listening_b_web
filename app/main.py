@@ -3484,6 +3484,7 @@ async def api_library_create(
     gender: str = Form(""),
     structure: str = Form("quest"),
     qwen_speaker: str = Form(""),
+    moss_voice: str = Form(""),
     image: UploadFile | None = File(None),
 ):
     """Manually create a new character in the library.
@@ -3510,6 +3511,7 @@ async def api_library_create(
         "gender": gender.strip(),
         "structure": structure,
         "qwen_speaker": qwen_speaker.strip(),
+        "moss_voice": moss_voice.strip(),
         "source_run": "",
         "source_key": "char_a",
         "created": time.time(),
@@ -3533,7 +3535,7 @@ async def api_library_update(lib_id: str, request: Request):
         return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
 
     data = await request.json()
-    for key in ("name", "description", "gender", "structure", "qwen_speaker"):
+    for key in ("name", "description", "gender", "structure", "qwen_speaker", "moss_voice"):
         if key in data:
             meta[key] = data[key]
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
