@@ -228,6 +228,10 @@ class PipelineService:
             os.environ["MOSS_DEVICE"] = str(config["moss_device"])
         if config.get("moss_repo_dir"):
             os.environ["MOSS_REPO_DIR"] = str(config["moss_repo_dir"])
+        if config.get("moss_tts_temperature"):
+            os.environ["MOSS_TTS_TEMPERATURE"] = str(config["moss_tts_temperature"])
+        if config.get("moss_tts_retry"):
+            os.environ["MOSS_TTS_RETRY"] = str(config["moss_tts_retry"])
 
     # Character image file patterns per structure
     _CHAR_FILES_ORIGINAL = ["char_scene.png", "char_a_ref.png", "char_b_ref.png"]
@@ -733,6 +737,8 @@ class PipelineService:
             moss_tokenizer_path=config.get("moss_tokenizer_path", ""),
             moss_device=config.get("moss_device", "cpu"),
             moss_repo_dir=config.get("moss_repo_dir", ""),
+            moss_tts_temperature=config.get("moss_tts_temperature", 0.8),
+            moss_tts_retry=config.get("moss_tts_retry", 3),
             upscale_timeout=int(config.get("upscale_timeout", 3600)),
             resume=False,
         )

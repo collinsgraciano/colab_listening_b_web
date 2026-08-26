@@ -114,6 +114,12 @@ PARAM_SPEC = {
     "moss_repo_dir": {"default": r"H:\models\MOSS-TTS-Nano", "type": "text", "group": "tts",
                       "label": "MOSS-TTS-Nano 仓库目录",
                       "help": "包含 infer.py / moss_tts_nano_runtime.py 的仓库路径"},
+    "moss_tts_temperature": {"default": 0.8, "type": "number", "group": "tts",
+                             "label": "MOSS-TTS 采样温度",
+                             "help": "越低越稳定（推荐 0.6-0.8），越高越有表现力；修改后自动重新生成 TTS 缓存"},
+    "moss_tts_retry": {"default": 3, "type": "number", "group": "tts",
+                       "label": "MOSS-TTS 重试次数",
+                       "help": "每句合成失败/校验不达标时换 seed 重试的次数（1=不重试）"},
 
     # --- MCP / Image ---
     "mcp_tokens": {"default": "", "type": "textarea", "group": "mcp",
@@ -430,6 +436,10 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--moss-device", config["moss_device"]]
     if config.get("moss_repo_dir"):
         args += ["--moss-repo-dir", config["moss_repo_dir"]]
+    if config.get("moss_tts_temperature"):
+        args += ["--moss-tts-temperature", str(config["moss_tts_temperature"])]
+    if config.get("moss_tts_retry"):
+        args += ["--moss-tts-retry", str(config["moss_tts_retry"])]
 
     # MCP
     tokens_raw = config.get("mcp_tokens", "").strip()

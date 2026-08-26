@@ -2,5 +2,7 @@
   "default_male": "Adam",
   "default_female": "Ava",
   "default_host_female": "Bella",
+  "default_male_zh": "Junhao",
+  "default_female_zh": "Xiaoyu",
   "custom_voices": []
 }

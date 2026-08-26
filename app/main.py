@@ -2904,12 +2904,21 @@ async def api_moss_preview(request: Request):
     tokenizer_path = config.get("moss_tokenizer_path") or r"H:\models\MOSS-Audio-Tokenizer-Nano"
     device = config.get("moss_device") or "cpu"
     repo_dir = config.get("moss_repo_dir") or r"H:\models\MOSS-TTS-Nano"
+    try:
+        moss_temperature = float(config.get("moss_tts_temperature") or 0.8)
+    except (TypeError, ValueError):
+        moss_temperature = 0.8
+    try:
+        moss_retry = int(config.get("moss_tts_retry") or 3)
+    except (TypeError, ValueError):
+        moss_retry = 3
 
     try:
         from moss_tts_engine import MossTTSEngine
 
         def _synth() -> None:
-            engine = MossTTSEngine(model_path, device, tokenizer_path, repo_dir)
+            engine = MossTTSEngine(model_path, device, tokenizer_path, repo_dir,
+                                   temperature=moss_temperature, retry=moss_retry)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             out_path = str(cache_path)
             with _TTS_SYNTH_LOCK:

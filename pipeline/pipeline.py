@@ -220,6 +220,10 @@ def _parse_args() -> argparse.Namespace:
                         help="Device for MOSS-TTS (e.g. cpu, cuda:0, default: cpu)")
     parser.add_argument("--moss-repo-dir", default=r"H:\models\MOSS-TTS-Nano",
                         help="MOSS-TTS-Nano repo dir (containing moss_tts_nano_runtime.py)")
+    parser.add_argument("--moss-tts-temperature", type=float, default=0.8,
+                        help="MOSS-TTS audio sampling temperature, lower = more stable (default 0.8)")
+    parser.add_argument("--moss-tts-retry", type=int, default=3,
+                        help="MOSS-TTS per-sentence retry attempts with re-seed (default 3)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
     return parser.parse_args()
 
@@ -940,6 +944,10 @@ def main():
         os.environ["MOSS_DEVICE"] = args.moss_device
     if args.moss_repo_dir:
         os.environ["MOSS_REPO_DIR"] = args.moss_repo_dir
+    if args.moss_tts_temperature is not None:
+        os.environ["MOSS_TTS_TEMPERATURE"] = str(args.moss_tts_temperature)
+    if args.moss_tts_retry:
+        os.environ["MOSS_TTS_RETRY"] = str(args.moss_tts_retry)
 
     if args.llm_provider == "openai":
         os.environ["LLM_PROVIDER"] = "openai"

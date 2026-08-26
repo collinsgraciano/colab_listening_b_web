@@ -12,15 +12,18 @@ def _audio_exists(path: str) -> bool:
     return bool(path) and os.path.exists(path) and os.path.getsize(path) > 100
 
 
-def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine):
-    """如果 tts_rate 配置变化，清除 audio_dir 中所有 .mp3 缓存文件。"""
+def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, extra_sig=""):
+    """如果 tts_rate / 引擎参数配置变化，清除 audio_dir 中所有 .mp3 缓存文件。"""
     audio_path = Path(audio_dir)
     meta_path = audio_path / ".tts_meta.json"
-    current_sig = json.dumps({
+    sig = {
         "tts_rate": tts_rate or "",
         "quest": quest,
         "engine": tts_engine,
-    })
+    }
+    if extra_sig:
+        sig["extra"] = extra_sig
+    current_sig = json.dumps(sig)
     if meta_path.exists():
         try:
             saved = meta_path.read_text(encoding="utf-8")
@@ -71,7 +74,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         narration_voice = voice_map.get("narration", voice_map.get("host", "Serena"))
         voice_label = "qwen"
     elif tts_engine == "moss":
-        from moss_tts_engine import MossTTSEngine, build_moss_voice_map
+        from moss_tts_engine import MossTTSEngine, build_moss_voice_map, get_moss_zh_default
 
         model_path = os.environ.get("MOSS_MODEL_PATH") or r"H:\models\MOSS-TTS-Nano-Model"
         tokenizer_path = os.environ.get("MOSS_TOKENIZER_PATH") or r"H:\models\MOSS-Audio-Tokenizer-Nano"
@@ -93,8 +96,13 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
         narration_voice = _narration_voice
     narration_zh_voice = script.get("narration_zh_voice", "").strip() or narration_voice
 
-    # 检测 tts_rate 变化，必要时清除旧缓存
-    _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine)
+    # 检测 tts_rate / 引擎参数变化，必要时清除旧缓存
+    extra_sig = ""
+    if tts_engine == "moss":
+        # MOSS 温度/句间停顿影响输出 — 参数变化时自动重新生成
+        extra_sig = (f"{os.environ.get('MOSS_TTS_TEMPERATURE', '0.8')}"
+                     f"|{os.environ.get('MOSS_TTS_GAP_MS', '120')}")
+    _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, extra_sig)
 
     narration = {}
     if quest:
@@ -182,12 +190,17 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, tts_rate=Non
             # 中文音频音色选择：
             # Qwen 引擎 → 优先 zh_voice 绑定，回退 voice_map（角色英文音色）
             # Kokoro 引擎 → get_zh_voice（优先 zh_voice 绑定，回退性别 edge-tts 默认）
+            # MOSS 引擎 → 优先 moss_voice 绑定，否则按性别用中文预设（英文参考音说中文带口音）
             zh_bind = script.get(f"{speaker}_zh_voice", "").strip()
             if tts_engine == "qwen":
                 voice = zh_bind or voice_map.get(speaker, voice_map.get("char_a", "Vivian"))
             elif tts_engine == "moss":
                 moss_bind = script.get(f"{speaker}_moss_voice", "").strip()
-                voice = moss_bind or voice_map.get(speaker, voice_map.get("char_a", "Ava"))
+                if moss_bind:
+                    voice = moss_bind
+                else:
+                    gender = script.get(f"{speaker}_gender", "").lower()
+                    voice = get_moss_zh_default(gender)
             else:
                 voice = zh_bind or get_zh_voice(speaker, script)
             path = str(audio_dir / f"zh_{i}.mp3")
