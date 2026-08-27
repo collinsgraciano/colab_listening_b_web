@@ -148,7 +148,17 @@ PARAM_SPEC = {
 
     # --- Video ---
     "practice_duration": {"default": 3.0, "type": "number", "group": "video",
-                          "label": "练习间隔(秒)"},
+                          "label": "Ch3 跟读间隔(秒)",
+                          "help": "Ch3 每次朗读（英文/中文）后的停顿秒数。Quest 模式不适用"},
+    "ch3_en_repeats": {"default": 3, "type": "number", "group": "video",
+                       "label": "Ch3 英文重复次数",
+                       "help": "跟读练习每句英文朗读遍数 (0-10, 0=不播英文)。Quest 模式不适用"},
+    "ch3_zh_repeats": {"default": 1, "type": "number", "group": "video",
+                       "label": "Ch3 中文重复次数",
+                       "help": "中文翻译朗读遍数 (0-10, 0=不播中文)。Quest 模式不适用"},
+    "ch3_zh_always": {"default": True, "type": "checkbox", "group": "video",
+                      "label": "Ch3 中文常显",
+                      "help": "英文跟读时画面同步显示中文翻译。Quest 模式不适用"},
     "pad": {"default": "", "type": "text", "group": "video",
             "label": "音频间隔(秒)", "help": "留空=自动 (0.4)"},
     "render_fps": {"default": 8, "type": "number", "group": "video",
@@ -470,6 +480,12 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
 
     # Video
     args += ["--practice-duration", str(config.get("practice_duration", 3.0))]
+    args += ["--ch3-en-repeats", str(int(config.get("ch3_en_repeats", 3) or 0))]
+    args += ["--ch3-zh-repeats", str(int(config.get("ch3_zh_repeats", 1) or 0))]
+    if config.get("ch3_zh_always", True):
+        args.append("--ch3-zh-always")
+    else:
+        args.append("--no-ch3-zh-always")
     if config.get("pad"):
         try:
             pad_val = float(config["pad"])

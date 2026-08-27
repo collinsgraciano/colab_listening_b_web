@@ -20,14 +20,17 @@ def _format_srt_time(seconds: float) -> str:
 
 def build_listening_timeline(script: dict, dialogue_durations: list[float],
                              practice_duration: float = 3.0,
-                             pad: float = 0.4) -> list[dict]:
+                             pad: float = 0.4,
+                             en_repeats: int = 3,
+                             zh_repeats: int = 1) -> list[dict]:
     """Build a timeline for the listening-practice lesson type.
 
     Structure:
       1. Title card (5s)
       2. Full dialogue (all lines, normal speed)
-      3. Practice intro (4s)
-      4. Per line: 1EN -> sil -> 1EN -> sil -> 1EN -> sil -> 1ZH -> 1EN -> sil (9 segments)
+      3. Practice intro (4s, only when en_repeats/zh_repeats > 0)
+      4. Per line: EN x en_repeats -> ZH x zh_repeats (each repetition
+         followed by a `practice_duration` silence gap; both counts may be 0)
       5. Outro (narration)
     """
     dialogue = script.get("dialogue", [])
@@ -36,6 +39,14 @@ def build_listening_timeline(script: dict, dialogue_durations: list[float],
     intro_zh = script.get("intro_zh", "")
     outro = script.get("outro", "That's all for today. Keep practicing!")
     outro_zh = script.get("outro_zh", "")
+    try:
+        en_repeats = max(0, int(en_repeats))
+    except (TypeError, ValueError):
+        en_repeats = 3
+    try:
+        zh_repeats = max(0, int(zh_repeats))
+    except (TypeError, ValueError):
+        zh_repeats = 1
 
     timeline = []
 
@@ -65,27 +76,26 @@ def build_listening_timeline(script: dict, dialogue_durations: list[float],
         _add("dialogue", dur, line.get("text", ""), line.get("zh", ""),
              audio_idx=i, image_idx=i + 1)
 
-    # 3. Practice intro
+    # 3. Practice intro（跟读次数全为 0 时整章无内容，跳过）
     practice_intro_en = script.get("practice_intro_en", "Now let's practice. Listen and repeat each sentence.")
     practice_intro_zh = script.get("practice_intro_zh", "現在來練習。請跟著朗讀每一句。")
-    _add("practice_intro", 4.0, practice_intro_en, practice_intro_zh, audio_idx=-1, image_idx=0)
+    if en_repeats > 0 or zh_repeats > 0:
+        _add("practice_intro", 4.0, practice_intro_en, practice_intro_zh,
+             audio_idx=-1, image_idx=0)
 
-    # 4. Per-line practice (9 segments per line)
+    # 4. Per-line practice：EN × N → ZH × M，每次朗读后跟一段静音间隔
     for i in range(n):
         line = dialogue[i]
         en_text = line.get("text", "")
         zh_text = line.get("zh", "")
         dur = dialogue_durations[i] if i < len(dialogue_durations) else 3.0
 
-        _add("listen_en", dur, en_text, "", audio_idx=i, image_idx=-1, d_idx=i)
-        _add("practice", practice_duration, "", "", audio_idx=-1, image_idx=-1, d_idx=i)
-        _add("listen_en", dur, en_text, "", audio_idx=i, image_idx=-1, d_idx=i)
-        _add("practice", practice_duration, "", "", audio_idx=-1, image_idx=-1, d_idx=i)
-        _add("listen_en", dur, en_text, "", audio_idx=i, image_idx=-1, d_idx=i)
-        _add("practice", practice_duration, "", "", audio_idx=-1, image_idx=-1, d_idx=i)
-        _add("listen_zh", dur, en_text, zh_text, audio_idx=i, image_idx=-1, d_idx=i)
-        _add("listen_en", dur, en_text, "", audio_idx=i, image_idx=-1, d_idx=i)
-        _add("practice", practice_duration, "", "", audio_idx=-1, image_idx=-1, d_idx=i)
+        for _ in range(en_repeats):
+            _add("listen_en", dur, en_text, "", audio_idx=i, image_idx=-1, d_idx=i)
+            _add("practice", practice_duration, "", "", audio_idx=-1, image_idx=-1, d_idx=i)
+        for _ in range(zh_repeats):
+            _add("listen_zh", dur, en_text, zh_text, audio_idx=i, image_idx=-1, d_idx=i)
+            _add("practice", practice_duration, "", "", audio_idx=-1, image_idx=-1, d_idx=i)
 
     # 5. Outro
     if outro:

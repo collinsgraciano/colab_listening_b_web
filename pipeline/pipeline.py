@@ -173,6 +173,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--image-concurrency", type=int, default=4, help="Max concurrent image generation tasks (1-4, default 4)")
     parser.add_argument("--clip-concurrency", type=int, default=4, help="Max concurrent video clip tasks (1-5, default 4)")
     parser.add_argument("--practice-duration", type=float, default=3.0, help="Silence duration in Ch3")
+    parser.add_argument("--ch3-en-repeats", type=int, default=3,
+                        help="Ch3 practice: English repetitions per line (0-10, 0=skip EN)")
+    parser.add_argument("--ch3-zh-repeats", type=int, default=1,
+                        help="Ch3 practice: Chinese repetition count per line (0-10, 0=skip ZH)")
+    parser.add_argument("--ch3-zh-always", action=argparse.BooleanOptionalAction, default=True,
+                        help="Ch3 practice: always show Chinese text on English frames (default: on)")
     parser.add_argument("--pad", type=float, default=None, help="Audio pad between segments (default 0.4; quest mode 5.0 — long thinking pauses for beginners)")
     parser.add_argument("--render-fps", type=int, default=8, help="Quest stop-motion render framerate (default 8; lower=faster but choppier)")
     parser.add_argument("--workers", type=int, default=1, help="Quest render threads (1=single, 2+=multi, 0=auto=cpu_count)")
@@ -639,6 +645,8 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
         timeline = build_listening_timeline(
             script, dialogue_durations,
             pad=args.pad, practice_duration=args.practice_duration,
+            en_repeats=getattr(args, "ch3_en_repeats", 3),
+            zh_repeats=getattr(args, "ch3_zh_repeats", 1),
         )
         if args.structure == "original_cutout":
             # 开头/结尾对齐 quest 主持人形式：移除标题卡，插入 welcome + hook_intro
@@ -828,6 +836,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
             show_zh=not getattr(args, "no_zh_subtitle", False),
+            ch3_zh_always=bool(getattr(args, "ch3_zh_always", True)),
         )
     elif args.structure == "original_cutout":
         from original_cutout_compose import compose_original_cutout
@@ -871,6 +880,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             show_zh=not getattr(args, "no_zh_subtitle", False),
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
+            ch3_zh_always=bool(getattr(args, "ch3_zh_always", True)),
             progress_cb=progress_cb,
             stop_check=stop_check,
         )
@@ -892,6 +902,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
             show_zh=not getattr(args, "no_zh_subtitle", False),
+            ch3_zh_always=bool(getattr(args, "ch3_zh_always", True)),
         )
     if not final_path:
         print("  [Compose] Interrupted or no output, skipping checkpoint save.")
@@ -959,6 +970,10 @@ def main():
         args.num_lines = 48 if args.structure == "quest" else 18
     if args.pad is None:
         args.pad = 0.4
+
+    # Ch3 跟读次数：clamp 到 0-10，防止误填导致视频长度失控
+    args.ch3_en_repeats = max(0, min(10, int(args.ch3_en_repeats)))
+    args.ch3_zh_repeats = max(0, min(10, int(args.ch3_zh_repeats)))
 
     # original_cutout: quest-style TTS rate (0% = normal speed)
     if args.tts_rate is None and args.structure == "original_cutout":

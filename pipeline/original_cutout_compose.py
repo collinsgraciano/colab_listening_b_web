@@ -390,6 +390,7 @@ def compose_original_cutout(
     show_zh: bool = True,
     subtitle_font_size: int = 60,
     subtitle_style: dict | None = None,
+    ch3_zh_always: bool = False,
     progress_cb=None,
     stop_check=None,
 ) -> str:
@@ -458,9 +459,11 @@ def compose_original_cutout(
                 print("  [Cutout] Stop requested during static frame rendering...")
                 return ""
             p_en = str(static_dir / f"en_{i}.png")
+            # 中文常显：EN 帧直接带中文翻译（内容同 zh 帧）
             _render_static_frame(
                 line.get("text", ""), line.get("phonetic", ""),
-                "", scene_img, p_en, i, n)
+                line.get("zh", "") if ch3_zh_always else "",
+                scene_img, p_en, i, n)
             p = str(static_dir / f"zh_{i}.png")
             _render_static_frame(
                 line.get("text", ""), line.get("phonetic", ""),

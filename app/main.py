@@ -1846,19 +1846,31 @@ async def api_character_sources():
                 script = json.loads(script_path.read_text(encoding="utf-8"))
                 img_dir = d / "images"
 
-                # Auto-detect structure by checking which image files exist
-                # (script.json does not store structure — it's a CLI arg)
-                if (img_dir / "pose_char_a_0.png").exists():
-                    structure = "quest"
-                elif (img_dir / "char_scene.png").exists():
-                    structure = "original"
-                else:
-                    continue  # no character images
+                # 结构识别：优先读 script.json 的 structure 字段（_step0_script 会写入），
+                # 旧运行缺失时回退文件探测
+                structure = script.get("structure", "")
+                if structure not in ("original", "original_static",
+                                     "original_cutout", "quest"):
+                    if (img_dir / "pose_char_a_0.png").exists():
+                        # 姿势图集 → quest 或 cutout：以 char_c 图集存在与否细分
+                        structure = ("quest" if (img_dir / "pose_char_c_0.png").exists()
+                                     else "original_cutout")
+                    elif (img_dir / "char_scene.png").exists():
+                        structure = "original"
+                    else:
+                        continue  # no character images
 
                 # Build character list based on detected structure
                 if structure == "quest":
                     char_keys = ["char_a", "char_b", "char_c", "host"]
                     char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
+                    img_name_for = lambda key: f"pose_{key}_0.png"
+                elif structure == "original_cutout":
+                    # 仅当源运行存在独立主持人图集时才提供 host 卡
+                    # （绑定了 char_a/char_b 的源运行没有独立主持人可复用）
+                    char_keys = (["char_a", "char_b"]
+                                 + (["host"] if (img_dir / "pose_host_0.png").exists() else []))
+                    char_labels = {"char_a": "角色A", "char_b": "角色B", "host": "主持人"}
                     img_name_for = lambda key: f"pose_{key}_0.png"
                 else:
                     char_keys = ["char_a", "char_b"]
@@ -1900,7 +1912,8 @@ async def api_character_sources():
 
 CHARACTER_SETS_PATH = WEB_ROOT / "configs" / "character_sets.json"
 _SET_FIELDS = ["character_source", "character_reuse", "character_fixes",
-               "character_library", "character_voices", "_ui_descs"]
+               "character_library", "character_voices", "character_zh_voices",
+               "character_moss_voices", "_ui_descs"]
 
 
 def _load_char_sets() -> list:

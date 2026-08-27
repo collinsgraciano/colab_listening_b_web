@@ -312,6 +312,7 @@ def compose_listening(
     subtitle_font_size: int = 60,
     subtitle_style: dict | None = None,
     show_zh: bool = True,
+    ch3_zh_always: bool = False,
 ) -> str:
     """Compose final listening practice video.
 
@@ -332,6 +333,7 @@ def compose_listening(
         line_to_group: {line_idx: group_idx} mapping for group-based dialogue.
         subtitle_font_size: Legacy EN subtitle font size (used when subtitle_style is None).
         subtitle_style: 字幕样式 dict（字幕样式设计器）；None → 历史行为。
+        ch3_zh_always: Ch3 英文跟读帧同时显示中文翻译（中文常显）。
 
     Returns:
         Path to final video.
@@ -357,12 +359,19 @@ def compose_listening(
     if os.path.exists(scene_img):
         _cb(5, f"Rendering {n} static frames...")
         for i, line in enumerate(dialogue):
-            # EN-only frame (listen_en): English + phonetic, NO Chinese yet —
-            # the translation must stay hidden until the listen_zh segment
-            p_en = str(static_dir / f"en_{i}.png")
-            _render_static_frame(
-                line.get("text", ""), line.get("phonetic", ""),
-                "", scene_img, p_en, i, n)
+            if ch3_zh_always:
+                # 中文常显：EN 帧直接带中文翻译（内容同 zh 帧）
+                p_en = str(static_dir / f"en_{i}.png")
+                _render_static_frame(
+                    line.get("text", ""), line.get("phonetic", ""),
+                    line.get("zh", ""), scene_img, p_en, i, n)
+            else:
+                # EN-only frame (listen_en): English + phonetic, NO Chinese yet —
+                # the translation must stay hidden until the listen_zh segment
+                p_en = str(static_dir / f"en_{i}.png")
+                _render_static_frame(
+                    line.get("text", ""), line.get("phonetic", ""),
+                    "", scene_img, p_en, i, n)
             # EN+ZH frame (listen_zh): reveals the Traditional Chinese translation
             p = str(static_dir / f"zh_{i}.png")
             _render_static_frame(
@@ -717,6 +726,7 @@ def compose_image(
     subtitle_font_size: int = 60,
     subtitle_style: dict | None = None,
     show_zh: bool = True,
+    ch3_zh_always: bool = False,
     target_w: int = TARGET_W,
     target_h: int = TARGET_H,
 ) -> str:
@@ -753,6 +763,7 @@ def compose_image(
         pad: Audio pad between segments (seconds).
         progress_cb: callback(percent, message).
         animation: "none", "landing", or "stop_motion".
+        ch3_zh_always: Ch3 英文跟读帧同时显示中文翻译（中文常显）。
         target_w / target_h: Output canvas size. Defaults to 1280x720;
             pass 1080x1920 for vertical output. stop_motion always
             renders at the default canvas.
@@ -830,9 +841,11 @@ def compose_image(
         _cb(10 if is_stop_motion else 5, f"Rendering {n} static frames...")
         for i, line in enumerate(dialogue):
             p_en = str(static_dir / f"en_{i}.png")
+            # 中文常显：EN 帧直接带中文翻译（内容同 zh 帧）
             _render_static_frame(
                 line.get("text", ""), line.get("phonetic", ""),
-                "", scene_img, p_en, i, n, w=tw, h=th)
+                line.get("zh", "") if ch3_zh_always else "",
+                scene_img, p_en, i, n, w=tw, h=th)
             p = str(static_dir / f"zh_{i}.png")
             _render_static_frame(
                 line.get("text", ""), line.get("phonetic", ""),

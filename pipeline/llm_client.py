@@ -341,6 +341,10 @@ def _build_character_override_prompt(quest: bool = False) -> str:
     }
     lines = ["PRE-DEFINED CHARACTERS (MANDATORY — these are FIXED, do NOT change):"]
     for key, info in overrides.items():
+        if key == "narration":
+            # narration 仅供 TTS 音色覆盖（由 _reuse_characters 写入 script.json），
+            # 与 LLM 无关，注入反而诱导模型输出多余字段
+            continue
         desc = info.get("description", "")
         gender = info.get("gender", "")
         role = info.get("role", "")

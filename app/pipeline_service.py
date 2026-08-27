@@ -71,6 +71,14 @@ class _LineBuffer(io.StringIO):
             self._buf = ""
 
 
+def _cfg_int(config: dict, key: str, default: int) -> int:
+    """配置值安全转 int（空串/非法值回退默认），并 clamp 到 0-10。"""
+    try:
+        return max(0, min(10, int(config.get(key, default))))
+    except (TypeError, ValueError):
+        return default
+
+
 class PipelineService:
     """Manages pipeline execution in a background thread with direct imports."""
 
@@ -244,7 +252,9 @@ class PipelineService:
             os.environ["QWEN_DEVICE"] = str(config["qwen_device"])
 
     # Character image file patterns per structure
-    _CHAR_FILES_ORIGINAL = ["char_scene.png", "char_a_ref.png", "char_b_ref.png"]
+    # （仅 char_scene.png 为 original/original_static 的角色合图；
+    #   旧清单中的 char_a_ref/char_b_ref 从未由 image_gen 生成，已移除）
+    _CHAR_FILES_ORIGINAL = ["char_scene.png"]
 
     def _build_character_overrides(self, config: dict) -> dict:
         """Build character overrides dict for LLM prompt injection.
@@ -300,6 +310,9 @@ class PipelineService:
         structure = config.get("structure", "original")
         if structure == "quest":
             all_keys = ["char_a", "char_b", "char_c", "host"]
+        elif structure == "original_cutout":
+            # 独立主持人（未绑定角色时）同样参与复用，否则每次新跑随机生成新主持人
+            all_keys = ["char_a", "char_b", "host", "narration"]
         else:
             all_keys = ["char_a", "char_b", "narration"]
 
@@ -416,6 +429,9 @@ class PipelineService:
         structure = self.config.get("structure", "original")
         if structure == "quest":
             all_char_keys = ["char_a", "char_b", "char_c", "host"]
+        elif structure == "original_cutout":
+            # 独立主持人（未绑定角色时）同样参与复用
+            all_char_keys = ["char_a", "char_b", "host", "narration"]
         else:
             all_char_keys = ["char_a", "char_b", "narration"]
 
@@ -444,8 +460,15 @@ class PipelineService:
 
                     # --- Mode "image": copy images + override desc + gender (NOT role) ---
                     image_keys = [k for k in all_char_keys if reuse_map.get(k) == "image"]
+                    if (structure not in ("quest", "original_cutout")
+                            and ("char_a" in image_keys) != ("char_b" in image_keys)):
+                        # char_scene.png 是 A+B 合图：只选其一无法只复制单个角色
+                        self._on_log_line(
+                            "  [Reuse] WARNING: image 复用需角色A、B 同时选择"
+                            "（char_scene 为双人合图），当前仅选其一时不会复制图片")
                     for key in image_keys:
-                        for suffix in ["description", "gender", "qwen_speaker", "moss_voice"]:
+                        for suffix in ["description", "gender", "qwen_speaker",
+                                       "zh_voice", "moss_voice"]:
                             field = f"{key}_{suffix}"
                             val = source_script.get(field, "")
                             if val:
@@ -506,7 +529,8 @@ class PipelineService:
                     for key in all_char_keys:
                         if reuse_map.get(key) != "desc":
                             continue
-                        for suffix in ["description", "gender", "qwen_speaker", "moss_voice"]:
+                        for suffix in ["description", "gender", "qwen_speaker",
+                                       "zh_voice", "moss_voice"]:
                             val = source_script.get(f"{key}_{suffix}", "")
                             if val:
                                 script[f"{key}_{suffix}"] = val
@@ -734,6 +758,9 @@ class PipelineService:
             used_topics_file=config.get("used_topics_file", "") or None,
             lessons_dir=config.get("lessons_dir", "") or None,
             practice_duration=float(config.get("practice_duration", 3.0)),
+            ch3_en_repeats=_cfg_int(config, "ch3_en_repeats", 3),
+            ch3_zh_repeats=_cfg_int(config, "ch3_zh_repeats", 1),
+            ch3_zh_always=bool(config.get("ch3_zh_always", True)),
             pad=pad,
             render_fps=int(config.get("render_fps", 8)),
             workers=int(config.get("workers", 1)),
@@ -800,8 +827,8 @@ class PipelineService:
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
         _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
                          structure=args.structure, animation=args.animation,
-                         visual_style=str(config.get("visual_style", "")),
-                         host_character=str(config.get("host_character", "") or ""))
+                         visual_style=str(self.config.get("visual_style", "")),
+                         host_character=str(self.config.get("host_character", "") or ""))
         # 各模式独立记录已用主题（不再写全局 used_topics.json，
         # 同一主题仍可在其他模式生成/使用）
         script_library.mark_topic_used_mode(
