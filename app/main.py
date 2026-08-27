@@ -1223,6 +1223,7 @@ async def api_scripts_form_options():
         "topics_data": _load_topics_data(config),
         "used_topics": _load_used_topic_names(config),
         "used_by_mode": script_library.used_by_mode_all(),
+        "library_topics": script_library.library_topics_by_mode(),
         "default_lines": script_library.DEFAULT_LINES,
         "last": _load_scripts_form(),  # 上次使用的 provider/model（优先于 current 回显）
         "current": {
@@ -1245,6 +1246,13 @@ async def api_scripts_form_memory(request: Request):
 @app.get("/api/scripts")
 async def api_scripts_list(structure: str = "", status: str = "", q: str = ""):
     return {"scripts": script_library.list_scripts(structure, status, q)}
+
+
+# 注意：必须注册在 /api/scripts/{sid} 之前，否则 "batch_status" 会被当作 sid 匹配
+@app.get("/api/scripts/batch_status")
+async def api_scripts_batch_status():
+    """后台批量任务状态（生成/审查/修复共用）— 页面刷新后恢复进度显示。"""
+    return script_library.batch_status()
 
 
 @app.get("/api/scripts/{sid}")
@@ -1290,6 +1298,7 @@ async def api_scripts_generate(request: Request):
         random_count = max(0, min(int(data.get("random_count", 0) or 0), 30))
     except (TypeError, ValueError):
         random_count = 0
+    # 服务端随机抽取仅 API 直调可用；Web 页面在前端抽取（恒传 random_count:0）
     if random_count > 0:
         import random as _random
         config = load_config()

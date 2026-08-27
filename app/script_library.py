@@ -6,9 +6,10 @@ Storage: configs/script_library/{id}.json — one doc per script:
 
 Generation reuses pipeline's LLM clients (generate_listening_script /
 generate_quest_script) + _validate_script, executed serially in a background
-thread. Env vars (LLM provider) are backed up / restored so the batch-selected
-provider only affects this batch. AI review follows topics_ai's chat pattern
-but with an explicit provider override.
+thread. The batch-selected provider is applied via a thread-local LLM override
+(set_llm_env_override) — it never touches os.environ, so concurrent pipeline
+runs are unaffected. AI review follows topics_ai's chat pattern but with an
+explicit provider override.
 """
 import json
 import random
@@ -29,12 +30,14 @@ SCRIPTS_DIR = WEB_ROOT / "configs" / "script_library"
 # 各模式独立记录的「已用主题」——同一主题在每个模式各可用一次
 _USED_BY_MODE_PATH = SCRIPTS_DIR / "used_topics_by_mode.json"
 _store_lock = threading.Lock()
+# 脚本文档读-改-写互斥（编辑保存 vs 审查/修复后台线程并发写同一 doc）
+_doc_lock = threading.Lock()
 
 _PIPELINE_DIR = WEB_ROOT / "pipeline"
 if str(_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_PIPELINE_DIR))
 
-from llm_client import _extract_json, set_llm_env_override  # noqa: E402
+from llm_client import _enforce_rate_limit, _extract_json, set_llm_env_override  # noqa: E402
 
 DEFAULT_LINES = {"original": 18, "original_static": 18, "original_cutout": 18, "quest": 48}
 
@@ -49,8 +52,19 @@ _GENDER_WORDS = {
     "female": (" woman ", " girl ", " she ", " her ", " female "),
 }
 
-# 批量生成/审查共用的运行状态（单任务互斥 + 停止信号）
-_batch_state: dict[str, Any] = {"running": False, "stop": threading.Event()}
+# 批量生成/审查共用的运行状态（单任务互斥 + 停止信号 + 进度快照供断线恢复查询）
+_batch_state: dict[str, Any] = {"running": False, "stop": threading.Event(),
+                                "snapshot": {}}
+
+
+def _set_snapshot(**kw: Any) -> None:
+    _batch_state["snapshot"] = {**(_batch_state.get("snapshot") or {}), **kw}
+
+
+def batch_status() -> dict:
+    """后台批量任务状态（页面刷新后恢复进度显示用）。"""
+    return {"running": bool(_batch_state["running"]),
+            "snapshot": dict(_batch_state.get("snapshot") or {})}
 
 
 # ===========================================================================
@@ -85,6 +99,7 @@ def _doc_meta(doc: dict) -> dict:
         "score": review.get("score"),
         "verdict": review.get("verdict", ""),
         "reviewed": review.get("score") is not None,
+        "stale": bool(review.get("stale")),
         "used_by": doc.get("used_by", ""),
         "used_at": doc.get("used_at", 0),
         "lines": len(dialogue),
@@ -174,17 +189,30 @@ def save_new_script(script: dict, meta: dict) -> dict:
 
 
 def update_script(sid: str, patch: dict) -> dict | None:
-    """Merge-edit a script doc (script payload and/or topic/cefr)."""
-    doc = get_script_doc(sid)
-    if not doc:
-        return None
-    if isinstance(patch.get("script"), dict):
-        doc["script"] = patch["script"]
-    if str(patch.get("topic", "")).strip():
-        doc["topic"] = str(patch["topic"]).strip()
-    if patch.get("cefr"):
-        doc["cefr"] = patch["cefr"]
-    _write_doc(doc)
+    """Merge-edit a script doc (script payload and/or topic/cefr).
+
+    内容变更时重算 local_checks；已有 AI 审查结论则标记 stale（已编辑，过期）。
+    """
+    with _doc_lock:
+        doc = get_script_doc(sid)
+        if not doc:
+            return None
+        content_changed = isinstance(patch.get("script"), dict)
+        if content_changed:
+            doc["script"] = patch["script"]
+        if str(patch.get("topic", "")).strip():
+            doc["topic"] = str(patch["topic"]).strip()
+        if patch.get("cefr"):
+            doc["cefr"] = patch["cefr"]
+        if content_changed:
+            review = doc.get("review") or {}
+            review["local_issues"] = local_checks(
+                doc["script"], doc.get("structure", "original"),
+                len(doc["script"].get("dialogue") or []))
+            if review.get("score") is not None:
+                review["stale"] = True
+            doc["review"] = review
+        _write_doc(doc)
     return doc
 
 
@@ -200,27 +228,29 @@ def delete_script(sid: str) -> bool:
 
 def mark_used(sid: str, run_name: str) -> dict | None:
     """Mark a script as used by a run (idempotent)."""
-    doc = get_script_doc(sid)
-    if not doc:
-        return None
-    if doc.get("status") != "used":
-        doc["status"] = "used"
-        doc["used_by"] = run_name
-        doc["used_at"] = time.time()
-        _write_doc(doc)
+    with _doc_lock:
+        doc = get_script_doc(sid)
+        if not doc:
+            return None
+        if doc.get("status") != "used":
+            doc["status"] = "used"
+            doc["used_by"] = run_name
+            doc["used_at"] = time.time()
+            _write_doc(doc)
     return doc
 
 
 def reset_used(sid: str) -> dict | None:
     """Reset the used mark → back to reviewed (if AI-reviewed) or draft."""
-    doc = get_script_doc(sid)
-    if not doc:
-        return None
-    review = doc.get("review") or {}
-    doc["status"] = "reviewed" if review.get("score") is not None else "draft"
-    doc["used_by"] = ""
-    doc["used_at"] = 0
-    _write_doc(doc)
+    with _doc_lock:
+        doc = get_script_doc(sid)
+        if not doc:
+            return None
+        review = doc.get("review") or {}
+        doc["status"] = "reviewed" if review.get("score") is not None else "draft"
+        doc["used_by"] = ""
+        doc["used_at"] = 0
+        _write_doc(doc)
     # 同步移除该模式已用主题记录（若由该脚本写入）
     if doc["status"] != "used":
         remove_topic_used_mode(doc.get("structure", ""), doc.get("topic", ""), sid)
@@ -284,6 +314,21 @@ def used_topics_for_mode(mode: str) -> list[str]:
 
 def used_by_mode_all() -> dict[str, list[str]]:
     return {m: list(v.keys()) for m, v in _load_used_by_mode().items()}
+
+
+def library_topics_by_mode() -> dict[str, list[str]]:
+    """各模式下「库中已有脚本」的主题集合（任意状态）— 前端防重复生成提示用。"""
+    out: dict[str, set[str]] = {}
+    for f in SCRIPTS_DIR.glob("script_*.json"):
+        try:
+            doc = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        mode = doc.get("structure", "")
+        topic = doc.get("topic", "")
+        if mode and topic:
+            out.setdefault(mode, set()).add(topic)
+    return {m: sorted(v) for m, v in out.items()}
 
 
 # ===========================================================================
@@ -415,15 +460,24 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
         q.put(None)
         return
 
+    # 同模式同主题查重：库中已有该主题脚本时仅提示不阻断（用户可能刻意重生成）
+    existing = {m["topic"]: m["id"] for m in list_scripts(structure=structure)}
+
     # 线程局部覆盖：批量线程用自己的 provider 配置，与运行中的 pipeline 互不干扰
     set_llm_env_override(override)
     try:
         for i, topic in enumerate(topics):
+            _set_snapshot(kind="generate", current=topic, done=i,
+                          total=len(topics), generated=summary["generated"],
+                          failed=summary["failed"])
             if stop_event.is_set():
                 summary["stopped"] = True
                 q.put(("progress",
                        f"⏹ 已停止（完成 {summary['generated']}/{summary['total']}）"))
                 break
+            if topic in existing:
+                q.put(("progress",
+                       f"⚠ 「{topic}」库中已有同名主题脚本（{existing[topic]}），仍继续生成"))
             q.put(("progress",
                    f"[{i + 1}/{len(topics)}] 「{topic}」生成中（{structure}/{cefr}）..."))
             try:
@@ -446,6 +500,10 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
                        f"{len(script.get('dialogue', []))} 行{extra}）"))
                 q.put(("script", _doc_meta(doc)))
                 summary["generated"] += 1
+                existing[topic] = doc["id"]
+                _set_snapshot(kind="generate", current=topic, done=i + 1,
+                              total=len(topics), generated=summary["generated"],
+                              failed=summary["failed"])
             except Exception as e:  # noqa: BLE001
                 summary["failed"] += 1
                 q.put(("error_item", {"topic": topic,
@@ -464,12 +522,16 @@ def start_generate_thread(params: dict, q) -> threading.Thread:
         raise RuntimeError("已有批量任务进行中，请等待完成或先停止")
     _batch_state["running"] = True
     _batch_state["stop"].clear()
+    _set_snapshot(kind="generate", current="", done=0,
+                  total=len(params.get("topics") or []),
+                  generated=0, failed=0)
 
     def _wrap():
         try:
             generate_batch(params, q, _batch_state["stop"])
         finally:
             _batch_state["running"] = False
+            _batch_state["snapshot"] = {}
 
     t = threading.Thread(target=_wrap, daemon=True)
     t.start()
@@ -540,36 +602,24 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
 # AI review
 # ===========================================================================
 
-_LAST_CALL_TIME = 0.0
-_RATE_LOCK = threading.Lock()
-
-
-def _reserve_slot(min_interval: float) -> None:
-    """锁内预约调用槽位（start-to-start 间隔，对齐 llm_client 模式）。"""
-    global _LAST_CALL_TIME
-    with _RATE_LOCK:
-        now = time.time()
-        start_at = max(now, _LAST_CALL_TIME + min_interval)
-        _LAST_CALL_TIME = start_at
-    if start_at > now:
-        time.sleep(start_at - now)
-
-
 class _RetryableError(Exception):
     """Internal: transient LLM failure worth retrying (empty/invalid output)."""
 
 
 def _chat_json_provider(provider_id: str, model: str, structure: str,
                         messages: list[dict], temperature: float = 0.3,
-                        max_tokens: int = 2048) -> Any:
+                        max_tokens: int = 2048,
+                        resolved: tuple | None = None) -> Any:
     """Non-streaming LLM call with explicit provider → parsed JSON.
 
     Reads rate-limit config from the structure's mode config. Retries on
     HTTP 429/gateway and network errors (15/30/60s backoff) and on invalid
-    JSON output (independent retry budget).
+    JSON output (independent retry budget). `resolved` 可传入预先解析好的
+    _resolve_batch_provider 结果（避免重复解析 + 复取 resolved_model）。
+    Rate limiting 走 llm_client 的共享限速器（与 pipeline 运行互认）。
     """
-    (p_type, base_url, api_key, resolved_model), cfg = _resolve_batch_provider(
-        provider_id, model, structure)
+    (p_type, base_url, api_key, resolved_model), cfg = (
+        resolved or _resolve_batch_provider(provider_id, model, structure))
     if not api_key:
         raise RuntimeError(
             f"未配置所选大模型的 API Key（provider={provider_id or p_type}）— "
@@ -580,7 +630,7 @@ def _chat_json_provider(provider_id: str, model: str, structure: str,
     http_attempt = 0      # HTTP 429/网关/网络错误重试额度
     content_attempt = 0   # 空内容/坏 JSON 重试额度（独立计数，互不挤占）
     while True:
-        _reserve_slot(min_interval)
+        _enforce_rate_limit(min_interval)
         body = {
             "model": resolved_model,
             "messages": messages,
@@ -700,12 +750,13 @@ RULES:
 OUTPUT JSON ONLY:
 {{"score": 78, "verdict": "needs_fix", "issues": [{{"dimension": "naturalness", "severity": "high", "line": 3, "comment": "...", "suggestion": "..."}}], "summary_zh": "总评 1-3 句"}}"""
 
+    resolved = _resolve_batch_provider(provider_id, model, structure)
     data = _chat_json_provider(
         provider_id, model, structure,
         [{"role": "system",
           "content": "You are a strict but fair ESL script auditor. Output valid JSON only."},
          {"role": "user", "content": prompt}],
-        temperature=0.2, max_tokens=2048)
+        temperature=0.2, max_tokens=2048, resolved=resolved)
 
     try:
         score = max(0, min(100, int(data.get("score", 0) or 0)))
@@ -726,45 +777,57 @@ OUTPUT JSON ONLY:
             "suggestion": str(it.get("suggestion", "")).strip(),
         })
 
-    review = doc.get("review") or {}
-    review.update({
-        "score": score, "verdict": verdict, "issues": issues,
-        "summary_zh": str(data.get("summary_zh", "")).strip(),
-        "reviewed_at": time.time(), "model": model or provider_id,
-    })
-    doc["review"] = review
-    if doc.get("status") != "used":
-        doc["status"] = "reviewed"
-    _write_doc(doc)
+    # 锁内重读最新 doc 再写：LLM 调用期间用户可能已编辑保存，避免整档覆盖
+    with _doc_lock:
+        fresh = get_script_doc(sid)
+        if fresh:
+            doc = fresh
+        review = doc.get("review") or {}
+        review.update({
+            "score": score, "verdict": verdict, "issues": issues,
+            "summary_zh": str(data.get("summary_zh", "")).strip(),
+            "reviewed_at": time.time(),
+            "model": resolved[0][3] or provider_id,
+            "stale": False,
+        })
+        doc["review"] = review
+        if doc.get("status") != "used":
+            doc["status"] = "reviewed"
+        _write_doc(doc)
     return _doc_meta(doc)
 
 
 def review_batch(ids: list[str], provider_id: str, model: str, q,
                  stop_event: threading.Event) -> None:
     """Sequentially review scripts; emits ("progress"/"reviewed"/"error_item"/
-    "done") + None terminator."""
+    "done") + None terminator (guaranteed via finally)."""
     summary = {"total": len(ids), "reviewed": 0, "failed": 0, "stopped": False}
-    for i, sid in enumerate(ids):
-        if stop_event.is_set():
-            summary["stopped"] = True
-            break
-        q.put(("progress", f"[{i + 1}/{len(ids)}] AI 审查中: {sid}"))
-        try:
-            meta = ai_review_script(sid, provider_id, model)
-            if meta:
-                q.put(("progress",
-                       f"✅ 审查完成「{meta['topic']}」: {meta['score']} 分 ({meta['verdict']})"))
-                q.put(("reviewed", meta))
-                summary["reviewed"] += 1
-            else:
+    try:
+        for i, sid in enumerate(ids):
+            _set_snapshot(kind="review", current=sid, done=i, total=len(ids),
+                          reviewed=summary["reviewed"], failed=summary["failed"])
+            if stop_event.is_set():
+                summary["stopped"] = True
+                break
+            q.put(("progress", f"[{i + 1}/{len(ids)}] AI 审查中: {sid}"))
+            try:
+                meta = ai_review_script(sid, provider_id, model)
+                if meta:
+                    q.put(("progress",
+                           f"✅ 审查完成「{meta['topic']}」: {meta['score']} 分 ({meta['verdict']})"))
+                    q.put(("reviewed", meta))
+                    summary["reviewed"] += 1
+                else:
+                    summary["failed"] += 1
+                    q.put(("error_item", {"topic": sid, "error": "脚本不存在"}))
+            except Exception as e:  # noqa: BLE001
                 summary["failed"] += 1
-                q.put(("error_item", {"topic": sid, "error": "脚本不存在"}))
-        except Exception as e:  # noqa: BLE001
-            summary["failed"] += 1
-            q.put(("error_item", {"topic": sid,
-                                  "error": f"{type(e).__name__}: {e}"}))
-    q.put(("done", summary))
-    q.put(None)
+                q.put(("error_item", {"topic": sid,
+                                      "error": f"{type(e).__name__}: {e}"}))
+        q.put(("done", summary))
+    finally:
+        # 终止符必达：SSE 端 q.get 阻塞依赖它收尾
+        q.put(None)
 
 
 def start_review_thread(ids: list[str], provider_id: str, model: str, q) -> threading.Thread:
@@ -773,12 +836,15 @@ def start_review_thread(ids: list[str], provider_id: str, model: str, q) -> thre
         raise RuntimeError("已有批量任务进行中，请等待完成或先停止")
     _batch_state["running"] = True
     _batch_state["stop"].clear()
+    _set_snapshot(kind="review", current="", done=0, total=len(ids),
+                  reviewed=0, failed=0)
 
     def _wrap():
         try:
             review_batch(ids, provider_id, model, q, _batch_state["stop"])
         finally:
             _batch_state["running"] = False
+            _batch_state["snapshot"] = {}
 
     t = threading.Thread(target=_wrap, daemon=True)
     t.start()
@@ -814,6 +880,17 @@ def _apply_patch(script: dict, patch: dict) -> dict:
 
 def fix_script(sid: str, issues: list[dict], provider_id: str, model: str,
                re_review: bool, q, stop_event: threading.Event) -> None:
+    """Wrapper: 兜底保证 fatal 事件与 None 终止符必达（SSE 端 q.get 阻塞依赖它收尾）。"""
+    try:
+        _fix_script_inner(sid, issues, provider_id, model, re_review, q, stop_event)
+    except Exception as e:  # noqa: BLE001 — 任何未捕获异常都要转成 fatal 事件
+        q.put(("fatal", f"修复失败: {type(e).__name__}: {e}"))
+    finally:
+        q.put(None)
+
+
+def _fix_script_inner(sid: str, issues: list[dict], provider_id: str, model: str,
+                      re_review: bool, q, stop_event: threading.Event) -> None:
     """Fix SELECTED issues on one script via LLM patch, then optionally re-review.
 
     Emits ("progress"/"fixed"/"reviewed"/"done"/"fatal") + None terminator.
@@ -839,7 +916,8 @@ def fix_script(sid: str, issues: list[dict], provider_id: str, model: str,
     lines_ref = "\n".join(
         f"{i}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
         f"   zh: {ln.get('zh', '')}\n"
-        f"   phonetic: {ln.get('phonetic', '')}"
+        f"   phonetic: {ln.get('phonetic', '')}\n"
+        f"   img: {(ln.get('image_prompt') or '')[:200]}"
         for i, ln in enumerate(dialogue))
     chars = "\n".join(
         f"- {k}: {script.get(k + '_description', '')} "
@@ -878,6 +956,7 @@ OUTPUT a JSON PATCH ONLY (no markdown, no explanation):
 RULES:
 - The dialogue MUST keep exactly {n} lines — never add or remove lines
 - Include ONLY dialogue lines that change; within a line include ONLY the fields that change (text/zh/phonetic/image_prompt/video_prompt/poses)
+- "img:" in the dialogue listing shows the current image_prompt — use it as context when fixing consistency issues
 - Do NOT change "speaker" unless an issue explicitly requires it
 - "fields" may contain top-level script fields (char_a_description, char_b_description, youtube_title, title, title_zh, intro_zh, outro_zh, ...)
 - If you change a character description, also patch that character's affected dialogue lines' image_prompt/video_prompt to keep the description consistent
@@ -938,6 +1017,7 @@ def start_fix_thread(sid: str, issues: list[dict], provider_id: str, model: str,
         raise RuntimeError("已有批量任务进行中，请等待完成或先停止")
     _batch_state["running"] = True
     _batch_state["stop"].clear()
+    _set_snapshot(kind="fix", current=sid, done=0, total=1, reviewed=0, failed=0)
 
     def _wrap():
         try:
@@ -945,6 +1025,7 @@ def start_fix_thread(sid: str, issues: list[dict], provider_id: str, model: str,
                        _batch_state["stop"])
         finally:
             _batch_state["running"] = False
+            _batch_state["snapshot"] = {}
 
     t = threading.Thread(target=_wrap, daemon=True)
     t.start()

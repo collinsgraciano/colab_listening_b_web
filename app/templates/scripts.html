@@ -116,7 +116,7 @@
         </div>
         <div class="flex gap-2">
             <button type="button" id="btn-review-all" onclick="reviewAll()"
-                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white font-medium">🔍 批量审查未审查</button>
+                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white font-medium">🔍 批量审查未审查（全库）</button>
             <button type="button" onclick="loadScripts()"
                 class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">🔄 刷新</button>
         </div>
@@ -264,6 +264,12 @@ function usedTopicsForCurrentMode() {
     return new Set((FORM.used_by_mode || {})[document.getElementById('gen-structure').value] || []);
 }
 
+// 当前所选模式下「库中已有脚本」的主题集合（任意状态，防重复生成提示用）
+function libraryTopicsForCurrentMode() {
+    if (!FORM) return new Set();
+    return new Set((FORM.library_topics || {})[document.getElementById('gen-structure').value] || []);
+}
+
 function toggleGenPanel() {
     const panel = document.getElementById('gen-panel');
     const arrow = document.getElementById('gen-panel-arrow');
@@ -282,19 +288,22 @@ function renderTopicList() {
     const needle = (document.getElementById('topic-search').value || '').toLowerCase();
     let html = '';
     const usedSet = usedTopicsForCurrentMode();
+    const libSet = libraryTopicsForCurrentMode();
     Object.entries(FORM.topics_data || {}).forEach(([cat, topics]) => {
         const hits = topics.filter(t => !needle || t.toLowerCase().includes(needle));
         if (!hits.length) return;
         html += `<div class="col-span-full text-[11px] text-slate-500 mt-1">${escapeHtml(cat)}</div>`;
         hits.forEach(t => {
             const used = usedSet.has(t);
+            const inLib = libSet.has(t);
             const checked = _selectedTopics.has(t);
+            const tip = used ? '已用于该模式的 run' : (inLib ? '库中已有该主题的脚本' : '');
             html += `
-                <label class="flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-slate-800 cursor-pointer ${used ? 'opacity-50' : ''}">
+                <label class="flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-slate-800 cursor-pointer ${used ? 'opacity-50' : ''}" ${tip ? `title="${tip}"` : ''}>
                     <input type="checkbox" ${checked ? 'checked' : ''} ${used ? 'disabled' : ''}
                         onchange="toggleTopic('${escapeHtml(t).replace(/'/g, '&#39;')}', this.checked)"
                         class="accent-indigo-500 w-3.5 h-3.5">
-                    <span class="${used ? 'line-through text-slate-500' : 'text-slate-300'} truncate">${escapeHtml(t)}</span>
+                    <span class="${used ? 'line-through text-slate-500' : 'text-slate-300'} truncate">${inLib && !used ? '📄 ' : ''}${escapeHtml(t)}</span>
                 </label>`;
         });
     });
@@ -330,9 +339,12 @@ function renderSelectedChips() {
 function randomPick() {
     if (!FORM) return;
     const usedSet = usedTopicsForCurrentMode();
+    const libSet = libraryTopicsForCurrentMode();
     const pool = [];
     Object.values(FORM.topics_data || {}).forEach(topics => {
-        topics.forEach(t => { if (!usedSet.has(t) && !_selectedTopics.has(t)) pool.push(t); });
+        topics.forEach(t => {
+            if (!usedSet.has(t) && !libSet.has(t) && !_selectedTopics.has(t)) pool.push(t);
+        });
     });
     const n = parseInt(document.getElementById('random-count').value) || 1;
     for (let i = pool.length - 1; i > 0; i--) {
@@ -507,6 +519,7 @@ function renderList() {
             <div class="flex flex-wrap gap-1.5">
                 <span class="px-2 py-0.5 rounded-full text-[10px] ${stCls}">${stLabel}</span>
                 ${scoreBadge(m)}
+                ${m.stale && m.reviewed ? '<span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-900/60 text-purple-300" title="保存编辑后 AI 审查结论可能过期">✎ 审查过期</span>' : ''}
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${STRUCT_LABEL[m.structure] || m.structure}</span>
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${escapeHtml(m.cefr)}</span>
                 ${m.local_issues ? '<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-900/60 text-amber-300">⚠ 本地' + m.local_issues + '</span>' : ''}
@@ -623,12 +636,16 @@ function reviewOne(id) {
 }
 
 function reviewAll() {
-    const ids = SCRIPTS.filter(s => !s.reviewed && s.status !== 'used').map(s => s.id);
-    if (!ids.length) {
-        alert('当前筛选下没有未审查的脚本');
-        return;
-    }
-    runReviewSSE(ids);
+    // 全库范围：不受当前筛选影响，避免漏审筛选外的未审查脚本
+    fetch('/api/scripts').then(r => r.json()).then(data => {
+        const ids = (data.scripts || [])
+            .filter(s => !s.reviewed && s.status !== 'used').map(s => s.id);
+        if (!ids.length) {
+            alert('脚本库中没有未审查的脚本');
+            return;
+        }
+        runReviewSSE(ids);
+    });
 }
 
 // =========================================================================
@@ -688,6 +705,7 @@ function renderEditor() {
                 <span class="text-lg font-bold ${review.score >= 80 ? 'text-green-400' : review.score >= 60 ? 'text-amber-400' : 'text-red-400'}">★ ${review.score}</span>
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${review.verdict || ''}</span>
                 <span class="text-xs text-slate-500">审查模型: ${escapeHtml(review.model || '')}</span>
+                ${review.stale ? '<span class="text-xs text-purple-300">✎ 保存编辑后审查已过期，建议重新审查</span>' : ''}
             </div>
             ${review.summary_zh ? `<p class="text-xs text-slate-300 mb-2">${escapeHtml(review.summary_zh)}</p>` : ''}`
             : '<p class="text-xs text-amber-300 mb-2">⚠ 本地校验提示（尚未 AI 审查）</p>';
@@ -896,10 +914,51 @@ function saveEditor() {
             btn.classList.add('bg-green-600');
             setTimeout(() => { btn.textContent = '💾 保存'; btn.classList.remove('bg-green-600'); }, 2000);
             loadScripts();
+            // 重开编辑器：显示重算后的本地检查与 stale 标记
+            if (_editingDoc) openEditor(_editingDoc.id, true);
         } else {
             alert('保存失败: ' + (data.error || ''));
         }
     });
+}
+
+// =========================================================================
+// 后台任务断线恢复：页面刷新后若有批量任务仍在跑，轮询状态直到结束
+// =========================================================================
+const KIND_LABEL = {generate: '批量生成', review: 'AI 审查', fix: 'AI 修复'};
+
+function checkBatchRecovery() {
+    fetch('/api/scripts/batch_status')
+        .then(r => r.json())
+        .then(d => {
+            if (!d || !d.running) return;
+            const progress = document.getElementById('review-progress');
+            progress.classList.remove('hidden');
+            _sseBusy = true;  // 后台任务占用中，禁止再启动新任务
+            const timer = setInterval(() => {
+                fetch('/api/scripts/batch_status')
+                    .then(r => r.json())
+                    .then(d2 => {
+                        const s = (d2 && d2.snapshot) || {};
+                        const label = KIND_LABEL[s.kind] || '批量任务';
+                        if (d2 && d2.running) {
+                            progress.innerHTML =
+                                `⚠ 页面刷新前有「${label}」任务仍在后台进行: ` +
+                                `${escapeHtml(String(s.current || ''))} ` +
+                                `(${s.done || 0}/${s.total || 0}) ` +
+                                `— <button type="button" onclick="stopGenerate()" class="text-red-400 hover:text-red-300 underline">⏹ 停止</button>`;
+                        } else {
+                            clearInterval(timer);
+                            _sseBusy = false;
+                            progress.textContent = `✅ 后台「${label}」任务已结束，列表已刷新`;
+                            loadScripts();
+                            setTimeout(() => progress.classList.add('hidden'), 6000);
+                        }
+                    })
+                    .catch(() => {});
+            }, 5000);
+        })
+        .catch(() => {});
 }
 
 // =========================================================================
@@ -908,6 +967,7 @@ function saveEditor() {
 window.addEventListener('load', function() {
     loadFormOptions();
     loadScripts();
+    checkBatchRecovery();
 });
 
 </script>

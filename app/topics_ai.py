@@ -7,7 +7,6 @@ Blocking work should be executed by callers via asyncio.to_thread.
 import json
 import re
 import sys
-import threading
 import time
 import urllib.error
 import urllib.request
@@ -20,23 +19,7 @@ from .config_manager import load_config, resolve_provider
 _PIPELINE_DIR = Path(__file__).parent.parent.resolve() / "pipeline"
 if str(_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_PIPELINE_DIR))
-from llm_client import _extract_json  # noqa: E402
-
-# Rate limiting shared by all calls in this module (per-process, thread-safe
-# via reservation lock; the review loop is the only multi-call path)
-_LAST_CALL_TIME = 0.0
-_RATE_LOCK = threading.Lock()
-
-
-def _reserve_slot(min_interval: float) -> None:
-    """锁内预约调用槽位（start-to-start 间隔，对齐 llm_client 模式）。"""
-    global _LAST_CALL_TIME
-    with _RATE_LOCK:
-        now = time.time()
-        start_at = max(now, _LAST_CALL_TIME + min_interval)
-        _LAST_CALL_TIME = start_at
-    if start_at > now:
-        time.sleep(start_at - now)
+from llm_client import _enforce_rate_limit, _extract_json  # noqa: E402
 
 _REVIEW_BATCH_SIZE = 50
 _ISSUE_TYPES = {"duplicate", "similar", "grammar", "too_vague", "unsuitable", "other"}
@@ -72,7 +55,7 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
     http_attempt = 0      # HTTP 429/网关/网络错误重试额度
     content_attempt = 0   # 空内容/坏 JSON 重试额度（独立计数，互不挤占）
     while True:
-        _reserve_slot(min_interval)
+        _enforce_rate_limit(min_interval)  # 共享 llm_client 限速状态（与 pipeline 互认）
         body = {
             "model": model,
             "messages": messages,

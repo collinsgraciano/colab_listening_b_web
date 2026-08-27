@@ -47,18 +47,20 @@ def _get_min_call_interval() -> float:
     return float(_env_get("LLM_MIN_INTERVAL", "5.0"))
 
 
-def _enforce_rate_limit():
+def _enforce_rate_limit(min_interval: float | None = None):
     """预约式限速：相邻两次 LLM 调用的开始时刻间隔 ≥ min_interval。
 
-    并发线程在锁内各自预约开始槽位（start-to-start 间隔），避免多线程
-    同时发起请求触发同一 provider 的 HTTP 429。
+    min_interval 缺省读 LLM_MIN_INTERVAL（线程局部 override 优先）；
+    显式传入时用调用方的值（topics_ai / script_library 网关按各自配置），
+    但共享同一 _LAST_CALL_TIME，使 Web 批量任务与 pipeline 并发时限速互认，
+    避免两路同时打同一 provider 触发 429。
     """
     import time as _time
     global _LAST_CALL_TIME
     with _RATE_LOCK:
-        min_interval = _get_min_call_interval()
+        interval = _get_min_call_interval() if min_interval is None else float(min_interval)
         now = _time.time()
-        start_at = max(now, _LAST_CALL_TIME + min_interval)
+        start_at = max(now, _LAST_CALL_TIME + interval)
         _LAST_CALL_TIME = start_at  # 预约本次调用的开始槽位
     if start_at > now:
         _time.sleep(start_at - now)
