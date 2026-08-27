@@ -240,38 +240,44 @@ def _render_practice_intro(intro_en, intro_zh, scene_img_path,
             lines.append(cur_line)
         return min_size, font, lines
 
-    en_lines = []
-    en_font = None
-    if intro_en:
-        en_size, en_font, en_lines = _wrap_text(
-            intro_en, FONT_EN, 96, 36, w - MARGIN, STROKE)
+    def _layout(en_start: int, zh_start: int):
+        """按给定起始字号排版，返回布局量与整块总高度。"""
+        en_size, en_font, en_lines = 0, None, []
+        if intro_en:
+            en_size, en_font, en_lines = _wrap_text(
+                intro_en, FONT_EN, en_start, 36, w - MARGIN, STROKE)
+        line_heights = []
+        for line_text in en_lines:
+            bbox = draw.textbbox((0, 0), line_text, font=en_font)
+            line_heights.append(bbox[3]-bbox[1])
+        zh_size, zh_font, zh_w, zh_h = 0, None, 0, 0
+        if intro_zh:
+            zh_size = zh_start
+            zh_font = ImageFont.truetype(FONT_ZH, zh_size)
+            while zh_size > 28:
+                bbox = draw.textbbox((0, 0), intro_zh, font=zh_font)
+                rendered_w = (bbox[2]-bbox[0]) + 5 * 2
+                if rendered_w <= w - MARGIN:
+                    break
+                zh_size -= 2
+                zh_font = ImageFont.truetype(FONT_ZH, zh_size)
+            bbox = draw.textbbox((0, 0), intro_zh, font=zh_font)
+            zh_w = bbox[2]-bbox[0]
+            zh_h = bbox[3]-bbox[1]
+        total_h = sum(line_heights) + max(0, len(line_heights) - 1) * 20
+        if intro_zh:
+            total_h += 30 + zh_h
+        return en_size, en_font, en_lines, zh_size, zh_font, zh_w, zh_h, total_h
 
-    # Calculate total height for vertical centering
-    line_heights = []
-    for line_text in en_lines:
-        bbox = draw.textbbox((0, 0), line_text, font=en_font)
-        line_heights.append(bbox[3]-bbox[1])
-
-    zh_h = 0
-    zh_font_final = None
-    zh_w = 0
-    if intro_zh:
-        zh_size = 80
-        zh_font_final = ImageFont.truetype(FONT_ZH, zh_size)
-        while zh_size > 28:
-            bbox = draw.textbbox((0, 0), intro_zh, font=zh_font_final)
-            rendered_w = (bbox[2]-bbox[0]) + 5 * 2
-            if rendered_w <= w - MARGIN:
-                break
-            zh_size -= 2
-            zh_font_final = ImageFont.truetype(FONT_ZH, zh_size)
-        bbox = draw.textbbox((0, 0), intro_zh, font=zh_font_final)
-        zh_w = bbox[2]-bbox[0]
-        zh_h = bbox[3]-bbox[1]
-
-    total_h = sum(line_heights) + max(0, len(line_heights) - 1) * 20
-    if intro_zh:
-        total_h += 30 + zh_h
+    en_size, en_font, en_lines, zh_size, zh_font_final, zh_w, zh_h, total_h = _layout(96, 80)
+    # 高度保底：整块超出画面底部时逐级缩小字号重排（逐句拆卡后罕见，防御超长单句）
+    while (int(h * 0.25) + total_h > h - 40 and (intro_en or intro_zh)
+           and (en_size > 36 or zh_size > 28)):
+        next_en = max(36, en_size - 8)
+        next_zh = max(28, zh_size - 6)
+        if next_en == en_size and next_zh == zh_size:
+            break
+        en_size, en_font, en_lines, zh_size, zh_font_final, zh_w, zh_h, total_h = _layout(next_en, next_zh)
     start_y = max(int(h * 0.25), (h - total_h) // 2)
 
     current_y = start_y
@@ -289,6 +295,89 @@ def _render_practice_intro(intro_en, intro_zh, scene_img_path,
                   fill=(255, 220, 0, 255), stroke_width=5, stroke_fill=(0, 0, 0, 255))
 
     bg.save(out_path, "PNG")
+
+
+def _split_intro_sentences(intro_en: str, intro_zh: str) -> list[tuple[str, str]]:
+    """把引导卡文本按句切分并配对，用于逐句显示。
+
+    EN 以 .!? 结句，ZH 以 。！？；… 结句，按出现顺序一一配对。
+    ZH 句数多于 EN 时多余句并入最后一张卡；EN 多于 ZH 时多余卡中文留空。
+    切不出任何句子时回退为单卡（原文整段）。
+    """
+    def _split(text: str, stops: str) -> list[str]:
+        parts, cur = [], ""
+        for ch in text:
+            cur += ch
+            if ch in stops:
+                parts.append(cur.strip())
+                cur = ""
+        if cur.strip():
+            parts.append(cur.strip())
+        return [p for p in parts if p]
+
+    en_parts = _split(intro_en, ".!?") if intro_en else []
+    zh_parts = _split(intro_zh, "。！？；…") if intro_zh else []
+    if not en_parts and not zh_parts:
+        return [(intro_en, intro_zh)]
+    if not en_parts:
+        return [("", intro_zh)]
+    if not zh_parts:
+        return [(p, "") for p in en_parts]
+    pairs = []
+    for i, en_p in enumerate(en_parts):
+        if i < len(zh_parts):
+            # ZH 多出的句子并入最后一张有中文的卡
+            zh_p = "".join(zh_parts[i:]) if i == len(en_parts) - 1 else zh_parts[i]
+        else:
+            zh_p = ""
+        pairs.append((en_p, zh_p))
+    return pairs
+
+
+def _render_intro_cards(intro_en: str, intro_zh: str, static_dir,
+                        out_dur: float, w: int = TARGET_W, h: int = TARGET_H,
+                        ) -> tuple[list[str], list[tuple[float, float]]]:
+    """逐句渲染 practice_intro 引导卡 overlay PNG，并给出各卡显示时间窗。
+
+    时间窗按英文句字符数加权、连续铺满 [0, out_dur]，最后一张精确到 out_dur。
+    返回 (卡片 PNG 路径列表, [(start, end), ...])。
+    """
+    pairs = _split_intro_sentences(intro_en, intro_zh)
+    weights = [max(1, len(en_p)) for en_p, _ in pairs]
+    total_w = float(sum(weights))
+    static_dir = Path(static_dir)
+    paths: list[str] = []
+    windows: list[tuple[float, float]] = []
+    cur = 0.0
+    for i, ((en_p, zh_p), wt) in enumerate(zip(pairs, weights)):
+        card_path = static_dir / f"practice_intro_card_{i}.png"
+        _render_practice_intro(en_p, zh_p, "", str(card_path), w=w, h=h)
+        paths.append(str(card_path))
+        end = float(out_dur) if i == len(pairs) - 1 else min(out_dur, cur + out_dur * wt / total_w)
+        windows.append((cur, end))
+        cur = end
+    return paths, windows
+
+
+def _build_intro_overlay_chain(bg_label: str, card_paths: list[str],
+                               windows: list[tuple[float, float]],
+                               start_idx: int = 2) -> tuple[str, str]:
+    """构建 practice_intro 逐卡定时 overlay 的 filter_complex 片段。
+
+    卡片输入流编号从 start_idx 开始，需与 ffmpeg 命令中卡片 -i 输入的实际
+    位置一致；级联输出最终标签固定为 [v]。与 burn_subtitles 的定时 overlay
+    采用同一套已验证模式（单帧 PNG 输入靠 overlay 默认 repeatlast 持续存在）。
+    """
+    if not card_paths:
+        raise ValueError("_build_intro_overlay_chain requires at least one card")
+    chain_parts = []
+    cur_label = bg_label
+    for i, (s, e) in enumerate(windows):
+        out_label = f"pi{i}" if i < len(card_paths) - 1 else "v"
+        chain_parts.append(
+            f"[{cur_label}][{start_idx + i}:v]overlay=0:0:enable='between(t,{s:.3f},{e:.3f})'[{out_label}]")
+        cur_label = out_label
+    return ";".join(chain_parts), cur_label
 
 
 # ---------------------------------------------------------------------------
@@ -570,33 +659,39 @@ def compose_listening(
                        out_path]
 
         elif seg_type == "practice_intro":
-            # Practice intro: video clip + text overlay + narration ONLY (no video audio)
+            # Practice intro: video clip + per-sentence text cards + narration ONLY (no video audio)
             intro_en = seg.get("subtitle_en", "")
             intro_zh = seg.get("subtitle_zh", "")
-            intro_overlay = str(static_dir / "practice_intro_overlay.png")
-            _render_practice_intro(intro_en, intro_zh, scene_img, intro_overlay)
             vid_dur = _get_duration(video_src) if os.path.exists(video_src) else 0
             vf = f"setpts={audio_dur/vid_dur:.4f}*PTS,{VF_NORM},fps=24" if vid_dur > 0 and audio_dur > 0 else f"{VF_NORM},fps=24"
             out_dur = audio_dur + pad
             fade_af_pi = f"afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05"
+            # 引导文字逐句拆成多张卡片，按时间窗依次显示（避免整段文字溢出画面）
+            card_paths, card_windows = _render_intro_cards(intro_en, intro_zh, static_dir, out_dur)
+            card_input_args = [arg for c in card_paths for arg in ("-i", c)]
             narration_audio = narration.get("practice_intro")
             if narration_audio and os.path.exists(narration_audio):
                 # Use narration audio ONLY (discard video's audio entirely)
                 # Audio filters go INSIDE filter_complex (not -af, which conflicts with filter_complex)
-                cmd = ["ffmpeg", "-y", "-i", video_src, "-i", narration_audio, "-i", intro_overlay,
+                overlay_chain, _ = _build_intro_overlay_chain("bg", card_paths, card_windows, start_idx=2)
+                cmd = ["ffmpeg", "-y", "-i", video_src, "-i", narration_audio,
+                       *card_input_args,
                        "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{vf}[bg];[bg][2:v]overlay=0:0[v];[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
+                       "-filter_complex", f"[0:v]{vf}[bg];{overlay_chain};[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
                        "-map", "[v]", "-map", "[a]",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                        out_path]
             else:
                 # No narration: use silence (no video audio)
-                cmd = ["ffmpeg", "-y", "-i", video_src, "-i", intro_overlay,
+                overlay_chain, _ = _build_intro_overlay_chain("bg", card_paths, card_windows, start_idx=1)
+                anull_idx = 1 + len(card_paths)
+                cmd = ["ffmpeg", "-y", "-i", video_src,
+                       *card_input_args,
                        "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                        "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{vf}[bg];[bg][1:v]overlay=0:0[v]",
-                       "-map", "[v]", "-map", "2:a",
+                       "-filter_complex", f"[0:v]{vf}[bg];{overlay_chain}",
+                       "-map", "[v]", "-map", f"{anull_idx}:a",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                        out_path]
@@ -941,32 +1036,37 @@ def compose_image(
                    out_path]
 
         elif seg_type == "practice_intro":
-            # Static scene image + text overlay + narration audio
+            # Static scene image + per-sentence text cards + narration audio
             intro_en = seg.get("subtitle_en", "")
             intro_zh = seg.get("subtitle_zh", "")
-            intro_overlay = str(static_dir / "practice_intro_overlay.png")
-            _render_practice_intro(intro_en, intro_zh, scene_img, intro_overlay,
-                                   w=tw, h=th)
             out_dur = audio_dur + pad
+            # 引导文字逐句拆成多张卡片，按时间窗依次显示（避免整段文字溢出画面）
+            card_paths, card_windows = _render_intro_cards(
+                intro_en, intro_zh, static_dir, out_dur, w=tw, h=th)
+            card_input_args = [arg for c in card_paths for arg in ("-i", c)]
             narration_audio = narration.get("practice_intro")
             if narration_audio and os.path.exists(narration_audio):
+                overlay_chain, _ = _build_intro_overlay_chain("bg", card_paths, card_windows, start_idx=2)
                 cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-i", narration_audio, "-i", intro_overlay,
+                       "-i", narration_audio,
+                       *card_input_args,
                        "-t", f"{out_dur:.3f}",
                        "-filter_complex",
-                       f"[0:v]{vf_norm}[bg];[bg][2:v]overlay=0:0[v];"
+                       f"[0:v]{vf_norm}[bg];{overlay_chain};"
                        f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
                        "-map", "[v]", "-map", "[a]",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                        out_path]
             else:
+                overlay_chain, _ = _build_intro_overlay_chain("bg", card_paths, card_windows, start_idx=1)
+                anull_idx = 1 + len(card_paths)
                 cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-i", intro_overlay,
+                       *card_input_args,
                        "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                        "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{vf_norm}[bg];[bg][1:v]overlay=0:0[v]",
-                       "-map", "[v]", "-map", "2:a",
+                       "-filter_complex", f"[0:v]{vf_norm}[bg];{overlay_chain}",
+                       "-map", "[v]", "-map", f"{anull_idx}:a",
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
                        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                        out_path]

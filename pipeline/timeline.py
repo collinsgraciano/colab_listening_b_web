@@ -22,13 +22,15 @@ def build_listening_timeline(script: dict, dialogue_durations: list[float],
                              practice_duration: float = 3.0,
                              pad: float = 0.4,
                              en_repeats: int = 3,
-                             zh_repeats: int = 1) -> list[dict]:
+                             zh_repeats: int = 1,
+                             practice_intro_show: bool = True) -> list[dict]:
     """Build a timeline for the listening-practice lesson type.
 
     Structure:
       1. Title card (5s)
       2. Full dialogue (all lines, normal speed)
-      3. Practice intro (4s, only when en_repeats/zh_repeats > 0)
+      3. Practice intro (4s, only when practice_intro_show is True and
+         en_repeats/zh_repeats > 0)
       4. Per line: EN x en_repeats -> ZH x zh_repeats (each repetition
          followed by a `practice_duration` silence gap; both counts may be 0)
       5. Outro (narration)
@@ -76,10 +78,10 @@ def build_listening_timeline(script: dict, dialogue_durations: list[float],
         _add("dialogue", dur, line.get("text", ""), line.get("zh", ""),
              audio_idx=i, image_idx=i + 1)
 
-    # 3. Practice intro（跟读次数全为 0 时整章无内容，跳过）
+    # 3. Practice intro（开关关闭或跟读次数全为 0 时整段跳过）
     practice_intro_en = script.get("practice_intro_en", "Now let's practice. Listen and repeat each sentence.")
     practice_intro_zh = script.get("practice_intro_zh", "現在來練習。請跟著朗讀每一句。")
-    if en_repeats > 0 or zh_repeats > 0:
+    if practice_intro_show and (en_repeats > 0 or zh_repeats > 0):
         _add("practice_intro", 4.0, practice_intro_en, practice_intro_zh,
              audio_idx=-1, image_idx=0)
 

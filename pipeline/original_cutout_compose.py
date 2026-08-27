@@ -29,6 +29,8 @@ from video_compose import (
     _render_static_frame,
     _render_title_card,
     _render_practice_intro,
+    _render_intro_cards,
+    _build_intro_overlay_chain,
 )
 from media_utils import (
     VF_NORM,
@@ -285,28 +287,33 @@ def _prepare_segment(
     elif seg_type == "practice_intro":
         intro_en = seg.get("subtitle_en", "")
         intro_zh = seg.get("subtitle_zh", "")
-        intro_overlay = str(static_dir / "practice_intro_overlay.png")
-        _render_practice_intro(intro_en, intro_zh, scene_img, intro_overlay)
         out_dur = audio_dur + pad
+        # 引导文字逐句拆成多张卡片，按时间窗依次显示（避免整段文字溢出画面）
+        card_paths, card_windows = _render_intro_cards(intro_en, intro_zh, static_dir, out_dur)
+        card_input_args = [arg for c in card_paths for arg in ("-i", c)]
         narration_audio = narration.get("practice_intro")
         if narration_audio and os.path.exists(narration_audio):
+            overlay_chain, _ = _build_intro_overlay_chain("bg", card_paths, card_windows, start_idx=2)
             cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                   "-i", narration_audio, "-i", intro_overlay,
+                   "-i", narration_audio,
+                   *card_input_args,
                    "-t", f"{out_dur:.3f}",
                    "-filter_complex",
-                   f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
+                   f"[0:v]{VF_NORM}[bg];{overlay_chain};"
                    f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
                    "-map", "[v]", "-map", "[a]",
                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                    out_path]
         else:
+            overlay_chain, _ = _build_intro_overlay_chain("bg", card_paths, card_windows, start_idx=1)
+            anull_idx = 1 + len(card_paths)
             cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                   "-i", intro_overlay,
+                   *card_input_args,
                    "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                    "-t", f"{out_dur:.3f}",
-                   "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
-                   "-map", "[v]", "-map", "2:a",
+                   "-filter_complex", f"[0:v]{VF_NORM}[bg];{overlay_chain}",
+                   "-map", "[v]", "-map", f"{anull_idx}:a",
                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                    out_path]

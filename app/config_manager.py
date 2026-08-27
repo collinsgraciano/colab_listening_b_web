@@ -159,6 +159,9 @@ PARAM_SPEC = {
     "ch3_zh_always": {"default": True, "type": "checkbox", "group": "video",
                       "label": "Ch3 中文常显",
                       "help": "英文跟读时画面同步显示中文翻译。Quest 模式不适用"},
+    "ch3_practice_intro_show": {"default": True, "type": "checkbox", "group": "video",
+                                "label": "Ch3 练习引导卡",
+                                "help": "跟读练习前的引导文字卡（逐句显示）。关闭后整段跳过。Quest 模式不适用"},
     "pad": {"default": "", "type": "text", "group": "video",
             "label": "音频间隔(秒)", "help": "留空=自动 (0.4)"},
     "render_fps": {"default": 8, "type": "number", "group": "video",
@@ -486,6 +489,10 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args.append("--ch3-zh-always")
     else:
         args.append("--no-ch3-zh-always")
+    if config.get("ch3_practice_intro_show", True):
+        args.append("--ch3-practice-intro-show")
+    else:
+        args.append("--no-ch3-practice-intro-show")
     if config.get("pad"):
         try:
             pad_val = float(config["pad"])
