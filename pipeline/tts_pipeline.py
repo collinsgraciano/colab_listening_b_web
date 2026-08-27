@@ -47,7 +47,8 @@ def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, ex
 
 
 def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narration=False,
-                 tts_rate=None, tts_engine="kokoro", stop_check=None):
+                 tts_rate=None, tts_engine="kokoro", stop_check=None,
+                 include_zh=True):
     """Generate all TTS audio. Runs in a thread.
 
     Produces narration and dialogue EN/ZH audio.
@@ -56,6 +57,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
     Args:
         host_narration: True 时按 quest 风格生成旁白 welcome/hook/outro
                         （original_cutout 主持人开场/结尾用），但仍生成中文对话。
+        include_zh: 生成对话中文音频 zh_{i}.mp3（Ch3 中文跟读专用）。
+                    ch3_zh_repeats=0 时时间轴无 listen_zh 段，传 False 跳过以省时。
         tts_rate: Override dialogue English TTS rate (e.g. '-15%', '0%').
                   If None, uses mode default (quest: '0%', non-quest: '-15%').
         tts_engine: 'kokoro' (default, local Kokoro TTS) or 'qwen'
@@ -217,9 +220,9 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
         dialogue_durations.append(dur)
         print(f"  [TTS] dialogue_{i}: {dur:.1f}s ({voice_label})")
 
-    # Dialogue Chinese (quest skips entirely)
+    # Dialogue Chinese (quest skips entirely; ch3_zh_repeats=0 时无 listen_zh 段，同样跳过)
     zh_paths = []
-    if not quest:
+    if not quest and include_zh:
         zh_rate = tts_rate if tts_rate else "-10%"
         for i, line in enumerate(dialogue):
             if stop_check and stop_check():

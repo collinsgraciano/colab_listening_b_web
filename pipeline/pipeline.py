@@ -180,6 +180,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Ch3 practice: Chinese repetition count per line (0-10, 0=skip ZH)")
     parser.add_argument("--ch3-zh-always", action=argparse.BooleanOptionalAction, default=True,
                         help="Ch3 practice: always show Chinese text on English frames (default: on)")
+    parser.add_argument("--ch3-practice-intro-show", action=argparse.BooleanOptionalAction, default=True,
+                        help="Ch3 practice intro text card before practice section (default: on; off = skip the whole segment)")
     parser.add_argument("--pad", type=float, default=None, help="Audio pad between segments (default 0.4; quest mode 5.0 — long thinking pauses for beginners)")
     parser.add_argument("--render-fps", type=int, default=8, help="Quest stop-motion render framerate (default 8; lower=faster but choppier)")
     parser.add_argument("--workers", type=int, default=1, help="Quest render threads (1=single, 2+=multi, 0=auto=cpu_count)")
@@ -375,6 +377,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     is_original_static = (args.structure == "original_static")
     is_quest = (args.structure == "quest")
     is_original_cutout = (args.structure == "original_cutout")
+    # ch3_zh_repeats=0 时时间轴无 listen_zh 段，中文音频无需生成
+    include_zh = (not is_quest) and getattr(args, "ch3_zh_repeats", 1) > 0
     img_dir, audio_dir, clips_dir = dirs["images"], dirs["audio"], dirs["clips"]
 
     char_a_desc = script.get("char_a_description", "friendly young man")
@@ -411,7 +415,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                               f"{style_prompt}, no people, no text, 16:9", "host_bg.png"))
 
     # --- Resume check ---
-    resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest)
+    resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest,
+                                        include_zh=include_zh)
     tts_thread = None
     if resume_result is not None:
         tts_results, image_urls = resume_result
@@ -425,7 +430,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                               host_narration=is_original_cutout,
                               tts_rate=args.tts_rate,
                               tts_engine=args.tts_engine,
-                              stop_check=stop_check)
+                              stop_check=stop_check,
+                              include_zh=include_zh)
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -433,6 +439,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
 
         tts_thread = threading.Thread(target=_tts_worker, daemon=True)
         tts_thread.start()
+        if not include_zh:
+            print("  [TTS] ch3_zh_repeats=0 → 跳过中文音频生成")
         print("  [TTS] Started TTS generation in background thread.")
 
         image_urls = _generate_images(image_prompts, img_dir, tts_thread,
@@ -649,6 +657,7 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
             pad=args.pad, practice_duration=args.practice_duration,
             en_repeats=getattr(args, "ch3_en_repeats", 3),
             zh_repeats=getattr(args, "ch3_zh_repeats", 1),
+            practice_intro_show=bool(getattr(args, "ch3_practice_intro_show", True)),
         )
         if args.structure == "original_cutout":
             # 开头/结尾对齐 quest 主持人形式：移除标题卡，插入 welcome + hook_intro

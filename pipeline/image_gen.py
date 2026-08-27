@@ -14,8 +14,11 @@ from atlas_split import split_atlas
 from style_manager import DEFAULT_STYLE_PROMPT
 
 
-def check_step2_resume(checkpoint, script, dirs, n, is_quest):
+def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
     """Check if Step 2 can be resumed from existing files. Returns (tts_results, image_urls) or None.
+
+    include_zh=False（ch3_zh_repeats=0，本次运行有意跳过中文音频）时不要求
+    zh_{i}.mp3 存在，zh_paths 重建为空占位（与 quest 同形）。
     """
     img_dir, audio_dir = dirs["images"], dirs["audio"]
     step2_done = step_done(checkpoint, "step2_images_tts")
@@ -27,7 +30,8 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
     scene_file = img_dir / "scene_0.png" if is_quest else img_dir / "scene.png"
     ref_file = (img_dir / "pose_char_a_0.png") if use_atlas_ref else char_scene_file
     all_audio_exist = all((audio_dir / f"dialogue_{i}.mp3").exists() for i in range(n))
-    if is_quest:
+    if is_quest or not include_zh:
+        # quest 不生成中文；ch3_zh_repeats=0 时有意跳过中文音频，不因缺文件阻断 resume
         all_zh_exist = True
     else:
         all_zh_exist = all((audio_dir / f"zh_{i}.mp3").exists() for i in range(n))
@@ -71,7 +75,7 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
             image_urls[filename] = url
 
     normal_paths = [str(audio_dir / f"dialogue_{i}.mp3") for i in range(n)]
-    if is_quest:
+    if is_quest or not include_zh:
         zh_paths = [""] * n
     else:
         zh_paths = [str(audio_dir / f"zh_{i}.mp3") for i in range(n)]
