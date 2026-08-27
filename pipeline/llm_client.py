@@ -621,6 +621,10 @@ def generate_listening_script(topic: str, cefr: str = "A2",
         line.setdefault("video_prompt", "")
         line.setdefault("poses", [])
 
+    # QA: programmatic gate + LLM critique/repair loop (mirrors quest Phase D+E)
+    from llm_review import run_listening_qa
+    run_listening_qa(script, num_lines)
+
     return script
 
 
