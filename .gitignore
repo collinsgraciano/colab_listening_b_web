@@ -19,6 +19,15 @@ configs/test.json
 
 # Generated audio previews / voice assets
 configs/voice_previews/
+configs/character_library/
+configs/custom_voices/
+configs/moss_previews/
+configs/moss_voices/
+configs/script_library/
+configs/style_previews/
+
+# Pipeline run outputs
+output/
 
 # OS
 Thumbs.db

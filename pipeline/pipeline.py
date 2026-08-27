@@ -25,7 +25,6 @@ Domain modules:
   image_gen.py       — character/scene/dialogue image generation + resume check
   timeline_enrich.py — fill audio_dur/duration on timeline segments
   group_audio.py     — concat per-line TTS into per-group audio files
-  structures.py      — mode registry: maps --structure to LLM/timeline/SRT/compose
   media_utils.py     — shared FFmpeg/Pillow helpers (concat, subtitle burn, loudnorm)
 """
 import argparse
@@ -293,9 +292,20 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
     if not cp_animation:
         cp_animation = args.animation
     structure_match = (cp_structure == args.structure)
+    # 结构一致的 resume：其它产物相关参数若与 checkpoint 不一致，提示但不阻断
+    # （旧行为是静默沿用旧产物，参数改动容易被忽略）
     if (_step_done(checkpoint, "step0_script") and script_path.exists()
             and structure_match):
         print("  [Resume] Loading existing script...")
+        for param, cp_key in (("animation", "animation"),
+                              ("visual_style", "visual_style"),
+                              ("host_character", "host_character")):
+            cp_val = checkpoint.get(cp_key)
+            cur_val = getattr(args, param, "")
+            if cp_val is not None and str(cp_val) != str(cur_val):
+                print(f"  [Resume] WARNING: {param} changed "
+                      f"({cp_val or '(empty)'} → {cur_val or '(empty)'}) — "
+                      f"existing artifacts were built with the old value.")
         script = json.loads(script_path.read_text(encoding="utf-8"))
         mark_topic_used(used_topics_file, topic)
     else:
@@ -315,13 +325,21 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
         if qa_report:
             qa_path = work_dir / "qa_report.json"
-            qa_path.write_text(json.dumps(qa_report, ensure_ascii=False, indent=2), encoding="utf-8")
+            qa_path.write_text(json.dumps(qa_report, indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"  QA report saved: {qa_path}")
-        _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr, structure=args.structure, animation=args.animation)
+        _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
+                         structure=args.structure, animation=args.animation,
+                         visual_style=getattr(args, "visual_style", ""),
+                         host_character=getattr(args, "host_character", ""))
         mark_topic_used(used_topics_file, topic)
     print(f"  Script saved: {script_path}")
     print(f"  Title: {script.get('title', '')}")
     print(f"  Dialogue lines: {len(script.get('dialogue', []))}")
+    if args.structure == "original_cutout" and not (script.get("welcome_en") or "").strip():
+        # 主持人开场 (commit 302fdb2) 之前的旧脚本没有 welcome_en/welcome_zh 字段
+        print("  [Resume] WARNING: script has no 'welcome_en' — written by an older "
+              "schema; the host welcome segment will be skipped. A fresh run "
+              "(new script) is recommended.")
     return script, work_dir, dirs
 
 

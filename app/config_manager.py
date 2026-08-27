@@ -8,12 +8,15 @@ from typing import Any
 
 # Resolve paths
 WEB_ROOT = Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = Path(__file__).parent.parent.parent / "colab_listening_b"
 CONFIGS_DIR = WEB_ROOT / "configs"
 DEFAULT_CONFIG_PATH = CONFIGS_DIR / "default.json"
 
+# pipeline 模块目录（自包含：topics.json / pipeline.py 均在本项目内，
+# 不再依赖旧的外部 colab_listening_b 目录）
+PIPELINE_DIR = WEB_ROOT / "pipeline"
+
 # pipeline 模块目录（style_manager 在其中）
-_LOCAL_PIPELINE_DIR = WEB_ROOT / "pipeline"
+_LOCAL_PIPELINE_DIR = PIPELINE_DIR
 if str(_LOCAL_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_LOCAL_PIPELINE_DIR))
 
@@ -134,7 +137,7 @@ PARAM_SPEC = {
                       "label": "视频片段时长(秒)", "help": "4-15"},
     "clip_concurrency": {"default": 4, "type": "number", "group": "mcp",
                           "label": "视频并发数", "help": "1-5, 默认4 (MCP最大并发5)"},
-    "output_dir": {"default": str(PIPELINE_DIR / "output"), "type": "text", "group": "mcp",
+    "output_dir": {"default": str(WEB_ROOT / "output"), "type": "text", "group": "mcp",
                    "label": "输出目录"},
     "topics_file": {"default": str(PIPELINE_DIR / "topics.json"), "type": "text", "group": "mcp",
                     "label": "主题库文件"},

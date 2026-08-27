@@ -19,20 +19,12 @@ from __future__ import annotations
 
 import math
 import os
-import shutil
 import subprocess
-import sys
-import tempfile
 from pathlib import Path
-from typing import Any
 
-from PIL import Image, ImageFilter, ImageDraw, ImageFont
+from PIL import Image, ImageFilter
 
-from media_utils import (
-    FONT_EN, FONT_ZH, FONT_PH, TARGET_W, TARGET_H, VF_NORM,
-    get_duration as _get_duration,
-    concat_segments, burn_subtitles, apply_final_loudnorm,
-)
+from media_utils import TARGET_W, TARGET_H
 
 # Try importing cv2/numpy for optical flow (Phase 3). Falls back gracefully.
 try:
@@ -45,7 +37,6 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-MOTION_FPS = 8          # stop-motion quantization rate
 DELIVERY_FPS = 24       # final output fps
 LANDING_DURATION = 0.3  # seconds — landing transform decay
 LANDING_X = 14          # px — horizontal offset
@@ -228,10 +219,6 @@ def generate_morph_frames(pose_a: Image.Image, pose_b: Image.Image,
 # Frame renderer (ported from render_semantic_cartoon.py)
 # ---------------------------------------------------------------------------
 
-def quantize(time: float, motion_fps: float = MOTION_FPS) -> float:
-    """Quantize time to motion_fps for stepped stop-motion feel."""
-    return math.floor(time * motion_fps + 1e-6) / motion_fps
-
 
 def transform_pose(source: Image.Image, scale: float = 1.0,
                    rotation: float = 0.0) -> Image.Image:
@@ -314,366 +301,8 @@ def compute_landing(local_time: float, landing_dur: float = LANDING_DURATION,
 # Subtitle rendering (reuse from video_compose)
 # ---------------------------------------------------------------------------
 
-def _render_subtitle_overlay(en_text: str, zh_text: str, w: int = TARGET_W,
-                              h: int = TARGET_H) -> Image.Image:
-    """Render a transparent subtitle overlay PNG with EN + ZH text."""
-    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-
-    en_font = ImageFont.truetype(FONT_EN, 44)
-    zh_font = ImageFont.truetype(FONT_ZH, 36)
-
-    # Semi-transparent black backdrop at bottom
-    en_bbox = draw.textbbox((0, 0), en_text, font=en_font)
-    en_w, en_h = en_bbox[2] - en_bbox[0], en_bbox[3] - en_bbox[1]
-    zh_bbox = draw.textbbox((0, 0), zh_text, font=zh_font) if zh_text else (0, 0, 0, 0)
-    zh_w, zh_h = zh_bbox[2] - zh_bbox[0], zh_bbox[3] - zh_bbox[1] if zh_text else (0, 0)
-
-    box_h = en_h + zh_h + 30 if zh_text else en_h + 20
-    box_top = h - box_h - 40
-    box = Image.new("RGBA", (w, box_h), (0, 0, 0, 140))
-    overlay.alpha_composite(box, (0, box_top))
-
-    # English text (white, centered)
-    en_x = (w - en_w) // 2
-    en_y = box_top + 10
-    draw.text((en_x, en_y), en_text, font=en_font, fill="white",
-              stroke_width=3, stroke_fill="black")
-
-    # Chinese text (gold, centered below)
-    if zh_text:
-        zh_x = (w - zh_w) // 2
-        zh_y = en_y + en_h + 8
-        draw.text((zh_x, zh_y), zh_text, font=zh_font,
-                  fill="rgb(255,220,0)", stroke_width=2, stroke_fill="black")
-
-    return overlay
 
 
-# ---------------------------------------------------------------------------
-# Main compose function
-# ---------------------------------------------------------------------------
-
-def compose_stop_motion(
-    work_dir: str,
-    pose_images: list[list[str]],
-    background_img: str,
-    timeline: list[dict],
-    script: dict,
-    narration: dict,
-    normal_paths: list[str],
-    zh_paths: list[str],
-    scene_img: str,
-    srt_dir: str,
-    pad: float = 0.4,
-    progress_cb=None,
-) -> str:
-    """Compose stop-motion video with multi-pose characters + optical flow.
-
-    Args:
-        work_dir: Working directory.
-        pose_images: pose_images[i] = list of pose image paths for dialogue line i.
-        background_img: Background image (scene without characters).
-        timeline: Timeline segments from build_listening_timeline.
-        script: Lesson script dict.
-        narration: {"intro": path, "outro": path, "practice_intro": path}.
-        normal_paths: English TTS paths.
-        zh_paths: Chinese TTS paths.
-        scene_img: Fallback scene image.
-        srt_dir: Directory for SRT.
-        pad: Audio pad between segments.
-        progress_cb: callback(percent, message).
-    """
-    def _cb(pct, msg):
-        if progress_cb:
-            progress_cb(pct, msg)
-
-    work = Path(work_dir)
-    tmp_dir = work / "tmp_segments"
-    frames_dir = Path(tempfile.gettempdir()) / f"sm_frames_{work.name}"
-    vid_dir = work / "videos"
-    static_dir = work / "static_frames"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    frames_dir.mkdir(parents=True, exist_ok=True)
-    vid_dir.mkdir(parents=True, exist_ok=True)
-    static_dir.mkdir(parents=True, exist_ok=True)
-
-    dialogue = script.get("dialogue", [])
-    n = len(dialogue)
-
-    # --- Load and prepare background ---
-    _cb(2, "Loading background...")
-    bg_img = Image.open(background_img).convert("RGBA").resize((TARGET_W, TARGET_H))
-
-    # --- Pre-process character poses: white-bg removal + normalization ---
-    _cb(5, f"Processing {sum(len(p) for p in pose_images)} character poses...")
-    processed_poses: list[list[Image.Image]] = []
-    for i, line_poses in enumerate(pose_images):
-        line_poses_processed = []
-        for j, p_path in enumerate(line_poses):
-            if not os.path.exists(p_path):
-                print(f"  [StopMotion] WARNING: pose image {p_path} not found, skipping")
-                continue
-            raw = Image.open(p_path)
-            alpha = remove_bg(raw)
-            normalized = normalize_pose(alpha)
-            line_poses_processed.append(normalized)
-        if not line_poses_processed:
-            # Fallback: use scene image as a "character"
-            line_poses_processed = [Image.new("RGBA", (TARGET_W, TARGET_H), (0, 0, 0, 0))]
-        processed_poses.append(line_poses_processed)
-    _cb(10, "Pose processing done.")
-
-    # --- Render static frames for Ch3 practice (same as compose_static) ---
-    if os.path.exists(scene_img):
-        _cb(12, f"Rendering {n} practice frames...")
-        from video_compose import _render_static_frame
-        for i, line in enumerate(dialogue):
-            p_en = str(static_dir / f"en_{i}.png")
-            _render_static_frame(
-                line.get("text", ""), line.get("phonetic", ""),
-                "", scene_img, p_en, i, n)
-            p = str(static_dir / f"zh_{i}.png")
-            _render_static_frame(
-                line.get("text", ""), line.get("phonetic", ""),
-                line.get("zh", ""), scene_img, p, i, n)
-        _cb(15, "Practice frames done.")
-
-    # --- Pre-render subtitle overlays for dialogue segments ---
-    subtitle_overlays: dict[int, Image.Image] = {}
-    for i, line in enumerate(dialogue):
-        en = line.get("text", "")
-        zh = line.get("zh", "")
-        subtitle_overlays[i] = _render_subtitle_overlay(en, zh)
-
-    # --- Build each segment ---
-    segments = []
-    seg_idx = 0
-    total_segs = len(timeline)
-
-    for seg in timeline:
-        seg_type = seg["type"]
-        duration = seg["duration"]
-        audio_idx = seg.get("audio_index", 0)
-        d_idx = seg.get("dialogue_idx", -1)
-        out_path = str(tmp_dir / f"seg_{seg_idx:03d}.mp4")
-        seg_idx += 1
-
-        # Determine audio
-        audio_file = None
-        audio_dur = seg.get("audio_dur", duration - pad)
-        if seg_type == "title_card":
-            audio_file = None
-            audio_dur = duration
-        elif seg_type == "practice_intro":
-            audio_file = narration.get("practice_intro")
-            if audio_file and os.path.exists(audio_file):
-                audio_dur = _get_duration(audio_file)
-            else:
-                audio_dur = duration - pad
-        elif seg_type == "dialogue":
-            audio_file = normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
-            audio_dur = seg.get("audio_dur", duration - pad)
-        elif seg_type == "listen_en":
-            audio_file = normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
-            audio_dur = seg.get("audio_dur", duration - pad)
-        elif seg_type == "listen_zh":
-            audio_file = zh_paths[audio_idx] if audio_idx < len(zh_paths) and zh_paths[audio_idx] else None
-            audio_dur = seg.get("audio_dur", duration - pad)
-        elif seg_type == "outro":
-            audio_file = narration.get("outro")
-            audio_dur = seg.get("audio_dur", duration - pad)
-
-        fade_af = f"afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05"
-
-        # --- Dialogue segment: render stop-motion frames ---
-        if seg_type == "dialogue" and d_idx >= 0 and d_idx < len(processed_poses):
-            line_poses = processed_poses[d_idx]
-            sub_overlay = subtitle_overlays.get(d_idx)
-            out_frames_dir = frames_dir / f"dialogue_{d_idx}"
-            out_frames_dir.mkdir(parents=True, exist_ok=True)
-
-            _render_dialogue_segment(
-                bg_img, line_poses, sub_overlay,
-                duration, audio_dur, DELIVERY_FPS,
-                out_frames_dir, d_idx,
-            )
-
-            # Encode frames → mp4 with audio
-            frame_pattern = str(out_frames_dir / "frame-%04d.png")
-            if audio_file and os.path.exists(audio_file):
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-framerate", str(DELIVERY_FPS), "-i", frame_pattern,
-                    "-i", audio_file,
-                    "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(DELIVERY_FPS),
-                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                    "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
-                    out_path,
-                ]
-            else:
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-framerate", str(DELIVERY_FPS), "-i", frame_pattern,
-                    "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                    "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(DELIVERY_FPS),
-                    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                    out_path,
-                ]
-            _run_cmd(cmd, f"dialogue {d_idx}", out_path)
-            # Cleanup frames to save disk
-            shutil.rmtree(out_frames_dir, ignore_errors=True)
-
-        elif seg_type in ("listen_en", "listen_zh", "practice"):
-            # Static Pillow frame + audio (same as compose_static)
-            from video_compose import _render_static_frame
-            if seg_type == "listen_zh":
-                frame_name = f"zh_{d_idx}.png" if d_idx >= 0 else ""
-            else:
-                frame_name = f"en_{d_idx}.png" if d_idx >= 0 else ""
-            video_src = str(static_dir / frame_name) if frame_name else scene_img
-            if not os.path.exists(video_src):
-                video_src = scene_img
-
-            if audio_file and os.path.exists(audio_file):
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", video_src, "-i", audio_file,
-                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
-                       out_path]
-            else:
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", video_src,
-                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       out_path]
-            _run_cmd(cmd, seg_type, out_path)
-
-        elif seg_type == "title_card":
-            title_en = seg.get("subtitle_en", "")
-            title_zh = seg.get("subtitle_zh", "")
-            title_overlay = str(static_dir / "title_overlay.png")
-            from video_compose import _render_title_card
-            _render_title_card(title_en, title_zh, "", scene_img, title_overlay)
-            cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                   "-i", title_overlay,
-                   "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                   "-t", f"{duration:.3f}",
-                   "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
-                   "-map", "[v]", "-map", "2:a",
-                   "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
-                   "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                   out_path]
-            _run_cmd(cmd, "title_card", out_path)
-
-        elif seg_type == "practice_intro":
-            intro_en = seg.get("subtitle_en", "")
-            intro_zh = seg.get("subtitle_zh", "")
-            intro_overlay = str(static_dir / "practice_intro_overlay.png")
-            from video_compose import _render_practice_intro
-            _render_practice_intro(intro_en, intro_zh, scene_img, intro_overlay)
-            out_dur = audio_dur + pad
-            narration_audio = narration.get("practice_intro")
-            if narration_audio and os.path.exists(narration_audio):
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-i", narration_audio, "-i", intro_overlay,
-                       "-t", f"{out_dur:.3f}",
-                       "-filter_complex",
-                       f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
-                       f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
-                       "-map", "[v]", "-map", "[a]",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       out_path]
-            else:
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-i", intro_overlay,
-                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                       "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
-                       "-map", "[v]", "-map", "2:a",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       out_path]
-            _run_cmd(cmd, "practice_intro", out_path)
-
-        elif seg_type == "outro":
-            outro_en = seg.get("subtitle_en", "")
-            outro_zh = seg.get("subtitle_zh", "")
-            outro_overlay = str(static_dir / "outro_overlay.png")
-            from video_compose import _render_practice_intro
-            _render_practice_intro(outro_en, outro_zh, scene_img, outro_overlay)
-            out_dur = audio_dur + pad
-            outro_audio = narration.get("outro")
-            if outro_audio and os.path.exists(outro_audio):
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-i", outro_audio, "-i", outro_overlay,
-                       "-t", f"{out_dur:.3f}",
-                       "-filter_complex",
-                       f"[0:v]{VF_NORM}[bg];[bg][2:v]overlay=0:0[v];"
-                       f"[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05,apad=whole_dur={out_dur:.3f}[a]",
-                       "-map", "[v]", "-map", "[a]",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       out_path]
-            else:
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-i", outro_overlay,
-                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                       "-t", f"{out_dur:.3f}",
-                       "-filter_complex", f"[0:v]{VF_NORM}[bg];[bg][1:v]overlay=0:0[v]",
-                       "-map", "[v]", "-map", "2:a",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       out_path]
-            _run_cmd(cmd, "outro", out_path)
-
-        else:
-            # Fallback: static scene image
-            if audio_file and os.path.exists(audio_file):
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img, "-i", audio_file,
-                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
-                       out_path]
-            else:
-                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", VF_NORM, "-r", "24",
-                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                       out_path]
-            _run_cmd(cmd, f"fallback_{seg_type}", out_path)
-
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
-            segments.append(out_path)
-        _cb(int(seg_idx / total_segs * 80),
-            f"  Segment {seg_idx}/{total_segs} ({seg_type})")
-
-    # --- Concat ---
-    _cb(80, "Concatenating segments...")
-    no_sub = str(vid_dir / "final_no_sub.mp4")
-    concat_segments(segments, no_sub, tmp_dir=tmp_dir)
-
-    # --- Burn subtitles ---
-    _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb)
-
-    # Cleanup
-    shutil.rmtree(tmp_dir, ignore_errors=True)
-    shutil.rmtree(frames_dir, ignore_errors=True)
-
-    # Final loudnorm
-    _cb(95, "Final loudnorm pass...")
-    apply_final_loudnorm(final_path, str(vid_dir))
-    size_mb = os.path.getsize(final_path) / (1024 * 1024)
-    _cb(100, f"Stop-motion video done: {final_path} ({size_mb:.1f}MB)")
-    return final_path
 
 
 # ---------------------------------------------------------------------------
@@ -683,7 +312,6 @@ def compose_stop_motion(
 def _render_dialogue_segment(
     background: Image.Image,
     poses: list[Image.Image],
-    subtitle_overlay: Image.Image | None,
     duration: float,
     audio_dur: float,
     fps: int,
@@ -780,12 +408,6 @@ def _render_dialogue_segment(
 
         # Render frame
         frame = render_frame(background, current_pose, x, bottom, scale, rotation, centered=True)
-
-        # Overlay subtitle
-        if subtitle_overlay is not None:
-            frame_rgba = frame.convert("RGBA")
-            frame_rgba.alpha_composite(subtitle_overlay, (0, 0))
-            frame = frame_rgba.convert("RGB")
 
         frame.save(out_dir / f"frame-{frame_idx:04d}.png", compress_level=2)
 

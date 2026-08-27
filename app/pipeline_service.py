@@ -799,7 +799,9 @@ class PipelineService:
         script_path.write_text(
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
         _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
-                         structure=args.structure, animation=args.animation)
+                         structure=args.structure, animation=args.animation,
+                         visual_style=str(config.get("visual_style", "")),
+                         host_character=str(config.get("host_character", "") or ""))
         # 各模式独立记录已用主题（不再写全局 used_topics.json，
         # 同一主题仍可在其他模式生成/使用）
         script_library.mark_topic_used_mode(

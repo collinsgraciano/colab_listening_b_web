@@ -998,7 +998,7 @@ def compose_image(
                 out_frames_dir = frames_dir / f"dialogue_{d_idx}"
                 out_frames_dir.mkdir(parents=True, exist_ok=True)
 
-                _render_sm(bg_img_rgba, line_poses, None,
+                _render_sm(bg_img_rgba, line_poses,
                            duration, audio_dur, 24, out_frames_dir, d_idx)
 
                 frame_pattern = str(out_frames_dir / "frame-%04d.png")

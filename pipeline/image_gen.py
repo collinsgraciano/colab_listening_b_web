@@ -38,7 +38,8 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
     elif is_quest:
         narration_names = ["welcome", "hook", "outro"]
     else:
-        narration_names = ["intro", "outro", "practice_intro"]
+        # intro.mp3 已不再生成（story_hook 只作标题卡文字，无音频消费方）
+        narration_names = ["outro", "practice_intro"]
     narration_files = [f"{name}.mp3" for name in narration_names]
     narration_exist = all((audio_dir / f).exists() for f in narration_files)
     # Only original_static generates per-line dialogue images

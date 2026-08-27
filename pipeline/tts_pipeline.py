@@ -141,6 +141,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
 
     narration = {}
     if quest or host_narration:
+        # hook 文本别名：quest 脚本产 hook_intro_en（长钩子）；
+        # listening 脚本只有 story_hook（短钩子），混用脚本库时语义自动降级兼容
         texts = [
             ("welcome", script.get("welcome_en", "")),
             ("hook", script.get("hook_intro_en") or script.get("story_hook", "")),
@@ -169,12 +171,12 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
     else:
-        intro_text = script.get("story_hook", "")
         outro_text = script.get("outro", "That's all for today. Keep practicing!")
         practice_intro_text = script.get("practice_intro_en", "Now let's practice. Listen and repeat each sentence.")
 
         narration_rate = tts_rate if tts_rate else "+0%"
-        for name, text in [("intro", intro_text), ("outro", outro_text), ("practice_intro", practice_intro_text)]:
+        # 注：不再生成 intro.mp3（story_hook 仅作标题卡文字，时间轴从不消费其音频）
+        for name, text in [("outro", outro_text), ("practice_intro", practice_intro_text)]:
             if stop_check and stop_check():
                 print("  [TTS] Stop requested, aborting narration.", flush=True)
                 results["fatal_error"] = "stopped"
@@ -261,6 +263,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
     results["normal_paths"] = normal_paths
     results["dialogue_durations"] = dialogue_durations
     results["zh_paths"] = zh_paths
+    # vocab/slow/quiz 曾属旧版结构；timeline_enrich/media_utils 仍预留对应段类型，
+    # 此处置空占位以保持 tts_results 形状稳定
     results["vocab_paths"] = []
     results["slow_paths"] = []
     results["slow_durations"] = []
