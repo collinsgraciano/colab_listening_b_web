@@ -121,7 +121,7 @@ def generate_thumbnail(script: dict, scene_img: str, output_path: str,
             result = mcp_call_tool("generate_image", gen_args)
             task_id = mcp_parse_task_id(result)
             if task_id:
-                data = mcp_poll_task(task_id, interval=10, max_wait=180)
+                data = mcp_poll_task(task_id, interval=10, max_wait=300)
                 url = data.get("url", "")
                 if url and mcp_download_file(url, output_path):
                     size_kb = os.path.getsize(output_path) // 1024
@@ -262,11 +262,13 @@ def _inject_chapters(desc: str, chapters: list[str]) -> str:
     section — replace that section with the real ones computed from the
     timeline. Append a new section only if none exists.
     """
-    if not desc or not chapters:
+    if not chapters:
         return desc
     block = "⏱️ Chapters:\n" + "\n".join(chapters)
     if _CHAPTERS_SECTION.search(desc):
         return _CHAPTERS_SECTION.sub(block + "\n", desc, count=1)
+    if not desc.strip():
+        return block + "\n"
     return desc.rstrip() + "\n\n" + block + "\n"
 
 
@@ -276,33 +278,34 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
 
     Also post-processes the description to insert real timestamps from the timeline.
     """
-    # Calculate real timestamps from timeline
-    timestamps = {}
+    # Collect ordered chapter candidates (seconds, label) from the timeline.
+    # YouTube chapter rules: the first chapter MUST start at 00:00 and every
+    # chapter must span >= 10 seconds — candidates starting less than 10s
+    # after the previously kept one are dropped (e.g. quest's short hook_intro).
+    if structure == "quest":
+        seg_labels = {
+            "welcome": "Welcome",
+            "hook_intro": "Intro · Listening Task",
+            "dialogue": "Slow Dialogue",
+            "outro": "Outro · Answer & CTA",
+        }
+    else:
+        seg_labels = {
+            "welcome": "Welcome & Hook",
+            "dialogue": "Immersive Dialogue",
+            "practice_intro": "Shadowing Practice",
+            "outro": "Outro",
+        }
+
+    marks: list[tuple[float, str]] = []
+    seen_types: set[str] = set()
     t_cursor = 0.0
     for seg in timeline:
         seg_type = seg.get("type", "")
-        dur = seg.get("duration", 0)
-
-        if structure == "quest":
-            if seg_type == "title_card" and "title" not in timestamps:
-                timestamps["title"] = t_cursor
-            elif seg_type == "hook_intro" and "hook" not in timestamps:
-                timestamps["hook"] = t_cursor
-            elif seg_type == "dialogue" and "dialogue" not in timestamps:
-                timestamps["dialogue"] = t_cursor
-            elif seg_type == "outro" and "outro" not in timestamps:
-                timestamps["outro"] = t_cursor
-        else:
-            if seg_type == "title_card" and "title" not in timestamps:
-                timestamps["title"] = t_cursor
-            elif seg_type == "dialogue" and "dialogue" not in timestamps:
-                timestamps["dialogue"] = t_cursor
-            elif seg_type == "practice_intro" and "shadowing" not in timestamps:
-                timestamps["shadowing"] = t_cursor
-            elif seg_type == "outro" and "outro" not in timestamps:
-                timestamps["outro"] = t_cursor
-
-        t_cursor += dur
+        if seg_type in seg_labels and seg_type not in seen_types:
+            seen_types.add(seg_type)
+            marks.append((t_cursor, seg_labels[seg_type]))
+        t_cursor += seg.get("duration", 0)
 
     def _fmt_ts(seconds):
         m = int(seconds // 60)
@@ -310,24 +313,15 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
         return f"{m:02d}:{s:02d}"
 
     chapters = []
-    if structure == "quest":
-        if "title" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['title'])} Title")
-        if "hook" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['hook'])} Intro · Listening Task")
-        if "dialogue" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['dialogue'])} Slow Dialogue")
-        if "outro" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['outro'])} Outro · Answer & CTA")
-    else:
-        if "title" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['title'])} Title Card")
-        if "dialogue" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['dialogue'])} Immersive Dialogue")
-        if "shadowing" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['shadowing'])} Shadowing Practice")
-        if "outro" in timestamps:
-            chapters.append(f"{_fmt_ts(timestamps['outro'])} Outro")
+    kept_t = 0.0
+    for i, (t, label) in enumerate(marks):
+        if i == 0:
+            kept_t = 0.0  # 首章节必须 00:00，否则 YouTube 禁用全部章节
+        elif t - kept_t < 10.0:
+            continue
+        else:
+            kept_t = t
+        chapters.append(f"{_fmt_ts(kept_t)} {label}")
 
     description = script.get("youtube_description", "")
     description = _inject_chapters(description, chapters)
@@ -338,14 +332,24 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
     tags = script.get("youtube_tags", [])
     # Append tags as #hashtag string at the end of description
     if tags:
-        hashtags = "".join(f"#{t.replace(' ', '')}" for t in tags)
+        hashtags = " ".join(f"#{t.replace(' ', '')}" for t in tags)
         description = description.rstrip() + "\n" + hashtags
         if description_en:
             description_en = description_en.rstrip() + "\n" + hashtags
 
+    title = script.get("youtube_title", script.get("title", ""))
+    title_en = script.get("youtube_title_en", "")
+    # YouTube 标题硬上限 100 字符，超长会被截断 —— 最后防线
+    if len(title) > 100:
+        print(f"  [YouTube] WARNING: title {len(title)} chars > 100, truncated")
+        title = title[:100]
+    if len(title_en) > 100:
+        print(f"  [YouTube] WARNING: title_en {len(title_en)} chars > 100, truncated")
+        title_en = title_en[:100]
+
     metadata = {
-        "title": script.get("youtube_title", script.get("title", "")),
-        "title_en": script.get("youtube_title_en", ""),
+        "title": title,
+        "title_en": title_en,
         "description": description,
         "description_en": description_en,
         "tags": tags,

@@ -58,7 +58,7 @@ _MALE_WORDS = {"man", "men", "boy", "guy", "he", "him", "his", "male"}
 _META_TARGETS = {
     "youtube_tags": (15, 20),
     "thumbnail_icons": (4, 5),
-    "youtube_title_chars": (80, 150),
+    "youtube_title_chars": (40, 95),
 }
 
 
@@ -317,8 +317,6 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
         add("metadata", "error", "welcome_en 为空（主持人开场白必需）")
     if not str(script.get("title", "")).strip():
         add("metadata", "warning", "title 为空")
-    if not str(script.get("thumbnail_prompt", "")).strip():
-        add("metadata", "warning", "thumbnail_prompt 为空（Step 4.5 需要）")
     tags = script.get("youtube_tags", [])
     if tags:
         lo, hi = _META_TARGETS["youtube_tags"]

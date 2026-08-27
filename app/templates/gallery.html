@@ -111,13 +111,16 @@
     <!-- YouTube tab -->
     <div id="content-youtube" class="tab-content hidden">
         {% if yt_desc or yt_title or yt_tags %}
-        <p class="text-xs mb-4">
-            {% if has_yt_meta %}
-            <span class="text-emerald-400">✓ 最终版 youtube_metadata.json（含真实章节时间戳 + 标签）</span>
-            {% else %}
-            <span class="text-amber-400">⚠ 未找到 youtube_metadata.json，显示原始脚本字段（时间戳为占位，建议先跑完 Step 4.5）</span>
-            {% endif %}
-        </p>
+        <div class="flex items-center justify-between mb-4">
+            <p class="text-xs">
+                {% if has_yt_meta %}
+                <span class="text-emerald-400">✓ 最终版 youtube_metadata.json（含真实章节时间戳 + 标签）</span>
+                {% else %}
+                <span class="text-amber-400">⚠ 未找到 youtube_metadata.json，显示原始脚本字段（时间戳为占位，建议先跑完 Step 4.5）</span>
+                {% endif %}
+            </p>
+            <button onclick="refreshYtMeta(this)" class="copy-btn flex-shrink-0">🔄 重新生成元数据</button>
+        </div>
         <div class="space-y-4">
             <div class="bg-slate-800 rounded-lg border border-slate-700">
                 <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
@@ -227,6 +230,27 @@ function fallbackCopy(text, done) {
     ta.select();
     try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选择文本复制'); }
     document.body.removeChild(ta);
+}
+
+async function refreshYtMeta(btn) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ 生成中…';
+    try {
+        const r = await fetch(`/api/runs/{{ run_name }}/yt_meta_refresh`, { method: 'POST' });
+        const data = await r.json();
+        if (!r.ok || !data.ok) {
+            alert('刷新失败: ' + (data.error || r.statusText));
+            btn.textContent = original;
+            btn.disabled = false;
+            return;
+        }
+        location.reload();
+    } catch (e) {
+        alert('请求异常: ' + e);
+        btn.textContent = original;
+        btn.disabled = false;
+    }
 }
 </script>
 <style>

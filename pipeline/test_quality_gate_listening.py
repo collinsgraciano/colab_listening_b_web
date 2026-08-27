@@ -91,7 +91,6 @@ def _clean_script() -> dict:
         "welcome_zh": "嗨朋友們！歡迎回來！今天我們在忙碌的咖啡店點餐。",
         "outro": "That's all for today. Keep practicing!",
         "outro_zh": "今天就到這裡。繼續練習！",
-        "thumbnail_prompt": "a cheerful young woman with an excited face at a coffee shop counter, bright colors",
         "youtube_title": ("【沉浸式英文動畫】咖啡店點餐 ☕ 18句超實用生活英文，"
                           "聽完就能開口說！每天聽一集，三個月開口不尷尬，"
                           "不用背單字（出國旅遊也用得到）｜Coffee Shop Ordering"),

@@ -1688,6 +1688,23 @@ async def api_recompose(name: str, request: Request):
     return {"ok": True, "message": msg, "status": service.status}
 
 
+@app.post("/api/runs/{name}/yt_meta_refresh")
+async def api_yt_meta_refresh(name: str):
+    """重新生成 youtube_metadata.json（脚本编辑后刷新标题/简介/章节，零 AI 成本）。"""
+    service = get_service()
+    ok, msg = service.refresh_youtube_metadata(name)
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    meta_path = (Path(load_config().get("output_dir", "./output")) / name
+                 / "youtube_metadata.json")
+    meta = {}
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {"ok": True, "message": msg, "metadata": meta}
+
+
 def _list_explorer_windows() -> set[int]:
     """枚举当前所有可见的资源管理器文件夹窗口（CabinetWClass）句柄。"""
     import ctypes

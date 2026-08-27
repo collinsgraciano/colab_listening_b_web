@@ -138,7 +138,6 @@ def generate_quest_script(topic: str, cefr: str = "A1",
         "youtube_description": meta.get("youtube_description", ""),
         "youtube_description_en": meta.get("youtube_description_en", ""),
         "youtube_tags": meta.get("youtube_tags", []),
-        "thumbnail_prompt": meta.get("thumbnail_prompt", ""),
         "scene": outline.get("scene", topic.lower()),
         "scene_images": meta.get("scene_images", []),
         "thumbnail_expression": meta.get("thumbnail_expression", "surprised and excited"),
@@ -744,12 +743,11 @@ Generate JSON with these fields:
   "outro": "narrator closing 80-110 words: how was it→repeat question→comment CTA→channel description→subscribe→bye",
   "outro_zh": "繁中",
   "host_bg_prompt": "TV studio background prompt (no people)",
-  "youtube_title": "高CTR繁中标题 with 【】and ｜ format. Pattern D: 【英文聽力挑戰】{{emoji}}{{topic 繁中}}｜❓你能聽出答案嗎？｜{{CEFR}}慢速英文｜不用背多聽就會用｜英文聽力訓練｜{{English topic}}",
+  "youtube_title": "高CTR繁中标题 with 【】and ｜ format. Pattern D: 【英文聽力挑戰】{{emoji}}{{topic 繁中}}｜❓你能聽出答案嗎？｜{{CEFR}}慢速英文｜{{English topic}}. Total length MUST be ≤95 chars (YouTube hard limit is 100) — drop middle segments if needed to fit.",
   "youtube_title_en": "high-CTR PURE ENGLISH title (no Chinese). STRONGLY PREFER opening with title_quote in quotes, then the scene context (e.g. \"Can You Guess Why It's Called Bubble Tea?\" — bubble tea shop mystery). Otherwise use a curiosity question. Max 100 chars.",
-  "youtube_description": "full 繁中 description with chapters + key_words",
-  "youtube_description_en": "full PURE ENGLISH description. Include chapters section, key_words, hashtags, and subscribe CTA.",
+  "youtube_description": "full 繁中 description with key_words. Do NOT write chapter timestamps — they are injected automatically after rendering.",
+  "youtube_description_en": "full PURE ENGLISH description. Include key_words, hashtags, and subscribe CTA. Do NOT write chapter timestamps — they are injected automatically after rendering.",
   "youtube_tags": ["tag1","tag2",... 15-20 tags],
-  "thumbnail_prompt": "thumbnail image prompt ({thumb_hint} style)",
   "thumbnail_expression": "main character expression",
   "thumbnail_action": "main character action",
   "thumbnail_subtitle": "繁中 short subtitle",
@@ -757,7 +755,7 @@ Generate JSON with these fields:
   "scene_images": [{{"prompt":"specific scene description with details (counter, menu board, equipment, decor), 16:9, no people","label":"short English label"}}]
 }}
 
-VISUAL STYLE (CRITICAL): The video's art style is: "{style_prompt}". EVERY host_bg_prompt, thumbnail_prompt, and scene_images prompt MUST include this EXACT style descriptor phrase. Do NOT mix other art styles.
+VISUAL STYLE (CRITICAL): The video's art style is: "{style_prompt}". EVERY host_bg_prompt and scene_images prompt MUST include this EXACT style descriptor phrase. Do NOT mix other art styles.
 
 IMPORTANT: Generate at least 8 scene_images covering different angles and details of the scene (e.g. exterior, counter, menu board, equipment, seating area, product close-up, kitchen, decoration).
 

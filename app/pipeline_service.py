@@ -1097,6 +1097,39 @@ class PipelineService:
             pass
         return 24
 
+    def refresh_youtube_metadata(self, run_name: str) -> tuple[bool, str]:
+        """用 script.json + subtitles/meta.json 的 timeline 重新生成 youtube_metadata.json。
+
+        复用 Step 4.5 的 save_youtube_metadata，零 AI 成本秒级完成，
+        用于脚本编辑后刷新标题/简介/章节。返回 (ok, message)。
+        """
+        if self.is_running:
+            return False, "Pipeline 正在运行中，请等待完成后再刷新"
+
+        output_dir = Path(load_config().get("output_dir", "./output"))
+        run_dir = output_dir / run_name
+        if not run_dir.is_dir():
+            return False, f"运行不存在: {run_name}"
+        script_path = run_dir / "script.json"
+        meta_path = run_dir / "subtitles" / "meta.json"
+        if not script_path.exists():
+            return False, "缺少 script.json"
+        if not meta_path.exists():
+            return False, "缺少 subtitles/meta.json（请先跑完 Step 4）"
+        try:
+            script = json.loads(script_path.read_text(encoding="utf-8"))
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            from thumbnail_gen import save_youtube_metadata
+            out = save_youtube_metadata(
+                script=script,
+                timeline=meta.get("timeline", []),
+                output_path=str(run_dir / "youtube_metadata.json"),
+                structure=script.get("structure", "original"),
+            )
+            return True, f"已重新生成: {Path(out).name}"
+        except Exception as e:
+            return False, f"生成失败: {e}"
+
     def recompose(self, run_name: str, subtitle_style: str = "", font_size: int = 60,
                   show_zh: bool = True, regen_4k: bool = False) -> tuple[bool, str]:
         """对已完成运行重选字幕样式重渲视频（仅字幕烧录 + 音量归一，本地渲染）。

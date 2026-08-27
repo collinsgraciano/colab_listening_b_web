@@ -465,17 +465,16 @@ TECHNICAL REQUIREMENTS:
 - "char_b_gender": "male" or "female" — the gender of speaker 2
 - "char_a_role": the role of speaker 1 in the story (e.g. "waitress", "customer")
 - "char_b_role": the role of speaker 2 in the story (e.g. "customer", "waitress")
-- "youtube_title": a high-CTR YouTube title for overseas Chinese learners. ALL Chinese text in Traditional Chinese (繁體中文). Start with 【】bracket tag, use ｜ as separator, include 3-8 emoji and catchy power phrases (e.g. "不用背多聽就會用", "聽完就能說"). Optionally open with the Traditional Chinese translation of title_quote in「」quotes as a hook (e.g. 「三號加油機，麻煩了！」). End with ｜{{English topic}}. Length 80-150 chars. Example: "【沉浸式英文動畫】出國怕開口？✈️ 超實用機場英文：訂票、報到、托運行李一次搞定，聽完就能說！｜Airport English"
+- "youtube_title": a high-CTR YouTube title for overseas Chinese learners. ALL Chinese text in Traditional Chinese (繁體中文). Start with 【】bracket tag, use ｜ as separator, include 3-8 emoji and catchy power phrases (e.g. "不用背多聽就會用", "聽完就能說"). Optionally open with the Traditional Chinese translation of title_quote in「」quotes as a hook (e.g. 「三號加油機，麻煩了！」). End with ｜{{English topic}}. Length 55-95 chars (YouTube hard limit is 100 chars — NEVER exceed 95). Example: "【沉浸式英文動畫】出國怕開口？✈️ 超實用機場英文，聽完就能說！｜Airport English"
 - "youtube_title_en": a high-CTR YouTube title in PURE ENGLISH (no Chinese). STRONGLY PREFER the "quote hook" pattern: open with title_quote in quotes, then the scene context. Example: '"Pump Number 3, Please" — Paying Inside at an American Gas Station'. Second-best pattern: a curiosity question, e.g. "Can You Order Coffee in English? ☕ Real Conversation at a Coffee Shop". Include the topic, keep it under 100 chars, and make viewers want to click.
-- "youtube_description": a full YouTube video description (max 3000 chars). First line must be a hook with the main keyword. Include a "⏱️ Chapters:" section with timestamps for: 00:00 Title, 00:05 Dialogue, 00:xx Shadowing Practice, 00:xx Outro. End with 3 hashtags (#EnglishListening #ESL #LearnEnglish) and a subscribe CTA. ALL Chinese text in Traditional Chinese (繁體中文).
-- "youtube_description_en": a full YouTube video description in PURE ENGLISH (no Chinese). Max 3000 chars. First line = hook with main keyword. Include "⏱️ Chapters:" section with timestamps. End with hashtags and subscribe CTA.
+- "youtube_description": a full YouTube video description (max 3000 chars). First line must be a hook with the main keyword. Do NOT write chapter timestamps — they are injected automatically after rendering. End with 3 hashtags (#EnglishListening #ESL #LearnEnglish) and a subscribe CTA. ALL Chinese text in Traditional Chinese (繁體中文).
+- "youtube_description_en": a full YouTube video description in PURE ENGLISH (no Chinese). Max 3000 chars. First line = hook with main keyword. Do NOT write chapter timestamps — they are injected automatically after rendering. End with hashtags and subscribe CTA.
 - "youtube_tags": an array of 15-20 SEO tags (mix of short and long-tail keywords, include both English and Traditional Chinese tags)
 - "scene": the English name of the scene/location (e.g. "pharmacy", "coffee shop", "hotel lobby"). Used for thumbnail and prompts.
 - "thumbnail_expression": the facial expression of the main character on the thumbnail (e.g. "surprised and excited", "confused and thinking", "cheerful and smiling", "friendly and confident")
 - "thumbnail_action": a short description of what the main character is doing on the thumbnail (e.g. "pointing to a menu", "holding a shopping bag", "waving hello", "gesturing toward the counter")
 - "thumbnail_subtitle": a short Traditional Chinese subtitle shown below the title on the thumbnail (e.g. "18句聽力練習", "每天50句", "實用日常英語")
 - "thumbnail_icons": an array of 4-5 objects with "en" and "zh" string keys, describing scene-related keywords shown as circular icons at the bottom of the thumbnail. Each has an English label and a Traditional Chinese label. Example for pharmacy: [{{"en": "Prescription", "zh": "處方"}}, {{"en": "Refill", "zh": "補充"}}, {{"en": "Cough Syrup", "zh": "止咳糖漿"}}, {{"en": "Side Effects", "zh": "副作用"}}]
-- "thumbnail_prompt": a detailed prompt for generating a YouTube thumbnail background image. Must describe: a {thumb_hint} character with an expressive face, the scene location, bright colors, reference-style layout.
 - "title": English title (e.g. "AT THE AIRPORT")
 - "title_quote": the single most catchy, memorable dialogue line from THIS dialogue, copied VERBATIM (under 10 words). It will be used as the YouTube title hook. Pick a line that instantly shows what the video teaches (e.g. "Pump number three, please.", "Do you have this in a medium?").
 - "cefr": the CEFR level of this lesson, exactly "{cefr}" (used for thumbnail level badge)
@@ -522,7 +521,6 @@ JSON schema:
   "youtube_description": string,
   "youtube_description_en": string,
   "youtube_tags": [string],
-  "thumbnail_prompt": string,
   "scene": string,
   "thumbnail_expression": string,
   "thumbnail_action": string,
@@ -669,7 +667,6 @@ def generate_listening_script(topic: str, cefr: str = "A2",
     script.setdefault("youtube_description", "")
     script.setdefault("youtube_description_en", "")
     script.setdefault("youtube_tags", [])
-    script.setdefault("thumbnail_prompt", "")
     script.setdefault("scene", "")
     script.setdefault("thumbnail_expression", "surprised and excited")
     script.setdefault("thumbnail_action", "looking toward the camera and gesturing naturally")
