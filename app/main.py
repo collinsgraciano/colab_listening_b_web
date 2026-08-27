@@ -96,13 +96,21 @@ templates.env.filters["datestr"] = _datestr
 async def dashboard(request: Request):
     service = get_service()
     config = load_config()
+    mode_configs = load_all_mode_configs()
+    # 快捷启动「画面风格」下拉选项（内置+自定义；各模式当前值不在选项中时兜底显示）
+    style_options = style_lib.get_style_options()
+    for mcfg in mode_configs.values():
+        vs = mcfg.get("visual_style")
+        if vs and vs not in style_options:
+            style_options[vs] = f"{vs}（已失效，请重新选择）"
     return templates.TemplateResponse(request, "dashboard.html", {
         "config": config,
         "runner": service,
         "active_page": "dashboard",
-        "mode_configs": load_all_mode_configs(),
+        "mode_configs": mode_configs,
         "active_mode": get_active_mode(),
         "mode_labels": MODE_LABELS,
+        "style_options": style_options,
     })
 
 

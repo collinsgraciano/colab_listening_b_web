@@ -68,6 +68,120 @@
             </div>
         </div>
 
+        <!-- 常用配置（折叠面板，默认收起；各模式独立保存） -->
+        <div class="mb-4 border border-slate-700 rounded-lg overflow-hidden">
+            <button type="button" onclick="toggleQuickConfig()"
+                class="w-full flex items-center justify-between px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 transition">
+                <span class="font-medium">⚙️ 常用配置
+                    <span class="text-xs text-slate-500 font-normal">（各模式独立保存 · 完整参数见「完整配置」页）</span>
+                </span>
+                <span id="quick-config-arrow" class="text-slate-400">▸</span>
+            </button>
+            <div id="quick-config-panel" class="hidden px-4 pb-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">TTS 引擎</label>
+                        <select id="qc-tts_engine" onchange="onQuickInput('tts_engine', this.value)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                            <option value="kokoro">Kokoro (本地)</option>
+                            <option value="qwen">Qwen3-TTS (本地 GPU)</option>
+                            <option value="moss">MOSS-TTS-Nano (本地 CPU)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">TTS 语速</label>
+                        <input type="text" id="qc-tts_rate" oninput="onQuickInput('tts_rate', this.value)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                            placeholder="留空=模式默认，如 -15%">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">对话行数</label>
+                        <input type="number" id="qc-num_lines" oninput="onQuickInput('num_lines', this.value)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                            placeholder="留空=自动 (original:18, quest:48)">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">画面风格</label>
+                        <select id="qc-visual_style" onchange="onQuickInput('visual_style', this.value)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                            {% for v, l in style_options.items() %}
+                            <option value="{{ v }}">{{ l }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div data-qc-group="ch3">
+                        <label class="block text-xs text-slate-400 mb-1">Ch3 英文重复</label>
+                        <input type="number" min="0" max="10" id="qc-ch3_en_repeats"
+                            oninput="onQuickInput('ch3_en_repeats', this.value, 3)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div data-qc-group="ch3">
+                        <label class="block text-xs text-slate-400 mb-1">Ch3 中文重复</label>
+                        <input type="number" min="0" max="10" id="qc-ch3_zh_repeats"
+                            oninput="onQuickInput('ch3_zh_repeats', this.value, 1)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div data-qc-group="ch3">
+                        <label class="block text-xs text-slate-400 mb-1">Ch3 中文常显</label>
+                        <label class="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer">
+                            <input type="checkbox" id="qc-ch3_zh_always"
+                                onchange="onQuickInput('ch3_zh_always', this.checked)" class="accent-indigo-500 w-4 h-4">
+                            英文轮次显示中文
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Ch3 跟读间隔(秒)</label>
+                        <input type="number" step="0.1" min="0" id="qc-practice_duration"
+                            oninput="onQuickInput('practice_duration', this.value, 3)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">字幕字号</label>
+                        <input type="number" min="10" id="qc-subtitle_font_size"
+                            oninput="onQuickInput('subtitle_font_size', this.value, 60)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">中文字幕</label>
+                        <label class="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer">
+                            <input type="checkbox" id="qc-no_zh_subtitle"
+                                onchange="onQuickInput('no_zh_subtitle', this.checked)" class="accent-indigo-500 w-4 h-4">
+                            隐藏中文字幕
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">4K 超分</label>
+                        <label class="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer">
+                            <input type="checkbox" id="qc-no_4k"
+                                onchange="onQuickInput('no_4k', this.checked)" class="accent-indigo-500 w-4 h-4">
+                            跳过 4K
+                        </label>
+                    </div>
+                    <div data-qc-group="clip">
+                        <label class="block text-xs text-slate-400 mb-1">片段时长(秒)</label>
+                        <input type="number" min="4" max="15" id="qc-clip_duration"
+                            oninput="onQuickInput('clip_duration', this.value, 15)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div data-qc-group="clip">
+                        <label class="block text-xs text-slate-400 mb-1">片段并发</label>
+                        <input type="number" min="1" max="5" id="qc-clip_concurrency"
+                            oninput="onQuickInput('clip_concurrency', this.value, 4)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div data-qc-group="host">
+                        <label class="block text-xs text-slate-400 mb-1">主持人形象绑定</label>
+                        <select id="qc-host_character" onchange="onQuickInput('host_character', this.value)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                            <option value="">独立主持人（新生成）</option>
+                            <option value="char_a">角色 A</option>
+                            <option value="char_b">角色 B</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Script library source -->
         <div class="mb-4">
             <div class="flex items-center justify-between mb-1">
@@ -261,6 +375,57 @@ function applyQuickFields() {
     document.getElementById('quick-anim-wrap').style.display = isImage ? '' : 'none';
     document.getElementById('cefr-cell').className = isImage ? '' : 'col-span-2';
     if (isImage) document.getElementById('quick-animation').value = cfg.animation || 'landing';
+    applyQuickConfigFields();
+}
+
+// --- 常用配置面板：回显当前模式的常用参数，按模式显隐专属组 ---
+function applyQuickConfigFields() {
+    const cfg = MODE_CONFIGS[ACTIVE_MODE];
+    const setVal = (id, v) => {
+        const el = document.getElementById(id);
+        if (el) el.value = (v === undefined || v === null) ? '' : v;
+    };
+    const setChk = (id, v) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = !!v;
+    };
+    setVal('qc-tts_engine', cfg.tts_engine || 'kokoro');
+    setVal('qc-tts_rate', cfg.tts_rate || '');
+    setVal('qc-num_lines', cfg.num_lines ?? '');
+    setVal('qc-visual_style', cfg.visual_style || 'pixar3d');
+    setVal('qc-practice_duration', cfg.practice_duration ?? 3);
+    setVal('qc-subtitle_font_size', cfg.subtitle_font_size ?? 60);
+    setChk('qc-no_zh_subtitle', cfg.no_zh_subtitle);
+    setChk('qc-no_4k', cfg.no_4k);
+    // Ch3 跟读组：quest 不适用，整组隐藏
+    const isQuest = ACTIVE_MODE === 'quest';
+    document.querySelectorAll('[data-qc-group="ch3"]').forEach(el => el.style.display = isQuest ? 'none' : '');
+    if (!isQuest) {
+        setVal('qc-ch3_en_repeats', cfg.ch3_en_repeats ?? 3);
+        setVal('qc-ch3_zh_repeats', cfg.ch3_zh_repeats ?? 1);
+        setChk('qc-ch3_zh_always', cfg.ch3_zh_always !== false);
+    }
+    // 片段组：仅 original 走 Step 3 视频片段生成
+    const isOriginal = ACTIVE_MODE === 'original';
+    document.querySelectorAll('[data-qc-group="clip"]').forEach(el => el.style.display = isOriginal ? '' : 'none');
+    if (isOriginal) {
+        setVal('qc-clip_duration', cfg.clip_duration ?? 15);
+        setVal('qc-clip_concurrency', cfg.clip_concurrency ?? 4);
+    }
+    // 主持人绑定：仅 original_cutout
+    const isCutout = ACTIVE_MODE === 'original_cutout';
+    document.querySelectorAll('[data-qc-group="host"]').forEach(el => el.style.display = isCutout ? '' : 'none');
+    if (isCutout) setVal('qc-host_character', cfg.host_character || '');
+}
+
+// 折叠面板展开/收起（默认收起，localStorage 记住状态）
+function toggleQuickConfig(force) {
+    const panel = document.getElementById('quick-config-panel');
+    const arrow = document.getElementById('quick-config-arrow');
+    const show = (force === undefined) ? panel.classList.contains('hidden') : !!force;
+    panel.classList.toggle('hidden', !show);
+    arrow.textContent = show ? '▾' : '▸';
+    try { localStorage.setItem('quickConfigExpanded', show ? '1' : '0'); } catch (e) {}
 }
 
 function switchMode(m) {
@@ -291,7 +456,8 @@ function switchMode(m) {
 
 // --- 快捷项即时保存（带模式，刷新不丢） ---
 let _quickSaveTimer = null;
-function onQuickInput(field, value) {
+function onQuickInput(field, value, emptyFallback) {
+    if (value === '' && emptyFallback !== undefined) value = emptyFallback;
     MODE_CONFIGS[ACTIVE_MODE][field] = value;
     clearTimeout(_quickSaveTimer);
     const mode = ACTIVE_MODE;
@@ -1176,6 +1342,7 @@ function deleteCharSet() {
 window.addEventListener('load', function() {
     applyModeTabStyles();
     applyQuickFields();
+    try { toggleQuickConfig(localStorage.getItem('quickConfigExpanded') === '1'); } catch (e) {}
     parseLibAssignments();
     renderCharEditor(null);
     loadQwenVoices();
