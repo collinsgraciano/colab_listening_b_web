@@ -17,7 +17,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from llm_client import _chat, _extract_json
-from quality_gate_listening import run_listening_quality_gate, format_report
+from quality_gate_listening import (
+    run_listening_quality_gate, format_report, PROMPT_FIELDS,
+)
+
+
+def _prompt_fields(structure: str) -> tuple[str, ...]:
+    """当前结构模式行级必需的 prompt 字段（未知结构回退 original）。"""
+    return PROMPT_FIELDS.get(structure if structure in PROMPT_FIELDS
+                             else "original", PROMPT_FIELDS["original"])
+
+
+def _prompt_field_reqs(pf: tuple[str, ...], scene: str,
+                       style_block: str) -> str:
+    """按结构生成重写 prompt 的行级 prompt 字段要求文本（cutout 为空）。"""
+    if not pf:
+        return ""
+    reqs = []
+    if "image_prompt" in pf:
+        reqs.append(f'- "image_prompt": the speaking character\'s FULL physical '
+                    f"description + role + the {scene} location + action matching "
+                    f"the text{style_block and ' + the style phrase'}")
+    if "video_prompt" in pf:
+        reqs.append('- "video_prompt": same character description + action + '
+                    "the line's text spoken naturally + match the reference "
+                    "image exactly")
+    return "\n" + "\n".join(reqs)
 
 _MAX_PATCHES = 8
 _PATCH_MERGE_GAP = 5
@@ -183,7 +208,8 @@ def _critique_listening(script: dict, report: dict) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _merge_patches(report: dict, judge_issues: list[dict],
-                   script: dict) -> list[tuple[int, int, list[str]]]:
+                   script: dict, structure: str = "original"
+                   ) -> list[tuple[int, int, list[str]]]:
     """Merge gate errors + judge issues into repair patches (s, e, hints)."""
     dialogue = script.get("dialogue", [])
     n = len(dialogue)
@@ -202,10 +228,14 @@ def _merge_patches(report: dict, judge_issues: list[dict],
             for l in ls:
                 spans.append((l, l, "Fix the speaker (only char_a/char_b allowed)."))
         elif "为空" in issue["detail"]:
+            fields_desc = "text/zh/phonetic"
+            pf = _prompt_fields(structure)
+            if pf:
+                fields_desc += "/" + "/".join(pf)
             for l in ls:
                 spans.append((l, l,
                               "This line has empty required fields — fill in "
-                              "text/zh/phonetic/image_prompt/video_prompt completely."))
+                              f"{fields_desc} completely."))
         elif "男女指示词混用" in issue["detail"]:
             for l in ls:
                 spans.append((l, l,
@@ -305,7 +335,7 @@ JSON array ONLY, no markdown."""
 
 
 def _repair_patches(script: dict, patches: list[tuple[int, int, list[str]]],
-                    cefr: str):
+                    cefr: str, structure: str = "original"):
     """Rewrite each patch in place, preserving the exact line count."""
     dialogue = script["dialogue"]
     scene = script.get("scene", "")
@@ -313,6 +343,7 @@ def _repair_patches(script: dict, patches: list[tuple[int, int, list[str]]],
     char_b_desc = script.get("char_b_description", "")
     char_a_role = script.get("char_a_role", "")
     char_b_role = script.get("char_b_role", "")
+    pf = _prompt_fields(structure)
 
     for s, e, hints in sorted(patches, key=lambda p: -p[0]):
         k = e - s + 1
@@ -326,17 +357,17 @@ def _repair_patches(script: dict, patches: list[tuple[int, int, list[str]]],
             style_prompt = str(get_active_style_prompt() or "").strip()
         except Exception:
             style_prompt = ""
-        style_block = (f"\nVisual style phrase (copy VERBATIM into image_prompt, "
-                       f"video_prompt and poses): \"{style_prompt}\"\n"
-                       if style_prompt else "")
+        style_block = ""
+        if style_prompt and pf:
+            style_block = (f"\nVisual style phrase (copy VERBATIM into "
+                           f"{' and '.join(pf)}): \"{style_prompt}\"\n")
 
-        orig_json = json.dumps(
-            [{"speaker": l.get("speaker"), "text": l.get("text"),
-              "phonetic": l.get("phonetic"), "zh": l.get("zh"),
-              "image_prompt": l.get("image_prompt"),
-              "video_prompt": l.get("video_prompt"),
-              "poses": l.get("poses")} for l in orig],
-            ensure_ascii=False, separators=(",", ":"))
+        orig_lines = [{"speaker": l.get("speaker"), "text": l.get("text"),
+                       "phonetic": l.get("phonetic"), "zh": l.get("zh"),
+                       **{f: l.get(f) for f in pf}}
+                      for l in orig]
+        orig_json = json.dumps(orig_lines,
+                               ensure_ascii=False, separators=(",", ":"))
 
         prompt = f"""Rewrite EXACTLY {k} dialogue lines (indices {s}-{e}) of an ongoing ESL conversation at a {scene}.
 
@@ -362,10 +393,7 @@ Requirements:
 - Every line keeps ALL fields:
   - "text": the English sentence
   - "phonetic": IPA transcription in /slashes/
-  - "zh": Traditional Chinese (繁體中文) translation
-  - "image_prompt": the speaking character's FULL physical description + role + the {scene} location + action matching the text{style_block and ' + the style phrase'}
-  - "video_prompt": same character description + action + the line's text spoken naturally + match the reference image exactly
-  - "poses": array of exactly 2 pose descriptions (pose 0 = speaking with mouth open, pose 1 = listening relaxed), each with the character's full physical description, no props, no scene
+  - "zh": Traditional Chinese (繁體中文) translation{_prompt_field_reqs(pf, scene, style_block)}
 - Seamless continuity with the before/after context lines.
 
 Output: JSON array of exactly {k} objects. JSON ONLY."""
@@ -396,9 +424,9 @@ Output: JSON array of exactly {k} objects. JSON ONLY."""
                 sp = new.get("speaker", "")
                 if sp not in ("char_a", "char_b"):
                     new["speaker"] = old.get("speaker", "char_a")
-                for f in ("phonetic", "poses"):
+                for f in ("phonetic",):
                     if not new.get(f):
-                        new[f] = old.get(f, "" if f == "phonetic" else [])
+                        new[f] = old.get(f, "")
             dialogue[s:e + 1] = lines
             print(f"    patch L{s}-{e}: rewritten ({len(hints)} hints)")
         else:
@@ -418,7 +446,8 @@ Output: JSON array of exactly {k} objects. JSON ONLY."""
 # 主入口：轮次循环
 # ---------------------------------------------------------------------------
 
-def run_listening_qa(script: dict, num_lines: int) -> dict:
+def run_listening_qa(script: dict, num_lines: int,
+                     structure: str = "original") -> dict:
     """Gate + critique/repair loop. Mutates script in place, stores script["_qa"]."""
     qa_rounds = _env_int("LISTENING_QA_MAX_ROUNDS", 3)
     if qa_rounds <= 0:
@@ -429,7 +458,7 @@ def run_listening_qa(script: dict, num_lines: int) -> dict:
     rounds_log = []
     had_judge_issues = True  # round 1 必跑 judge
     for rnd in range(1, qa_rounds + 1):
-        report = run_listening_quality_gate(script, num_lines)
+        report = run_listening_quality_gate(script, num_lines, structure=structure)
         judge_issues = []
         if report["n_errors"] or had_judge_issues:
             print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
@@ -446,16 +475,18 @@ def run_listening_qa(script: dict, num_lines: int) -> dict:
         if report["passed"] and not judge_issues:
             print(f"  [QA] Round {rnd}: PASSED (0 errors, judges clean)")
             break
-        patches = _merge_patches(report, judge_issues, script)
+        patches = _merge_patches(report, judge_issues, script,
+                                 structure=structure)
         if not patches:
             print(f"  [QA] Round {rnd}: no actionable patches, accepting best effort")
             break
         print(f"  [QA] Round {rnd}: repairing {len(patches)} patches: "
               + ", ".join(f"L{p[0]}-{p[1]}" for p in patches))
-        _repair_patches(script, patches, script.get("cefr", "A2"))
+        _repair_patches(script, patches, script.get("cefr", "A2"),
+                        structure=structure)
         _apply_fixes(script)
 
-    final = run_listening_quality_gate(script, num_lines)
+    final = run_listening_quality_gate(script, num_lines, structure=structure)
     script["_qa"] = {"rounds": rounds_log, "final": final}
     print(format_report(final))
     if not final["passed"]:

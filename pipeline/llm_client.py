@@ -372,14 +372,46 @@ def _build_character_override_prompt(quest: bool = False) -> str:
     lines.append("2. Set char_{key}_gender to the specified gender. If gender is not given, infer it from the description.")
     lines.append("3. Set char_{key}_role to the specified role. If role is not given, generate one that fits the description.")
     lines.append("4. Write ALL dialogue for this character to match their role — the story scenario MUST fit these characters' roles (e.g. if role is 'dentist', the conversation should be about a dental visit).")
-    lines.append("5. If a description is given, use the EXACT same description text in ALL image_prompt, video_prompt, and poses entries for this character. If you created a new description, use YOUR new description consistently in ALL entries.")
+    lines.append("5. If a description is given, use the EXACT same description text in ALL visual prompt entries for this character. If you created a new description, use YOUR new description consistently in ALL entries.")
     lines.append("6. If host is pre-defined, host_description and host_gender MUST match the provided values.")
     return "\n".join(lines) + "\n\n"
 
 
+def _per_line_prompt_reqs(pf: str, style_prompt: str) -> str:
+    """按结构生成行级视觉 prompt 字段要求文本（cutout 无 → 只要求三件套）。"""
+    if pf == "original":
+        return f"""
+  - "video_prompt": a detailed prompt for AI video generation. MUST include: (1) the character's EXACT physical description (same every time for same speaker), (2) their role (e.g. "a waitress", "a customer"), (3) the scene location, (4) the action matching the dialogue text, AND the dialogue text itself so the character appears to be speaking those words naturally (e.g. "The character says: 'Hi, I'd like a latte, please.' while gesturing toward the menu"). CRITICAL: the video MUST closely reference the uploaded reference image — the character's appearance, clothing, and the scene must match the reference image exactly. Style phrase (copy verbatim): "{style_prompt}"."""
+    if pf == "original_static":
+        return f"""
+  - "image_prompt": a detailed prompt describing what this character looks like AND what they are doing. MUST include: (1) the character's EXACT physical description (same every time for same speaker), (2) their role (e.g. "a waitress", "a customer"), (3) the scene location, (4) the action matching the dialogue text. Style phrase (copy verbatim): "{style_prompt}"."""
+    return ""
+
+
+def _desc_consistency_hint(pf: str, speaker_num: int) -> str:
+    """char 描述字段的一致性提示（无 prompt 字段的结构不追加）。"""
+    if pf == "original":
+        return (f" This MUST be used identically in ALL of speaker "
+                f"{speaker_num}'s video_prompt entries.")
+    if pf == "original_static":
+        return (f" This MUST be used identically in ALL of speaker "
+                f"{speaker_num}'s image_prompt entries.")
+    return ""
+
+
 def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = None,
-                            num_lines: int = 18) -> str:
-    """Build prompt for listening-practice lesson (num_lines + IPA + 繁中)."""
+                            num_lines: int = 18,
+                            structure: str = "original") -> str:
+    """Build prompt for listening-practice lesson (num_lines + IPA + 繁中).
+
+    structure 决定行级视觉 prompt 字段（其余模式不需要的字段不再要求生成）：
+    original → video_prompt；original_static → image_prompt；original_cutout → 无。
+    """
+    pf = structure if structure in ("original", "original_static",
+                                    "original_cutout") else "original"
+    prompt_fields = {"original": ("video_prompt",),
+                     "original_static": ("image_prompt",),
+                     "original_cutout": ()}[pf]
     used_hint = ""
     if used_dialogues:
         used_hint = f"""
@@ -389,9 +421,11 @@ Do NOT create dialogue that is too similar to these. Use a DIFFERENT situation, 
 """
     style_prompt = get_active_style_prompt()
     thumb_hint = get_active_thumbnail_hint()
-    style_section = f"""
+    style_section = ""
+    if prompt_fields:
+        style_section = f"""
 VISUAL STYLE (CRITICAL): The video's art style is: "{style_prompt}".
-- EVERY image_prompt, video_prompt, and poses entry MUST include this EXACT style descriptor phrase (copy it verbatim).
+- EVERY {' and '.join(prompt_fields)} entry MUST include this EXACT style descriptor phrase (copy it verbatim).
 - Do NOT use any other art style, do NOT mix styles, do NOT add contradicting style words (e.g. photorealistic, sketch).
 """
     return f"""You are an expert ESL teacher creating ENGLISH LISTENING PRACTICE content for overseas Chinese learners.
@@ -424,12 +458,9 @@ TECHNICAL REQUIREMENTS:
 - Every dialogue line MUST include:
   - "text": the English sentence
   - "phonetic": IPA phonetic transcription in /slashes/ (use proper IPA symbols)
-  - "zh": Traditional Chinese (繁體中文) translation
-  - "image_prompt": a detailed prompt describing what this character looks like AND what they are doing. MUST include: (1) the character's EXACT physical description (same every time for same speaker), (2) their role (e.g. "a waitress", "a customer"), (3) the scene location, (4) the action matching the dialogue text.
-  - "video_prompt": a detailed prompt for AI video generation. MUST include the SAME character description and action as image_prompt. MUST also include the dialogue text so the character appears to be speaking those words naturally (e.g. "The character says: 'Hi, I'd like a latte, please.' while gesturing toward the menu"). CRITICAL: the video MUST closely reference the uploaded reference image — the character's appearance, clothing, and the scene must match the reference image exactly.
-  - "poses": array of exactly 2 pose descriptions for stop-motion animation. Pose 0 = speaking (mouth open, expressive gesture). Pose 1 = listening (slight smile, relaxed). Each MUST include the character's full physical description (identical every time). NO props, NO objects, NO scene. Example: ["a young woman with brown hair in a green apron, speaking with mouth open, raising right hand", "a young woman with brown hair in a green apron, listening with a slight smile, relaxed posture"].
-- "char_a_description": a detailed physical description of speaker 1 (gender, hair color, hairstyle, clothing). This MUST be used identically in ALL of speaker 1's image_prompt and video_prompt entries.
-- "char_b_description": a detailed physical description of speaker 2 (gender, hair color, hairstyle, clothing). This MUST be used identically in ALL of speaker 2's image_prompt and video_prompt entries.
+  - "zh": Traditional Chinese (繁體中文) translation{_per_line_prompt_reqs(pf, style_prompt)}
+- "char_a_description": a detailed physical description of speaker 1 (gender, hair color, hairstyle, clothing).{_desc_consistency_hint(pf, 1)}
+- "char_b_description": a detailed physical description of speaker 2 (gender, hair color, hairstyle, clothing).{_desc_consistency_hint(pf, 2)}
 - "char_a_gender": "male" or "female" — the gender of speaker 1
 - "char_b_gender": "male" or "female" — the gender of speaker 2
 - "char_a_role": the role of speaker 1 in the story (e.g. "waitress", "customer")
@@ -461,9 +492,7 @@ TECHNICAL REQUIREMENTS:
 - ALL Chinese text MUST be in Traditional Chinese (繁體中文)
 
 {style_section}CONSISTENCY RULES (CRITICAL):
-- Gender: char_a_gender/char_b_gender MUST match the description text. If female, description MUST say "a young woman" and ALL her prompts MUST say so. NEVER mix genders.
-- Appearance: each speaker's description (hair, clothing, etc.) MUST be IDENTICAL across ALL their image_prompt/video_prompt/poses entries.
-- Scene: image_prompt and video_prompt MUST match the dialogue context (if at a restaurant, say "restaurant", NOT "airport"). Scene MUST be consistent throughout ALL lines.
+- Gender: char_a_gender/char_b_gender MUST match the description text. If female, description MUST say "a young woman" and ALL her prompts MUST say so. NEVER mix genders.{_consistency_prompt_rules(pf)}
 - Speaker field: MUST use "char_a" or "char_b" (not actual names).
 
 JSON schema:
@@ -499,10 +528,36 @@ JSON schema:
   "thumbnail_action": string,
   "thumbnail_subtitle": string,
   "thumbnail_icons": [{{"en": string, "zh": string}}],
-  "dialogue": [{{"speaker": string, "text": string, "phonetic": string, "zh": string, "image_prompt": string, "video_prompt": string, "poses": [string, string]}}]
+  "dialogue": [{{"speaker": string, "text": string, "phonetic": string, "zh": string{_schema_prompt_fields(pf)}}}]
 }}
 
 Topic: {topic}"""
+
+
+def _consistency_prompt_rules(pf: str) -> str:
+    """CONSISTENCY RULES 中与视觉 prompt 相关的规则行（无 prompt 字段的结构省略）。"""
+    if pf == "original":
+        return ("\n- Appearance: each speaker's description (hair, clothing, etc.) "
+                "MUST be IDENTICAL across ALL their video_prompt entries."
+                "\n- Scene: video_prompt MUST match the dialogue context (if at a "
+                "restaurant, say \"restaurant\", NOT \"airport\"). Scene MUST be "
+                "consistent throughout ALL lines.")
+    if pf == "original_static":
+        return ("\n- Appearance: each speaker's description (hair, clothing, etc.) "
+                "MUST be IDENTICAL across ALL their image_prompt entries."
+                "\n- Scene: image_prompt MUST match the dialogue context (if at a "
+                "restaurant, say \"restaurant\", NOT \"airport\"). Scene MUST be "
+                "consistent throughout ALL lines.")
+    return ""
+
+
+def _schema_prompt_fields(pf: str) -> str:
+    """JSON schema 中行级 prompt 字段片段（cutout 为空串）。"""
+    if pf == "original":
+        return ', "video_prompt": string'
+    if pf == "original_static":
+        return ', "image_prompt": string'
+    return ""
 
 
 def _load_used_listening_summaries(lessons_dir: str = None,
@@ -536,7 +591,8 @@ def _load_used_listening_summaries(lessons_dir: str = None,
 
 def generate_listening_script(topic: str, cefr: str = "A2",
                               lessons_dir: str = None,
-                              num_lines: int = 18) -> dict:
+                              num_lines: int = 18,
+                              structure: str = "original") -> dict:
     """Generate a listening-practice lesson script via SenseNova DeepSeek V4 Flash.
 
     Args:
@@ -544,13 +600,18 @@ def generate_listening_script(topic: str, cefr: str = "A2",
         cefr: CEFR level (A1, A2, B1, B2, C1, C2)
         lessons_dir: optional path to lessons/ directory for anti-duplicate check
         num_lines: number of dialogue lines to generate (default 18)
+        structure: original / original_static / original_cutout — 决定行级
+            视觉 prompt 字段的裁剪（original→video_prompt, static→image_prompt,
+            cutout→无）；未知值回退 original。
 
     Returns:
         Script dict with dialogue[], char descriptions, title, etc.
     """
+    if structure not in ("original", "original_static", "original_cutout"):
+        structure = "original"
     used_summaries = _load_used_listening_summaries(lessons_dir)
     prompt = _build_listening_prompt(topic, cefr, used_dialogues=used_summaries,
-                                     num_lines=num_lines)
+                                     num_lines=num_lines, structure=structure)
 
     # Retry up to 3 times on JSON parse errors (LLM may truncate or produce invalid JSON)
     last_error = None
@@ -615,17 +676,18 @@ def generate_listening_script(topic: str, cefr: str = "A2",
     script.setdefault("thumbnail_subtitle", "18句聽力練習")
     script.setdefault("thumbnail_icons", [])
 
-    # Ensure dialogue has all required fields
+    # Ensure dialogue has all required fields（行级 prompt 字段按结构裁剪）
     for line in script.get("dialogue", []):
         line.setdefault("phonetic", "")
         line.setdefault("zh", "")
-        line.setdefault("image_prompt", "")
-        line.setdefault("video_prompt", "")
-        line.setdefault("poses", [])
+        if structure == "original":
+            line.setdefault("video_prompt", "")
+        elif structure == "original_static":
+            line.setdefault("image_prompt", "")
 
     # QA: programmatic gate + LLM critique/repair loop (mirrors quest Phase D+E)
     from llm_review import run_listening_qa
-    run_listening_qa(script, num_lines)
+    run_listening_qa(script, num_lines, structure=structure)
 
     return script
 

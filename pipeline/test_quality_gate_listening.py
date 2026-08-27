@@ -152,7 +152,8 @@ class TestDefectFixture(unittest.TestCase):
 
     def test_gender_conflict(self):
         def mutate(s):
-            s["dialogue"][7]["image_prompt"] = (
+            # original 结构逐行一致性只看 video_prompt（裁剪后 image_prompt 不再生成）
+            s["dialogue"][7]["video_prompt"] = (
                 f"{CB_DESC}, the barista, she pours milk in the coffee shop")
         report = run_listening_quality_gate(self._defect(mutate), 18)
         found = _find_issues(report, "consistency", "error", "男女指示词混用")
@@ -165,11 +166,17 @@ class TestDefectFixture(unittest.TestCase):
         report = run_listening_quality_gate(self._defect(mutate), 18)
         self.assertTrue(_find_issues(report, "fields", "error", "'zh' 为空"))
 
-    def test_empty_image_prompt(self):
+    def test_empty_video_prompt(self):
+        def mutate(s):
+            s["dialogue"][4]["video_prompt"] = ""
+        report = run_listening_quality_gate(self._defect(mutate), 18)
+        self.assertTrue(_find_issues(report, "fields", "error", "'video_prompt' 为空"))
+
+    def test_empty_image_prompt_not_required_for_original(self):
         def mutate(s):
             s["dialogue"][4]["image_prompt"] = ""
         report = run_listening_quality_gate(self._defect(mutate), 18)
-        self.assertTrue(_find_issues(report, "fields", "error", "'image_prompt' 为空"))
+        self.assertFalse(_find_issues(report, "fields", "error", "'image_prompt' 为空"))
 
     def test_simplified_zh(self):
         def mutate(s):
@@ -203,17 +210,65 @@ class TestDefectFixture(unittest.TestCase):
         report = run_listening_quality_gate(self._defect(mutate), 18)
         self.assertTrue(_find_issues(report, "fields", "warning", "/slashes/"))
 
-    def test_poses_missing(self):
+    def test_poses_no_longer_checked(self):
+        # poses 字段已废弃（管线从不消费），缺失不应再产生任何 warning
         def mutate(s):
-            s["dialogue"][2]["poses"] = []
+            for line in s["dialogue"]:
+                line.pop("poses", None)
         report = run_listening_quality_gate(self._defect(mutate), 18)
-        self.assertTrue(_find_issues(report, "fields", "warning", "poses"))
+        self.assertFalse(_find_issues(report, "fields", "warning", "poses"))
 
     def test_title_quote_mismatch(self):
         def mutate(s):
             s["title_quote"] = "Give me a burger"
         report = run_listening_quality_gate(self._defect(mutate), 18)
         self.assertTrue(_find_issues(report, "consistency", "warning", "未逐字命中"))
+
+
+def _strip_prompts(script: dict, keep: set[str]) -> dict:
+    """按结构矩阵裁掉行级 prompt 字段（模拟裁剪后的新生成脚本）。"""
+    for line in script["dialogue"]:
+        for f in ("image_prompt", "video_prompt", "poses"):
+            if f not in keep:
+                line.pop(f, None)
+    return script
+
+
+class TestStructureMatrix(unittest.TestCase):
+    """按结构裁剪后的字段矩阵：original→video_prompt / static→image_prompt / cutout→无"""
+
+    def test_static_requires_image_prompt_only(self):
+        script = _clean_script()
+        script["structure"] = "original_static"
+        _strip_prompts(script, {"image_prompt"})
+        report = run_listening_quality_gate(script, 18)
+        self.assertEqual(report["n_errors"], 0,
+                         f"static script with image_prompt only should pass, "
+                         f"issues={report['issues']}")
+
+    def test_static_empty_image_prompt_errors(self):
+        script = _clean_script()
+        script["structure"] = "original_static"
+        _strip_prompts(script, {"image_prompt"})
+        script["dialogue"][3]["image_prompt"] = ""
+        report = run_listening_quality_gate(script, 18)
+        self.assertTrue(_find_issues(report, "fields", "error", "'image_prompt' 为空"))
+
+    def test_cutout_needs_no_prompts(self):
+        script = _clean_script()
+        script["structure"] = "original_cutout"
+        _strip_prompts(script, set())
+        report = run_listening_quality_gate(script, 18)
+        self.assertTrue(report["passed"],
+                        f"cutout script without prompts should pass, "
+                        f"issues={report['issues']}")
+
+    def test_original_missing_video_prompt_errors(self):
+        script = _clean_script()
+        script["structure"] = "original"
+        _strip_prompts(script, {"image_prompt"})
+        report = run_listening_quality_gate(script, 18)
+        self.assertTrue(_find_issues(report, "fields", "error", "'video_prompt' 为空"))
 
 
 class TestMergeAndFixes(unittest.TestCase):

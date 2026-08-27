@@ -62,7 +62,6 @@ from image_gen import (
     check_step2_resume as _check_step2_resume,
     generate_images as _generate_images,
     generate_dialogue_images as _generate_dialogue_images,
-    generate_pose_images as _generate_pose_images,
     generate_quest_atlases as _generate_quest_atlases,
     generate_scene_atlas as _generate_scene_atlas,
     reupload_for_cdn as _reupload_for_cdn,
@@ -136,7 +135,8 @@ def _validate_script(script: dict, num_lines: int,
 
 
 def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
-                                quest=False, max_attempts=5) -> dict:
+                                quest=False, structure="original",
+                                max_attempts=5) -> dict:
     """Generate and validate script, retrying on failure."""
     for attempt in range(max_attempts):
         try:
@@ -147,7 +147,8 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                                                num_lines=num_lines)
             else:
                 script = generate_listening_script(topic, cefr, lessons_dir=lessons_dir,
-                                                   num_lines=num_lines)
+                                                   num_lines=num_lines,
+                                                   structure=structure)
             valid, msg = _validate_script(script, num_lines, quest=quest)
             if valid:
                 print(f"  [Script] Valid: {len(script['dialogue'])} lines")
@@ -317,7 +318,8 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
     else:
         script = _generate_script_with_retry(
             topic, args.cefr, args.lessons_dir, args.num_lines,
-            quest=(args.structure == "quest"))
+            quest=(args.structure == "quest"),
+            structure=(args.structure if args.structure != "quest" else "original"))
         yt_title = script.get("youtube_title", script.get("title", topic))
         safe_title = _safe_dirname(yt_title, topic)
         work_dir = parent_dir / safe_title

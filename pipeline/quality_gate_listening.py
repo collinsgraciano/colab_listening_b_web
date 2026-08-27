@@ -92,7 +92,24 @@ def _scene_tokens(scene: str) -> list[str]:
 # 主入口
 # ---------------------------------------------------------------------------
 
-def run_listening_quality_gate(script: dict, num_lines: int | None = None) -> dict:
+# 各结构模式行级必需的视觉 prompt 字段（裁剪后 poses 已彻底废弃）：
+# original 只生成 video_prompt（Step3 片段）；original_static 只生成 image_prompt（逐行图）；
+# original_cutout 不生成任何 prompt 文本（姿势图全部程序化生成）。
+PROMPT_FIELDS = {
+    "original": ("video_prompt",),
+    "original_static": ("image_prompt",),
+    "original_cutout": (),
+}
+
+
+def _resolve_structure(script: dict, structure: str = "") -> str:
+    """解析结构模式：显式参数优先，其次 script 内记录，缺省 original（旧脚本最严兼容）。"""
+    s = (structure or str(script.get("structure", "")) or "original").strip()
+    return s if s in PROMPT_FIELDS else "original"
+
+
+def run_listening_quality_gate(script: dict, num_lines: int | None = None,
+                               structure: str = "") -> dict:
     """对 listening 脚本跑全部程序化检查，返回报告。"""
     issues: list[dict] = []
 
@@ -100,6 +117,8 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None) -> di
         issues.append({"check": check, "severity": severity,
                        "detail": detail, "lines": lines or []})
 
+    structure = _resolve_structure(script, structure)
+    prompt_fields = PROMPT_FIELDS[structure]
     dialogue = script.get("dialogue", [])
     if num_lines is None:
         num_lines = script.get("_requested_num_lines", 0) or len(dialogue)
@@ -124,16 +143,12 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None) -> di
 
     # ── 2. 字段完整性 ────────────────────────────────────────────────
     for i, line in enumerate(dialogue):
-        for f in ("text", "zh", "phonetic", "image_prompt", "video_prompt"):
+        for f in ("text", "zh", "phonetic", *prompt_fields):
             if not str(line.get(f, "")).strip():
                 add("fields", "error", f"line {i} 字段 '{f}' 为空", [i])
         ph = str(line.get("phonetic", "")).strip()
         if ph and not (ph.startswith("/") and ph.endswith("/")):
             add("fields", "warning", f"line {i} phonetic 未用 /slashes/ 包裹", [i])
-        poses = line.get("poses", None)
-        if not isinstance(poses, list) or len(poses) != 2:
-            add("fields", "warning",
-                f"line {i} poses 缺失或不是 2 条（stop_motion 动画需要）", [i])
 
     # ── 3. 自然度 ────────────────────────────────────────────────────
     texts = [l.get("text", "") for l in dialogue]
@@ -210,18 +225,12 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None) -> di
         corpus = desc
         for i in own_lines:
             l = dialogue[i]
-            corpus += " " + " ".join([
-                str(l.get("image_prompt", "")), str(l.get("video_prompt", "")),
-                *[str(p) for p in (l.get("poses") or []) if isinstance(p, str)],
-            ])
+            corpus += " " + " ".join(str(l.get(f, "")) for f in prompt_fields)
         fw, mw = _gender_words(corpus)
         line_conflicts = []
         for i in own_lines:
             l = dialogue[i]
-            ltext = " ".join([
-                str(l.get("image_prompt", "")), str(l.get("video_prompt", "")),
-                *[str(p) for p in (l.get("poses") or []) if isinstance(p, str)],
-            ])
+            ltext = " ".join(str(l.get(f, "")) for f in prompt_fields)
             lf, lm = _gender_words(ltext)
             if lf and lm:
                 line_conflicts.append(i)
@@ -246,11 +255,10 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None) -> di
     else:
         summary_gender = 0
 
-    # 5b. 场景一致性：逐行 image_prompt/video_prompt 是否提及 scene 词元
-    if scene_toks:
+    # 5b. 场景一致性：逐行 prompt 文本是否提及 scene 词元（无 prompt 字段的结构跳过）
+    if scene_toks and prompt_fields:
         for i, l in enumerate(dialogue):
-            ptext = (str(l.get("image_prompt", "")) + " "
-                     + str(l.get("video_prompt", ""))).lower()
+            ptext = " ".join(str(l.get(f, "")) for f in prompt_fields).lower()
             if not any(tok in ptext for tok in scene_toks):
                 scene_missing.append(i)
         if scene_missing:
@@ -266,11 +274,10 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None) -> di
         style_prompt = str(get_active_style_prompt() or "").strip()
     except Exception:
         style_prompt = ""
-    if style_prompt:
+    if style_prompt and prompt_fields:
         style_missing = []
         for i, l in enumerate(dialogue):
-            ptext = (str(l.get("image_prompt", "")) + " "
-                     + str(l.get("video_prompt", ""))).lower()
+            ptext = " ".join(str(l.get(f, "")) for f in prompt_fields).lower()
             if style_prompt.lower() not in ptext:
                 style_missing.append(i)
         if len(style_missing) > max(1, round(len(dialogue) * 0.2)):

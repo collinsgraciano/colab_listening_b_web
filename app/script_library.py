@@ -415,7 +415,8 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
             else:
                 from llm_client import generate_listening_script
                 script = generate_listening_script(
-                    topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines)
+                    topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines,
+                    structure=structure)
             valid, msg = _validate_script(script, num_lines, quest=quest)
             if valid:
                 return script, attempt + 1
