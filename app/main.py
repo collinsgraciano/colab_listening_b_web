@@ -254,7 +254,8 @@ async def runs_page(request: Request):
     runs = []
     if output_dir.exists():
         for d in sorted(output_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-            if not d.is_dir():
+            # 跳过文件与隐藏目录（含回收站 .recycle_bin）
+            if not d.is_dir() or d.name.startswith("."):
                 continue
             script_path = d / "script.json"
             videos_dir = d / "videos"
@@ -275,6 +276,7 @@ async def runs_page(request: Request):
                 "uploaded": (d / "uploaded.flag").exists(),
                 "has_4k": has_4k,
                 "recomposable": recomposable,
+                "structure": "",
             }
             # Find video files — final videos are in work_dir root, not videos/
             video_files = []
@@ -302,10 +304,40 @@ async def runs_page(request: Request):
                 run_info["title"] = d.name
             runs.append(run_info)
 
+    # 回收站列表（.recycle_bin 下所有已删除运行）
+    trash_runs = []
+    recycle_root = output_dir / RECYCLE_DIRNAME
+    if recycle_root.is_dir():
+        for d in sorted(recycle_root.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if not d.is_dir():
+                continue
+            item = {
+                "name": d.name,
+                "original_name": d.name,
+                "deleted_at": d.stat().st_mtime,
+                "title": d.name,
+            }
+            meta_path = d / TRASH_META_FILENAME
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    item["deleted_at"] = meta.get("deleted_at", item["deleted_at"])
+                    item["original_name"] = meta.get("original_name", d.name)
+                except (json.JSONDecodeError, OSError):
+                    pass
+            script_path = d / "script.json"
+            if script_path.exists():
+                try:
+                    s = json.loads(script_path.read_text(encoding="utf-8"))
+                    item["title"] = s.get("youtube_title", s.get("title", d.name))
+                except (json.JSONDecodeError, OSError):
+                    pass
+            trash_runs.append(item)
+
     return templates.TemplateResponse(request, "runs.html", {
         "runs": runs,
-        "pending_runs": [r for r in runs if not r["uploaded"]],
-        "uploaded_runs": [r for r in runs if r["uploaded"]],
+        "trash_runs": trash_runs,
+        "mode_labels": MODE_LABELS,
         "subtitle_style_options": subtitle_style_lib.get_style_options(),
         "active_page": "runs",
     })
@@ -1492,18 +1524,114 @@ async def api_list_images(name: str):
     return {"images": images}
 
 
+# 回收站：删除运行先移入 output/.recycle_bin，回收站内再次删除才真正删文件
+RECYCLE_DIRNAME = ".recycle_bin"
+TRASH_META_FILENAME = ".trash_meta.json"
+
+
+def _move_run_to_recycle_bin(run_dir: Path) -> str:
+    """把运行目录移入回收站（同盘 rename），重名自动追加 _N 后缀。返回回收站内的目录名。"""
+    import shutil
+    recycle_root = run_dir.parent / RECYCLE_DIRNAME
+    recycle_root.mkdir(exist_ok=True)
+    dst = recycle_root / run_dir.name
+    suffix = 1
+    while dst.exists():
+        dst = recycle_root / f"{run_dir.name}_{suffix}"
+        suffix += 1
+    shutil.move(str(run_dir), str(dst))
+    meta = {"original_name": run_dir.name, "deleted_at": time.time()}
+    (dst / TRASH_META_FILENAME).write_text(
+        json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    return dst.name
+
+
 @app.delete("/api/runs/{name}")
 async def api_delete_run(name: str):
-    import shutil
+    """删除运行 → 移入回收站（防误删，可在页面恢复）。"""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     run_dir = output_dir / name
-    if run_dir.exists() and run_dir.is_dir():
-        # Safety: ensure it's within output_dir
-        if str(run_dir.resolve()).startswith(str(output_dir.resolve())):
-            shutil.rmtree(str(run_dir))
-            return {"ok": True}
-    return JSONResponse({"ok": False, "error": "Cannot delete"}, status_code=400)
+    if not run_dir.is_dir():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    # Safety: ensure it's within output_dir
+    if not str(run_dir.resolve()).startswith(str(output_dir.resolve())):
+        return JSONResponse({"ok": False, "error": "Cannot delete"}, status_code=400)
+    try:
+        _move_run_to_recycle_bin(run_dir)
+    except OSError as e:
+        return JSONResponse({"ok": False, "error": f"移入回收站失败: {e}"}, status_code=500)
+    return {"ok": True}
+
+
+@app.post("/api/trash/{name}/restore")
+async def api_trash_restore(name: str):
+    """从回收站恢复运行到 output 目录。"""
+    import shutil
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    recycle_root = output_dir / RECYCLE_DIRNAME
+    src = recycle_root / name
+    if not src.is_dir() or not str(src.resolve()).startswith(str(recycle_root.resolve())):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    original = name
+    meta_path = src / TRASH_META_FILENAME
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            saved = meta.get("original_name") or ""
+            if saved and "/" not in saved and "\\" not in saved:
+                original = saved
+        except (json.JSONDecodeError, OSError):
+            pass
+    # 同名运行已存在时追加 _N 后缀，绝不覆盖现有数据
+    dst = output_dir / original
+    suffix = 1
+    while dst.exists():
+        dst = output_dir / f"{original}_{suffix}"
+        suffix += 1
+    try:
+        shutil.move(str(src), str(dst))
+    except OSError as e:
+        return JSONResponse({"ok": False, "error": f"恢复失败: {e}"}, status_code=500)
+    (dst / TRASH_META_FILENAME).unlink(missing_ok=True)
+    return {"ok": True, "restored_as": dst.name}
+
+
+@app.delete("/api/trash/{name}")
+async def api_trash_purge(name: str):
+    """从回收站彻底删除运行（不可恢复）。"""
+    import shutil
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    recycle_root = output_dir / RECYCLE_DIRNAME
+    run_dir = recycle_root / name
+    if not run_dir.is_dir() or not str(run_dir.resolve()).startswith(str(recycle_root.resolve())):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    shutil.rmtree(str(run_dir))
+    return {"ok": True}
+
+
+@app.post("/api/trash/empty")
+async def api_trash_empty():
+    """清空回收站（彻底删除其中所有内容）。"""
+    import shutil
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    recycle_root = output_dir / RECYCLE_DIRNAME
+    if not recycle_root.is_dir():
+        return {"ok": True, "removed": 0}
+    removed = 0
+    for entry in recycle_root.iterdir():
+        try:
+            if entry.is_dir():
+                shutil.rmtree(str(entry))
+            else:
+                entry.unlink()
+            removed += 1
+        except OSError:
+            continue
+    return {"ok": True, "removed": removed}
 
 
 @app.post("/api/runs/{name}/mark_uploaded")
@@ -1543,6 +1671,54 @@ async def api_recompose(name: str, request: Request):
     return {"ok": True, "message": msg, "status": service.status}
 
 
+def _list_explorer_windows() -> set[int]:
+    """枚举当前所有可见的资源管理器文件夹窗口（CabinetWClass）句柄。"""
+    import ctypes
+    user32 = ctypes.windll.user32
+    found: set[int] = set()
+    proto = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, ctypes.c_ssize_t, ctypes.c_ssize_t)
+
+    def _cb(hwnd, _lparam):
+        buf = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, buf, 64)
+        if buf.value == "CabinetWClass" and user32.IsWindowVisible(hwnd):
+            found.add(hwnd)
+        return True
+
+    user32.EnumWindows(proto(_cb), 0)
+    return found
+
+
+def _bring_window_to_front(hwnd) -> None:
+    """把窗口强制带到前台获得焦点。先按一下 ALT 再 SetForegroundWindow，
+    绕过 Windows 对非前台进程的焦点锁定限制；SW_RESTORE 兼容最小化状态。"""
+    import ctypes
+    user32 = ctypes.windll.user32
+    user32.keybd_event(0x12, 0, 0, 0)   # ALT down
+    user32.keybd_event(0x12, 0, 2, 0)   # ALT up（KEYEVENTF_KEYUP）
+    user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+    user32.SetForegroundWindow(hwnd)
+
+
+def _raise_folder_window(folder_name: str, before: set[int], timeout: float = 3.0) -> None:
+    """等待新开的资源管理器窗口出现并置顶：优先找新建句柄，否则按标题匹配（兼容旧窗口新开标签页）。"""
+    import ctypes
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        windows = _list_explorer_windows()
+        fresh = [h for h in windows if h not in before]
+        if fresh:
+            _bring_window_to_front(fresh[0])
+            return
+        for h in windows:
+            buf = ctypes.create_unicode_buffer(256)
+            ctypes.windll.user32.GetWindowTextW(h, buf, 256)
+            if buf.value.strip() == folder_name:
+                _bring_window_to_front(h)
+                return
+        time.sleep(0.15)
+
+
 @app.post("/api/runs/{name}/open_folder")
 async def api_open_folder(name: str):
     """在系统文件管理器中打开运行目录（视频及所有素材所在目录）。"""
@@ -1556,7 +1732,12 @@ async def api_open_folder(name: str):
         return JSONResponse({"ok": False, "error": "Invalid path"}, status_code=400)
     try:
         if sys.platform == "win32":
+            # 记录已有窗口，打开后把新资源管理器窗口强行带到前台（否则常被浏览器挡住）
+            before = _list_explorer_windows()
             os.startfile(str(run_dir))
+            threading.Thread(
+                target=_raise_folder_window,
+                args=(run_dir.name, before), daemon=True).start()
         else:
             import subprocess
             opener = "open" if sys.platform == "darwin" else "xdg-open"

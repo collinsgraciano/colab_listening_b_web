@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% macro run_card(run) %}
-<div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition run-card" data-run="{{ run.name }}">
+<div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition run-card"
+     data-run="{{ run.name }}" data-uploaded="{% if run.uploaded %}1{% else %}0{% endif %}" data-structure="{{ run.structure }}">
     <!-- Thumbnail -->
     {% if run.has_thumbnail %}
     <div class="aspect-video bg-slate-900 cursor-pointer" onclick="showVideo('{{ run.name }}', '{{ run.videos[0].name if run.videos else '' }}')">
@@ -74,38 +75,70 @@
         </a>
     </div>
     {% else %}
-    <!-- 分组 Tab：未上传 / 已上传 -->
-    <div class="flex items-center gap-2 mb-4">
-        <button id="tab-pending" onclick="switchGroup('pending')"
-            class="px-4 py-2 rounded-lg text-sm font-medium bg-amber-600/80 text-white">
-            未上传 <span id="count-pending" class="ml-1 opacity-80">{{ pending_runs | length }}</span>
-        </button>
-        <button id="tab-uploaded" onclick="switchGroup('uploaded')"
-            class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300">
-            已上传 <span id="count-uploaded" class="ml-1 opacity-80">{{ uploaded_runs | length }}</span>
-        </button>
+    <!-- 筛选条：上传状态 × 模式（两组筛选同时选择、叠加生效） -->
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-3 mb-5">
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs text-slate-500 mr-1">上传状态</span>
+            <button data-upload-chip="all" onclick="setUploadFilter('all')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">全部 <span data-upload-count="all"></span></button>
+            <button data-upload-chip="pending" onclick="setUploadFilter('pending')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">未上传 <span data-upload-count="0"></span></button>
+            <button data-upload-chip="uploaded" onclick="setUploadFilter('uploaded')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">已上传 <span data-upload-count="1"></span></button>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs text-slate-500 mr-1">模式</span>
+            <button data-mode-chip="all" onclick="setModeFilter('all')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">全部</button>
+            {% for mid, mlabel in mode_labels.items() %}
+            <button data-mode-chip="{{ mid }}" onclick="setModeFilter('{{ mid }}')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">{{ mlabel }} <span data-mode-count="{{ mid }}"></span></button>
+            {% endfor %}
+        </div>
     </div>
 
-    <!-- 未上传组 -->
-    <div id="group-pending">
-        <div id="empty-pending" class="bg-slate-800 rounded-xl p-8 border border-slate-700 text-center{% if pending_runs %} hidden{% endif %}">
-            <p class="text-slate-400">没有待上传的视频 🎉</p>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for run in pending_runs %}{{ run_card(run) }}{% endfor %}
-        </div>
+    <!-- 运行卡片网格（受上面两组筛选共同过滤） -->
+    <div id="grid-runs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for run in runs %}{{ run_card(run) }}{% endfor %}
     </div>
-
-    <!-- 已上传组 -->
-    <div id="group-uploaded" class="hidden">
-        <div id="empty-uploaded" class="bg-slate-800 rounded-xl p-8 border border-slate-700 text-center{% if uploaded_runs %} hidden{% endif %}">
-            <p class="text-slate-400">还没有已上传的视频</p>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for run in uploaded_runs %}{{ run_card(run) }}{% endfor %}
-        </div>
-    </div>
+    <p id="runs-empty" class="hidden bg-slate-800 rounded-xl p-8 border border-slate-700 text-center text-slate-400">
+        没有符合当前筛选条件的视频
+    </p>
     {% endif %}
+
+    <!-- 回收站：误删保护，再次删除才真正删除 -->
+    <details class="mt-10"{% if trash_runs %} open{% endif %}>
+        <summary class="cursor-pointer select-none flex items-center gap-3 list-none">
+            <span class="text-lg font-semibold text-white">🗑️ 回收站</span>
+            <span class="text-sm text-slate-400">{{ trash_runs | length }} 个已删除</span>
+        </summary>
+        {% if trash_runs %}
+        <div class="mt-4 flex justify-end">
+            <button onclick="emptyTrash(event)"
+                class="px-3 py-1.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-xs text-white">清空回收站</button>
+        </div>
+        <div class="mt-3 space-y-3">
+            {% for t in trash_runs %}
+            <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4 flex items-center gap-4 flex-wrap">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-white truncate" title="{{ t.title }}">{{ t.title }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5 truncate">原名 {{ t.original_name }} · 删除于 {{ t.deleted_at | datestr }}</p>
+                </div>
+                <div class="flex gap-2 shrink-0 ml-auto">
+                    <button onclick="restoreRun('{{ t.name }}')"
+                        class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs text-white">恢复</button>
+                    <button onclick="purgeRun('{{ t.name }}')"
+                        class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs text-white">彻底删除</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="mt-4 bg-slate-800/40 border border-dashed border-slate-700 rounded-xl p-6 text-center">
+            <p class="text-slate-500 text-sm">回收站为空，删除的视频会先移到这里</p>
+        </div>
+        {% endif %}
+    </details>
 
     <!-- Video player modal -->
     <div id="video-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8" onclick="closeVideoModal(event)">
@@ -219,34 +252,57 @@ function closeScriptModal(e) {
 }
 
 // ---------------------------------------------------------------------------
-// 分组 Tab：未上传 / 已上传
+// 筛选：上传状态 × 模式（两组筛选可同时选择、叠加生效）
 // ---------------------------------------------------------------------------
-let activeGroup = 'pending';
+const _CHIP_OFF = 'px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300';
+let uploadFilter = 'all';   // all / pending / uploaded
+let modeFilter = 'all';     // all / original / original_static / original_cutout / quest
 
-function switchGroup(g) {
-    activeGroup = g;
-    const gp = document.getElementById('group-pending');
-    const gu = document.getElementById('group-uploaded');
-    const tp = document.getElementById('tab-pending');
-    const tu = document.getElementById('tab-uploaded');
-    if (g === 'pending') {
-        gp.classList.remove('hidden'); gu.classList.add('hidden');
-        tp.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-amber-600/80 text-white';
-        tu.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300';
-    } else {
-        gu.classList.remove('hidden'); gp.classList.add('hidden');
-        tu.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600/80 text-white';
-        tp.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300';
-    }
+function paintUploadChips() {
+    ['all', 'pending', 'uploaded'].forEach(key => {
+        const btn = document.querySelector(`[data-upload-chip="${key}"]`);
+        if (!btn) return;
+        if (key !== uploadFilter) { btn.className = _CHIP_OFF; return; }
+        const color = key === 'pending' ? 'bg-amber-600/80'
+            : key === 'uploaded' ? 'bg-emerald-600/80' : 'bg-indigo-600';
+        btn.className = `px-3 py-1.5 rounded-lg text-xs font-medium ${color} text-white`;
+    });
 }
 
-function _updateCounts() {
-    const pending = document.querySelectorAll('#group-pending .run-card').length;
-    const uploaded = document.querySelectorAll('#group-uploaded .run-card').length;
-    document.getElementById('count-pending').textContent = pending;
-    document.getElementById('count-uploaded').textContent = uploaded;
-    document.getElementById('empty-pending').classList.toggle('hidden', pending > 0);
-    document.getElementById('empty-uploaded').classList.toggle('hidden', uploaded > 0);
+function paintModeChips() {
+    document.querySelectorAll('[data-mode-chip]').forEach(btn => {
+        btn.className = btn.dataset.modeChip === modeFilter
+            ? 'px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white'
+            : _CHIP_OFF;
+    });
+}
+
+function setUploadFilter(v) { uploadFilter = v; paintUploadChips(); applyFilters(); }
+function setModeFilter(v) { modeFilter = v; paintModeChips(); applyFilters(); }
+
+function applyFilters() {
+    let visible = 0;
+    document.querySelectorAll('#grid-runs .run-card').forEach(card => {
+        const okU = uploadFilter === 'all'
+            || card.dataset.uploaded === (uploadFilter === 'uploaded' ? '1' : '0');
+        const okM = modeFilter === 'all' || card.dataset.structure === modeFilter;
+        const show = okU && okM;
+        card.classList.toggle('hidden', !show);
+        if (show) visible++;
+    });
+    document.getElementById('runs-empty').classList.toggle('hidden', visible > 0);
+}
+
+function refreshChipCounts() {
+    const cards = Array.from(document.querySelectorAll('#grid-runs .run-card'));
+    document.querySelectorAll('[data-upload-count]').forEach(el => {
+        el.textContent = el.dataset.uploadCount === 'all'
+            ? cards.length
+            : cards.filter(c => c.dataset.uploaded === el.dataset.uploadCount).length;
+    });
+    document.querySelectorAll('[data-mode-count]').forEach(el => {
+        el.textContent = cards.filter(c => c.dataset.structure === el.dataset.modeCount).length;
+    });
 }
 
 function toggleUploaded(runName) {
@@ -262,14 +318,14 @@ function toggleUploaded(runName) {
                 btn.textContent = '已上传 ✓';
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-500';
                 if (badge) badge.classList.remove('hidden');
-                if (card) document.querySelector('#group-uploaded .grid').prepend(card);
             } else {
                 btn.textContent = '标记已上传';
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-amber-600/80 hover:bg-amber-500';
                 if (badge) badge.classList.add('hidden');
-                if (card) document.querySelector('#group-pending .grid').prepend(card);
             }
-            _updateCounts();
+            if (card) card.dataset.uploaded = data.uploaded ? '1' : '0';
+            refreshChipCounts();
+            applyFilters();
         });
 }
 
@@ -282,10 +338,35 @@ function openFolder(runName) {
 }
 
 function deleteRun(runName) {
-    if (!confirm('删除运行 "' + runName + '"? 所有文件将被永久删除.')) return;
+    if (!confirm(`将 "${runName}" 移入回收站？（可在页面下方回收站中恢复）`)) return;
     fetch(`/api/runs/${runName}`, {method: 'DELETE'})
         .then(r => r.json())
-        .then(data => { if (data.ok) location.reload(); });
+        .then(data => { if (data.ok) location.reload(); else alert('删除失败: ' + (data.error || '未知错误')); });
+}
+
+// ---------------------------------------------------------------------------
+// 回收站：恢复 / 彻底删除 / 清空
+// ---------------------------------------------------------------------------
+function restoreRun(trashName) {
+    fetch(`/api/trash/${trashName}/restore`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) location.reload(); else alert('恢复失败: ' + (data.error || '未知错误')); });
+}
+
+function purgeRun(trashName) {
+    if (!confirm(`彻底删除 "${trashName}"？此操作不可恢复！`)) return;
+    fetch(`/api/trash/${trashName}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) location.reload(); else alert('删除失败: ' + (data.error || '未知错误')); });
+}
+
+function emptyTrash(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('清空回收站？其中所有视频将被彻底删除且无法恢复！')) return;
+    fetch('/api/trash/empty', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => { if (data.ok) location.reload(); else alert('操作失败: ' + (data.error || '未知错误')); });
 }
 
 // ---------------------------------------------------------------------------
@@ -391,5 +472,11 @@ function pollRecompose() {
         })
         .catch(() => { _recomposeTimer = setTimeout(pollRecompose, 2000); });
 }
+
+// 初始渲染筛选状态
+paintUploadChips();
+paintModeChips();
+refreshChipCounts();
+applyFilters();
 </script>
 {% endblock %}
