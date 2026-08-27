@@ -586,7 +586,8 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
         return clip_paths, [], {}
 
     group_info, line_to_group = _build_group_info(
-        groups, normal_paths, dialogue_durations, audio_dir, clip_paths, args.pad)
+        groups, normal_paths, dialogue_durations, audio_dir, clip_paths, args.pad,
+        fps=24)  # original 模式 24fps：组音频总长与 timeline 帧格精确同源
     return clip_paths, group_info, line_to_group
 
 

@@ -64,7 +64,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
     """
     # --- Engine + voice map setup ---
     if tts_engine == "qwen":
-        from qwen_tts_engine import QwenTTSEngine, build_qwen_voice_map
+        from qwen_tts_engine import (QwenTTSEngine, build_qwen_voice_map,
+                                     pick_zh_preset_fallback)
 
         model_path = os.environ.get("QWEN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
         base_model_path = os.environ.get("QWEN_BASE_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
@@ -101,6 +102,34 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
         narration_voice = voice_map.get(script["host_character"].strip(), narration_voice)
     narration_zh_voice = script.get("narration_zh_voice", "").strip() or narration_voice
 
+    # --- 跨引擎回退：qwen/moss 单句失败 → 降级 Kokoro 合成该句，整线不报废 ---
+    # kokoro 为本地最终兜底，自身失败直接抛出。
+    _fb_state = {"engine": None, "voice_map": None}
+
+    def _kokoro():
+        if _fb_state["engine"] is None:
+            print("  [TTS][Fallback] Initializing Kokoro fallback engine...")
+            _fb_state["engine"] = TTSEngine()
+        if _fb_state["voice_map"] is None:
+            _fb_state["voice_map"] = build_voice_map(script)
+        return _fb_state["engine"], _fb_state["voice_map"]
+
+    def _synth_line(method, text, voice, path, rate, speaker="char_a"):
+        """单句合成 + 引擎级回退。primary=qwen/moss 失败时用 Kokoro 重试一次。"""
+        try:
+            return getattr(tts, method)(text, voice, path, rate=rate)
+        except Exception as e:
+            if tts_engine == "kokoro":
+                raise
+            print(f"  [TTS][Fallback] {Path(path).name} {type(e).__name__}: {e}")
+            eng, kmap = _kokoro()
+            if method == "synth_chinese":
+                fb_voice = get_zh_voice(speaker, script)
+            else:
+                fb_voice = kmap.get(speaker) or kmap.get("host", "af_sky")
+            print(f"  [TTS][Fallback] Retrying with Kokoro voice '{fb_voice}'")
+            return getattr(eng, method)(text, fb_voice, path, rate=rate)
+
     # 检测 tts_rate / 引擎参数变化，必要时清除旧缓存
     extra_sig = ""
     if tts_engine == "moss":
@@ -135,7 +164,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                     narration[name] = path
                     print(f"  [TTS] {name}: {dur:.1f}s (cached)")
                     continue
-                dur = tts.synth_english(text, narration_voice, path, rate=quest_narration_rate)
+                dur = _synth_line("synth_english", text, narration_voice, path,
+                                  quest_narration_rate, speaker="host")
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
     else:
@@ -156,7 +186,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                     narration[name] = path
                     print(f"  [TTS] {name}: {dur:.1f}s (cached)")
                     continue
-                dur = tts.synth_english(text, narration_voice, path, rate=narration_rate)
+                dur = _synth_line("synth_english", text, narration_voice, path,
+                                  narration_rate, speaker="host")
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
 
@@ -179,7 +210,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
             dialogue_durations.append(dur)
             print(f"  [TTS] dialogue_{i}: {dur:.1f}s (cached)")
             continue
-        dur = tts.synth_english(text, voice, path, rate=dialogue_rate)
+        dur = _synth_line("synth_english", text, voice, path, dialogue_rate, speaker)
         normal_paths.append(path)
         dialogue_durations.append(dur)
         print(f"  [TTS] dialogue_{i}: {dur:.1f}s ({voice_label})")
@@ -199,12 +230,14 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                 continue
             speaker = line.get("speaker", "char_a")
             # 中文音频音色选择：
-            # Qwen 引擎 → 优先 zh_voice 绑定，回退 voice_map（角色英文音色）
+            # Qwen 引擎 → 优先 zh_voice 绑定，回退 voice_map；预设为外语时校正为中文性别预设
             # Kokoro 引擎 → get_zh_voice（优先 zh_voice 绑定，回退性别 edge-tts 默认）
             # MOSS 引擎 → 优先 moss_voice 绑定，否则按性别用中文预设（英文参考音说中文带口音）
             zh_bind = script.get(f"{speaker}_zh_voice", "").strip()
             if tts_engine == "qwen":
-                voice = zh_bind or voice_map.get(speaker, voice_map.get("char_a", "Vivian"))
+                voice = zh_bind or pick_zh_preset_fallback(
+                    voice_map.get(speaker, voice_map.get("char_a", "Vivian")),
+                    script.get(f"{speaker}_gender", ""))
             elif tts_engine == "moss":
                 moss_bind = script.get(f"{speaker}_moss_voice", "").strip()
                 if moss_bind:
@@ -220,7 +253,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                 zh_paths.append(path)
                 print(f"  [TTS] zh_{i}: {dur:.1f}s (cached)")
                 continue
-            dur = tts.synth_chinese(text, voice, path, rate=zh_rate)
+            dur = _synth_line("synth_chinese", text, voice, path, zh_rate, speaker)
             zh_paths.append(path)
             print(f"  [TTS] zh_{i}: {dur:.1f}s")
 

@@ -77,6 +77,13 @@ _DEFAULT_MALE = "Ryan"
 _DEFAULT_FEMALE = "Vivian"
 _DEFAULT_HOST_FEMALE = "Serena"
 
+# 预设名 → 语言（中文台词回退校正用：英文/日/韩预设说中文带外语口音）
+_PRESET_LANG = {s["name"]: s["lang"] for s in QWEN_SPEAKERS}
+
+# 中文台词的默认性别预设（与 MOSS 的 Junhao/Xiaoyu 策略对齐）
+_ZH_DEFAULT_MALE = "Dylan"
+_ZH_DEFAULT_FEMALE = "Vivian"
+
 
 # ---------------------------------------------------------------------------
 # Config file helpers
@@ -179,6 +186,20 @@ def get_custom_voice_meta(name: str) -> dict | None:
         if cv["name"] == name:
             return cv
     return None
+
+
+def pick_zh_preset_fallback(name: str, gender: str = "") -> str:
+    """中文合成音色回退校正：绑定的预设为外语（en/ja/ko）时换成中文性别预设。
+
+    背景：角色 voice_map 默认按性别给英文 speaker（Ryan/Vivian 混中文），
+    英文男声 Ryan 朗读中文台词带明显英文口音。克隆/设计音色不受影响
+    （非 _PRESET_LANG 成员，原样返回）。
+    """
+    if _PRESET_LANG.get(name, "zh") == "zh":
+        return name
+    if (gender or "").lower() == "male":
+        return _ZH_DEFAULT_MALE
+    return _ZH_DEFAULT_FEMALE
 
 
 def build_qwen_voice_map(script: dict) -> dict:

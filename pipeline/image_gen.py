@@ -21,8 +21,11 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
     step2_done = step_done(checkpoint, "step2_images_tts")
     char_scene_file = img_dir / "char_scene.png"
     # Quest mode uses scene_0.png instead of scene.png; pose_char_a_0.png instead of char_scene.png
+    # original_cutout 同 quest 用姿势图集（pose_char_a_0.png），不生成 char_scene.png
+    is_cutout = (checkpoint.get("structure", "") == "original_cutout")
+    use_atlas_ref = is_quest or is_cutout
     scene_file = img_dir / "scene_0.png" if is_quest else img_dir / "scene.png"
-    ref_file = img_dir / "pose_char_a_0.png" if is_quest else char_scene_file
+    ref_file = (img_dir / "pose_char_a_0.png") if use_atlas_ref else char_scene_file
     all_audio_exist = all((audio_dir / f"dialogue_{i}.mp3").exists() for i in range(n))
     if is_quest:
         all_zh_exist = True
@@ -49,8 +52,16 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest):
         return None
 
     print("  [Resume] Step 2 already done, loading existing images + audio...")
-    # Quest mode re-uploads pose_char_a_0.png + scene_0.png; others re-upload char_scene.png + scene.png
-    reupload_files = ["pose_char_a_0.png", "scene_0.png"] if is_quest else ["char_scene.png", "scene.png"]
+    # 结构化重传清单：
+    #   quest → 姿势图集参考 + scene_0；original_cutout → 姿势图集参考 + scene + host_bg；
+    #   其余 → char_scene（角色设计表）+ scene
+    if is_quest:
+        reupload_files = ["pose_char_a_0.png", "scene_0.png"]
+    elif is_cutout:
+        reupload_files = [f for f in ("pose_char_a_0.png", "scene.png", "host_bg.png")
+                          if (img_dir / f).exists()]
+    else:
+        reupload_files = ["char_scene.png", "scene.png"]
     image_urls = {}
     for filename in reupload_files:
         filepath = str(img_dir / filename)

@@ -1,15 +1,31 @@
 """Group audio concatenation: merge per-line TTS into one file per dialogue group."""
+import math
 import os
 import subprocess
 
 from media_utils import get_duration as _get_audio_duration
 
 
+def _snap(duration: float, fps: int | None) -> float:
+    """Snap duration up to the nearest frame boundary (see timeline_enrich)."""
+    if not fps or fps <= 0:
+        return duration
+    f = 1.0 / fps
+    return math.ceil(round(duration / f, 6)) * f
+
+
 def build_group_info(groups: list[dict], normal_paths: list[str],
                       dialogue_durations: list[float], audio_dir,
-                      clip_paths: list[str], pad: float) -> tuple[list[dict], dict]:
+                      clip_paths: list[str], pad: float,
+                      fps: int | None = None) -> tuple[list[dict], dict]:
     """Concat each group's TTS audio into one file (pad between lines) and build
-    the group_info / line_to_group structures used by compose."""
+    the group_info / line_to_group structures used by compose.
+
+    Args:
+        fps: 编码输出帧率。传入时每行的 pad 目标时长先做帧量化（与
+             enrich_timeline 的 snap_to_frame 完全同公式），保证组音频总长 ==
+             该组在 timeline 中各段 duration 之和（帧格精确，消除跨段漂移）。
+    """
     group_info = []
     for gi, group in enumerate(groups):
         clip_idx = gi + 1  # scene is index 0
@@ -24,34 +40,47 @@ def build_group_info(groups: list[dict], normal_paths: list[str],
         if not lines_audio:
             continue
 
-        if n_lines == 1:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", lines_audio[0],
-                 "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                 group_audio_path],
-                capture_output=True, timeout=30)
-        else:
-            inputs = []
-            for la in lines_audio:
-                inputs.extend(["-i", la])
-            filter_parts = []
-            for j in range(n_lines):
-                line_idx = kept_lines[j]
-                line_dur = dialogue_durations[line_idx] if line_idx < len(dialogue_durations) else 3.0
-                pad_dur = line_dur + pad
-                filter_parts.append(f"[{j}:a]apad=whole_dur={pad_dur:.3f}[a{j}]")
-            concat_inputs = "".join(f"[a{j}]" for j in range(n_lines))
-            filter_parts.append(f"{concat_inputs}concat=n={n_lines}:v=0:a=1[a]")
-            filter_complex = ";".join(filter_parts)
-            subprocess.run(
-                ["ffmpeg", "-y"] + inputs + ["-filter_complex", filter_complex,
-                 "-map", "[a]",
-                 "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                 group_audio_path],
-                capture_output=True, timeout=60)
+        # 每行目标时长（含尾 pad），帧量化后与 timeline 各段 duration 同源同值；
+        # expected_total 即组窗口的期望长度
+        targets = []
+        for j in range(n_lines):
+            line_idx = kept_lines[j]
+            line_dur = dialogue_durations[line_idx] if line_idx < len(dialogue_durations) else 3.0
+            targets.append(_snap(line_dur + pad, fps))
+        expected_total = sum(targets)
+
+        def _af_chain(idx_target: float) -> str:
+            # loudnorm 统一组内响度；apad/atrim 把长度钉死到期望帧格值，
+            # 消除 mp3 编码引入的毫秒级抖动
+            return (f"loudnorm=I=-16:TP=-1.5:LRA=11,"
+                    f"aresample=44100,"
+                    f"apad=whole_dur={idx_target:.3f},atrim=end={idx_target:.3f}")
+
+        inputs = []
+        for la in lines_audio:
+            inputs.extend(["-i", la])
+        filter_parts = []
+        for j in range(n_lines):
+            filter_parts.append(f"[{j}:a]{_af_chain(targets[j])}[a{j}]")
+        concat_inputs = "".join(f"[a{j}]" for j in range(n_lines))
+        filter_parts.append(f"{concat_inputs}concat=n={n_lines}:v=0:a=1[a]")
+        subprocess.run(
+            ["ffmpeg", "-y"] + inputs + ["-filter_complex", ";".join(filter_parts),
+             "-map", "[a]",
+             "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+             group_audio_path],
+            capture_output=True, timeout=120)
 
         if os.path.exists(group_audio_path) and os.path.getsize(group_audio_path) > 1000:
-            group_total_dur = _get_audio_duration(group_audio_path)
+            if fps:
+                # 帧量化模式下以构造值为准（ffprobe 只作异常兜底）
+                group_total_dur = expected_total
+                measured = _get_audio_duration(group_audio_path)
+                if abs(measured - expected_total) > 0.05:
+                    print(f"  [Group {gi}] WARNING: audio len {measured:.3f}s "
+                          f"!= expected {expected_total:.3f}s")
+            else:
+                group_total_dur = _get_audio_duration(group_audio_path)
         else:
             group_total_dur = group["total_audio"]
             group_audio_path = normal_paths[group["lines"][0]] if normal_paths else None
