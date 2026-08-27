@@ -624,8 +624,10 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
         if args.structure == "original_cutout":
             # 开头/结尾对齐 quest 主持人形式：移除标题卡，插入 welcome + hook_intro
             rewrite_title_card_as_host_segments(timeline, script)
+        # original/original_static 按 24fps 编码输出，quantize 消除逐段累计漂移
+        # （与 quest/cutout 的 25fps 量化同理）
         _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration,
-                         output_fps=25 if args.structure == "original_cutout" else None)
+                         output_fps=25 if args.structure == "original_cutout" else 24)
         srt = build_srt_from_timeline(timeline, gap=0.0)
 
     srt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -898,15 +900,18 @@ def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
              "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-threads", "0",
              "-c:a", "copy",
              str(final_4k_path), "-y"],
-            capture_output=True)
+            capture_output=True,
+            timeout=max(60, int(getattr(args, "upscale_timeout", 3600) or 3600)))
     except subprocess.TimeoutExpired:
-        print(f"  [4K] Upscaling timed out — 720p version is still available.")
+        print(f"  [4K] Upscaling timed out (>{getattr(args, 'upscale_timeout', 3600)}s) — 720p version is still available.")
         r = None
         final_4k_path.unlink(missing_ok=True)
+        raise RuntimeError("STEP6_4K_FAILED") from None
     except Exception as e:
         print(f"  [4K] Upscaling error: {e}")
         r = None
         final_4k_path.unlink(missing_ok=True)
+        raise RuntimeError("STEP6_4K_FAILED") from None
     if r is not None and r.returncode == 0 and final_4k_path.exists():
         size_4k = os.path.getsize(final_4k_path) / (1024 * 1024)
         print(f"  4K video saved: {final_4k_path} ({size_4k:.1f}MB)")
@@ -917,6 +922,9 @@ def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
         stderr = r.stderr.decode("utf-8", errors="replace")[-500:] if r.stderr else ""
         if stderr:
             print(f"  [4K] FFmpeg stderr: {stderr}")
+        # 失败必须抛出：否则调用方会误以为全部完成而清除 checkpoint，
+        # 导致无法用 --resume 直接重试 4K 步骤
+        raise RuntimeError("STEP6_4K_FAILED")
     return None
 
 
@@ -1069,6 +1077,11 @@ if __name__ == "__main__":
             print("FATAL: 所有 MCP Token 积分已耗尽！")
             print("请充值积分后重新运行（加 --resume 参数）继续上次未完成的视频。")
             print("=" * 60)
+            sys.exit(1)
+        if "STEP6_4K_FAILED" in str(e):
+            print("\n[4K] 上采样失败 — 1080p 成片已完成且可用。")
+            print("checkpoint 已保留：加 --resume 可直接重试 4K 步骤；"
+                  "或加 --no-4k --resume 直接完成本次运行。")
             sys.exit(1)
         raise
     except KeyboardInterrupt:

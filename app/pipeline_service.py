@@ -233,6 +233,16 @@ class PipelineService:
         if config.get("moss_tts_retry"):
             os.environ["MOSS_TTS_RETRY"] = str(config["moss_tts_retry"])
 
+        # Qwen-TTS env vars（与 CLI main() 注入保持一致；不设则引擎用内置默认）
+        if config.get("qwen_model_path"):
+            os.environ["QWEN_MODEL_PATH"] = str(config["qwen_model_path"])
+        if config.get("qwen_base_model_path"):
+            os.environ["QWEN_BASE_MODEL_PATH"] = str(config["qwen_base_model_path"])
+        if config.get("qwen_voicedesign_model_path"):
+            os.environ["QWEN_VOICEDSIGN_MODEL_PATH"] = str(config["qwen_voicedesign_model_path"])
+        if config.get("qwen_device"):
+            os.environ["QWEN_DEVICE"] = str(config["qwen_device"])
+
     # Character image file patterns per structure
     _CHAR_FILES_ORIGINAL = ["char_scene.png", "char_a_ref.png", "char_b_ref.png"]
 
@@ -733,6 +743,10 @@ class PipelineService:
             no_4k=bool(config.get("no_4k", False)),
             tts_engine=config.get("tts_engine", "kokoro"),
             tts_rate=tts_rate,
+            qwen_model_path=config.get("qwen_model_path", ""),
+            qwen_base_model_path=config.get("qwen_base_model_path", ""),
+            qwen_voicedesign_model_path=config.get("qwen_voicedesign_model_path", ""),
+            qwen_device=config.get("qwen_device", ""),
             moss_model_path=config.get("moss_model_path", ""),
             moss_tokenizer_path=config.get("moss_tokenizer_path", ""),
             moss_device=config.get("moss_device", "cpu"),
@@ -740,6 +754,7 @@ class PipelineService:
             moss_tts_temperature=config.get("moss_tts_temperature", 0.8),
             moss_tts_retry=config.get("moss_tts_retry", 3),
             upscale_timeout=int(config.get("upscale_timeout", 3600)),
+            host_character=str(config.get("host_character", "") or ""),
             resume=False,
         )
 

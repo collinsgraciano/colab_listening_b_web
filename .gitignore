@@ -10,6 +10,13 @@ configs/*.local.json
 configs/llm_providers.json
 configs/page_mcp_tokens.json
 
+# Runtime mode/default configs contain real API keys & MCP tokens — never commit
+configs/default.json
+configs/mode_*.json
+configs/ori.json
+configs/quest.json
+configs/test.json
+
 # Generated audio previews / voice assets
 configs/voice_previews/
 

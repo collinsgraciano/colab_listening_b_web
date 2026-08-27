@@ -683,7 +683,9 @@ def compose_listening(
 
     # --- Burn subtitles via Pillow overlay ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
+    # outro/title_card/practice_intro 的文字卡已在段内画进画面，此处只烧 dialogue，
+    # 避免 outro 文字双重显示（welcome/hook_intro 仅存在于 quest/cutout 流程）
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style, subtitle_seg_types=("dialogue",))
 
     # Cleanup
     shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -790,13 +792,12 @@ def compose_image(
     has_listen_segs = any(seg.get("type", "").startswith("listen_")
                           for seg in timeline)
 
-    # --- Stop-motion: preprocess poses + subtitle overlays ---
+    # --- Stop-motion: preprocess poses ---
     processed_poses: list[list] = []
-    subtitle_overlays: dict[int, object] = {}
     frames_dir = None
     bg_img_rgba = None
     if is_stop_motion:
-        from stop_motion import remove_bg, normalize_pose, _render_subtitle_overlay
+        from stop_motion import remove_bg, normalize_pose
         from PIL import Image as _PILImage
 
         frames_dir = Path(tempfile.gettempdir()) / f"sm_frames_{work.name}"
@@ -821,12 +822,8 @@ def compose_image(
                 line_processed = [_PILImage.new("RGBA", (TARGET_W, TARGET_H), (0, 0, 0, 0))]
             processed_poses.append(line_processed)
         _cb(8, "Pose processing done.")
-
-        # Pre-render subtitle overlays for dialogue segments
-        for i, line in enumerate(dialogue):
-            en = line.get("text", "")
-            zh = line.get("zh", "")
-            subtitle_overlays[i] = _render_subtitle_overlay(en, zh)
+        # 对话字幕不再画进停格帧：统一由结尾 burn_subtitles 按样式烧录，
+        # 避免与帧内字幕叠加成双重字幕（与 quest 行为一致）
 
     # --- Render static frames for Ch3 (same as compose_listening) ---
     if os.path.exists(scene_img) and has_listen_segs:
@@ -998,11 +995,10 @@ def compose_image(
                 # --- Stop-motion: PIL frame rendering + optical flow ---
                 from stop_motion import _render_dialogue_segment as _render_sm
                 line_poses = processed_poses[d_idx]
-                sub_overlay = subtitle_overlays.get(d_idx)
                 out_frames_dir = frames_dir / f"dialogue_{d_idx}"
                 out_frames_dir.mkdir(parents=True, exist_ok=True)
 
-                _render_sm(bg_img_rgba, line_poses, sub_overlay,
+                _render_sm(bg_img_rgba, line_poses, None,
                            duration, audio_dur, 24, out_frames_dir, d_idx)
 
                 frame_pattern = str(out_frames_dir / "frame-%04d.png")
@@ -1121,7 +1117,8 @@ def compose_image(
 
     # --- Burn subtitles via Pillow overlay (same as compose_listening) ---
     _cb(90, "Burning subtitles (Pillow overlay)...")
-    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style)
+    # 只烧 dialogue：outro/title_card/practice_intro 文字卡已在段内画进画面
+    final_path = burn_subtitles(no_sub, timeline, script, str(work), srt_dir, pad, _cb, show_zh=show_zh, en_font_size=subtitle_font_size, zh_font_size=int(subtitle_font_size * 0.85), style=subtitle_style, subtitle_seg_types=("dialogue",))
 
     # Cleanup
     shutil.rmtree(tmp_dir, ignore_errors=True)
