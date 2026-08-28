@@ -43,8 +43,10 @@ def load_checkpoint(work_dir: Path) -> dict:
 
     _check(work_dir / "checkpoint.json")
     if not candidates and work_dir.exists():
+        # 回收站文件夹（Web 移入的已删除运行）不参与续传扫描
+        recycle_names = ("_recycle_bin", ".recycle_bin")
         for sub in work_dir.iterdir():
-            if sub.is_dir():
+            if sub.is_dir() and sub.name not in recycle_names:
                 _check(sub / "checkpoint.json")
 
     if candidates:

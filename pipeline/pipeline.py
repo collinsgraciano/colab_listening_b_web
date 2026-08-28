@@ -1060,11 +1060,14 @@ def main():
 
     parent_dir = Path(args.output).resolve()
     parent_dir.mkdir(parents=True, exist_ok=True)
+    # 新布局：每种模式一个独立文件夹 output/{mode}/{run_name}/
+    mode_dir = parent_dir / args.structure
+    mode_dir.mkdir(parents=True, exist_ok=True)
 
     used_topics_file = args.used_topics_file or str(parent_dir / "used_topics.json")
 
     if args.resume:
-        checkpoint = _load_checkpoint(parent_dir)
+        checkpoint = _load_checkpoint(mode_dir)
         if checkpoint:
             cp_struct = checkpoint.get("structure")
             cp_anim = checkpoint.get("animation", args.animation)
@@ -1088,7 +1091,7 @@ def main():
             sys.exit(1)
     args.topic = topic
 
-    script, work_dir, dirs = _step0_script(args, checkpoint, topic, parent_dir, used_topics_file)
+    script, work_dir, dirs = _step0_script(args, checkpoint, topic, mode_dir, used_topics_file)
     _step1_mcp(args)
     ctx = _step2_images_tts(args, checkpoint, script, work_dir, dirs)
     clip_paths, group_info, line_to_group = _step3_clips(args, checkpoint, work_dir, dirs, script, ctx)

@@ -26,10 +26,13 @@ from .config_manager import (
     build_cli_args, detect_local_mcp_token,
     load_llm_providers, save_llm_providers,
     get_provider_options, resolve_provider,
-    MODES, MODE_LABELS, get_active_mode, set_active_mode,
+    MODES, MODE_LABELS, MODE_SHORT_LABELS, get_active_mode, set_active_mode,
     load_mode_config, save_mode_config, load_all_mode_configs,
+    RECYCLE_DIRNAME, LEGACY_RECYCLE_DIRNAME,
+    find_run_dir, iter_run_dirs,
 )
 from .pipeline_service import get_service, STEP_ORDER
+from .mode_test_service import get_mode_test_service
 from .config_manager import detect_local_mcp_token
 from .page_mcp import (
     PAGES as MCP_PAGES, SOURCE_LABELS as MCP_SOURCE_LABELS,
@@ -197,10 +200,11 @@ async def topics_page(request: Request):
 
 
 @app.get("/runs/{name}/gallery", response_class=HTMLResponse)
-async def gallery_page(request: Request, name: str):
+async def gallery_page(request: Request, name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    run_dir = output_dir / name
+    # 运行卡片带 ?mode= 消歧；查不到时保持原「渲染空页面」行为
+    run_dir = find_run_dir(output_dir, name, mode) or (output_dir / name)
     script_path = run_dir / "script.json"
     script = {}
     if script_path.exists():
@@ -261,62 +265,64 @@ async def runs_page(request: Request):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     runs = []
-    if output_dir.exists():
-        for d in sorted(output_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-            # 跳过文件与隐藏目录（含回收站 .recycle_bin）
-            if not d.is_dir() or d.name.startswith("."):
+    for d in iter_run_dirs(output_dir):
+        script_path = d / "script.json"
+        videos_dir = d / "videos"
+        thumbnail = d / "thumbnail.jpg"
+        no_sub = videos_dir / "final_no_sub.mp4"
+        meta_path = d / "subtitles" / "meta.json"
+        has_4k = any(d.glob("*_4K.mp4"))
+        # 重渲条件：无字幕底片 + 时间轴元数据 + 脚本齐备（仅重跑字幕烧录环节）
+        recomposable = (no_sub.exists() and no_sub.stat().st_size >= 1_000_000
+                        and meta_path.exists() and script_path.exists())
+        run_info = {
+            "name": d.name,
+            "path": str(d),
+            "created": d.stat().st_mtime,
+            "has_script": script_path.exists(),
+            "has_thumbnail": thumbnail.exists(),
+            "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
+            "uploaded": (d / "uploaded.flag").exists(),
+            "has_4k": has_4k,
+            "recomposable": recomposable,
+            "structure": "",
+        }
+        # Find video files — final videos are in work_dir root, not videos/
+        video_files = []
+        for v in d.glob("*.mp4"):
+            if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
                 continue
-            script_path = d / "script.json"
-            videos_dir = d / "videos"
-            thumbnail = d / "thumbnail.jpg"
-            no_sub = videos_dir / "final_no_sub.mp4"
-            meta_path = d / "subtitles" / "meta.json"
-            has_4k = any(d.glob("*_4K.mp4"))
-            # 重渲条件：无字幕底片 + 时间轴元数据 + 脚本齐备（仅重跑字幕烧录环节）
-            recomposable = (no_sub.exists() and no_sub.stat().st_size >= 1_000_000
-                            and meta_path.exists() and script_path.exists())
-            run_info = {
-                "name": d.name,
-                "path": str(d),
-                "created": d.stat().st_mtime,
-                "has_script": script_path.exists(),
-                "has_thumbnail": thumbnail.exists(),
-                "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
-                "uploaded": (d / "uploaded.flag").exists(),
-                "has_4k": has_4k,
-                "recomposable": recomposable,
-                "structure": "",
-            }
-            # Find video files — final videos are in work_dir root, not videos/
-            video_files = []
-            for v in d.glob("*.mp4"):
-                if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
-                    continue
-                video_files.append({
-                    "name": v.name,
-                    "size_mb": round(v.stat().st_size / (1024*1024), 1),
-                    "url": f"/api/runs/{d.name}/video/{v.name}",
-                })
-            # Also check videos/ subdir for intermediates (but don't show them as main)
-            run_info["videos"] = video_files
-            # Load script metadata
-            if script_path.exists():
-                try:
-                    script = json.loads(script_path.read_text(encoding="utf-8"))
-                    run_info["title"] = script.get("youtube_title", script.get("title", d.name))
-                    run_info["title_en"] = script.get("youtube_title_en", "")
-                    run_info["cefr"] = script.get("cefr", "")
-                    run_info["structure"] = script.get("structure", "")
-                except (json.JSONDecodeError, OSError):
-                    run_info["title"] = d.name
-            else:
+            video_files.append({
+                "name": v.name,
+                "size_mb": round(v.stat().st_size / (1024*1024), 1),
+                "url": f"/api/runs/{d.name}/video/{v.name}",
+            })
+        # Also check videos/ subdir for intermediates (but don't show them as main)
+        run_info["videos"] = video_files
+        # Load script metadata
+        if script_path.exists():
+            try:
+                script = json.loads(script_path.read_text(encoding="utf-8"))
+                run_info["title"] = script.get("youtube_title", script.get("title", d.name))
+                run_info["title_en"] = script.get("youtube_title_en", "")
+                run_info["cefr"] = script.get("cefr", "")
+                run_info["structure"] = script.get("structure", "")
+            except (json.JSONDecodeError, OSError):
                 run_info["title"] = d.name
-            runs.append(run_info)
+        else:
+            run_info["title"] = d.name
+        # 卡片模式徽标：脚本缺 structure 时回退所在模式文件夹名
+        if run_info["structure"] not in MODES:
+            run_info["structure"] = d.parent.name if d.parent.name in MODES else ""
+        run_info["structure_label"] = MODE_SHORT_LABELS.get(run_info["structure"],
+                                                            run_info["structure"])
+        runs.append(run_info)
 
-    # 回收站列表（.recycle_bin 下所有已删除运行）
+    # 回收站列表（_recycle_bin 下所有已删除运行；兼容旧版 .recycle_bin）
     trash_runs = []
-    recycle_root = output_dir / RECYCLE_DIRNAME
-    if recycle_root.is_dir():
+    for recycle_root in (output_dir / RECYCLE_DIRNAME, output_dir / LEGACY_RECYCLE_DIRNAME):
+        if not recycle_root.is_dir():
+            continue
         for d in sorted(recycle_root.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
             if not d.is_dir():
                 continue
@@ -325,6 +331,7 @@ async def runs_page(request: Request):
                 "original_name": d.name,
                 "deleted_at": d.stat().st_mtime,
                 "title": d.name,
+                "structure_label": "",
             }
             meta_path = d / TRASH_META_FILENAME
             if meta_path.exists():
@@ -334,13 +341,16 @@ async def runs_page(request: Request):
                     item["original_name"] = meta.get("original_name", d.name)
                 except (json.JSONDecodeError, OSError):
                     pass
+            structure = ""
             script_path = d / "script.json"
             if script_path.exists():
                 try:
                     s = json.loads(script_path.read_text(encoding="utf-8"))
                     item["title"] = s.get("youtube_title", s.get("title", d.name))
+                    structure = s.get("structure", "")
                 except (json.JSONDecodeError, OSError):
                     pass
+            item["structure_label"] = MODE_SHORT_LABELS.get(structure, structure)
             trash_runs.append(item)
 
     return templates.TemplateResponse(request, "runs.html", {
@@ -527,6 +537,109 @@ async def api_run_logs_since(since: int):
     logs = service.get_logs_since(since)
     total = len(service.log_lines)
     return {"logs": logs, "total": total, "status": service.get_progress()}
+
+
+# ===========================================================================
+# 模式效果测试（一次性生成迷你素材 + 零消耗本地合成）
+# ===========================================================================
+
+@app.get("/mode-test", response_class=HTMLResponse)
+async def mode_test_page(request: Request):
+    service = get_mode_test_service()
+    return templates.TemplateResponse(request, "mode_test.html", {
+        "active_page": "mode_test",
+        "mode_labels": MODE_LABELS,
+        "status": service.full_status(),
+    })
+
+
+@app.get("/api/mode_test/status")
+async def api_mode_test_status():
+    return get_mode_test_service().full_status()
+
+
+@app.post("/api/mode_test/generate")
+async def api_mode_test_generate(request: Request):
+    """生成指定模式的迷你测试素材（消耗积分，与主 pipeline 互斥）。"""
+    data = await request.json()
+    mode = data.get("mode", "")
+    topic = str(data.get("topic", "") or "")
+    force = bool(data.get("force", False))
+    ok, msg = get_mode_test_service().start_generate(mode, topic=topic, force=force)
+    return {"ok": ok, "message": msg}
+
+
+@app.post("/api/mode_test/compose")
+async def api_mode_test_compose(request: Request):
+    """对已生成素材批量本地合成测试视频（零积分）。"""
+    data = await request.json()
+    modes = data.get("modes") or []
+    ok, msg = get_mode_test_service().start_compose(modes)
+    return {"ok": ok, "message": msg}
+
+
+@app.post("/api/mode_test/stop")
+async def api_mode_test_stop():
+    service = get_mode_test_service()
+    service.stop()
+    return {"ok": True}
+
+
+@app.get("/api/mode_test/logs")
+async def api_mode_test_logs():
+    """SSE endpoint for mode-test logs."""
+    service = get_mode_test_service()
+
+    async def event_stream():
+        last_idx = 0
+        existing = service.get_logs_since(last_idx)
+        last_idx = len(service.log_lines)
+        for line in existing:
+            yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
+
+        while True:
+            status = service.get_progress()
+            new_logs = service.get_logs_since(last_idx)
+            last_idx = len(service.log_lines)
+            for line in new_logs:
+                yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', **status})}\n\n"
+            if status["status"] not in ("running", "paused"):
+                break
+            await asyncio.sleep(0.5)
+
+        status = service.get_progress()
+        yield f"data: {json.dumps({'type': 'done', **status})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/mode_test/video/{mode}/{video_name}")
+async def api_mode_test_video(mode: str, video_name: str):
+    """播放测试视频（仅限 active 素材集目录内，防路径穿越）。"""
+    service = get_mode_test_service()
+    if mode not in ("original", "original_static", "original_cutout", "quest"):
+        return JSONResponse({"error": "未知模式"}, status_code=400)
+    # 路径穿越防护：只允许纯文件名
+    if "/" in video_name or "\\" in video_name or ".." in video_name:
+        return JSONResponse({"error": "非法路径"}, status_code=400)
+    set_dir = service._active_set(mode)
+    if set_dir is None:
+        return JSONResponse({"error": "素材集不存在"}, status_code=404)
+    video_path = set_dir / video_name
+    if not video_path.exists():
+        video_path = set_dir / "videos" / video_name
+    if not video_path.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(video_path), media_type="video/mp4")
 
 
 # ===========================================================================
@@ -1459,98 +1572,102 @@ async def api_list_runs():
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     runs = []
-    if output_dir.exists():
-        for d in sorted(output_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-            if not d.is_dir():
-                continue
-            script_path = d / "script.json"
-            videos_dir = d / "videos"
-            run_info = {"name": d.name, "created": d.stat().st_mtime}
-            if script_path.exists():
-                try:
-                    script = json.loads(script_path.read_text(encoding="utf-8"))
-                    run_info["title"] = script.get("youtube_title", d.name)
-                except (json.JSONDecodeError, OSError):
-                    run_info["title"] = d.name
-            else:
+    for d in iter_run_dirs(output_dir):
+        script_path = d / "script.json"
+        videos_dir = d / "videos"
+        run_info = {"name": d.name, "created": d.stat().st_mtime}
+        if script_path.exists():
+            try:
+                script = json.loads(script_path.read_text(encoding="utf-8"))
+                run_info["title"] = script.get("youtube_title", d.name)
+            except (json.JSONDecodeError, OSError):
                 run_info["title"] = d.name
-            run_info["videos"] = []
-            for v in d.glob("*.mp4"):
-                if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
-                    continue
-                run_info["videos"].append({
-                    "name": v.name,
-                    "size_mb": round(v.stat().st_size / (1024*1024), 1),
-                })
-            runs.append(run_info)
+        else:
+            run_info["title"] = d.name
+        run_info["videos"] = []
+        for v in d.glob("*.mp4"):
+            if v.name.startswith("final_no_sub") or v.name.startswith("final_video_norm"):
+                continue
+            run_info["videos"].append({
+                "name": v.name,
+                "size_mb": round(v.stat().st_size / (1024*1024), 1),
+            })
+        runs.append(run_info)
     return {"runs": runs}
 
 
 @app.get("/api/runs/{name}/script")
-async def api_get_script(name: str):
+async def api_get_script(name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    script_path = output_dir / name / "script.json"
-    if not script_path.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    script_path = run_dir / "script.json" if run_dir else None
+    if not script_path or not script_path.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return json.loads(script_path.read_text(encoding="utf-8"))
 
 
 @app.get("/api/runs/{name}/thumbnail")
-async def api_get_thumbnail(name: str):
+async def api_get_thumbnail(name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    thumb = output_dir / name / "thumbnail.jpg"
-    if not thumb.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    thumb = run_dir / "thumbnail.jpg" if run_dir else None
+    if not thumb or not thumb.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(thumb), media_type="image/jpeg")
 
 
 @app.get("/api/runs/{name}/video/{video_name}")
-async def api_get_video(name: str, video_name: str):
+async def api_get_video(name: str, video_name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir:
+        return JSONResponse({"error": "Not found"}, status_code=404)
     # Final videos are in work_dir root; clips are in clips/ subdir
-    video_path = output_dir / name / video_name
+    video_path = run_dir / video_name
     if not video_path.exists():
-        video_path = output_dir / name / "clips" / video_name
+        video_path = run_dir / "clips" / video_name
     if not video_path.exists():
-        video_path = output_dir / name / "videos" / video_name
+        video_path = run_dir / "videos" / video_name
     if not video_path.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(video_path), media_type="video/mp4")
 
 
 @app.get("/api/runs/{name}/images/{image_name}")
-async def api_get_image(name: str, image_name: str):
+async def api_get_image(name: str, image_name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    img_path = output_dir / name / "images" / image_name
-    if not img_path.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    img_path = run_dir / "images" / image_name if run_dir else None
+    if not img_path or not img_path.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(img_path), media_type="image/png")
 
 
 @app.get("/api/runs/{name}/images_list")
-async def api_list_images(name: str):
+async def api_list_images(name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    images_dir = output_dir / name / "images"
-    if not images_dir.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    images_dir = run_dir / "images" if run_dir else None
+    if not images_dir or not images_dir.exists():
         return {"images": []}
     images = sorted([f.name for f in images_dir.glob("*.png")])
     return {"images": images}
 
 
-# 回收站：删除运行先移入 output/.recycle_bin，回收站内再次删除才真正删文件
-RECYCLE_DIRNAME = ".recycle_bin"
+# 回收站：删除运行先移入 output/_recycle_bin，回收站内再次删除才真正删文件
+# （RECYCLE_DIRNAME / LEGACY_RECYCLE_DIRNAME 定义见 config_manager.py）
 TRASH_META_FILENAME = ".trash_meta.json"
 
 
-def _move_run_to_recycle_bin(run_dir: Path) -> str:
+def _move_run_to_recycle_bin(output_dir: Path, run_dir: Path) -> str:
     """把运行目录移入回收站（同盘 rename），重名自动追加 _N 后缀。返回回收站内的目录名。"""
     import shutil
-    recycle_root = run_dir.parent / RECYCLE_DIRNAME
+    recycle_root = output_dir / RECYCLE_DIRNAME
     recycle_root.mkdir(exist_ok=True)
     dst = recycle_root / run_dir.name
     suffix = 1
@@ -1558,25 +1675,38 @@ def _move_run_to_recycle_bin(run_dir: Path) -> str:
         dst = recycle_root / f"{run_dir.name}_{suffix}"
         suffix += 1
     shutil.move(str(run_dir), str(dst))
-    meta = {"original_name": run_dir.name, "deleted_at": time.time()}
+    meta = {
+        "original_name": run_dir.name,
+        "original_parent": run_dir.parent.name if run_dir.parent.name in MODES else "",
+        "deleted_at": time.time(),
+    }
     (dst / TRASH_META_FILENAME).write_text(
         json.dumps(meta, ensure_ascii=False), encoding="utf-8")
     return dst.name
 
 
+def _find_trash_item(output_dir: Path, name: str) -> Path | None:
+    """在回收站（新旧两种目录）中按名定位已删除运行。"""
+    for recycle_root in (output_dir / RECYCLE_DIRNAME, output_dir / LEGACY_RECYCLE_DIRNAME):
+        src = recycle_root / name
+        if src.is_dir() and str(src.resolve()).startswith(str(recycle_root.resolve())):
+            return src
+    return None
+
+
 @app.delete("/api/runs/{name}")
-async def api_delete_run(name: str):
+async def api_delete_run(name: str, mode: str = ""):
     """删除运行 → 移入回收站（防误删，可在页面恢复）。"""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    run_dir = output_dir / name
-    if not run_dir.is_dir():
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir or not run_dir.is_dir():
         return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     # Safety: ensure it's within output_dir
     if not str(run_dir.resolve()).startswith(str(output_dir.resolve())):
         return JSONResponse({"ok": False, "error": "Cannot delete"}, status_code=400)
     try:
-        _move_run_to_recycle_bin(run_dir)
+        _move_run_to_recycle_bin(output_dir, run_dir)
     except OSError as e:
         return JSONResponse({"ok": False, "error": f"移入回收站失败: {e}"}, status_code=500)
     return {"ok": True}
@@ -1584,15 +1714,15 @@ async def api_delete_run(name: str):
 
 @app.post("/api/trash/{name}/restore")
 async def api_trash_restore(name: str):
-    """从回收站恢复运行到 output 目录。"""
+    """从回收站恢复运行（新条目回模式文件夹；旧条目按脚本结构归类）。"""
     import shutil
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    recycle_root = output_dir / RECYCLE_DIRNAME
-    src = recycle_root / name
-    if not src.is_dir() or not str(src.resolve()).startswith(str(recycle_root.resolve())):
+    src = _find_trash_item(output_dir, name)
+    if not src:
         return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     original = name
+    parent = ""
     meta_path = src / TRASH_META_FILENAME
     if meta_path.exists():
         try:
@@ -1600,15 +1730,29 @@ async def api_trash_restore(name: str):
             saved = meta.get("original_name") or ""
             if saved and "/" not in saved and "\\" not in saved:
                 original = saved
+            parent = meta.get("original_parent") or ""
         except (json.JSONDecodeError, OSError):
             pass
+    if parent not in MODES:
+        # 旧回收条目无 original_parent：按脚本 structure 归入模式文件夹
+        parent = ""
+        script_path = src / "script.json"
+        if script_path.exists():
+            try:
+                s = json.loads(script_path.read_text(encoding="utf-8"))
+                if s.get("structure") in MODES:
+                    parent = s["structure"]
+            except (json.JSONDecodeError, OSError):
+                pass
     # 同名运行已存在时追加 _N 后缀，绝不覆盖现有数据
-    dst = output_dir / original
+    dst = (output_dir / parent / original) if parent else (output_dir / original)
     suffix = 1
     while dst.exists():
-        dst = output_dir / f"{original}_{suffix}"
+        dst = (output_dir / parent / f"{original}_{suffix}" if parent
+               else output_dir / f"{original}_{suffix}")
         suffix += 1
     try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
     except OSError as e:
         return JSONResponse({"ok": False, "error": f"恢复失败: {e}"}, status_code=500)
@@ -1622,9 +1766,8 @@ async def api_trash_purge(name: str):
     import shutil
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    recycle_root = output_dir / RECYCLE_DIRNAME
-    run_dir = recycle_root / name
-    if not run_dir.is_dir() or not str(run_dir.resolve()).startswith(str(recycle_root.resolve())):
+    run_dir = _find_trash_item(output_dir, name)
+    if not run_dir:
         return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     shutil.rmtree(str(run_dir))
     return {"ok": True}
@@ -1636,29 +1779,29 @@ async def api_trash_empty():
     import shutil
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    recycle_root = output_dir / RECYCLE_DIRNAME
-    if not recycle_root.is_dir():
-        return {"ok": True, "removed": 0}
     removed = 0
-    for entry in recycle_root.iterdir():
-        try:
-            if entry.is_dir():
-                shutil.rmtree(str(entry))
-            else:
-                entry.unlink()
-            removed += 1
-        except OSError:
+    for recycle_root in (output_dir / RECYCLE_DIRNAME, output_dir / LEGACY_RECYCLE_DIRNAME):
+        if not recycle_root.is_dir():
             continue
+        for entry in recycle_root.iterdir():
+            try:
+                if entry.is_dir():
+                    shutil.rmtree(str(entry))
+                else:
+                    entry.unlink()
+                removed += 1
+            except OSError:
+                continue
     return {"ok": True, "removed": removed}
 
 
 @app.post("/api/runs/{name}/mark_uploaded")
-async def api_mark_uploaded(name: str):
+async def api_mark_uploaded(name: str, mode: str = ""):
     """切换运行目录的 uploaded.flag 标记（记录视频已上传到 YouTube）。"""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    run_dir = output_dir / name
-    if not run_dir.is_dir():
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir or not run_dir.is_dir():
         return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     flag = run_dir / "uploaded.flag"
     if flag.exists():
@@ -1669,7 +1812,7 @@ async def api_mark_uploaded(name: str):
 
 
 @app.post("/api/runs/{name}/recompose")
-async def api_recompose(name: str, request: Request):
+async def api_recompose(name: str, request: Request, mode: str = ""):
     """重选字幕样式重渲视频（复用 final_no_sub 底片，仅本地渲染）。"""
     data = await request.json()
     service = get_service()
@@ -1683,17 +1826,17 @@ async def api_recompose(name: str, request: Request):
     ok, msg = service.recompose(
         name, subtitle_style=style_id, font_size=font_size,
         show_zh=bool(data.get("show_zh", True)),
-        regen_4k=bool(data.get("regen_4k", False)))
+        regen_4k=bool(data.get("regen_4k", False)), mode=mode)
     if not ok:
         return JSONResponse({"ok": False, "error": msg}, status_code=409)
     return {"ok": True, "message": msg, "status": service.status}
 
 
 @app.post("/api/runs/{name}/yt_meta_refresh")
-async def api_yt_meta_refresh(name: str):
+async def api_yt_meta_refresh(name: str, mode: str = ""):
     """重新生成 youtube_metadata.json（脚本编辑后刷新标题/简介/章节，零 AI 成本）。"""
     service = get_service()
-    ok, msg = service.refresh_youtube_metadata(name)
+    ok, msg = service.refresh_youtube_metadata(name, mode=mode)
     if not ok:
         return JSONResponse({"ok": False, "error": msg}, status_code=409)
     meta_path = (Path(load_config().get("output_dir", "./output")) / name
@@ -1755,12 +1898,12 @@ def _raise_folder_window(folder_name: str, before: set[int], timeout: float = 3.
 
 
 @app.post("/api/runs/{name}/open_folder")
-async def api_open_folder(name: str):
+async def api_open_folder(name: str, mode: str = ""):
     """在系统文件管理器中打开运行目录（视频及所有素材所在目录）。"""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    run_dir = output_dir / name
-    if not run_dir.is_dir():
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir or not run_dir.is_dir():
         return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     # Safety: ensure it's within output_dir
     if not str(run_dir.resolve()).startswith(str(output_dir.resolve())):
@@ -1870,74 +2013,71 @@ async def api_character_sources():
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     sources = []
-    if output_dir.exists():
-        for d in sorted(output_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-            if not d.is_dir():
-                continue
-            script_path = d / "script.json"
-            if not script_path.exists():
-                continue
-            try:
-                script = json.loads(script_path.read_text(encoding="utf-8"))
-                img_dir = d / "images"
+    for d in iter_run_dirs(output_dir):
+        script_path = d / "script.json"
+        if not script_path.exists():
+            continue
+        try:
+            script = json.loads(script_path.read_text(encoding="utf-8"))
+            img_dir = d / "images"
 
-                # 结构识别：优先读 script.json 的 structure 字段（_step0_script 会写入），
-                # 旧运行缺失时回退文件探测
-                structure = script.get("structure", "")
-                if structure not in ("original", "original_static",
-                                     "original_cutout", "quest"):
-                    if (img_dir / "pose_char_a_0.png").exists():
-                        # 姿势图集 → quest 或 cutout：以 char_c 图集存在与否细分
-                        structure = ("quest" if (img_dir / "pose_char_c_0.png").exists()
-                                     else "original_cutout")
-                    elif (img_dir / "char_scene.png").exists():
-                        structure = "original"
-                    else:
-                        continue  # no character images
-
-                # Build character list based on detected structure
-                if structure == "quest":
-                    char_keys = ["char_a", "char_b", "char_c", "host"]
-                    char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
-                    img_name_for = lambda key: f"pose_{key}_0.png"
-                elif structure == "original_cutout":
-                    # 仅当源运行存在独立主持人图集时才提供 host 卡
-                    # （绑定了 char_a/char_b 的源运行没有独立主持人可复用）
-                    char_keys = (["char_a", "char_b"]
-                                 + (["host"] if (img_dir / "pose_host_0.png").exists() else []))
-                    char_labels = {"char_a": "角色A", "char_b": "角色B", "host": "主持人"}
-                    img_name_for = lambda key: f"pose_{key}_0.png"
+            # 结构识别：优先读 script.json 的 structure 字段（_step0_script 会写入），
+            # 旧运行缺失时回退文件探测
+            structure = script.get("structure", "")
+            if structure not in ("original", "original_static",
+                                 "original_cutout", "quest"):
+                if (img_dir / "pose_char_a_0.png").exists():
+                    # 姿势图集 → quest 或 cutout：以 char_c 图集存在与否细分
+                    structure = ("quest" if (img_dir / "pose_char_c_0.png").exists()
+                                 else "original_cutout")
+                elif (img_dir / "char_scene.png").exists():
+                    structure = "original"
                 else:
-                    char_keys = ["char_a", "char_b"]
-                    char_labels = {"char_a": "角色A", "char_b": "角色B"}
-                    img_name_for = lambda key: "char_scene.png"
+                    continue  # no character images
 
-                characters = []
-                for key in char_keys:
-                    desc = script.get(f"{key}_description", "")
-                    gender = script.get(f"{key}_gender", "")
-                    role = script.get(f"{key}_role", "")
-                    qwen_speaker = script.get(f"{key}_qwen_speaker", "")
-                    img_name = img_name_for(key)
-                    img_exists = (img_dir / img_name).exists()
-                    characters.append({
-                        "key": key,
-                        "label": char_labels.get(key, key),
-                        "description": desc,
-                        "gender": gender,
-                        "role": role,
-                        "qwen_speaker": qwen_speaker,
-                        "image_url": f"/api/runs/{d.name}/images/{img_name}" if img_exists else "",
-                    })
+            # Build character list based on detected structure
+            if structure == "quest":
+                char_keys = ["char_a", "char_b", "char_c", "host"]
+                char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
+                img_name_for = lambda key: f"pose_{key}_0.png"
+            elif structure == "original_cutout":
+                # 仅当源运行存在独立主持人图集时才提供 host 卡
+                # （绑定了 char_a/char_b 的源运行没有独立主持人可复用）
+                char_keys = (["char_a", "char_b"]
+                             + (["host"] if (img_dir / "pose_host_0.png").exists() else []))
+                char_labels = {"char_a": "角色A", "char_b": "角色B", "host": "主持人"}
+                img_name_for = lambda key: f"pose_{key}_0.png"
+            else:
+                char_keys = ["char_a", "char_b"]
+                char_labels = {"char_a": "角色A", "char_b": "角色B"}
+                img_name_for = lambda key: "char_scene.png"
 
-                sources.append({
-                    "name": d.name,
-                    "title": script.get("youtube_title", script.get("title", d.name)),
-                    "structure": structure,
-                    "characters": characters,
+            characters = []
+            for key in char_keys:
+                desc = script.get(f"{key}_description", "")
+                gender = script.get(f"{key}_gender", "")
+                role = script.get(f"{key}_role", "")
+                qwen_speaker = script.get(f"{key}_qwen_speaker", "")
+                img_name = img_name_for(key)
+                img_exists = (img_dir / img_name).exists()
+                characters.append({
+                    "key": key,
+                    "label": char_labels.get(key, key),
+                    "description": desc,
+                    "gender": gender,
+                    "role": role,
+                    "qwen_speaker": qwen_speaker,
+                    "image_url": f"/api/runs/{d.name}/images/{img_name}" if img_exists else "",
                 })
-            except (json.JSONDecodeError, OSError):
-                continue
+
+            sources.append({
+                "name": d.name,
+                "title": script.get("youtube_title", script.get("title", d.name)),
+                "structure": structure,
+                "characters": characters,
+            })
+        except (json.JSONDecodeError, OSError):
+            continue
     return {"sources": sources}
 
 
@@ -2025,23 +2165,25 @@ async def health():
 # ===========================================================================
 
 @app.get("/api/runs/{name}/script/edit")
-async def api_get_script_edit(name: str):
+async def api_get_script_edit(name: str, mode: str = ""):
     """Get script for editing (returns full JSON)."""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    script_path = output_dir / name / "script.json"
-    if not script_path.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    script_path = run_dir / "script.json" if run_dir else None
+    if not script_path or not script_path.exists():
         return JSONResponse({"error": "Script not found"}, status_code=404)
     return json.loads(script_path.read_text(encoding="utf-8"))
 
 
 @app.post("/api/runs/{name}/script/save")
-async def api_save_script(name: str, request: Request):
+async def api_save_script(name: str, request: Request, mode: str = ""):
     """Save edited script JSON."""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    script_path = output_dir / name / "script.json"
-    if not script_path.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    script_path = run_dir / "script.json" if run_dir else None
+    if not script_path or not script_path.exists():
         return JSONResponse({"error": "Script not found"}, status_code=404)
     data = await request.json()
     script_path.write_text(
@@ -2054,22 +2196,22 @@ async def api_save_script(name: str, request: Request):
 # ===========================================================================
 
 @app.get("/api/runs/{name}/gallery")
-async def api_gallery(name: str):
+async def api_gallery(name: str, mode: str = ""):
     """List all images for a run, grouped by type."""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    images_dir = output_dir / name / "images"
-    if not images_dir.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    images_dir = run_dir / "images" if run_dir else None
+    if not images_dir or not images_dir.exists():
         return {"images": [], "clips": []}
-    
+
     images = sorted([f.name for f in images_dir.glob("*.png")])
-    clips_dir = output_dir / name / "clips"
+    clips_dir = run_dir / "clips"
     clips = sorted([f.name for f in clips_dir.glob("*.mp4")]) if clips_dir.exists() else []
-    audio_dir = output_dir / name / "audio"
+    audio_dir = run_dir / "audio"
     audio = sorted([f.name for f in audio_dir.glob("*.mp3")]) if audio_dir.exists() else []
-    
+
     # Final videos in work_dir root (excluding intermediate files)
-    run_dir = output_dir / name
     final_videos = []
     if run_dir.exists():
         for v in sorted(run_dir.glob("*.mp4")):
@@ -2090,22 +2232,24 @@ async def api_gallery(name: str):
 
 
 @app.get("/api/runs/{name}/audio/{audio_name}")
-async def api_get_audio(name: str, audio_name: str):
+async def api_get_audio(name: str, audio_name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    audio_path = output_dir / name / "audio" / audio_name
-    if not audio_path.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    audio_path = run_dir / "audio" / audio_name if run_dir else None
+    if not audio_path or not audio_path.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(audio_path), media_type="audio/mpeg")
 
 
 @app.get("/api/runs/{name}/srt")
-async def api_get_srt(name: str):
+async def api_get_srt(name: str, mode: str = ""):
     """Serve the SRT subtitle file for step-mode review."""
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    srt_path = output_dir / name / "subtitles" / "output.srt"
-    if not srt_path.exists():
+    run_dir = find_run_dir(output_dir, name, mode)
+    srt_path = run_dir / "subtitles" / "output.srt" if run_dir else None
+    if not srt_path or not srt_path.exists():
         return JSONResponse({"error": "SRT not found"}, status_code=404)
     return PlainTextResponse(srt_path.read_text(encoding="utf-8"), media_type="text/plain")
 
@@ -2152,9 +2296,9 @@ async def api_library_save(request: Request):
 
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
-    run_dir = output_dir / run_name
-    script_path = run_dir / "script.json"
-    if not script_path.exists():
+    run_dir = find_run_dir(output_dir, run_name)
+    script_path = run_dir / "script.json" if run_dir else None
+    if not script_path or not script_path.exists():
         return JSONResponse({"ok": False, "error": "运行不存在"}, status_code=404)
 
     script = json.loads(script_path.read_text(encoding="utf-8"))

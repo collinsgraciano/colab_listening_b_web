@@ -220,6 +220,12 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).classList.add('active');
 }
 
+// 运行可能位于模式子文件夹（output/{mode}/{name}/），API 调用带上 ?mode= 消歧
+const _runMode = new URLSearchParams(location.search).get('mode') || '';
+
+// 进入画廊默认优先显示 📺 YouTube 标签页
+switchTab('youtube');
+
 function openImage(name) {
     document.getElementById('image-modal-img').src = `/api/runs/{{ run_name }}/images/${name}`;
     document.getElementById('image-modal-title').textContent = name;
@@ -260,7 +266,7 @@ async function refreshYtMeta(btn) {
     btn.disabled = true;
     btn.textContent = '⏳ 生成中…';
     try {
-        const r = await fetch(`/api/runs/{{ run_name }}/yt_meta_refresh`, { method: 'POST' });
+        const r = await fetch(`/api/runs/{{ run_name }}/yt_meta_refresh${_runMode ? `?mode=${_runMode}` : ''}`, { method: 'POST' });
         const data = await r.json();
         if (!r.ok || !data.ok) {
             alert('刷新失败: ' + (data.error || r.statusText));

@@ -206,6 +206,72 @@ MODE_LABELS = {
 }
 ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
 
+# --- 输出目录布局 ---
+# 新布局：output/{mode}/{run_name}/，每种模式一个独立文件夹；
+# 旧扁平布局 output/{run_name}/ 继续兼容读写。
+# 回收站：output/_recycle_bin/（与模式文件夹平级的独立文件夹）。
+RECYCLE_DIRNAME = "_recycle_bin"
+LEGACY_RECYCLE_DIRNAME = ".recycle_bin"  # 旧版回收站（兼容恢复/清空）
+
+MODE_SHORT_LABELS = {
+    "original": "Original",
+    "original_static": "Static",
+    "original_cutout": "Cutout",
+    "quest": "Quest",
+}
+
+
+def _is_safe_run_name(name: str) -> bool:
+    return bool(name) and name not in (".", "..") and "/" not in name and "\\" not in name
+
+
+def find_run_dir(output_dir: Path | str, name: str, mode_hint: str = "") -> Path | None:
+    """按运行名查找运行目录（兼容新旧两种布局）。
+
+    查找顺序：mode_hint 指定的模式文件夹 → 旧扁平布局 → 各模式文件夹。
+    同名运行跨模式重名时以 hint 消歧；未找到返回 None。
+    """
+    root = Path(output_dir)
+    if not _is_safe_run_name(name):
+        return None
+    if mode_hint in MODES:
+        p = root / mode_hint / name
+        if p.is_dir():
+            return p
+    if name not in MODES and name not in (RECYCLE_DIRNAME, LEGACY_RECYCLE_DIRNAME):
+        p = root / name
+        if p.is_dir():
+            return p
+    for mode in MODES:
+        p = root / mode / name
+        if p.is_dir():
+            return p
+    return None
+
+
+def iter_run_dirs(output_dir: Path | str) -> list[Path]:
+    """遍历输出目录下所有运行目录（新旧布局，按修改时间倒序）。
+
+    新布局取模式文件夹下一层；旧扁平布局取根目录一层
+    （模式文件夹与回收站文件夹除外，不要求 script.json 已生成）。
+    """
+    root = Path(output_dir)
+    runs: list[Path] = []
+    if not root.is_dir():
+        return runs
+    for entry in root.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        if entry.name in (RECYCLE_DIRNAME, LEGACY_RECYCLE_DIRNAME):
+            continue
+        if entry.name in MODES:
+            runs.extend(d for d in entry.iterdir()
+                        if d.is_dir() and not d.name.startswith("."))
+        else:
+            runs.append(entry)  # 旧扁平布局运行目录
+    runs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+    return runs
+
 
 def _mode_config_path(mode: str) -> Path:
     return CONFIGS_DIR / f"mode_{mode}.json"

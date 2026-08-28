@@ -14,7 +14,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from .config_manager import resolve_provider, load_config
+from .config_manager import resolve_provider, load_config, find_run_dir
+from . import run_mutex
 
 # Add pipeline source to path (local copy — fully independent)
 PIPELINE_DIR = Path(__file__).parent.parent / "pipeline"
@@ -114,6 +115,12 @@ class PipelineService:
 
     def start(self, config: dict[str, Any], resume: bool = False, step_mode: bool = False) -> bool:
         if self.is_running:
+            return False
+        # 与模式测试互斥（MCP/TTS/FFmpeg 抢资源）；失败时在日志区提示占用方
+        if not run_mutex.try_acquire("pipeline"):
+            self._on_log_line(
+                f"⏳ 启动被拒绝：当前被「{run_mutex.current_owner()}」占用，"
+                f"请等待其完成后再启动主 pipeline。")
             return False
 
         self.config = config
@@ -333,8 +340,9 @@ class PipelineService:
 
         if source:
             output_dir = Path(config.get("output_dir", "./output"))
-            sp = output_dir / source / "script.json"
-            if sp.exists():
+            source_dir = find_run_dir(output_dir, source)
+            sp = source_dir / "script.json" if source_dir else None
+            if sp and sp.exists():
                 try:
                     source_script = json.loads(sp.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
@@ -452,8 +460,8 @@ class PipelineService:
 
         if source_run:
             output_dir = Path(self.config.get("output_dir", "./output"))
-            source_dir = output_dir / source_run
-            if not source_dir.exists():
+            source_dir = find_run_dir(output_dir, source_run)
+            if not source_dir:
                 self._on_log_line(f"  [Reuse] Source run not found: {source_run}")
             else:
                 sp = source_dir / "script.json"
@@ -822,7 +830,7 @@ class PipelineService:
         self._on_log_line("Step 0: 使用脚本库脚本（跳过 LLM 生成）...")
         yt_title = script.get("youtube_title", script.get("title", topic))
         safe_title = _safe_dirname(yt_title, topic)
-        work_dir = parent_dir / safe_title
+        work_dir = parent_dir / args.structure / safe_title
         work_dir.mkdir(parents=True, exist_ok=True)
         dirs = {k: work_dir / k for k in ("images", "clips", "audio", "subtitles", "videos")}
         for d in dirs.values():
@@ -863,6 +871,15 @@ class PipelineService:
 
     def _run(self, config: dict, resume: bool):
         """Main pipeline execution in background thread."""
+        # 无论 _run 主体在哪一步抛异常（含 try 块之前的 env/args 构建），
+        # 都必须释放互斥锁，否则模式测试/下次启动会被永久阻塞
+        try:
+            self._run_inner(config, resume)
+        finally:
+            run_mutex.release("pipeline")
+
+    def _run_inner(self, config: dict, resume: bool):
+        """Main pipeline execution body (mutex held by _run)."""
         # Import here so heavy imports happen in the worker thread
         from pipeline import (
             _step0_script, _step1_mcp, _step2_images_tts,
@@ -895,13 +912,16 @@ class PipelineService:
         try:
             parent_dir = Path(args.output).resolve()
             parent_dir.mkdir(parents=True, exist_ok=True)
+            # 新布局：每种模式一个独立文件夹 output/{mode}/{run_name}/
+            mode_dir = parent_dir / args.structure
+            mode_dir.mkdir(parents=True, exist_ok=True)
             # Full raw LLM responses are dumped here when _chat hits errors
             os.environ["LLM_DEBUG_DIR"] = str(parent_dir / "llm_debug")
             used_topics_file = args.used_topics_file or str(parent_dir / "used_topics.json")
 
             # Load checkpoint for resume
             if resume:
-                checkpoint = _load_checkpoint(parent_dir)
+                checkpoint = _load_checkpoint(mode_dir)
                 if not checkpoint:
                     checkpoint = {}
             else:
@@ -925,7 +945,7 @@ class PipelineService:
                     return
             else:
                 script, work_dir, dirs = _step0_script(
-                    args, checkpoint, topic, parent_dir, used_topics_file)
+                    args, checkpoint, topic, mode_dir, used_topics_file)
                 # 全新生成也补记「模式已用」（脚本页按模式排除主题用）
                 try:
                     from . import script_library as _sl
@@ -1103,7 +1123,7 @@ class PipelineService:
             pass
         return 24
 
-    def refresh_youtube_metadata(self, run_name: str) -> tuple[bool, str]:
+    def refresh_youtube_metadata(self, run_name: str, mode: str = "") -> tuple[bool, str]:
         """用 script.json + subtitles/meta.json 的 timeline 重新生成 youtube_metadata.json。
 
         复用 Step 4.5 的 save_youtube_metadata，零 AI 成本秒级完成，
@@ -1113,8 +1133,8 @@ class PipelineService:
             return False, "Pipeline 正在运行中，请等待完成后再刷新"
 
         output_dir = Path(load_config().get("output_dir", "./output"))
-        run_dir = output_dir / run_name
-        if not run_dir.is_dir():
+        run_dir = find_run_dir(output_dir, run_name, mode)
+        if not run_dir:
             return False, f"运行不存在: {run_name}"
         script_path = run_dir / "script.json"
         meta_path = run_dir / "subtitles" / "meta.json"
@@ -1137,7 +1157,8 @@ class PipelineService:
             return False, f"生成失败: {e}"
 
     def recompose(self, run_name: str, subtitle_style: str = "", font_size: int = 60,
-                  show_zh: bool = True, regen_4k: bool = False) -> tuple[bool, str]:
+                  show_zh: bool = True, regen_4k: bool = False,
+                  mode: str = "") -> tuple[bool, str]:
         """对已完成运行重选字幕样式重渲视频（仅字幕烧录 + 音量归一，本地渲染）。
 
         复用 videos/final_no_sub.mp4 + subtitles/meta.json + script.json，
@@ -1147,8 +1168,8 @@ class PipelineService:
             return False, "Pipeline 正在运行中，请等待完成后再重渲"
 
         output_dir = Path(load_config().get("output_dir", "./output"))
-        run_dir = output_dir / run_name
-        if not run_dir.is_dir():
+        run_dir = find_run_dir(output_dir, run_name, mode)
+        if not run_dir:
             return False, f"运行不存在: {run_name}"
         no_sub = run_dir / "videos" / "final_no_sub.mp4"
         meta_path = run_dir / "subtitles" / "meta.json"

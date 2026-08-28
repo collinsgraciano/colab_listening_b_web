@@ -1515,8 +1515,13 @@ function connectSSE() {
                     if (data.work_dir) msg += '\n\n查看图片画廊和脚本?';
                     setTimeout(() => {
                         if (confirm(msg)) {
-                            const runName = data.work_dir ? data.work_dir.split(/[\\/]/).pop() : '';
-                            if (runName) location.href = '/runs/' + runName + '/gallery';
+                            // work_dir 形如 output/{mode}/{run_name}/（旧布局无 mode 段）
+                            const parts = data.work_dir ? data.work_dir.split(/[\\/]/).filter(Boolean) : [];
+                            const runName = parts[parts.length - 1] || '';
+                            const parentSeg = parts.length >= 2 ? parts[parts.length - 2] : '';
+                            const isMode = ['original', 'original_static', 'original_cutout', 'quest'].includes(parentSeg);
+                            const modeQ = isMode ? `?mode=${parentSeg}` : '';
+                            if (runName) location.href = `/runs/${runName}/gallery${modeQ}`;
                             else location.href = '/runs';
                         }
                     }, 500);
