@@ -221,11 +221,12 @@ class PipelineService:
         if sys.platform == "win32" and "HF_ENDPOINT" not in os.environ:
             os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
-        # Quest 多轮生成 QA 旋钮（quest 脚本生成读取）
+        # 多轮生成 QA 旋钮（quest 与 original* 脚本生成读取；0=关闭需显式写入）
         if config.get("quest_beat_lines"):
             os.environ["QUEST_BEAT_LINES"] = str(config["quest_beat_lines"])
-        if config.get("quest_qa_rounds"):
+        if config.get("quest_qa_rounds") is not None and config.get("quest_qa_rounds") != "":
             os.environ["QUEST_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
+            os.environ["LISTENING_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
 
         # MOSS-TTS env vars (read by generate_tts -> MossTTSEngine)
         if config.get("moss_model_path"):

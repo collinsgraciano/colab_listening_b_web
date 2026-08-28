@@ -391,11 +391,13 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
         ov["OPENAI_MODEL"] = resolved_model or "grok-4.6"
     if cfg.get("llm_min_interval"):
         ov["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
+    # QA 轮数全模式生效（quest 读 QUEST_QA_MAX_ROUNDS，original* 读 LISTENING_QA_MAX_ROUNDS）
+    if cfg.get("quest_qa_rounds") is not None and cfg.get("quest_qa_rounds") != "":
+        ov["LISTENING_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
     if structure == "quest":
         if cfg.get("quest_beat_lines"):
             ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])
-        if cfg.get("quest_qa_rounds") is not None and cfg.get("quest_qa_rounds") != "":
-            ov["QUEST_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
+        ov["QUEST_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
     return ov
 
 

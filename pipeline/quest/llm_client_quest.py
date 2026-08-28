@@ -10,7 +10,8 @@
   D. Programmatic quality gate (quality_gate.py): structure / fields /
      naturalness / duplicates / story / translation / metadata
   E. LLM critique (story judge + language judge) -> targeted patch rewrites
-     (line-count preserving), loop until gate passes or QUEST_QA_MAX_ROUNDS.
+     (line-count preserving): run qa_rounds rounds minimum, keep repairing
+     while gate errors remain (hard cap _QA_HARD_CAP).
 
 Env knobs: QUEST_BEAT_LINES (default 10), QUEST_QA_MAX_ROUNDS (default 3).
 Reuses _chat, _extract_json from parent llm_client.
@@ -177,40 +178,40 @@ def generate_quest_script(topic: str, cefr: str = "A1",
     # ── Phase D+E: quality gate + critique/repair loop ──────────────────
     _apply_programmatic_fixes(script, num_lines)
     rounds_log = []
-    had_judge_issues = True  # run judges at least once (round 1)
-    for rnd in range(1, qa_rounds + 1):
-        report = run_quality_gate(script, num_lines)
-        judge_issues = []
-        if report["n_errors"] or had_judge_issues:
+    if qa_rounds > 0:
+        hard_cap = max(_QA_HARD_CAP, qa_rounds)
+        print(f"  [QA] quality loop: min {qa_rounds} rounds, "
+              f"error-repair up to {hard_cap} rounds")
+        for rnd in range(1, hard_cap + 1):
+            report = run_quality_gate(script, num_lines)
             print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
                   f"warnings={report['n_warnings']}, running LLM judges...")
             judge_issues = _critique_script(script, report)
-            had_judge_issues = bool(judge_issues)
-        else:
-            had_judge_issues = False
-        rounds_log.append({
-            "round": rnd,
-            "gate": report,
-            "judge_issues": judge_issues,
-        })
-        if report["passed"] and not judge_issues:
-            print(f"  [QA] Round {rnd}: PASSED (0 errors, judges clean)")
-            break
-        patches = _merge_patches(report, judge_issues, script)
-        if not patches:
-            print(f"  [QA] Round {rnd}: no actionable patches, accepting best effort")
-            break
-        print(f"  [QA] Round {rnd}: repairing {len(patches)} patches: "
-              + ", ".join(f"L{p[0]}-{p[1]}" for p in patches))
-        _repair_patches(script, patches, outline, cefr)
-        _apply_programmatic_fixes(script, num_lines)
+            rounds_log.append({
+                "round": rnd,
+                "gate": report,
+                "judge_issues": judge_issues,
+            })
+            patches = _merge_patches(report, judge_issues, script)
+            if patches:
+                print(f"  [QA] Round {rnd}: repairing {len(patches)} patches: "
+                      + ", ".join(f"L{p[0]}-{p[1]}" for p in patches))
+                _repair_patches(script, patches, outline, cefr)
+                _apply_programmatic_fixes(script, num_lines)
+            if rnd >= qa_rounds and report["n_errors"] == 0:
+                print(f"  [QA] Round {rnd}: done (0 errors, {rnd} rounds run)")
+                break
+            if report["n_errors"] > 0 and not patches:
+                print(f"  [QA] Round {rnd}: errors remain but no actionable "
+                      f"patches, accepting best effort")
+                break
 
     final = run_quality_gate(script, num_lines)
     script["_qa"] = {"rounds": rounds_log, "final": final}
     print(format_report(final))
     if not final["passed"]:
         print(f"  [QA] WARNING: {final['n_errors']} errors remain after "
-              f"{qa_rounds} QA rounds (accepted best effort)")
+              f"{len(rounds_log)} QA rounds (accepted best effort)")
     return script
 
 
@@ -1049,6 +1050,7 @@ JSON array ONLY, no markdown."""
 
 _MAX_PATCHES = 8
 _PATCH_MERGE_GAP = 5
+_QA_HARD_CAP = 10  # 有 error 时的修复轮数硬上限，防止 LLM 修不动时无限循环
 
 
 def _judge_dialogue_compact(script: dict, with_zh: bool) -> str:

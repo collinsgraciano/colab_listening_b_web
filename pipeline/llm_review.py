@@ -4,19 +4,19 @@
   1. 程序化预修复（opencc 繁化 / speaker 钳制）
   2. LLM 双评审（story judge + language judge）
   3. 门禁 error + judge issues 合并为定向 patch → 保持行数的局部重写
-  4. 轮次循环至通过或 LISTENING_QA_MAX_ROUNDS 上限（默认 3，0 = 禁用）
+  4. 轮次循环：跑满 LISTENING_QA_MAX_ROUNDS 轮（默认 3，0 = 禁用），每轮必跑双评审；
+     轮满仍有 error 则继续修到 0 error，硬上限 _QA_HARD_CAP 轮（超限接受 best effort）
 
 报告结构与 quest 一致，存入 script["_qa"] = {"rounds": [...], "final": {...}}。
 只 import llm_client 内部助手，不反向依赖 quest 子包（通用小助手本地精简复制）。
 """
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from llm_client import _chat, _extract_json
+from llm_client import _chat, _env_get, _extract_json
 from quality_gate_listening import (
     run_listening_quality_gate, format_report, PROMPT_FIELDS,
 )
@@ -47,6 +47,7 @@ def _prompt_field_reqs(pf: tuple[str, ...], scene: str,
 _MAX_PATCHES = 8
 _PATCH_MERGE_GAP = 5
 _MAX_SPAN = 20
+_QA_HARD_CAP = 10  # 有 error 时的修复轮数硬上限，防止 LLM 修不动时无限循环
 
 _WRITER_SYSTEM = (
     "You are an expert ESL script writer for slow-listening videos for "
@@ -56,8 +57,9 @@ _WRITER_SYSTEM = (
 
 
 def _env_int(name: str, default: int) -> int:
+    # 经 _env_get 读取：批量生成线程的线程局部 override 才能生效
     try:
-        return int(os.environ.get(name, "") or default)
+        return int(_env_get(name, "") or default)
     except ValueError:
         return default
 
@@ -448,48 +450,51 @@ Output: JSON array of exactly {k} objects. JSON ONLY."""
 
 def run_listening_qa(script: dict, num_lines: int,
                      structure: str = "original") -> dict:
-    """Gate + critique/repair loop. Mutates script in place, stores script["_qa"]."""
+    """Gate + critique/repair loop. Mutates script in place, stores script["_qa"].
+
+    轮次语义：跑满 qa_rounds 轮（每轮必跑双评审，发现问题即修复）；轮满仍有
+    error 则继续修到 0 error，硬上限 _QA_HARD_CAP 轮；有 error 但无可行动
+    patch 时提前接受 best effort（脚本未变，再循环结果相同）。
+    """
     qa_rounds = _env_int("LISTENING_QA_MAX_ROUNDS", 3)
     if qa_rounds <= 0:
         return script
+    hard_cap = max(_QA_HARD_CAP, qa_rounds)
 
-    print(f"  [QA] listening quality loop: max {qa_rounds} rounds")
+    print(f"  [QA] listening quality loop: min {qa_rounds} rounds, "
+          f"error-repair up to {hard_cap} rounds")
     _apply_fixes(script)
     rounds_log = []
-    had_judge_issues = True  # round 1 必跑 judge
-    for rnd in range(1, qa_rounds + 1):
+    for rnd in range(1, hard_cap + 1):
         report = run_listening_quality_gate(script, num_lines, structure=structure)
-        judge_issues = []
-        if report["n_errors"] or had_judge_issues:
-            print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
-                  f"warnings={report['n_warnings']}, running LLM judges...")
-            judge_issues = _critique_listening(script, report)
-            had_judge_issues = bool(judge_issues)
-        else:
-            had_judge_issues = False
+        print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
+              f"warnings={report['n_warnings']}, running LLM judges...")
+        judge_issues = _critique_listening(script, report)
         rounds_log.append({
             "round": rnd,
             "gate": report,
             "judge_issues": judge_issues,
         })
-        if report["passed"] and not judge_issues:
-            print(f"  [QA] Round {rnd}: PASSED (0 errors, judges clean)")
-            break
         patches = _merge_patches(report, judge_issues, script,
                                  structure=structure)
-        if not patches:
-            print(f"  [QA] Round {rnd}: no actionable patches, accepting best effort")
+        if patches:
+            print(f"  [QA] Round {rnd}: repairing {len(patches)} patches: "
+                  + ", ".join(f"L{p[0]}-{p[1]}" for p in patches))
+            _repair_patches(script, patches, script.get("cefr", "A2"),
+                            structure=structure)
+            _apply_fixes(script)
+        if rnd >= qa_rounds and report["n_errors"] == 0:
+            print(f"  [QA] Round {rnd}: done (0 errors, {rnd} rounds run)")
             break
-        print(f"  [QA] Round {rnd}: repairing {len(patches)} patches: "
-              + ", ".join(f"L{p[0]}-{p[1]}" for p in patches))
-        _repair_patches(script, patches, script.get("cefr", "A2"),
-                        structure=structure)
-        _apply_fixes(script)
+        if report["n_errors"] > 0 and not patches:
+            print(f"  [QA] Round {rnd}: errors remain but no actionable "
+                  f"patches, accepting best effort")
+            break
 
     final = run_listening_quality_gate(script, num_lines, structure=structure)
     script["_qa"] = {"rounds": rounds_log, "final": final}
     print(format_report(final))
     if not final["passed"]:
         print(f"  [QA] WARNING: {final['n_errors']} errors remain after "
-              f"{qa_rounds} QA rounds (accepted best effort)")
+              f"{len(rounds_log)} QA rounds (accepted best effort)")
     return script
