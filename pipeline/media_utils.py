@@ -16,7 +16,10 @@ import shutil
 from pathlib import Path
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass  # stdout may be redirected/captured (web/pytest) — reconfigure unavailable
 
 # ---------------------------------------------------------------------------
 # Font paths (auto-detect Windows vs Linux/Colab)

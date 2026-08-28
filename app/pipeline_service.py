@@ -70,6 +70,11 @@ class _LineBuffer(io.StringIO):
             self._on_line(self._buf.rstrip("\r"))
             self._buf = ""
 
+    def reconfigure(self, *args, **kwargs):
+        # Pipeline 模块在 win32 下 import 时会调用 sys.stdout.reconfigure()；
+        # Web 模式下 stdout 是本对象，接受并忽略该调用避免 AttributeError。
+        pass
+
 
 def _cfg_int(config: dict, key: str, default: int) -> int:
     """配置值安全转 int（空串/非法值回退默认），并 clamp 到 0-10。"""

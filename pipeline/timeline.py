@@ -4,7 +4,10 @@ No external dependencies. Extracted from listening video subtitle module.
 """
 import sys
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass  # stdout may be redirected/captured (web/pytest) — reconfigure unavailable
 
 from media_utils import build_srt
 

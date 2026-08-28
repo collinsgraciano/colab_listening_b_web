@@ -16,7 +16,10 @@ import sys
 from pathlib import Path
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass  # stdout may be redirected/captured (web/pytest) — reconfigure unavailable
 
 # SoX (installed via conda) may not be in PATH for the web process
 _conda_bin = r"G:\software\miniconda3\Library\bin"

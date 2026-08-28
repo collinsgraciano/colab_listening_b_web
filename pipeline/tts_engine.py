@@ -15,7 +15,10 @@ from pathlib import Path
 from dataclasses import dataclass
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass  # stdout may be redirected/captured (web/pytest) — reconfigure unavailable
 
 # HF_ENDPOINT: Windows local uses hf-mirror (HuggingFace blocked in China),
 # Colab/Linux uses direct huggingface.co. Allow override via env var.

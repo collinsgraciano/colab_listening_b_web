@@ -13,7 +13,10 @@ No external dependencies. Pure Python.
 """
 import sys
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass  # stdout may be redirected/captured (web/pytest) — reconfigure unavailable
 
 
 def build_dialogue_groups(dialogue: list[dict], dialogue_durations: list[float],
