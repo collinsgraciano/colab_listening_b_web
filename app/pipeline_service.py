@@ -214,6 +214,9 @@ class PipelineService:
         os.environ["VISUAL_STYLE_ID"] = style_id
         os.environ["VISUAL_STYLE_PROMPT"] = _rsp(style_id)
 
+        # 生图 Provider：mcp（默认，TJGenerators 积分）或 sensenova（U1.5 Lite API 计费）
+        os.environ["IMAGE_PROVIDER"] = str(config.get("image_provider", "mcp"))
+
         provider = config.get("llm_provider", "sensenova")
         p_type, p_base_url, p_api_key, p_model = resolve_provider(config)
         os.environ["LLM_PROVIDER"] = p_type

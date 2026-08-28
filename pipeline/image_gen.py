@@ -12,6 +12,7 @@ from checkpoint import step_done
 from media_utils import get_duration as _get_audio_duration
 from atlas_split import split_atlas
 from style_manager import DEFAULT_STYLE_PROMPT
+import sensenova_image
 
 
 def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
@@ -180,6 +181,19 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
     def _gen_one(prompt, filename):
         print(f"  [Image] Generating: {filename}...")
         try:
+            if sensenova_image.get_image_provider() == "sensenova":
+                # U1.5 Lite：生成 → 下载落盘 → 重传 TOS 换永久 URL
+                # （U1.5 返回的 URL 仅 24h 有效，不能直接进 image_urls 给 Seedance/resume 用）
+                size = sensenova_image.SIZE_MAP.get(image_size, "2720x1536")
+                url = sensenova_image.text_to_image(prompt, size=size, output_format="png")
+                dest = str(img_dir / filename)
+                if not download_file(url, dest):
+                    return filename, "", "download_failed"
+                print(f"    [Image] Downloaded: {dest}")
+                tos_url = reupload_for_cdn(dest, filename)
+                if not tos_url:
+                    return filename, "", "tos_reupload_failed"
+                return filename, tos_url, None
             result = call_tool("generate_image", {
                 "prompt": prompt,
                 "provider": "seedream",
@@ -258,6 +272,22 @@ def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
             ref_cdn = char_scene_cdn
         print(f"    [Image] Generating dialogue_img_{i}/{n}...")
         try:
+            if sensenova_image.get_image_provider() == "sensenova":
+                # U1.5 Lite edits：参考图（CDN URL 优先，缺失时本地 char_scene）+ 编辑提示词
+                ref = ref_cdn
+                if not ref:
+                    _local_ref = str(img_dir / "char_scene.png")
+                    if os.path.exists(_local_ref):
+                        ref = _local_ref
+                if ref:
+                    url = sensenova_image.edit_image(ref, img_prompt, size="auto")
+                else:
+                    url = sensenova_image.text_to_image(img_prompt, size="2720x1536")
+                if url and download_file(url, d_img_path):
+                    print(f"      [Image] Downloaded: dialogue_img_{i}.png")
+                    return i, True
+                print(f"      [Image] WARNING: U1.5 no URL for dialogue_img_{i}, will use scene image as fallback")
+                return i, False
             gen_params = {
                 "prompt": img_prompt,
                 "provider": "frontier",
@@ -342,17 +372,24 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
 
         print(f"  [QuestAtlas] Generating {grid_w}×{grid_h} atlas for {char_key} ({n_poses} poses)...")
         try:
-            gen_params = {
-                "prompt": atlas_prompt,
-                "provider": "seedream",
-                "image_size": img_size,
-                "output_format": "png",
-                "is_segmentation": True,
-            }
-            result = call_tool("generate_image", gen_params)
-            task_id = parse_task_id(result)
-            data = poll_task(task_id, interval=10, max_wait=600)
-            url = data.get("url", "")
+            if sensenova_image.get_image_provider() == "sensenova":
+                # U1.5 无 is_segmentation，白底由 stop_motion 白度抠图 fallback 处理；
+                # prompt_extend=False 防止 "4x2 grid" 布局描述被润色改写
+                url = sensenova_image.text_to_image(
+                    atlas_prompt, size=sensenova_image.SIZE_MAP["atlas_pose"],
+                    prompt_extend=False)
+            else:
+                gen_params = {
+                    "prompt": atlas_prompt,
+                    "provider": "seedream",
+                    "image_size": img_size,
+                    "output_format": "png",
+                    "is_segmentation": True,
+                }
+                result = call_tool("generate_image", gen_params)
+                task_id = parse_task_id(result)
+                data = poll_task(task_id, interval=10, max_wait=600)
+                url = data.get("url", "")
             if not url:
                 import json as _json
                 raw = data.get("raw_json", "")
@@ -468,16 +505,22 @@ def generate_scene_atlas(scene_images, scene, img_dir, tts_thread,
               f"(scene_{start}..scene_{end-1}, {n_batch} scenes)...")
 
         try:
-            gen_params = {
-                "prompt": atlas_prompt,
-                "provider": "seedream",
-                "image_size": "4992x3328",
-                "output_format": "png",
-            }
-            result = call_tool("generate_image", gen_params)
-            task_id = parse_task_id(result)
-            data = poll_task(task_id, interval=10, max_wait=600)
-            url = data.get("url", "")
+            if sensenova_image.get_image_provider() == "sensenova":
+                # prompt_extend=False 防止 "2x2 grid" 布局描述被润色改写
+                url = sensenova_image.text_to_image(
+                    atlas_prompt, size=sensenova_image.SIZE_MAP["atlas_scene"],
+                    prompt_extend=False)
+            else:
+                gen_params = {
+                    "prompt": atlas_prompt,
+                    "provider": "seedream",
+                    "image_size": "4992x3328",
+                    "output_format": "png",
+                }
+                result = call_tool("generate_image", gen_params)
+                task_id = parse_task_id(result)
+                data = poll_task(task_id, interval=10, max_wait=600)
+                url = data.get("url", "")
             if not url:
                 import json as _json
                 raw = data.get("raw_json", "")

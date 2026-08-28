@@ -134,6 +134,9 @@ PARAM_SPEC = {
                    "label": "MCP Tokens", "help": "每行一个 token, 多 token 自动轮换"},
     "image_concurrency": {"default": 4, "type": "number", "group": "mcp",
                           "label": "图片并发数", "help": "1-4, 默认4"},
+    "image_provider": {"default": "mcp", "type": "select", "group": "mcp",
+                       "label": "生图 Provider", "options": ["mcp", "sensenova"],
+                       "help": "mcp=TJGenerators(积分)；sensenova=SenseNova U1.5 Lite(API 计费, 复用 SenseNova API Key)"},
     "clip_duration": {"default": 15, "type": "number", "group": "mcp",
                       "label": "视频片段时长(秒)", "help": "4-15"},
     "clip_concurrency": {"default": 4, "type": "number", "group": "mcp",
@@ -538,6 +541,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
             args += ["--mcp-tokens", ",".join(tokens)]
 
     args += ["--image-concurrency", str(config.get("image_concurrency", 4))]
+    args += ["--image-provider", str(config.get("image_provider", "mcp"))]
     args += ["--clip-duration", str(config.get("clip_duration", 15))]
     args += ["--clip-concurrency", str(config.get("clip_concurrency", 4))]
     args += ["--output", str(config.get("output_dir", "./output"))]

@@ -18,6 +18,7 @@ if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
 from media_utils import FONT_EN, FONT_ZH
+import sensenova_image
 
 # YouTube thumbnail specs
 THUMB_W = 1280
@@ -103,6 +104,34 @@ def generate_thumbnail(script: dict, scene_img: str, output_path: str,
     # If we have a char_scene reference, add instruction to match it
     if char_scene_url:
         prompt += "\n\nIMPORTANT: The characters' appearance, clothing, and hair MUST closely match the uploaded reference image. Use the reference image as the character design guide."
+
+    # SenseNova U1.5 Lite 路径（image_provider=sensenova）：
+    # 有 char_scene 参考图走 edits，否则纯文生图；失败直接落 Pillow fallback
+    # （不再落 MCP 生成，避免用户选择 sensenova 省积分时被意外消耗）
+    if sensenova_image.get_image_provider() == "sensenova":
+        print("  [Thumbnail] Generating thumbnail via SenseNova U1.5 Lite...")
+        try:
+            if char_scene_url:
+                url = sensenova_image.edit_image(
+                    char_scene_url, prompt,
+                    size=sensenova_image.SIZE_MAP["landscape_16_9"],
+                    output_format="jpeg")
+            else:
+                url = sensenova_image.text_to_image(
+                    prompt, size=sensenova_image.SIZE_MAP["landscape_16_9"],
+                    output_format="jpeg")
+            if url and sensenova_image.download_image(url, output_path):
+                size_kb = os.path.getsize(output_path) // 1024
+                if size_kb > 10:
+                    print(f"  [Thumbnail] Saved (U1.5): {output_path} ({size_kb}KB)")
+                    return output_path
+                print(f"  [Thumbnail] U1.5 image too small ({size_kb}KB), falling back")
+            else:
+                print("  [Thumbnail] U1.5 generation returned no URL, falling back to Pillow")
+        except Exception as e:
+            print(f"  [Thumbnail] U1.5 generation failed: {e}, falling back to Pillow")
+        print("  [Thumbnail] Using Pillow fallback (text overlay on scene image)...")
+        return _pillow_fallback(script, scene_img, output_path, structure)
 
     # Try AI generation with text baked in
     if mcp_call_tool and mcp_parse_task_id and mcp_poll_task and mcp_download_file:

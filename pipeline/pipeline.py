@@ -191,6 +191,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48)")
     parser.add_argument("--mcp-tokens", default=None, help="TJGenerators MCP OAuth tokens, comma-separated for multi-token rotation")
     parser.add_argument("--mcp-token", default=None, help="(Deprecated) Single MCP token. Use --mcp-tokens instead.")
+    parser.add_argument("--image-provider", default="mcp", choices=["mcp", "sensenova"],
+                        help="Image generation provider: 'mcp' (default, TJGenerators credits) or 'sensenova' (U1.5 Lite, API billing with SENSENOVA_API_KEY)")
     parser.add_argument("--api-key", default=None, help="SenseNova API key (or set SENSENOVA_API_KEY env var)")
     parser.add_argument("--model", default=None,
                         help="LLM model name. SenseNova: 'deepseek-v4-flash' (default) or 'glm-5.2'. OpenAI-compatible: 'grok-4.6' (default), 'gemini-3.1-pro-preview', 'claude-sonnet-5', etc.")
@@ -1057,6 +1059,12 @@ def main():
         if not os.environ.get("SENSENOVA_API_KEY"):
             print("ERROR: SENSENOVA_API_KEY not set. Pass --api-key or set env var.")
             sys.exit(1)
+
+    # 生图 Provider：mcp（默认）或 sensenova（U1.5 Lite，读 IMAGE_PROVIDER env）
+    os.environ["IMAGE_PROVIDER"] = args.image_provider
+    if args.image_provider == "sensenova" and not os.environ.get("SENSENOVA_API_KEY"):
+        print("ERROR: image_provider=sensenova requires SENSENOVA_API_KEY.")
+        sys.exit(1)
 
     parent_dir = Path(args.output).resolve()
     parent_dir.mkdir(parents=True, exist_ok=True)
