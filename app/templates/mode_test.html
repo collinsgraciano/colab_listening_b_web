@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white flex items-center gap-2">⚡ 模式效果测试</h1>
+            <p class="text-sm text-slate-400 mt-1">
+                一次性生成各模式迷你素材（original* 4 行 / quest 8 行对话），之后合成测试视频纯本地零积分、随时可跑。
+                生成素材会消耗 LLM/MCP/TTS 额度，且与主 pipeline 互斥。
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btn-stop" onclick="stopAll()" class="hidden px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-sm font-medium">
+                ⏹ 停止
+            </button>
+        </div>
+    </div>
+
+    <!-- 互斥提示条 -->
+    <div id="mutex-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-900/40 border border-amber-700 text-amber-200 text-sm"></div>
+
+    <!-- 全局操作 -->
+    <div class="mb-6 flex flex-wrap items-center gap-2">
+        <button onclick="generateAllMissing()" id="btn-gen-all"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+            📦 生成全部缺失素材
+        </button>
+        <button onclick="composeAll()" id="btn-compose-all"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+            🎬 全部合成测试视频
+        </button>
+        <span id="global-status" class="text-xs text-slate-400"></span>
+    </div>
+
+    <!-- 模式卡片 -->
+    <div id="cards" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6"></div>
+
+    <!-- 日志 -->
+    <div class="bg-slate-800/60 border border-slate-700 rounded-lg overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+            <span class="text-sm font-medium text-slate-300">执行日志</span>
+            <label class="text-xs text-slate-400 flex items-center gap-1">
+                <input type="checkbox" id="autoscroll" checked class="accent-indigo-500"> 自动滚动
+            </label>
+        </div>
+        <pre id="log" class="p-4 text-xs leading-5 text-slate-300 whitespace-pre-wrap max-h-80 overflow-y-auto font-mono"></pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODE_LABELS = {{ mode_labels | tojson }};
+const MINI_LINES = {{ status.mini_lines | tojson }};
+let lastStatus = null;
+let generatingSeq = false;   // 客户端串行「生成全部缺失素材」进行中
+
+function modeLabel(m) { return (MODE_LABELS && MODE_LABELS[m]) ? MODE_LABELS[m] : m; }
+
+function fmtTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleString('zh-CN', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'});
+}
+
+async function api(url, body) {
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: body ? JSON.stringify(body) : '{}'
+    });
+    return resp.json();
+}
+
+// ---------- 渲染 ----------
+
+function badge(info, progress) {
+    if (progress.is_running && progress.phase === 'generate' && progress.current_mode === info.mode)
+        return `<span class="px-2 py-0.5 rounded-full text-xs bg-indigo-600 text-white">生成素材中…</span>`;
+    if (progress.is_running && progress.phase === 'compose' && progress.compose_modes.includes(info.mode)
+        && !progress.compose_done.includes(info.mode))
+        return `<span class="px-2 py-0.5 rounded-full text-xs bg-emerald-600 text-white">合成测试中…</span>`;
+    if (info.has_active)
+        return `<span class="px-2 py-0.5 rounded-full text-xs bg-emerald-900/60 text-emerald-300 border border-emerald-700">素材已就绪</span>`;
+    if (info.interrupted)
+        return `<span class="px-2 py-0.5 rounded-full text-xs bg-amber-900/60 text-amber-300 border border-amber-700">生成中断（可继续）</span>`;
+    return `<span class="px-2 py-0.5 rounded-full text-xs bg-slate-700 text-slate-300">未生成</span>`;
+}
+
+function cardHTML(info, progress) {
+    const m = info.mode;
+    const mf = info.manifest;
+    let body = '';
+    if (info.has_active && mf) {
+        const videos = (info.videos || []).map(v => `
+            <div class="mt-2">
+                <video src="${v.url}" controls preload="metadata"
+                    class="w-full rounded-lg bg-black border border-slate-700"></video>
+                <div class="flex items-center justify-between mt-1 text-xs text-slate-400">
+                    <span>${v.name}（${v.size_mb}MB）</span>
+                    <button onclick="openFolder('${m}')" class="text-indigo-400 hover:text-indigo-300">打开目录</button>
+                </div>
+            </div>`).join('');
+        body = `
+            <div class="text-xs text-slate-400 space-y-0.5 mb-3">
+                <div>主题：<span class="text-slate-200">${mf.topic || ''}</span></div>
+                <div>${mf.num_lines || MINI_LINES[m]} 行对话 · 生成于 ${fmtTime(mf.generated_at)} · 素材 ${info.size_mb}MB</div>
+                ${mf.visual_style ? `<div>风格：${mf.visual_style}</div>` : ''}
+            </div>
+            ${videos || '<div class="text-xs text-slate-500 mb-2">尚无测试视频</div>'}
+            <div class="flex flex-wrap gap-2 mt-3">
+                <button onclick="composeOne('${m}')" ${btnDisabled(progress)}
+                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium">🎬 合成测试视频</button>
+                <button onclick="generateOne('${m}', true)" ${btnDisabled(progress)}
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs">♻️ 重新生成素材</button>
+            </div>`;
+    } else if (info.interrupted) {
+        body = `
+            <div class="text-xs text-amber-300 mb-3">上次素材生成被中断（${info.interrupted_set}），可从断点继续，已生成的图片/音频不会重复消耗。</div>
+            <div class="flex items-center gap-2 mb-2">
+                <input id="topic-${m}" placeholder="主题（留空随机）" ${btnDisabled(progress) ? 'disabled' : ''}
+                    class="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500">
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="generateOne('${m}', false)" ${btnDisabled(progress)}
+                    class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium">▶ 继续生成</button>
+                <button onclick="generateOne('${m}', true)" ${btnDisabled(progress)}
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs">🗑 放弃并重来</button>
+            </div>`;
+    } else {
+        body = `
+            <div class="text-xs text-slate-400 mb-3">尚未生成素材。生成后即可随时零消耗合成测试视频，对比各模式画面/结构效果。</div>
+            <div class="flex items-center gap-2 mb-2">
+                <input id="topic-${m}" placeholder="主题（留空随机）" ${btnDisabled(progress) ? 'disabled' : ''}
+                    class="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500">
+            </div>
+            <button onclick="generateOne('${m}', false)" ${btnDisabled(progress)}
+                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium">📦 生成素材</button>`;
+    }
+    return `
+        <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="font-semibold text-white text-sm">${modeLabel(m)}
+                    <span class="text-slate-500 font-normal text-xs">${m} · ${MINI_LINES[m]} 行</span></h2>
+                ${badge(info, progress)}
+            </div>
+            ${body}
+        </div>`;
+}
+
+function btnDisabled(progress) {
+    // 运行中或主 pipeline 占用时禁用启动类按钮
+    if (progress.is_running) return 'disabled';
+    if (progress.mutex_owner && progress.mutex_owner !== '' ) return 'disabled';
+    return '';
+}
+
+function render(st) {
+    lastStatus = st;
+    const progress = st.progress;
+    // 提示条
+    const banner = document.getElementById('mutex-banner');
+    if (progress.is_running) {
+        banner.classList.remove('hidden');
+        banner.textContent = progress.phase === 'generate'
+            ? `正在生成「${modeLabel(progress.current_mode)}」测试素材… ${progress.current_step_label || ''}（已运行 ${progress.elapsed}s）`
+            : `正在合成测试视频（${progress.compose_done.length}/${progress.compose_modes.length}）：${progress.compose_done.join(', ') || '…'}（已运行 ${progress.elapsed}s）`;
+    } else if (progress.mutex_owner) {
+        banner.classList.remove('hidden');
+        banner.textContent = `资源被「${progress.mutex_owner}」占用中，模式测试暂不可启动。`;
+    } else {
+        banner.classList.add('hidden');
+    }
+    // 停止按钮
+    document.getElementById('btn-stop').classList.toggle('hidden', !progress.is_running);
+    // 全局按钮可用性
+    const disabled = progress.is_running || (!!progress.mutex_owner) || generatingSeq;
+    document.getElementById('btn-gen-all').disabled = disabled || !st.modes.some(i => !i.has_active);
+    document.getElementById('btn-compose-all').disabled = disabled || !st.modes.some(i => i.has_active);
+    // 全局状态文本
+    let gs = '';
+    if (progress.status === 'error') gs = `❌ 上次出错：${progress.error || ''}`;
+    else if (progress.status === 'stopped') gs = '⏹ 已停止（素材生成中断可点「继续生成」）';
+    else if (progress.status === 'done' && !progress.is_running) gs = '✅ 上次任务完成';
+    document.getElementById('global-status').textContent = gs;
+    // 卡片
+    document.getElementById('cards').innerHTML =
+        st.modes.map(info => cardHTML(info, progress)).join('');
+}
+
+// ---------- 动作 ----------
+
+async function refresh() {
+    try {
+        const st = await (await fetch('/api/mode_test/status')).json();
+        render(st);
+    } catch (e) { /* 服务重启等瞬时失败忽略 */ }
+}
+
+function readTopic(m) {
+    const el = document.getElementById(`topic-${m}`);
+    return el ? el.value.trim() : '';
+}
+
+async function generateOne(mode, force) {
+    if (force && !confirm(`确定删除「${modeLabel(mode)}」现有素材并重新生成？\n旧素材将被清空，且本次生成消耗积分。`)) return;
+    const r = await api('/api/mode_test/generate', {mode, topic: readTopic(mode), force});
+    if (!r.ok) alert(r.message || '启动失败');
+    refresh();
+}
+
+async function composeOne(mode) {
+    const r = await api('/api/mode_test/compose', {modes: [mode]});
+    if (!r.ok) alert(r.message || '启动失败');
+    refresh();
+}
+
+async function composeAll() {
+    const st = await (await fetch('/api/mode_test/status')).json();
+    const modes = st.modes.filter(i => i.has_active).map(i => i.mode);
+    if (!modes.length) { alert('尚无任何已生成素材'); return; }
+    const r = await api('/api/mode_test/compose', {modes});
+    if (!r.ok) alert(r.message || '启动失败');
+    refresh();
+}
+
+async function generateAllMissing() {
+    const st = await (await fetch('/api/mode_test/status')).json();
+    const missing = st.modes.filter(i => !i.has_active && !i.interrupted).map(i => i.mode);
+    if (!missing.length) { alert('所有模式素材均已生成'); return; }
+    if (!confirm(`将依次生成 ${missing.length} 个模式的测试素材（${modeLabel(missing[0])} 等），消耗积分且耗时较长。继续？`)) return;
+    generatingSeq = true;
+    try {
+        for (const m of missing) {
+            const r = await api('/api/mode_test/generate', {mode: m, topic: readTopic(m), force: false});
+            if (!r.ok) { alert(`「${modeLabel(m)}」启动失败：${r.message}`); break; }
+            // 等待当前模式生成完成（轮询 status）
+            while (true) {
+                await new Promise(res => setTimeout(res, 2000));
+                const s = await (await fetch('/api/mode_test/status')).json();
+                render(s);
+                if (!s.progress.is_running) {
+                    if (s.progress.status === 'error') { alert(`「${modeLabel(m)}」生成失败：${s.progress.error}`); return; }
+                    if (s.progress.status === 'stopped') return;
+                    break;
+                }
+            }
+        }
+    } finally {
+        generatingSeq = false;
+        refresh();
+    }
+}
+
+async function stopAll() {
+    if (!confirm('确定停止当前测试任务？素材生成中断后可从断点继续。')) return;
+    await api('/api/mode_test/stop');
+    refresh();
+}
+
+function openFolder(mode) {
+    const info = (lastStatus && lastStatus.modes || []).find(i => i.mode === mode);
+    if (info && info.manifest && info.manifest.set_name) {
+        alert(`素材目录：output/.mode_test/assets/${mode}/${info.manifest.set_name}`);
+    }
+}
+
+// ---------- 日志 SSE ----------
+
+const logEl = document.getElementById('log');
+let es = null;
+function connectSSE() {
+    if (es) es.close();
+    es = new EventSource('/api/mode_test/logs');
+    es.onmessage = (ev) => {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'log') {
+            logEl.textContent += data.line + '\n';
+            if (document.getElementById('autoscroll').checked)
+                logEl.scrollTop = logEl.scrollHeight;
+        } else if (data.type === 'status' || data.type === 'done') {
+            refresh();
+        }
+    };
+    es.onerror = () => { es.close(); setTimeout(connectSSE, 3000); };
+}
+
+connectSSE();
+refresh();
+setInterval(refresh, 2500);
+</script>
+{% endblock %}
