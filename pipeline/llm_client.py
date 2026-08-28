@@ -470,6 +470,8 @@ TECHNICAL REQUIREMENTS:
 - "youtube_description": a full YouTube video description (max 3000 chars). First line must be a hook with the main keyword. Do NOT write chapter timestamps — they are injected automatically after rendering. End with 3 hashtags (#EnglishListening #ESL #LearnEnglish) and a subscribe CTA. ALL Chinese text in Traditional Chinese (繁體中文).
 - "youtube_description_en": a full YouTube video description in PURE ENGLISH (no Chinese). Max 3000 chars. First line = hook with main keyword. Do NOT write chapter timestamps — they are injected automatically after rendering. End with hashtags and subscribe CTA.
 - "youtube_tags": an array of 15-20 SEO tags (mix of short and long-tail keywords, include both English and Traditional Chinese tags)
+- "youtube_title_ref": a SECOND YouTube title option in the reference channel's "沉浸式英文動畫" style. Exact format: 【🎬沉浸式英文動畫】+ emoji + 主題+"英文" ｜ 內容點1・內容點2・內容點3 ｜ 吸引句 ｜ 🌱{cefr} 初級英文 ｜ 💡不用背，多聽就會用 ｜ 🎧聽力口說練習 ｜ 後段逐句跟讀 — segments joined by ｜. The 3 content points name specifically what viewers learn from THIS dialogue, joined by "・" (e.g. "形容味道與口感・問口味・和陌生人聊美食"). ALL Traditional Chinese. Length 55-95 chars (NEVER exceed 95). Example: "【🎬沉浸式英文動畫】✈️聽懂美食英文｜🍢形容味道與口感・問口味・和陌生人聊美食｜🍽️出國盡情嚐美食｜🌱A1–A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀"
+- "youtube_description_ref": a SECOND YouTube description option in the same reference style (max 3000 chars). ALL Traditional Chinese (繁體中文). Structure: start with "📌 影片簡介：" + a relatable hook question (2-3 short lines); then a paragraph "這一集帶大家走進…" (narrate the scene/location); then "你會聽到：" with 2-4 emoji bullet sections, each = a Traditional Chinese heading + 1-2 lines explaining what you'll learn, quoting REAL English phrases from THIS dialogue; then a paragraph about the 逐句聽力＋跟讀練習 🎧 in the second half; then "🌱 適合 {cefr} 初級英文學習者" paragraph (不用背，跟著情境反覆聽就會自然); end with a short warm closing line. Do NOT write timestamps or 時間軸 (auto-injected). Do NOT include playlist/video links or hashtags (auto-appended).
 - "scene": the English name of the scene/location (e.g. "pharmacy", "coffee shop", "hotel lobby"). Used for thumbnail and prompts.
 - "thumbnail_expression": the facial expression of the main character on the thumbnail (e.g. "surprised and excited", "confused and thinking", "cheerful and smiling", "friendly and confident")
 - "thumbnail_action": a short description of what the main character is doing on the thumbnail (e.g. "pointing to a menu", "holding a shopping bag", "waving hello", "gesturing toward the counter")
@@ -521,6 +523,8 @@ JSON schema:
   "youtube_description": string,
   "youtube_description_en": string,
   "youtube_tags": [string],
+  "youtube_title_ref": string,
+  "youtube_description_ref": string,
   "scene": string,
   "thumbnail_expression": string,
   "thumbnail_action": string,
@@ -667,6 +671,8 @@ def generate_listening_script(topic: str, cefr: str = "A2",
     script.setdefault("youtube_description", "")
     script.setdefault("youtube_description_en", "")
     script.setdefault("youtube_tags", [])
+    script.setdefault("youtube_title_ref", "")
+    script.setdefault("youtube_description_ref", "")
     script.setdefault("scene", "")
     script.setdefault("thumbnail_expression", "surprised and excited")
     script.setdefault("thumbnail_action", "looking toward the camera and gesturing naturally")

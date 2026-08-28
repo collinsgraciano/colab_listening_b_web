@@ -331,8 +331,8 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
 
     tags = script.get("youtube_tags", [])
     # Append tags as #hashtag string at the end of description
-    if tags:
-        hashtags = " ".join(f"#{t.replace(' ', '')}" for t in tags)
+    hashtags = " ".join(f"#{t.replace(' ', '')}" for t in tags) if tags else ""
+    if hashtags:
         description = description.rstrip() + "\n" + hashtags
         if description_en:
             description_en = description_en.rstrip() + "\n" + hashtags
@@ -355,6 +355,23 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
         "tags": tags,
         "chapters": chapters,
     }
+
+    # 多样式选项（title_options）：yt_meta_styles/ 下每个注册样式生成一套备选
+    # 标题+简介（如"参考频道同款"），与默认选项并存供上传时多选一。
+    try:
+        from yt_meta_styles import collect_options
+        options = collect_options(script, chapters=chapters, marks=marks, structure=structure)
+    except Exception as e:
+        print(f"  [YouTube] WARNING: 样式选项收集失败: {e}")
+        options = []
+    for opt in options:
+        if len(opt["title"]) > 100:
+            print(f"  [YouTube] WARNING: {opt['style_id']} title {len(opt['title'])} chars > 100, truncated")
+            opt["title"] = opt["title"][:100]
+        if hashtags:
+            opt["description"] = opt["description"].rstrip() + "\n" + hashtags
+    if options:
+        metadata["title_options"] = options
 
     Path(output_path).write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"  [YouTube] Metadata saved: {output_path}")

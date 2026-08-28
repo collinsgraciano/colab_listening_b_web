@@ -754,7 +754,11 @@ function renderEditor() {
                 <input data-field="title" value="${escapeHtml(s.title || '')}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
             <div><label class="block text-xs text-slate-400 mb-1">YouTube 标题</label>
                 <input data-field="youtube_title" value="${escapeHtml(s.youtube_title || '')}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
+            <div><label class="block text-xs text-slate-400 mb-1">同款标题</label>
+                <input data-field="youtube_title_ref" value="${escapeHtml(s.youtube_title_ref || '')}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white"></div>
         </div>
+        <div class="mt-3"><label class="block text-xs text-slate-400 mb-1">同款简介（参考频道样式，时间戳/链接/hashtag 自动注入勿写）</label>
+            <textarea data-field="youtube_description_ref" rows="6" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white">${escapeHtml(s.youtube_description_ref || '')}</textarea></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">`;
     charKeys.forEach(ck => {
         metaHtml += `

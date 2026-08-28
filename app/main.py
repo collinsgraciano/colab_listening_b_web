@@ -251,6 +251,7 @@ async def gallery_page(request: Request, name: str):
         "yt_desc": yt_meta.get("description") or script.get("youtube_description", ""),
         "yt_desc_en": yt_meta.get("description_en") or script.get("youtube_description_en", ""),
         "yt_tags": yt_meta.get("tags") or script.get("youtube_tags", []),
+        "yt_options": yt_meta.get("title_options", []),
         "active_page": "runs",
     })
 

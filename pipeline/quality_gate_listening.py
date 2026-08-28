@@ -335,6 +335,12 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
         if not (lo <= len(yt_title) <= hi):
             add("metadata", "warning",
                 f"youtube_title {len(yt_title)} 字符（建议 {lo}-{hi}）")
+    yt_title_ref = str(script.get("youtube_title_ref", ""))
+    if yt_title_ref:
+        lo, hi = _META_TARGETS["youtube_title_chars"]
+        if not (lo <= len(yt_title_ref) <= hi):
+            add("metadata", "warning",
+                f"youtube_title_ref {len(yt_title_ref)} 字符（建议 {lo}-{hi}）")
 
     # ── 汇总 ────────────────────────────────────────────────────────
     n_errors = sum(1 for i in issues if i["severity"] == "error")
