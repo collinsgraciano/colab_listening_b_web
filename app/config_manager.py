@@ -187,6 +187,13 @@ PARAM_SPEC = {
               "label": "跳过4K"},
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
                        "label": "4K超时(秒)"},
+    "matting_engine": {"default": "auto", "type": "select", "group": "video",
+                       "label": "抠图引擎",
+                       "options": {"auto": "Auto (有权重用MODNet)",
+                                   "modnet": "MODNet (AI抠图)",
+                                   "white_threshold": "白度阈值 (原方法)"},
+                       "help": "MODNet 本地 ONNX 抠图（权重 H:\\models\\modnet\\modnet.onnx），"
+                               "任意背景角色图可抠；原白度抠图始终保留可选"},
 }
 
 # Group display metadata
@@ -585,6 +592,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     if config.get("no_4k"):
         args.append("--no-4k")
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]
+    args += ["--matting-engine", str(config.get("matting_engine", "auto"))]
 
     if resume:
         args.append("--resume")

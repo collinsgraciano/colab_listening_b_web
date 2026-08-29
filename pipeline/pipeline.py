@@ -240,6 +240,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--moss-tts-retry", type=int, default=3,
                         help="MOSS-TTS per-sentence retry attempts with re-seed (default 3)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
+    parser.add_argument("--matting-engine", default="auto",
+                        choices=["auto", "modnet", "white_threshold"],
+                        help="Cutout matting engine: auto (MODNet if weights exist) / modnet / white_threshold (legacy)")
     return parser.parse_args()
 
 
@@ -998,6 +1001,8 @@ def main():
         args.animation = "none"
 
     os.environ["LLM_RETRIES"] = str(args.llm_retries)
+    # 抠图引擎（stop_motion.remove_bg 读取）：auto/modnet/white_threshold
+    os.environ["MATTING_ENGINE"] = str(getattr(args, "matting_engine", "auto") or "auto")
     # 每行最大词数（字幕两行约束）：prompt + QA 门禁共用；未传则用各模块默认 10
     if args.max_line_words:
         os.environ["LISTENING_MAX_LINE_WORDS"] = str(args.max_line_words)

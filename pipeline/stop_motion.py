@@ -92,6 +92,17 @@ def remove_bg(img: Image.Image) -> Image.Image:
     # Fast path: image already has transparency (from is_segmentation=true)
     if _has_transparency(img):
         return img.convert("RGBA")
+    # 新增选项：MODNet AI 抠图（engine=modnet，或 auto 且权重可用时）
+    try:
+        import matting as _matting
+        engine = _matting.resolve_engine()
+        if engine in ("auto", "modnet"):
+            if _matting.matting_available():
+                return _matting.matting_remove_bg(img)
+            if engine == "modnet":
+                print("  [Matting] MODNet 权重不可用，回退白度抠图")
+    except Exception as e:
+        print(f"  [Matting] MODNet 抠图失败，回退白度抠图: {e}")
     return _remove_white_bg_fallback(img)
 
 
