@@ -185,6 +185,14 @@ PARAM_SPEC = {
                        "label": "隐藏中文字幕"},
     "no_4k": {"default": False, "type": "checkbox", "group": "video",
               "label": "跳过4K"},
+    "upscale_engine": {"default": "ffmpeg", "type": "select", "group": "video",
+                       "label": "4K 超分引擎",
+                       "options": {"ffmpeg": "FFmpeg Lanczos (原方法)",
+                                   "ai": "AI 超分 (animevideov3)"},
+                       "help": "AI 超分 = realesr-animevideov3 本地 GPU 推理（权重 "
+                               "H:\\models\\upscaling\\，锐度比插值高约 12-28%）；推理约 "
+                               "110ms/帧，12 分钟全片预计比原方法多 30-60 分钟；"
+                               "权重缺失或无 CUDA 自动回退原方法"},
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
                        "label": "4K超时(秒)"},
     "matting_engine": {"default": "auto", "type": "select", "group": "video",
@@ -593,6 +601,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args.append("--no-4k")
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]
     args += ["--matting-engine", str(config.get("matting_engine", "auto"))]
+    args += ["--upscale-engine", str(config.get("upscale_engine", "ffmpeg"))]
 
     if resume:
         args.append("--resume")

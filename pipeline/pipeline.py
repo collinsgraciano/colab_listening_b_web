@@ -240,6 +240,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--moss-tts-retry", type=int, default=3,
                         help="MOSS-TTS per-sentence retry attempts with re-seed (default 3)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
+    parser.add_argument("--upscale-engine", default="ffmpeg", choices=["ffmpeg", "ai"],
+                        help="4K upscale engine: ffmpeg (lanczos, default) or ai (realesr-animevideov3, torch CUDA)")
     parser.add_argument("--matting-engine", default="auto",
                         choices=["auto", "modnet", "white_threshold"],
                         help="Cutout matting engine: auto (MODNet if weights exist) / modnet / white_threshold (legacy)")
@@ -941,14 +943,29 @@ def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
         print("  [Resume] 4K video already exists, skipping...")
         return final_4k_path
     try:
-        r = subprocess.run(
-            ["ffmpeg", "-i", final_path,
-             "-vf", "scale=3840:2160:flags=lanczos",
-             "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-threads", "0",
-             "-c:a", "copy",
-             str(final_4k_path), "-y"],
-            capture_output=True,
-            timeout=max(60, int(getattr(args, "upscale_timeout", 3600) or 3600)))
+        # 新增引擎选项：ai = Real-ESRGAN animevideov3 本地超分（默认 ffmpeg 原路径不变）
+        engine = str(getattr(args, "upscale_engine", "ffmpeg") or "ffmpeg")
+        r = None
+        ai_done = False
+        if engine == "ai":
+            from sr_upscale import upscale_video_ai, model_available
+            if not model_available():
+                print("  [4K] AI 超分不可用（权重缺失或无 CUDA），回退 ffmpeg lanczos")
+            else:
+                print("  [4K] AI 超分引擎：realesr-animevideov3 (torch CUDA fp16)")
+                upscale_video_ai(
+                    final_path, str(final_4k_path),
+                    timeout=max(60, int(getattr(args, "upscale_timeout", 3600) or 3600)))
+                ai_done = True
+        if not ai_done:
+            r = subprocess.run(
+                ["ffmpeg", "-i", final_path,
+                 "-vf", "scale=3840:2160:flags=lanczos",
+                 "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-threads", "0",
+                 "-c:a", "copy",
+                 str(final_4k_path), "-y"],
+                capture_output=True,
+                timeout=max(60, int(getattr(args, "upscale_timeout", 3600) or 3600)))
     except subprocess.TimeoutExpired:
         print(f"  [4K] Upscaling timed out (>{getattr(args, 'upscale_timeout', 3600)}s) — 720p version is still available.")
         r = None
@@ -972,6 +989,12 @@ def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
         # 失败必须抛出：否则调用方会误以为全部完成而清除 checkpoint，
         # 导致无法用 --resume 直接重试 4K 步骤
         raise RuntimeError("STEP6_4K_FAILED")
+    # AI 引擎成功路径：r 为 None 且文件已生成
+    if final_4k_path.exists() and final_4k_path.stat().st_size > 0:
+        size_4k = os.path.getsize(final_4k_path) / (1024 * 1024)
+        print(f"  4K video saved: {final_4k_path} ({size_4k:.1f}MB)")
+        _save_checkpoint(work_dir, "step6_4k")
+        return final_4k_path
     return None
 
 
