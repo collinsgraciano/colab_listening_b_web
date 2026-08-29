@@ -33,6 +33,7 @@ from llm_client import (
     _load_used_listening_summaries,
     _build_character_override_prompt,
     _get_character_overrides,
+    resolve_max_line_words,
 )
 
 try:
@@ -177,13 +178,15 @@ def generate_quest_script(topic: str, cefr: str = "A1",
 
     # ── Phase D+E: quality gate + critique/repair loop ──────────────────
     _apply_programmatic_fixes(script, num_lines)
+    cap = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
     rounds_log = []
     if qa_rounds > 0:
         hard_cap = max(_QA_HARD_CAP, qa_rounds)
         print(f"  [QA] quality loop: min {qa_rounds} rounds, "
               f"error-repair up to {hard_cap} rounds")
         for rnd in range(1, hard_cap + 1):
-            report = run_quality_gate(script, num_lines)
+            report = run_quality_gate(script, num_lines,
+                                      max_line_words=cap)
             print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
                   f"warnings={report['n_warnings']}, running LLM judges...")
             judge_issues = _critique_script(script, report)
@@ -206,7 +209,7 @@ def generate_quest_script(topic: str, cefr: str = "A1",
                       f"patches, accepting best effort")
                 break
 
-    final = run_quality_gate(script, num_lines)
+    final = run_quality_gate(script, num_lines, max_line_words=cap)
     script["_qa"] = {"rounds": rounds_log, "final": final}
     print(format_report(final))
     if not final["passed"]:
@@ -551,6 +554,7 @@ def _build_group_prompt(outline: dict, group: list[dict], cefr: str,
     scene = outline.get("scene", "")
     key_words = ", ".join(w.get("en", "") for w in outline.get("key_words", []))
     budget = sum(b["lines"] for b in group)
+    mw = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
 
     head = ""
     if first:
@@ -613,7 +617,7 @@ Write the next beats of dialogue ({budget} lines total):
 {beats_desc}
 Listening question (already raised earlier): {question}
 {answer_block}
-CEFR {cefr} level. Each line 5-15 words, vary length naturally.
+CEFR {cefr} level. Each line 5-{mw} words (HARD LIMIT: never exceed {mw} words — subtitles must fit 2 lines), vary length naturally.
 {rules}
 
 {kw_hint}
@@ -714,6 +718,7 @@ def _build_metadata_prompt(topic: str, cefr: str, outline: dict, dialogue: list[
     from style_manager import get_active_style_prompt, get_active_thumbnail_hint
     style_prompt = get_active_style_prompt()
     thumb_hint = get_active_thumbnail_hint()
+    mw = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
     dialogue_text = json.dumps(
         [{"s": d.get("speaker",""), "t": d.get("text",""), "p": d.get("phase","")}
          for d in dialogue],
@@ -739,9 +744,9 @@ Generate JSON with these fields:
   "intro_zh": "繁中 story hook translation",
   "welcome_en": "short channel welcome (max 8 words)",
   "welcome_zh": "繁中",
-  "hook_intro_en": "narrator opening 70-110 words. Must include: greeting, topic intro, the listening question, and a CTA. Vary the structure — don't always start with greeting.",
+  "hook_intro_en": "narrator opening 70-110 words. Must include: greeting, topic intro, the listening question, and a CTA. Vary the structure — don't always start with greeting. Write in SHORT sentences — every sentence at most {mw} words.",
   "hook_intro_zh": "繁中",
-  "outro": "narrator closing 80-110 words: how was it→repeat question→comment CTA→channel description→subscribe→bye",
+  "outro": "narrator closing 80-110 words: how was it→repeat question→comment CTA→channel description→subscribe→bye. Write in SHORT sentences — every sentence at most {mw} words.",
   "outro_zh": "繁中",
   "host_bg_prompt": "TV studio background prompt (no people)",
   "youtube_title": "高CTR繁中标题 with 【】and ｜ format. Pattern D: 【英文聽力挑戰】{{emoji}}{{topic 繁中}}｜❓你能聽出答案嗎？｜{{CEFR}}慢速英文｜{{English topic}}. Total length MUST be ≤95 chars (YouTube hard limit is 100) — drop middle segments if needed to fit.",
@@ -814,9 +819,10 @@ def _meta_failing_fields(meta: dict) -> list[str]:
 def _build_metadata_fix_prompt(meta: dict, failing: list[str],
                                topic: str, cefr: str) -> str:
     import json
+    mw = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
     hints = {
-        "hook_intro_en": "narrator opening, 70-110 words",
-        "outro": "narrator closing, 80-110 words",
+        "hook_intro_en": f"narrator opening, 70-110 words, SHORT sentences (every sentence at most {mw} words)",
+        "outro": f"narrator closing, 80-110 words, SHORT sentences (every sentence at most {mw} words)",
         "youtube_tags": "15-20 youtube tags (mix 繁中/English)",
         "thumbnail_icons": "4-5 icons",
         "scene_images": "8-12 scene images",
@@ -1270,6 +1276,7 @@ Requirements:
 - Keep EXACTLY {k} lines. Same phase values: {", ".join(phases)}.
 - Speaker rules: buildup/reveal/review only char_a/char_b; core may use char_c.
 - CEFR {cefr}. Natural conversational English with fillers and varied length.
+- Each line AT MOST {resolve_max_line_words("QUEST_MAX_LINE_WORDS")} words (HARD LIMIT — subtitles must fit 2 lines).
 - Every line keeps fields: speaker/text/phase/zh(繁體中文)/on_screen.
 - Seamless continuity with the before/after context lines.
 

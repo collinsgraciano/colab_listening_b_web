@@ -36,6 +36,22 @@ def _env_get(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
 
+def _env_int_clamped(name: str, default: int, lo: int, hi: int) -> int:
+    """线程局部 override 优先读取整型 env 配置，clamp 到 [lo, hi]。"""
+    raw = (_env_get(name, "") or "").strip()
+    try:
+        val = int(raw) if raw else default
+    except ValueError:
+        val = default
+    return max(lo, min(hi, val))
+
+
+def resolve_max_line_words(env_name: str = "LISTENING_MAX_LINE_WORDS",
+                           default: int = 10) -> int:
+    """对话/旁白每句最大词数（字幕最多两行约束）：env（线程局部优先）→ clamp [4,20]。"""
+    return _env_int_clamped(env_name, default, 4, 20)
+
+
 # Rate limiting: enforce minimum interval between LLM API calls to avoid HTTP 429.
 # glm-5.2 is especially aggressive about "request rate increased too quickly".
 _LAST_CALL_TIME = 0.0  # 最近一次调用的开始时刻（预约槽位）
@@ -412,6 +428,14 @@ def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = N
     prompt_fields = {"original": ("video_prompt",),
                      "original_static": ("image_prompt",),
                      "original_cutout": ()}[pf]
+    # 每句最大词数（字幕两行约束）：LISTENING_MAX_LINE_WORDS → clamp [4,20]
+    mw = resolve_max_line_words()
+    cefr_guide = (
+        f"- A1: basic everyday words, present tense, short sentences (5-8 words)\n"
+        f"- A2: common daily phrases, present/past tense, sentences 5-{min(12, mw)} words\n"
+        f"- B1: moderate vocabulary, mixed tenses, sentences 8-{mw} words, some idioms\n"
+        f"- B2: advanced vocabulary, natural idioms and phrasal verbs, sentences up to {mw} words"
+    )
     used_hint = ""
     if used_dialogues:
         used_hint = f"""
@@ -435,10 +459,7 @@ CORE MISSION: 帮助海外华人用最地道最日常的英语，搞定真实生
 Topic: {topic}
 CEFR Level: {cefr}
 CEFR Vocabulary Guide:
-- A1: basic everyday words, present tense, short sentences (5-8 words)
-- A2: common daily phrases, present/past tense, sentences 5-12 words
-- B1: moderate vocabulary, mixed tenses, sentences 8-15 words, some idioms
-- B2: advanced vocabulary, complex sentences, natural idioms and phrasal verbs
+{cefr_guide}
 Output: a JSON object ONLY (no markdown, no explanation).
 
 {_build_character_override_prompt(quest=False)}CONTENT REQUIREMENTS — This is for a LISTENING PRACTICE video targeting overseas Chinese:
@@ -453,7 +474,7 @@ Output: a JSON object ONLY (no markdown, no explanation).
 TECHNICAL REQUIREMENTS:
 - Exactly 2 speakers with natural American English
 - Each speaker MUST have a clearly defined ROLE in the story (e.g. "customer" vs "waiter", "passenger" vs "check-in agent"). The role must be appropriate for the topic.
-- Exactly {num_lines} dialogue lines (each under 15 words)
+- Exactly {num_lines} dialogue lines (each AT MOST {mw} words — HARD LIMIT, so on-screen subtitles never exceed 2 lines)
 - The dialogue must flow as a continuous, coherent story (not disconnected Q&A)
 - Every dialogue line MUST include:
   - "text": the English sentence
@@ -482,13 +503,13 @@ TECHNICAL REQUIREMENTS:
 - "cefr": the CEFR level of this lesson, exactly "{cefr}" (used for thumbnail level badge)
 - "title_zh": Traditional Chinese short title (max 6 characters, e.g. "在機場")
 - "scene_zh": Traditional Chinese scene description (e.g. "餐廳 · 點餐")
-- "story_hook": a compelling 1-sentence intro that sets the scene
+- "story_hook": a compelling 1-sentence intro that sets the scene (AT MOST {mw} words)
 - "intro_zh": Traditional Chinese translation of the intro
-- "welcome_en": a warm YouTube-host greeting opening the video (1-2 sentences), welcoming viewers and hinting at today's topic (e.g. "Hi friends! Welcome back! Today we're checking out at a pharmacy.")
+- "welcome_en": a warm YouTube-host greeting opening the video (1-2 sentences), welcoming viewers and hinting at today's topic (e.g. "Hi friends! Welcome back! Today we're checking out at a pharmacy."). Keep each sentence at most {mw} words.
 - "welcome_zh": Traditional Chinese translation of the welcome greeting
-- "outro": a short closing line
+- "outro": a short closing line (each sentence at most {mw} words)
 - "outro_zh": Traditional Chinese translation of the outro
-- "practice_intro_en": English instruction before the 跟讀 section
+- "practice_intro_en": English instruction before the 跟讀 section (at most {mw} words)
 - "practice_intro_zh": Traditional Chinese translation of the practice intro
 - ALL Chinese text MUST be in Traditional Chinese (繁體中文)
 

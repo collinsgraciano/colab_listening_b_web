@@ -189,6 +189,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--topics-file", default=str(Path(__file__).parent / "topics.json"), help="Path to topics.json")
     parser.add_argument("--used-topics-file", default=None, help="Path to used_topics.json (default: <output>/used_topics.json — persists on Drive across Colab sessions)")
     parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48)")
+    parser.add_argument("--max-line-words", type=int, default=None, help="Max words per dialogue line / narration sentence (default 10) so on-screen subtitles never exceed 2 lines")
     parser.add_argument("--mcp-tokens", default=None, help="TJGenerators MCP OAuth tokens, comma-separated for multi-token rotation")
     parser.add_argument("--mcp-token", default=None, help="(Deprecated) Single MCP token. Use --mcp-tokens instead.")
     parser.add_argument("--image-provider", default="mcp", choices=["mcp", "sensenova"],
@@ -997,6 +998,10 @@ def main():
         args.animation = "none"
 
     os.environ["LLM_RETRIES"] = str(args.llm_retries)
+    # 每行最大词数（字幕两行约束）：prompt + QA 门禁共用；未传则用各模块默认 10
+    if args.max_line_words:
+        os.environ["LISTENING_MAX_LINE_WORDS"] = str(args.max_line_words)
+        os.environ["QUEST_MAX_LINE_WORDS"] = str(args.max_line_words)
     # 画面风格：注入 env 供 llm_client / thumbnail_gen / 各 step 读取
     os.environ["VISUAL_STYLE_ID"] = str(getattr(args, "visual_style", "pixar3d"))
     os.environ["VISUAL_STYLE_PROMPT"] = _resolve_style_prompt(args.visual_style)

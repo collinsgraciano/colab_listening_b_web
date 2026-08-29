@@ -29,6 +29,9 @@ PARAM_SPEC = {
              "label": "CEFR 等级", "options": ["A1", "A2", "B1", "B2", "C1", "C2"]},
     "num_lines": {"default": "", "type": "number", "group": "content",
                   "label": "对话行数", "help": "留空=自动 (original:18, quest:48)"},
+    "max_line_words": {"default": 10, "type": "number", "group": "content",
+                       "label": "每行最大词数",
+                       "help": "对话每行/旁白每句词数上限（默认 10，建议 5-15），保证字幕最多显示两行；超长行触发 QA 修复"},
     "structure": {"default": "original", "type": "select", "group": "content",
                   "label": "视频结构", "options": {
                       "original": "Original (4章视频片段)",
@@ -484,6 +487,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--cefr", str(config.get("cefr", "A2"))]
     if config.get("num_lines"):
         args += ["--num-lines", str(config["num_lines"])]
+    if config.get("max_line_words"):
+        args += ["--max-line-words", str(config["max_line_words"])]
     args += ["--structure", str(config.get("structure", "original"))]
     args += ["--animation", str(config.get("animation", "landing"))]
     if config.get("host_character"):

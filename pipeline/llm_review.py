@@ -16,7 +16,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from llm_client import _chat, _env_get, _extract_json
+from llm_client import (
+    _chat,
+    _env_get,
+    _extract_json,
+    resolve_max_line_words,
+)
 from quality_gate_listening import (
     run_listening_quality_gate, format_report, PROMPT_FIELDS,
 )
@@ -346,6 +351,7 @@ def _repair_patches(script: dict, patches: list[tuple[int, int, list[str]]],
     char_a_role = script.get("char_a_role", "")
     char_b_role = script.get("char_b_role", "")
     pf = _prompt_fields(structure)
+    cap = resolve_max_line_words()
 
     for s, e, hints in sorted(patches, key=lambda p: -p[0]):
         k = e - s + 1
@@ -391,7 +397,7 @@ Problems to fix:
 
 Requirements:
 - Keep EXACTLY {k} lines, same order, speakers only "char_a" or "char_b".
-- CEFR {cefr}: natural conversational English, contractions, fillers ("well", "um", "you know"), varied length, each line under 15 words.
+- CEFR {cefr}: natural conversational English, contractions, fillers ("well", "um", "you know"), varied length, each line AT MOST {cap} words (HARD LIMIT — subtitles must fit 2 lines).
 - Every line keeps ALL fields:
   - "text": the English sentence
   - "phonetic": IPA transcription in /slashes/
@@ -460,13 +466,17 @@ def run_listening_qa(script: dict, num_lines: int,
     if qa_rounds <= 0:
         return script
     hard_cap = max(_QA_HARD_CAP, qa_rounds)
+    # 每行最大词数（字幕两行约束）：线程局部 override 优先，传给门禁与修复 prompt
+    cap = resolve_max_line_words()
 
     print(f"  [QA] listening quality loop: min {qa_rounds} rounds, "
           f"error-repair up to {hard_cap} rounds")
     _apply_fixes(script)
     rounds_log = []
     for rnd in range(1, hard_cap + 1):
-        report = run_listening_quality_gate(script, num_lines, structure=structure)
+        report = run_listening_quality_gate(script, num_lines,
+                                            structure=structure,
+                                            max_line_words=cap)
         print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
               f"warnings={report['n_warnings']}, running LLM judges...")
         judge_issues = _critique_listening(script, report)
@@ -491,7 +501,8 @@ def run_listening_qa(script: dict, num_lines: int,
                   f"patches, accepting best effort")
             break
 
-    final = run_listening_quality_gate(script, num_lines, structure=structure)
+    final = run_listening_quality_gate(script, num_lines, structure=structure,
+                                       max_line_words=cap)
     script["_qa"] = {"rounds": rounds_log, "final": final}
     print(format_report(final))
     if not final["passed"]:

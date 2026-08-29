@@ -245,6 +245,85 @@ VF_NORM = (
 )
 
 
+def _split_overlong_entries(entries: list[dict], en_font, max_w: int,
+                            max_lines: int = 2) -> list[dict]:
+    """渲染端兜底：把 EN 超过 max_lines 行的字幕条按词边界拆成多条。
+
+    与 render_subtitle_text_overlay._wrap_fixed 的英文贪心包裹算法完全一致
+    （getlength 测宽、cur+" "+word 累积），保证"数出来几行"与"渲染几行"一致。
+    - EN ≤ max_lines 行：原样保留
+    - EN 超行：切成 N 个 chunk（每个 ≤max_lines 行，前后均衡），ZH 按字符数
+      比例切成同数量份，时长按 chunk 字符占比分配（最后一份吃余数）。
+    覆盖对话与旁白（脚本库旧脚本/QA 未修净残留），成片字幕一律 ≤2 行。
+    """
+    def _wrap_count(text: str) -> int:
+        words = text.split()
+        lines, cur = 0, ""
+        for word in words:
+            test = (cur + " " + word).strip()
+            if en_font.getlength(test) <= max_w or not cur:
+                cur = test
+            else:
+                lines += 1
+                cur = word
+        if cur:
+            lines += 1
+        return lines
+
+    def _word_chunks(text: str, n: int) -> list[str]:
+        """把 text 的词均衡分成 n 组（非空，尽量前后均衡）。"""
+        words = text.split()
+        if n <= 1 or not words:
+            return [text.strip()]
+        base, extra = divmod(len(words), n)
+        chunks, idx = [], 0
+        for i in range(n):
+            take = base + (1 if i < extra else 0)
+            chunks.append(" ".join(words[idx:idx + take]).strip())
+            idx += take
+        return [c for c in chunks if c] or [text.strip()]
+
+    out: list[dict] = []
+    for e in entries:
+        en = str(e.get("en", "") or "")
+        zh = str(e.get("zh", "") or "")
+        if not en or _wrap_count(en) <= max_lines:
+            out.append(e)
+            continue
+        # 目标 chunk 数 = ceil(行数/每 chunk 上限)，至少 2 份，上限 6 防御
+        n = min(6, max(2, -(-_wrap_count(en) // max_lines)))
+        chunks = _word_chunks(en, n)
+        # 兜底校验：逐 chunk 仍超行则继续加份，直到满足或达到上限
+        for _ in range(3):
+            if all(_wrap_count(c) <= max_lines for c in chunks) or n >= 6:
+                break
+            n += 1
+            chunks = _word_chunks(en, n)
+        # ZH 按字符比例切分（中文无词边界）：均衡分配字符数
+        if zh:
+            zh_chunks = []
+            base_z, extra_z = divmod(len(zh), len(chunks))
+            zi = 0
+            for i in range(len(chunks)):
+                take = base_z + (1 if i < extra_z else 0)
+                zh_chunks.append(zh[zi:zi + take])
+                zi += take
+        else:
+            zh_chunks = [""] * len(chunks)
+        total = sum(len(c) for c in chunks) or 1
+        dur = e["end"] - e["start"]
+        cur = e["start"]
+        for i, c in enumerate(chunks):
+            if i < len(chunks) - 1:
+                d = dur * len(c) / total
+            else:
+                d = e["end"] - cur
+            out.append({"start": cur, "end": cur + d, "en": c,
+                        "zh": zh_chunks[i] if i < len(zh_chunks) else ""})
+            cur += d
+    return out
+
+
 # ---------------------------------------------------------------------------
 # ffprobe helpers
 # ---------------------------------------------------------------------------
@@ -672,6 +751,19 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
         for k in effective_style:
             if k in style and style[k] is not None:
                 effective_style[k] = style[k]
+
+    # 渲染端兜底：EN 超过 2 行的字幕条按词边界拆条（旧脚本/脚本库/QA 残留
+    # 超长句），按实际字号测量，任何来源的脚本成片字幕一律 ≤2 行
+    from PIL import ImageFont
+    try:
+        _fallback_font = ImageFont.truetype(
+            _resolve_subtitle_font(effective_style["font_en"], FONT_EN),
+            int(effective_style["en_size"]))
+    except OSError:
+        _fallback_font = None
+    if _fallback_font is not None:
+        subtitle_entries = _split_overlong_entries(
+            subtitle_entries, _fallback_font, w - 80, max_lines=2)
 
     for i, entry in enumerate(subtitle_entries):
         overlay_path = str(sub_overlay_dir / f"sub_{i:03d}.png")

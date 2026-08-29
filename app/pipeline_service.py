@@ -243,6 +243,11 @@ class PipelineService:
             os.environ["QUEST_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
             os.environ["LISTENING_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
 
+        # 每行最大词数（字幕两行约束）：prompt 硬约束 + QA 门禁 + 渲染兜底共用
+        if config.get("max_line_words"):
+            os.environ["LISTENING_MAX_LINE_WORDS"] = str(config["max_line_words"])
+            os.environ["QUEST_MAX_LINE_WORDS"] = str(config["max_line_words"])
+
         # MOSS-TTS env vars (read by generate_tts -> MossTTSEngine)
         if config.get("moss_model_path"):
             os.environ["MOSS_MODEL_PATH"] = str(config["moss_model_path"])
@@ -753,6 +758,7 @@ class PipelineService:
             topic=config.get("topic", "") or None,
             cefr=config.get("cefr", "A2"),
             num_lines=num_lines,
+            max_line_words=_cfg_int(config, "max_line_words", 10),
             structure=structure,
             animation=animation,
             visual_style=str(config.get("visual_style", "pixar3d")),

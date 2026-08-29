@@ -7,6 +7,8 @@ severity="error" 阻断通过（触发修复轮）；"warning" 仅报告并喂�
 可独立运行：python quality_gate.py <script.json> [num_lines]
 """
 import json
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -50,6 +52,27 @@ _META_TARGETS = {
     "youtube_tags": (15, 20),
     "thumbnail_icons": (4, 5),
 }
+
+# 每行最大词数默认值（实际值 = param > env QUEST_MAX_LINE_WORDS > 此默认）
+_MAX_LINE_WORDS_DEFAULT = 10
+
+# 旁白字段（逐句检查每句词数 ≤ max_line_words；warning 级）
+_NARRATION_FIELDS = ("welcome_en", "hook_intro_en", "outro")
+
+
+def _resolve_max_line_words(max_line_words: int | None) -> int:
+    """每行最大词数：param → env QUEST_MAX_LINE_WORDS → 默认 10，clamp [4,20]。
+
+    env 直读 os.environ（本模块独立可跑）；Web 批量生成的线程局部 override
+    由调用方（llm_client_quest）解析后经 param 传入。
+    """
+    if max_line_words is None:
+        raw = (os.environ.get("QUEST_MAX_LINE_WORDS", "") or "").strip()
+        try:
+            max_line_words = int(raw) if raw else _MAX_LINE_WORDS_DEFAULT
+        except ValueError:
+            max_line_words = _MAX_LINE_WORDS_DEFAULT
+    return max(4, min(20, int(max_line_words)))
 
 
 def _words(text: str) -> list[str]:
@@ -110,7 +133,8 @@ def _split_phase_lines_ref(num_lines: int) -> tuple[int, int, int, int]:
 # 主入口
 # ---------------------------------------------------------------------------
 
-def run_quality_gate(script: dict, num_lines: int | None = None) -> dict:
+def run_quality_gate(script: dict, num_lines: int | None = None,
+                     max_line_words: int | None = None) -> dict:
     """对 quest 脚本跑全部程序化检查，返回报告。"""
     issues: list[dict] = []
 
@@ -122,6 +146,7 @@ def run_quality_gate(script: dict, num_lines: int | None = None) -> dict:
     if num_lines is None:
         num_lines = script.get("_requested_num_lines", 0) or len(dialogue)
     cefr = (script.get("cefr") or "A2").upper()
+    max_line_words = _resolve_max_line_words(max_line_words)
 
     # ── 1. 结构 ──────────────────────────────────────────────────────
     if len(dialogue) != num_lines:
@@ -230,13 +255,26 @@ def run_quality_gate(script: dict, num_lines: int | None = None) -> dict:
     if wc:
         avg = sum(wc) / len(wc)
         lo, hi = _CEFR_WORD_RANGE.get(cefr, (6, 10))
+        hi = min(hi, max_line_words)
         if not (lo <= avg <= hi):
             add("naturalness", "warning",
                 f"平均每行 {avg:.1f} 词，CEFR {cefr} 建议 {lo}-{hi}")
-        long_lines = [i for i, w in enumerate(wc) if w > hi + 8]
+        long_lines = [i for i, w in enumerate(wc) if w > max_line_words]
         if long_lines:
-            add("naturalness", "warning",
-                f"{len(long_lines)} 行超长（>{hi + 8} 词）", long_lines[:10])
+            add("naturalness", "error",
+                f"{len(long_lines)} 行超长（>{max_line_words} 词，字幕将超过两行）",
+                long_lines[:10])
+
+    # 旁白逐句词数检查（warning：旁白不在对话行 patch 修复范围，设 error 会
+    # 误触 QA 循环的空转保护提前终止；实际显示由渲染兜底保证 ≤2 行）
+    for field in _NARRATION_FIELDS:
+        ntext = str(script.get(field, "") or "").strip()
+        if not ntext:
+            continue
+        for si, sent in enumerate(re.split(r"(?<=[.!?])\s+", ntext)):
+            if sent.strip() and len(_words(sent)) > max_line_words:
+                add("narration", "warning",
+                    f"旁白 {field} 第 {si + 1} 句超长（>{max_line_words} 词）")
 
     # ── 4. 重复 ──────────────────────────────────────────────────────
     seen: dict[str, int] = {}

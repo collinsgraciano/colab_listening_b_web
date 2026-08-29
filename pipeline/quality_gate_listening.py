@@ -9,6 +9,8 @@ severity="error" 计入阻断（触发修补轮）；"warning" 仅报告并喂�
 
 可独立运行：python quality_gate_listening.py <script.json> [num_lines]
 """
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -42,13 +44,16 @@ STOPWORDS = {
     "how", "when", "there", "here", "just", "very", "really",
 }
 
-# CEFR → 每行期望词数区间（与 quest 一致）
+# CEFR → 每行期望词数区间（与 quest 一致；上限按 max_line_words clamp）
 _CEFR_WORD_RANGE = {
     "A1": (4, 8), "A2": (6, 10), "B1": (8, 13), "B2": (10, 16),
 }
 
-# prompt 技术要求：每行台词不超过 15 词
-_MAX_LINE_WORDS = 15
+# 每行最大词数默认值（实际值 = param > env LISTENING_MAX_LINE_WORDS > 此默认）
+_MAX_LINE_WORDS_DEFAULT = 10
+
+# 旁白字段（逐句检查每句词数 ≤ max_line_words；warning 级）
+_NARRATION_FIELDS = ("welcome_en", "story_hook", "outro", "practice_intro_en")
 
 # 性别指示词（一致性检查用）
 _FEMALE_WORDS = {"woman", "women", "girl", "lady", "she", "her", "hers", "female"}
@@ -108,8 +113,24 @@ def _resolve_structure(script: dict, structure: str = "") -> str:
     return s if s in PROMPT_FIELDS else "original"
 
 
+def _resolve_max_line_words(max_line_words: int | None) -> int:
+    """每行最大词数：param → env LISTENING_MAX_LINE_WORDS → 默认 10，clamp [4,20]。
+
+    env 直读 os.environ（本模块 stdlib-only 独立可跑）；Web 批量生成的
+    线程局部 override 由调用方（llm_review）解析后经 param 传入。
+    """
+    if max_line_words is None:
+        raw = (os.environ.get("LISTENING_MAX_LINE_WORDS", "") or "").strip()
+        try:
+            max_line_words = int(raw) if raw else _MAX_LINE_WORDS_DEFAULT
+        except ValueError:
+            max_line_words = _MAX_LINE_WORDS_DEFAULT
+    return max(4, min(20, int(max_line_words)))
+
+
 def run_listening_quality_gate(script: dict, num_lines: int | None = None,
-                               structure: str = "") -> dict:
+                               structure: str = "",
+                               max_line_words: int | None = None) -> dict:
     """对 listening 脚本跑全部程序化检查，返回报告。"""
     issues: list[dict] = []
 
@@ -119,6 +140,7 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
 
     structure = _resolve_structure(script, structure)
     prompt_fields = PROMPT_FIELDS[structure]
+    max_line_words = _resolve_max_line_words(max_line_words)
     dialogue = script.get("dialogue", [])
     if num_lines is None:
         num_lines = script.get("_requested_num_lines", 0) or len(dialogue)
@@ -167,13 +189,14 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
     if wc:
         avg = sum(wc) / len(wc)
         lo, hi = _CEFR_WORD_RANGE.get(cefr, (6, 10))
+        hi = min(hi, max_line_words)
         if not (lo <= avg <= hi):
             add("naturalness", "warning",
                 f"平均每行 {avg:.1f} 词，CEFR {cefr} 建议 {lo}-{hi}")
-        long_lines = [i for i, w in enumerate(wc) if w > _MAX_LINE_WORDS]
+        long_lines = [i for i, w in enumerate(wc) if w > max_line_words]
         if long_lines:
-            add("naturalness", "warning",
-                f"{len(long_lines)} 行超长（>{_MAX_LINE_WORDS} 词，TTS 会拖慢节奏）",
+            add("naturalness", "error",
+                f"{len(long_lines)} 行超长（>{max_line_words} 词，字幕将超过两行）",
                 long_lines[:10])
     streak = 0
     for i, w in enumerate(wc):
@@ -182,6 +205,17 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
             add("naturalness", "warning",
                 f"连续 3+ 短行（≤5 词）止于 line {i}", [i - 2, i])
             streak = 0
+
+    # 旁白逐句词数检查（warning：旁白不在对话行 patch 修复范围，设 error 会
+    # 误触 QA 循环的空转保护提前终止；实际显示由渲染兜底保证 ≤2 行）
+    for field in _NARRATION_FIELDS:
+        ntext = str(script.get(field, "") or "").strip()
+        if not ntext:
+            continue
+        for si, sent in enumerate(re.split(r"(?<=[.!?])\s+", ntext)):
+            if sent.strip() and len(_words(sent)) > max_line_words:
+                add("narration", "warning",
+                    f"旁白 {field} 第 {si + 1} 句超长（>{max_line_words} 词）")
 
     # ── 4. 重复 ──────────────────────────────────────────────────────
     seen: dict[str, int] = {}
