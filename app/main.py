@@ -28,6 +28,7 @@ from .config_manager import (
     get_provider_options, resolve_provider,
     MODES, MODE_LABELS, MODE_SHORT_LABELS, get_active_mode, set_active_mode,
     load_mode_config, save_mode_config, load_all_mode_configs,
+    effective_param_spec, param_effective_in_mode,
     RECYCLE_DIRNAME, LEGACY_RECYCLE_DIRNAME,
     find_run_dir, iter_run_dirs,
 )
@@ -140,9 +141,11 @@ async def config_page(request: Request, mode: str = ""):
     if cur_sub_style and cur_sub_style not in sub_style_opts:
         sub_style_opts = {cur_sub_style: f"{cur_sub_style}（已失效，请重新选择）", **sub_style_opts}
     PARAM_SPEC["subtitle_style"]["options"] = sub_style_opts
+    # 按模式过滤：只渲染该模式实际消费的参数（PARAM_SPEC "modes" 标注）
+    mode_spec = effective_param_spec(mode)
     # Group params by group
     grouped = {}
-    for key, spec in PARAM_SPEC.items():
+    for key, spec in mode_spec.items():
         if key == "structure":
             continue  # 结构由 Tab 决定，不渲染下拉
         g = spec["group"]

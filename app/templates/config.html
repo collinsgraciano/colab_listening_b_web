@@ -57,7 +57,9 @@
             </button>
             <div class="section-content px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {% for key, spec, value in params %}
-                <div class="config-field" data-group="{{ group_key }}" {% if group_key == 'content' and key == 'animation' and config.structure != 'original_static' %}style="display:none"{% endif %}{% if key.startswith('ch3_') and config.structure == 'quest' %}style="display:none"{% endif %}{% if key in ('dh_quality', 'dh_neural_fps') and (config.structure != 'original_cutout' or config.animation != 'digital_human') %}style="display:none"{% endif %}>
+                {# 模式级过滤已由服务端完成（effective_param_spec）；此处仅剩
+                   animation 值相关的动态显隐：dh_* 仅 animation=digital_human 时显示 #}
+                <div class="config-field" data-group="{{ group_key }}" {% if key in ('dh_quality', 'dh_neural_fps') and config.animation != 'digital_human' %}style="display:none"{% endif %}>
                     {% if spec.type == 'text' or spec.type == 'password' %}
                     <label class="block text-xs text-slate-400 mb-1">{{ spec.label }}</label>
                     <input type="{{ spec.type }}"" data-field="{{ key }}" value="{{ value }}"
@@ -74,8 +76,7 @@
                     {% elif spec.type == 'select' %}
                     <label class="block text-xs text-slate-400 mb-1">{{ spec.label }}</label>
                     <select data-field="{{ key }}"
-                        {% if key == 'structure' %}onchange="toggleAnimationField(this.value)"{% endif %}
-                        {% if key == 'animation' %}onchange="toggleDHFields(MODE, this.value)"{% endif %}
+                        {% if key == 'animation' %}onchange="toggleDHFields(this.value)"{% endif %}
                         {% if key == 'llm_provider' %}onchange="toggleLLMFields(this.value)"{% endif %}
                         {% if key == 'tts_engine' %}onchange="toggleTTSFields(this.value)"{% endif %}
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
@@ -152,23 +153,10 @@ function toggleSection(btn) {
     }
 }
 
-function toggleAnimationField(structure) {
-    const animField = document.querySelector('[data-field="animation"]').closest('.config-field');
-    animField.style.display = structure === 'original_static' ? 'none' : '';
-    // digital_human 动画类型仅 original_cutout 支持
-    const animSel = document.querySelector('[data-field="animation"]');
-    const dhOption = animSel ? animSel.querySelector('option[value="digital_human"]') : null;
-    if (dhOption) {
-        dhOption.style.display = structure === 'original_cutout' ? '' : 'none';
-        if (structure !== 'original_cutout' && animSel.value === 'digital_human') {
-            animSel.value = 'stop_motion';
-        }
-    }
-    toggleDHFields(structure, animSel ? animSel.value : '');
-}
-
-function toggleDHFields(structure, animation) {
-    const isDH = structure === 'original_cutout' && animation === 'digital_human';
+function toggleDHFields(animation) {
+    // digital_human 动画子参数（dh_quality / dh_neural_fps）
+    // 模式级过滤已在服务端完成（animation 字段仅 cutout 模式渲染）
+    const isDH = animation === 'digital_human';
     document.querySelectorAll('.config-field').forEach(f => {
         const field = f.querySelector('[data-field]');
         if (!field) return;
@@ -260,7 +248,8 @@ function collectConfig() {
 function forceStructureMode() {
     const hidden = document.querySelector('[data-field="structure"]');
     if (hidden) hidden.value = MODE;
-    toggleAnimationField(MODE);
+    const animSel = document.querySelector('[data-field="animation"]');
+    if (animSel) toggleDHFields(animSel.value);
 }
 
 function fillForm(config) {
@@ -360,8 +349,7 @@ function detectMCPToken() {
 // Initialize conditional displays on load
 window.addEventListener('load', function() {
     const config = {{ config | tojson }};
-    toggleAnimationField(MODE);
-    toggleDHFields(MODE, config.animation || '');
+    forceStructureMode();
     toggleLLMFields(config.llm_provider || 'sensenova');
     toggleTTSFields(config.tts_engine || 'kokoro');
 });

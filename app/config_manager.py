@@ -21,6 +21,13 @@ if str(_LOCAL_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_LOCAL_PIPELINE_DIR))
 
 # All configurable parameters with defaults, types, and metadata
+#
+# 模式生效性标注（"modes" 键）：
+#   - 缺省 = 四种模式全部生效
+#   - "modes": [模式列表] = 仅这些模式消费该参数（其余模式的配置页不渲染，
+#     保存时回落默认值，不影响 CLI 构建——load_mode_config 会合并补全）
+#   生效性以 pipeline 实际消费方为准（_step2/_step3/_step5/compose 调用链），
+#   修改管线时须同步维护本标注。
 PARAM_SPEC = {
     # --- Content ---
     "topic": {"default": "", "type": "text", "group": "content",
@@ -39,19 +46,23 @@ PARAM_SPEC = {
                       "original_cutout": "Original Cutout (4章+人物抠图)",
                       "quest": "Quest (任务听力)"}},
     "animation": {"default": "landing", "type": "select", "group": "content",
+                  "modes": ["original_cutout"],
                   "label": "动画类型", "options": {
-                      "none": "None (静态)",
-                      "landing": "Landing (降落变换)",
-                      "stop_motion": "Stop Motion (定格动画)",
+                      "none": "None (静态，等效定格)",
+                      "landing": "Landing (静态，等效定格)",
+                      "stop_motion": "Stop Motion (定格动画，默认)",
                       "digital_human": "Digital Human (数字人说话)"},
-                  "help": "digital_human 仅 original_cutout 模式：角色开口说话（本地 AI，"
-                          "音频驱动口型）；其余模式忽略此选项"},
+                  "help": "cutout 模式下 none/landing/stop_motion 渲染结果相同"
+                          "（都走双人定格动画）；digital_human=单人开口说话。"
+                          "original_static 模式动画被强制为 none（不显示此项）"},
     "dh_quality": {"default": "preview", "type": "select", "group": "content",
+                   "modes": ["original_cutout"],
                    "label": "数字人画质",
                    "options": {"preview": "Preview (256px，快)",
                                "quality": "Quality (512px，慢)"},
                    "help": "数字人渲染分辨率；quality 约 1.25 倍耗时"},
     "dh_neural_fps": {"default": 3, "type": "number", "group": "content",
+                      "modes": ["original_cutout"],
                       "label": "数字人关键帧率",
                       "help": "每秒 AI 渲染的关键帧数（1-8）：越高口型越流畅但越慢"
                               "（CPU 约 4.4 秒/帧）；插帧后输出恒为 25fps"},
@@ -68,13 +79,15 @@ PARAM_SPEC = {
     "character_library": {"default": "", "type": "text", "group": "content",
                            "label": "素材库分配", "help": "JSON: {char_a: 'lib_id', char_b: 'lib_id'}"},
     "character_voices": {"default": "", "type": "text", "group": "content",
-                          "label": "角色音色绑定", "help": "JSON: {char_a: 'Vivian', char_b: 'Ryan'} — 复用角色时绑定 Qwen TTS 音色"},
+                          "label": "角色音色绑定", "help": "JSON: {char_a: 'Vivian', 'char_b': 'Ryan'} — 复用角色时绑定 Qwen TTS 音色"},
     "character_zh_voices": {"default": "", "type": "text", "group": "content",
-                            "label": "中文声音绑定", "help": "JSON: {char_a: 'zh-CN-YunxiNeural', char_b: 'zh-CN-XiaoxiaoNeural'} — 绑定中文翻译旁白的 edge-tts 声音"},
+                            "modes": ["original", "original_static", "original_cutout"],
+                            "label": "中文声音绑定", "help": "JSON: {char_a: 'zh-CN-YunxiNeural', char_b: 'zh-CN-XiaoxiaoNeural'} — 绑定中文翻译旁白的 edge-tts 声音（quest 不生成中文音频）"},
     "host_character": {"default": "", "type": "select", "group": "content",
+                       "modes": ["original_cutout"],
                        "label": "主持人形象绑定",
                        "options": {"": "独立主持人（新生成）", "char_a": "角色 A", "char_b": "角色 B"},
-                       "help": "Original Cutout 模式生效：开场/结尾主持人复用所选角色的姿势图集与音色，不再单独生成主持人"},
+                       "help": "开场/结尾主持人复用所选角色的姿势图集与音色，不再单独生成主持人"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -98,6 +111,7 @@ PARAM_SPEC = {
     "llm_min_interval": {"default": 3, "type": "number", "group": "llm",
                          "label": "LLM 最小间隔(秒)"},
     "quest_beat_lines": {"default": 10, "type": "number", "group": "llm",
+                         "modes": ["quest"],
                          "label": "Quest 节拍行数", "help": "节拍表每拍的行数预算 (默认10)"},
     "quest_qa_rounds": {"default": 3, "type": "number", "group": "llm",
                         "label": "QA 轮数（全模式）",
@@ -153,8 +167,10 @@ PARAM_SPEC = {
                        "label": "生图 Provider", "options": ["mcp", "sensenova"],
                        "help": "mcp=TJGenerators(积分)；sensenova=SenseNova U1.5 Lite(API 计费, 复用 SenseNova API Key)"},
     "clip_duration": {"default": 15, "type": "number", "group": "mcp",
+                      "modes": ["original"],
                       "label": "视频片段时长(秒)", "help": "4-15"},
     "clip_concurrency": {"default": 4, "type": "number", "group": "mcp",
+                          "modes": ["original"],
                           "label": "视频并发数", "help": "1-5, 默认4 (MCP最大并发5)"},
     "output_dir": {"default": str(WEB_ROOT / "output"), "type": "text", "group": "mcp",
                    "label": "输出目录"},
@@ -167,25 +183,32 @@ PARAM_SPEC = {
 
     # --- Video ---
     "practice_duration": {"default": 3.0, "type": "number", "group": "video",
+                          "modes": ["original", "original_static", "original_cutout"],
                           "label": "Ch3 跟读间隔(秒)",
                           "help": "Ch3 每次朗读（英文/中文）后的停顿秒数。Quest 模式不适用"},
     "ch3_en_repeats": {"default": 3, "type": "number", "group": "video",
+                       "modes": ["original", "original_static", "original_cutout"],
                        "label": "Ch3 英文重复次数",
                        "help": "跟读练习每句英文朗读遍数 (0-10, 0=不播英文)。Quest 模式不适用"},
     "ch3_zh_repeats": {"default": 1, "type": "number", "group": "video",
+                       "modes": ["original", "original_static", "original_cutout"],
                        "label": "Ch3 中文重复次数",
                        "help": "中文翻译朗读遍数 (0-10, 0=不播中文)。Quest 模式不适用"},
     "ch3_zh_always": {"default": True, "type": "checkbox", "group": "video",
+                      "modes": ["original", "original_static", "original_cutout"],
                       "label": "Ch3 中文常显",
                       "help": "英文跟读时画面同步显示中文翻译。Quest 模式不适用"},
     "ch3_practice_intro_show": {"default": True, "type": "checkbox", "group": "video",
+                                "modes": ["original", "original_static", "original_cutout"],
                                 "label": "Ch3 练习引导卡",
                                 "help": "跟读练习前的引导文字卡（逐句显示）。关闭后整段跳过。Quest 模式不适用"},
     "pad": {"default": "", "type": "text", "group": "video",
             "label": "音频间隔(秒)", "help": "留空=自动 (0.4)"},
     "render_fps": {"default": 8, "type": "number", "group": "video",
-                   "label": "渲染帧率 (stop_motion)"},
+                   "modes": ["original_cutout", "quest"],
+                   "label": "渲染帧率 (定格动画)"},
     "workers": {"default": 1, "type": "number", "group": "video",
+                "modes": ["original_cutout", "quest"],
                 "label": "渲染线程数", "help": "0=自动(CPU核数)"},
     "subtitle_style": {"default": "", "type": "select", "group": "video",
                        "label": "字幕样式",
@@ -208,6 +231,7 @@ PARAM_SPEC = {
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
                        "label": "4K超时(秒)"},
     "matting_engine": {"default": "auto", "type": "select", "group": "video",
+                       "modes": ["original_cutout", "quest"],
                        "label": "抠图引擎",
                        "options": {"auto": "Auto (有权重用MODNet)",
                                    "modnet": "MODNet (AI抠图)",
@@ -215,6 +239,29 @@ PARAM_SPEC = {
                        "help": "MODNet 本地 ONNX 抠图（权重 H:\\models\\modnet\\modnet.onnx），"
                                "任意背景角色图可抠；原白度抠图始终保留可选"},
 }
+
+
+def param_effective_in_mode(key: str, mode: str) -> bool:
+    """参数在某模式下是否被管线实际消费（缺省全模式生效）。"""
+    if mode not in MODES:
+        return True
+    spec = PARAM_SPEC.get(key)
+    if spec is None:
+        return False
+    modes = spec.get("modes")
+    return not modes or mode in modes
+
+
+def effective_param_spec(mode: str) -> dict[str, dict]:
+    """返回指定模式的生效参数子集（条目浅拷贝，不改动 PARAM_SPEC 原始对象）。
+
+    仅用于配置页渲染过滤；保存/加载/API 仍基于完整 PARAM_SPEC
+    （被过滤键保存后回落默认值，load_mode_config 合并补全）。
+    """
+    if mode not in MODES:
+        return dict(PARAM_SPEC)
+    return {k: dict(v) for k, v in PARAM_SPEC.items()
+            if not v.get("modes") or mode in v["modes"]}
 
 # Group display metadata
 GROUP_META = {

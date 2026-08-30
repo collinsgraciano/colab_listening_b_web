@@ -140,6 +140,7 @@ python pipeline.py --resume  # 断点续传
 
 ### 配置管理
 
+- **按模式过滤：** 配置页只渲染当前模式实际消费的参数（`PARAM_SPEC` 条目 `modes` 标注，缺省=全模式生效；`effective_param_spec(mode)` 过滤，`param_effective_in_mode` 查询）。生效性以管线消费方为准——original: clip_duration/clip_concurrency；cutout: animation/dh_*/host_character/render_fps/workers/matting_engine；quest: quest_beat_lines/render_fps/workers/matting_engine；quest 无 Ch3/中文（practice_duration/ch3_*/character_zh_voices 仅 original*）；static 无特有项（animation 强制 none）。被过滤键保存后回落默认值（load_mode_config 合并补全），CLI 构建不受影响；新增管线参数须同步维护 modes 标注
 - 默认配置：`configs/default.json`（所有参数的当前值）
 - 预设文件：`configs/{name}.json`（保存的参数组合）
 - 配置合并策略：`get_default_config()` → `merged.update(saved)`（新增参数自动补全默认值）
@@ -192,6 +193,7 @@ python pipeline.py --resume  # 断点续传
 - [2026-08-29 23:03:35] [2026-08-29 23:05] 句子限长约束链上线：配置 max_line_words（content 组，默认 10，clamp [4,20]，空/0→10）保证字幕最多两行。env 双通道 LISTENING_MAX_LINE_WORDS（original*）+ QUEST_MAX_LINE_WORDS（quest），注入点 pipeline_service._set_env / script_library 批量 override（线程局部，读端必须经 llm_client.resolve_max_line_words 的 _env_get）/ pipeline.py main()（CLI --max-line-words）。约束三层：①LLM prompt（对话行 HARD LIMIT + 旁白字段 welcome_en/story_hook/outro/practice_intro_en、quest hook_intro_en/outro 每句 ≤cap，CEFR 词数区间 hi=min(hi,cap)）；②质检门禁超长 warning→error 触发 QA 修复（quality_gate_listening._resolve_max_line_words / quest 同构）；③渲染兜底 media_utils._split_overlong_entries（burn_subtitles 内按实际字号测量，EN >2 行字幕条按词边界拆条+ZH 按字符比例+时长按字符占比，覆盖旧脚本/脚本库/QA 残留）。**Why:** 用户实测 15 词句字幕折 3 行影响学习。**How to apply:** 旁白超长是 warning 不是 error（旁白无行号不可 patch，error 会误触 QA 空转保护提前终止循环，勿"修复"成 error）；改字幕字号时兜底自动适配；quest _META_TARGETS 总词数目标（70-110/80-110）与每句 ≤cap 共存。
 - [2026-08-30 01:04:31] [2026-08-30] 本机网络：huggingface.co 与 hf-mirror.com 均 TCP 不通，ModelScope（modelscope.cn）可达。**Why:** 下载模型权重必须优先找 ModelScope 镜像（AI-ModelScope/* 社区镜像或官方中文仓库）。**How to apply:** HF 直链失败时改用 https://www.modelscope.cn/models/{ns}/{name}/resolve/{rev}/{file}。
 - [2026-08-30 01:04:36] [2026-08-30] 用户清单来源项目=Timeline Studio（github.com/MartinDelophy/ai-video-editor，MIT，浏览器 WebGPU 视频编辑器）；其 ONNX 模型镜像仓 martindelophy/timeline-studio-onnx-models（ModelScope+HF 双托管，revision a201b681）含 JoyVASA+LivePortrait 全部权重，SHA256 清单在仓库 src/config/{joyVasa,livePortrait}.js。**Why:** 三个新本地AI能力的模型与推理逻辑均移植自此项目（joyvasa.worker.js + liveportrait.worker.js）。**How to apply:** 模型已落盘 H:\models\digital_human\{joyvasa,liveportrait}\；Python 移植已验证（M0.3 spike）；LivePortrait 用纯 ONNX landmark 检测（无需 dlib/insightface，避开 Windows 编译坑）。
+- [2026-08-30 08:43:38] [2026-08-30] 本地 AI 三件套上线（commit 7a2cf01/fb1565a/ea591ed）：①抠图 matting_engine=auto/modnet/white_threshold（MODNet ONNX H:\models\modnet，stop_motion.remove_bg 三分支，白度法保留）；②4K upscale_engine=ffmpeg/ai 默认 ffmpeg（realesr-animevideov3 torch CUDA fp16 ~110ms/帧，sr_upscale.py rawvideo 双管道流式，权重 H:\models\upscaling）；③animation=digital_human 仅 original_cutout（JoyVASA+LivePortrait 本地 ONNX，H:\models\digital_human，1 张正面像/角色替代 8 姿势图集，dh_quality/dh_neural_fps 子参数，CPU 关键帧 ~4.4s/帧）。**Why:** 用户要求「保留原来的方法功能，可以在配置里设置用哪个和用不用」。**How to apply:** 三者全部走 PARAM_SPEC→build_cli_args/_build_args→env/args 三层接线；不要把回退路径当 bug 删掉（权重缺失回退是设计行为）；数字人音频超 4s 静止保持末帧是 JoyVASA 模型窗口限制。
 
 ### Reference
 
