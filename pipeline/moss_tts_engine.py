@@ -223,14 +223,42 @@ def _clean_sentence_audio(audio, sr: int):
     if tail.size:
         cleaned = np.concatenate([cleaned, tail])
 
-    # 10ms linear fade in/out prevents clicks at joins
-    fade = min(int(0.01 * sr), cleaned.size // 2)
-    if fade > 0:
-        cleaned = cleaned.copy()
-        ramp = np.linspace(0.0, 1.0, fade, dtype=np.float32)
-        cleaned[:fade] *= ramp
-        cleaned[-fade:] *= ramp[::-1]
+    # 25ms fade-in suppresses residual onset clicks/bursts; 10ms fade-out
+    fade_in = min(int(0.025 * sr), cleaned.size // 2)
+    fade_out = min(int(0.01 * sr), cleaned.size // 2)
+    cleaned = cleaned.copy()
+    if fade_in > 0:
+        cleaned[:fade_in] *= np.linspace(0.0, 1.0, fade_in, dtype=np.float32)
+    if fade_out > 0:
+        cleaned[-fade_out:] *= np.linspace(1.0, 0.0, fade_out, dtype=np.float32)
     return cleaned
+
+
+def _has_leading_burst(audio, sr: int) -> bool:
+    """Detect an unnatural full-energy onset in the first ~120ms.
+
+    MOSS 冷启动后第一次推理 / 个别采样劣化会在句首产生爆音或含混，听感为
+    "杂音"：第 2-4 帧（20-80ms）就冲到全句峰值附近、完全没有自然起音包络
+    （正常起音前 40ms 至少比峰值低 ~35%）。所有历史劣化样本（4/5 的
+    welcome 首句）均呈现 [≤12%, >75%, >75%, >75%] 形态；正常样本无一命中。
+    """
+    import numpy as np
+    audio = np.asarray(audio, dtype=np.float32)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    win = int(0.02 * sr)
+    n = audio.size // win
+    if n < 10:
+        return False
+    frames = audio[:n * win].reshape(n, win).astype(np.float64)
+    rms = np.sqrt((frames ** 2).mean(axis=1))
+    p95 = float(np.percentile(rms, 95))
+    if p95 <= 1e-6:
+        return False
+    head = rms[:4] / p95
+    # 帧1(0-20ms)极低 + 帧2-4(20-80ms)直接冲到 75% 峰值以上 = 无起音瞬态
+    return bool(head[0] <= 0.15 and head[1] >= 0.75
+                and head[2] >= 0.75 and head[3] >= 0.75)
 
 
 # ---------------------------------------------------------------------------
@@ -402,8 +430,45 @@ class MossTTSEngine(TTSEngine):
                 device=device,
                 dtype="auto",
             )
+            cls._warm_up()
             print(f"  [MOSS-TTS] NanoTTSService ready.")
         return cls._service
+
+    @classmethod
+    def _warm_up(cls):
+        """加载后立即做一次丢弃式预热合成。
+
+        冷启动后第一次推理容易在句首产生爆音/含混（历史 cutout 运行中
+        welcome.mp3 恒为首个合成文件且多次出现起始满能量包络）。预热消耗
+        一次推理，使真实首句不再是"第一次生成"。失败不阻断主流程
+        （真实调用仍有 retry + 起始爆音校验兜底）。
+        """
+        import tempfile
+        import time as _time
+        voice = next((v for v in (_DEFAULT_MALE, _DEFAULT_FEMALE, "Bella")
+                      if v in _PRESET_NAMES),
+                     next(iter(sorted(_PRESET_NAMES)), ""))
+        if not voice:
+            return
+        tmp = os.path.join(tempfile.gettempdir(), f"moss_warmup_{os.getpid()}.wav")
+        t0 = _time.time()
+        try:
+            cls._service.synthesize(
+                text="Hello.",
+                mode="voice_clone",
+                voice=voice,
+                output_audio_path=tmp,
+                max_new_frames=100,
+            )
+            print(f"  [MOSS-TTS] Warm-up done in {_time.time() - t0:.1f}s "
+                  f"(voice={voice}, cold-start first inference consumed).")
+        except Exception as e:
+            print(f"  [MOSS-TTS] Warm-up skipped ({type(e).__name__}: {str(e)[:80]})")
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
     def _synth(self, text: str, voice: str, language: str,
                out_path: str, rate: str) -> float:
@@ -547,6 +612,16 @@ class MossTTSEngine(TTSEngine):
                 last_err = RuntimeError("near-silent audio output")
                 print(f"    [MOSS-TTS retry {attempt}/{self._retry}] near-silent audio: {sentence[:40]}")
                 continue
+
+            # Validation 1b: leading non-speech burst (cold-start artifact).
+            # Last attempt accepts with a warning — never worse than before.
+            if _has_leading_burst(audio, sr):
+                if attempt < self._retry:
+                    last_err = RuntimeError("leading burst artifact")
+                    print(f"    [MOSS-TTS retry {attempt}/{self._retry}] leading burst: {sentence[:40]}")
+                    continue
+                print(f"    [MOSS-TTS WARN] leading burst persisted after "
+                      f"{self._retry} attempts: {sentence[:40]}")
 
             # Validation 2: implausible duration (truncation / babbling)
             actual = audio.size / float(sr)
