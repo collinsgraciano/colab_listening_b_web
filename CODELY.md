@@ -35,6 +35,9 @@ colab_listening_b_web/
 │   ├── original_cutout_compose.py # Original Cutout 合成（人物抠图停格动画）
 │   ├── stop_motion.py            # 定格动画渲染（多姿势+光流插帧，quest/cutout 共用）
 │   ├── thumbnail_gen.py          # YouTube 缩略图 + 元数据生成
+│   ├── matting.py                # MODNet AI 抠图（本地 ONNX，matting_engine 配置，白度法保留可选）
+│   ├── sr_upscale.py             # realesr-animevideov3 AI 4K 超分（torch CUDA fp16 双管道流式，upscale_engine 配置）
+│   ├── digital_human.py          # 数字人说话引擎（JoyVASA 音频→动作 + LivePortrait 渲染，本地 ONNX）
 │   ├── media_utils.py            # FFmpeg/Pillow 共享工具（concat/字幕烧录/loudnorm/分辨率探测）
 │   ├── topic_manager.py          # 主题随机选择 + 防重复（topics.json + used_topics.json）
 │   ├── checkpoint.py             # 断点续传（checkpoint.json 保存/加载/步骤完成检查）
@@ -156,6 +159,7 @@ python pipeline.py --resume  # 断点续传
 - Seedance2 视频最大并发 5 个任务，超出需分批创建
 - MCP 下载文件需验证大小 > 500KB（防止静默失败的小文件）
 - `probe_resolution` 解析 ffprobe csv 输出（`1080,1920` 逗号分隔，非 `x` 分隔）— 字幕叠加按实测画布渲染
+- 本地 AI 引擎三件套（2026-08-30）：MODNet 抠图 `H:\models\modnet\`、AI 超分 `H:\models\upscaling\`、数字人 `H:\models\digital_human\{joyvasa,liveportrait}\`（ModelScope 镜像下载，SHA256 校验过）；全部走「配置选项 + 原方法保留」：matting_engine=auto/modnet/white_threshold、upscale_engine=ffmpeg/ai（默认 ffmpeg）、animation=digital_human（仅 original_cutout，其余 stop_motion/landing/none 不变）；数字人 JoyVASA 窗口固定 4s、CPU 渲染关键帧 ~4.4s/帧（minterpolate 插帧到 25fps）、无 MODNet 时整帧 cover 兜底
 - 主题库矩阵策略：每个场景从多角度开采（顾客操作/员工POV/品牌具体/首次体验/小麻烦/文化问答），`pipeline/topics.json` 现 726 条 26 分类；topics_ai.py 生成 prompt 已内置矩阵思维
 
 ## Codely Structured Memories

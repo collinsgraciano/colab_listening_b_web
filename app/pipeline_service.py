@@ -807,6 +807,10 @@ class PipelineService:
             moss_tts_temperature=config.get("moss_tts_temperature", 0.8),
             moss_tts_retry=config.get("moss_tts_retry", 3),
             upscale_timeout=int(config.get("upscale_timeout", 3600)),
+            upscale_engine=str(config.get("upscale_engine", "ffmpeg")),
+            matting_engine=str(config.get("matting_engine", "auto")),
+            dh_quality=str(config.get("dh_quality", "preview")),
+            dh_neural_fps=_cfg_int(config, "dh_neural_fps", 3),
             host_character=str(config.get("host_character", "") or ""),
             resume=False,
         )
