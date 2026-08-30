@@ -236,11 +236,15 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
             if url:
                 image_urls[filename] = url
             elif err:
+                # 失败原因必须落到日志：否则 ABORTING 后无从排查
+                print(f"    [Image] ERROR generating {filename}: {err}")
                 image_failed = True
 
     if image_failed:
-        missing = [fn for fn, _ in image_prompts if fn not in image_urls]
+        # image_prompts 元素是 (prompt, filename) — 取文件名判断缺失
+        missing = [fn for _, fn in image_prompts if fn not in image_urls]
         print(f"  [Image] ABORTING: Missing required images: {missing}")
+        print("  [Image] 请查看上方 ERROR 行的失败原因；修正后用「继续运行」(resume) 重试本步骤。")
         if tts_thread:
             tts_thread.join(timeout=5)
         sys.exit(1)

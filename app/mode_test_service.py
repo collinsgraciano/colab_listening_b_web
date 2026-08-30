@@ -219,6 +219,11 @@ class ModeTestService:
         """统一线程外壳：无论 fn 在哪一步抛异常都保证释放互斥锁。"""
         try:
             fn(*args)
+        except SystemExit as e:
+            # pipeline 模块 sys.exit(1)（素材缺失/token 耗尽）在后台线程表现为
+            # SystemExit（非 Exception 子类）— 不接住的话 finally 兜底会把
+            # running 误标 done（与 pipeline_service._run_inner 同一坑）
+            self._fail(f"Pipeline aborted (exit code {e.code})")
         except Exception as e:
             self._fail(f"{type(e).__name__}: {e}")
             import traceback

@@ -1090,6 +1090,12 @@ class PipelineService:
             if final_4k_path and Path(final_4k_path).exists():
                 self._on_log_line(f"4K video: {final_4k_path}")
 
+        except SystemExit as e:
+            # pipeline 模块用 sys.exit(1) 中止（图片缺失 / MCP token 耗尽 /
+            # 质检门禁 exit=2 等）。SystemExit 不是 Exception 子类，
+            # except Exception 接不住 — 不显式处理的话 finally 兜底会把
+            # running 误标成 done（前端弹"视频生成完成"）。
+            self._fail(f"Pipeline aborted (exit code {e.code})")
         except Exception as e:
             self._fail(f"{type(e).__name__}: {e}")
             import traceback
@@ -1102,7 +1108,10 @@ class PipelineService:
             os.environ.pop("CHARACTER_OVERRIDES", None)
             with self._lock:
                 if self.status == "running":
-                    self.status = "done"
+                    # 正常完成路径在上面已显式置 done；走到这里仍 running
+                    # 说明线程异常退出 — 一律标记失败，绝不静默显示为完成
+                    self.status = "error"
+                    self.error = "Pipeline thread exited without a terminal status"
                 self.finished_at = time.time()
 
     def _fail(self, msg: str):
