@@ -1,6 +1,6 @@
 """SenseNova U1.5 Lite 生图客户端（同步接口，无轮询）。
 
-依赖 SENSENOVA_API_KEY 环境变量（与 LLM 共用同一 key）。
+依赖 SENSENOVA_API_KEY 环境变量（配置键 sensenova_api_key，可与 LLM provider 分开填写）。
 IMAGE_PROVIDER=sensenova 时 image_gen / thumbnail_gen 的生图走本模块，
 视频生成（Seedance2）仍走 MCP。
 
@@ -46,7 +46,7 @@ def _api_key() -> str:
     if not key:
         raise RuntimeError(
             "SENSENOVA_API_KEY 未设置 — 生图 Provider=sensenova 需要在 Web 配置中"
-            "填写 SenseNova API Key（与 LLM 共用）")
+            "填写 SenseNova API Key（配置键 sensenova_api_key，可与 LLM provider 分开填写）")
     return key
 
 

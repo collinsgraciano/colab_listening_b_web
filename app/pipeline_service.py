@@ -220,6 +220,10 @@ class PipelineService:
         # 抠图引擎：auto（默认，有权重用 MODNet）/ modnet / white_threshold（原方法）
         os.environ["MATTING_ENGINE"] = str(config.get("matting_engine", "auto"))
 
+        # SenseNova key：除 LLM 外，生图 Provider=sensenova 也依赖（LLM 可走自定义 OpenAI 通道，二者解耦）
+        if str(config.get("sensenova_api_key") or "").strip():
+            os.environ["SENSENOVA_API_KEY"] = str(config["sensenova_api_key"]).strip()
+
         provider = config.get("llm_provider", "sensenova")
         p_type, p_base_url, p_api_key, p_model = resolve_provider(config)
         os.environ["LLM_PROVIDER"] = p_type

@@ -1107,6 +1107,10 @@ def main():
     if args.moss_tts_retry:
         os.environ["MOSS_TTS_RETRY"] = str(args.moss_tts_retry)
 
+    # SenseNova key：LLM(sensenova) 与 生图 provider=sensenova 共用；提前注入，与 LLM provider 解耦
+    if args.api_key:
+        os.environ["SENSENOVA_API_KEY"] = args.api_key
+
     if args.llm_provider == "openai":
         os.environ["LLM_PROVIDER"] = "openai"
         if args.openai_base_url:
@@ -1124,8 +1128,6 @@ def main():
             sys.exit(1)
     else:
         os.environ["LLM_PROVIDER"] = "sensenova"
-        if args.api_key:
-            os.environ["SENSENOVA_API_KEY"] = args.api_key
         if args.model:
             os.environ["SENSENOVA_MODEL"] = args.model
         if not os.environ.get("SENSENOVA_API_KEY"):
