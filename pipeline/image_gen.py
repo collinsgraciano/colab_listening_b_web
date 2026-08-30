@@ -27,11 +27,9 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
     # Quest mode uses scene_0.png instead of scene.png; pose_char_a_0.png instead of char_scene.png
     # original_cutout 同 quest 用姿势图集（pose_char_a_0.png），不生成 char_scene.png
     is_cutout = (checkpoint.get("structure", "") == "original_cutout")
-    is_dh = (is_cutout and checkpoint.get("animation", "") == "digital_human")
-    use_atlas_ref = is_quest or (is_cutout and not is_dh)
+    use_atlas_ref = is_quest or is_cutout
     scene_file = img_dir / "scene_0.png" if is_quest else img_dir / "scene.png"
-    ref_file = (img_dir / "portrait_char_a.png") if (is_cutout and is_dh) \
-        else ((img_dir / "pose_char_a_0.png") if use_atlas_ref else char_scene_file)
+    ref_file = (img_dir / "pose_char_a_0.png") if use_atlas_ref else char_scene_file
     all_audio_exist = all((audio_dir / f"dialogue_{i}.mp3").exists() for i in range(n))
     if is_quest or not include_zh:
         # quest 不生成中文；ch3_zh_repeats=0 时有意跳过中文音频，不因缺文件阻断 resume
@@ -65,9 +63,6 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
     #   其余 → char_scene（角色设计表）+ scene
     if is_quest:
         reupload_files = ["pose_char_a_0.png", "scene_0.png"]
-    elif is_cutout and is_dh:
-        reupload_files = [f for f in ("portrait_char_a.png", "scene.png", "host_bg.png")
-                          if (img_dir / f).exists()]
     elif is_cutout:
         reupload_files = [f for f in ("pose_char_a_0.png", "scene.png", "host_bg.png")
                           if (img_dir / f).exists()]
@@ -332,78 +327,6 @@ def generate_dialogue_images(dialogue, img_dir, char_a_desc, char_b_desc, scene,
         futs = [pool.submit(_gen_one, i, line) for i, line in enumerate(dialogue)]
         for fut in as_completed(futs):
             fut.result()
-
-
-def generate_portraits(script, img_dir, tts_thread, max_workers=4,
-                       style_prompt: str = DEFAULT_STYLE_PROMPT,
-                       char_keys=("char_a", "char_b")):
-    """digital_human 动画模式：每个角色生成 1 张正面中性半身像（替代 8 姿势图集）。
-
-    与 generate_quest_atlases 并存（不同动画类型走不同素材）；白底方便 MODNet 抠像。
-    """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    _STYLE = style_prompt
-
-    all_chars = [
-        ("char_a", script.get("char_a_description", "friendly young man")),
-        ("char_b", script.get("char_b_description", "friendly young woman")),
-        ("host", script.get("host_description",
-                            "friendly young woman with short brown hair, wearing a smart "
-                            "blue blazer, warm smile, professional TV host appearance")),
-    ]
-    chars = [c for c in all_chars if c[0] in (char_keys or ("char_a", "char_b"))]
-
-    def _gen_one(char_key, char_desc):
-        out_path = str(img_dir / f"portrait_{char_key}.png")
-        if os.path.exists(out_path):
-            print(f"  [Portrait] {char_key} portrait already exists, skipping")
-            return
-        prompt = (
-            f"front-facing half-body portrait of one single character, {char_desc}, "
-            f"looking directly at camera with a friendly neutral expression, "
-            f"head and shoulders clearly visible, arms relaxed, "
-            f"plain pure white background, {_STYLE}, "
-            f"no props, no objects, no scene, no text, no other people"
-        )
-        print(f"  [Portrait] Generating portrait for {char_key}...")
-        try:
-            if sensenova_image.get_image_provider() == "sensenova":
-                url = sensenova_image.text_to_image(
-                    prompt, size=sensenova_image.SIZE_MAP["landscape_16_9"],
-                    prompt_extend=False)
-            else:
-                gen_params = {
-                    "prompt": prompt,
-                    "provider": "seedream",
-                    "image_size": "2048x1152",
-                    "output_format": "png",
-                    "is_segmentation": True,
-                }
-                result = call_tool("generate_image", gen_params)
-                task_id = parse_task_id(result)
-                data = poll_task(task_id, interval=10, max_wait=600)
-                url = data.get("url", "")
-            if not url:
-                print(f"    [Portrait] WARNING: No URL for {char_key}")
-                return
-            download_file(url, out_path)
-            print(f"    [Portrait] Downloaded: portrait_{char_key}.png")
-        except RuntimeError as e:
-            if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
-                if tts_thread:
-                    tts_thread.join(timeout=5)
-                sys.exit(1)
-            print(f"    [Portrait] ERROR {char_key}: {e}")
-        except Exception as e:
-            print(f"    [Portrait] ERROR {char_key}: {e}")
-
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futs = [pool.submit(_gen_one, ck, cd) for ck, cd in chars]
-        for fut in as_completed(futs):
-            fut.result()
-
-    print(f"  [Portrait] Done — {len(chars)} portrait image(s).")
-    return {}
 
 
 def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,

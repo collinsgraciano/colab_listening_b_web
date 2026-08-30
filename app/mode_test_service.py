@@ -367,8 +367,6 @@ class ModeTestService:
                 "generated_at": datetime.now().isoformat(timespec="seconds"),
                 "visual_style": args.visual_style,
                 "animation": args.animation,
-                "dh_quality": getattr(args, "dh_quality", "preview"),
-                "dh_neural_fps": int(getattr(args, "dh_neural_fps", 3) or 3),
                 "pad": args.pad,
                 "practice_duration": args.practice_duration,
                 "clip_duration": args.clip_duration,
@@ -485,10 +483,8 @@ class ModeTestService:
         args.workers = int(manifest.get("workers", 1))
         args.host_character = str(manifest.get("host_character", "") or "")
         args.num_lines = int(manifest.get("num_lines", MINI_LINES[mode]))
-        # 数字人参数同样按素材快照回放（无值时保持当前配置）
+        # animation 同样按素材快照回放（无值时保持当前配置）
         args.animation = str(manifest.get("animation", getattr(args, "animation", "stop_motion")))
-        args.dh_quality = str(manifest.get("dh_quality", getattr(args, "dh_quality", "preview")))
-        args.dh_neural_fps = int(manifest.get("dh_neural_fps", getattr(args, "dh_neural_fps", 3)))
 
         dirs = {
             "images": set_dir / "images",

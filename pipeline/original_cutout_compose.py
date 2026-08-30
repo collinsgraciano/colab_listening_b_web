@@ -108,9 +108,6 @@ def _prepare_segment(
     static_dir: Path,
     host_poses: list[str] | None = None,
     host_bg: str = "",
-    animation: str = "stop_motion",
-    dh_quality: str = "preview",
-    dh_neural_fps: int = 3,
     stop_check=None,
 ) -> tuple[str | None, str]:
     """Prepare params and render a single segment.
@@ -177,28 +174,6 @@ def _prepare_segment(
     elif seg_type == "dialogue":
         line_data = dialogue[audio_idx] if audio_idx < len(dialogue) else {}
         speaker = line_data.get("speaker", "char_a")
-
-        # digital_human 动画：说话角色开口说话（本地 JoyVASA+LivePortrait）
-        if animation == "digital_human" and speaker in char_pose_map \
-                and char_pose_map[speaker] and audio_file and os.path.exists(audio_file):
-            from digital_human import render_dh_segment, models_available
-            if models_available(dh_quality):
-                # 场景背景轮换（与 stop_motion 分支一致）
-                dialogue_seg_count = sum(
-                    1 for s in timeline[:timeline.index(seg)] if s["type"] == "dialogue")
-                n_scene_bgs = max(1, len(scene_bgs))
-                line_bg = scene_bgs[(dialogue_seg_count // 5) % n_scene_bgs]
-                dh_frames_dir = sm_root / f"dh_{audio_idx}"
-                ok = render_dh_segment(
-                    char_pose_map[speaker][0], line_bg, audio_file, out_path,
-                    duration, dh_frames_dir,
-                    quality=dh_quality, neural_fps=dh_neural_fps,
-                    fade_af=fade_af)
-                if ok:
-                    return out_path, seg_type
-                print(f"    [DH] digital_human 渲染失败，回退 stop_motion/static")
-            else:
-                print("    [DH] 数字人模型不齐备（H:\\models\\digital_human\\），回退 stop_motion")
 
         other = "char_b" if speaker == "char_a" else "char_a"
 
@@ -420,9 +395,6 @@ def compose_original_cutout(
     pad: float = 0.4,
     render_fps: int = 12,
     workers: int = 1,
-    animation: str = "stop_motion",
-    dh_quality: str = "preview",
-    dh_neural_fps: int = 3,
     show_zh: bool = True,
     subtitle_font_size: int = 60,
     subtitle_style: dict | None = None,
@@ -450,10 +422,6 @@ def compose_original_cutout(
         pad: Audio pad between segments.
         render_fps: Stop-motion render framerate.
         workers: Render threads (1=single, 2+=multi, 0=auto).
-        animation: stop_motion (default) or digital_human (JoyVASA+LivePortrait
-                   audio-driven talking portrait for dialogue segments).
-        dh_quality: digital human render size (preview=256px / quality=512px).
-        dh_neural_fps: digital human neural keyframes per second.
         show_zh: Show Chinese subtitles.
         subtitle_font_size: English subtitle font size.
         subtitle_style: Subtitle style dict or None.
@@ -526,8 +494,6 @@ def compose_original_cutout(
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses=host_poses, host_bg=host_bg or scene_img,
-                animation=animation, dh_quality=dh_quality,
-                dh_neural_fps=dh_neural_fps,
                 stop_check=stop_check,
             )
             if out_path:
@@ -548,7 +514,6 @@ def compose_original_cutout(
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses, host_bg or scene_img,
-                animation, dh_quality, dh_neural_fps,
                 stop_check,
             ): seg_idx
             for seg_idx, seg in enumerate(timeline)

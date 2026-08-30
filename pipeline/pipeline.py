@@ -64,7 +64,6 @@ from image_gen import (
     generate_dialogue_images as _generate_dialogue_images,
     generate_quest_atlases as _generate_quest_atlases,
     generate_scene_atlas as _generate_scene_atlas,
-    generate_portraits as _generate_portraits,
     reupload_for_cdn as _reupload_for_cdn,
 )
 from timeline_enrich import enrich_timeline as _enrich_timeline
@@ -210,8 +209,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
-    parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion", "digital_human"],
-                        help="Dialogue animation: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow), 'digital_human' (audio-driven talking portrait, original_cutout only). Default: landing")
+    parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
+                        help="Dialogue animation: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow). Default: landing")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint in output dir")
     parser.add_argument("--no-4k", dest="no_4k", action="store_true", help="Skip the final 4K upscaling step")
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
@@ -245,11 +244,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
     parser.add_argument("--upscale-engine", default="ffmpeg", choices=["ffmpeg", "ai"],
                         help="4K upscale engine: ffmpeg (lanczos, default) or ai (realesr-animevideov3, torch CUDA)")
-    parser.add_argument("--dh-quality", default="preview", choices=["preview", "quality"],
-                        help="Digital human render size: preview (256px, fast) or quality (512px)")
-    parser.add_argument("--dh-neural-fps", type=int, default=3,
-                        help="Digital human neural keyframes per second (1-8; higher = smoother "
-                             "but slower, CPU ~4.4s per keyframe)")
     parser.add_argument("--matting-engine", default="auto",
                         choices=["auto", "modnet", "white_threshold"],
                         help="Cutout matting engine: auto (MODNet if weights exist) / modnet / white_threshold (legacy)")
@@ -356,9 +350,7 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
         _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
                          structure=args.structure, animation=args.animation,
                          visual_style=getattr(args, "visual_style", ""),
-                         host_character=getattr(args, "host_character", ""),
-                         dh_quality=getattr(args, "dh_quality", "preview"),
-                         dh_neural_fps=int(getattr(args, "dh_neural_fps", 3) or 3))
+                         host_character=getattr(args, "host_character", ""))
         mark_topic_used(used_topics_file, topic)
     print(f"  Script saved: {script_path}")
     print(f"  Title: {script.get('title', '')}")
@@ -480,35 +472,20 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
                                    style_prompt=style_prompt)
         elif is_original_cutout:
-            if getattr(args, "animation", "") == "digital_human":
-                # digital_human 动画：角色只需 1 张正面像（省生图积分）；
-                # 主持人段仍走定格动画 → 始终生成独立主持人图集
-                _portrait_keys = ["char_a", "char_b"]
-                _generate_portraits(script, img_dir, tts_thread,
+            # original_cutout: per-character pose atlas (char_a + char_b, 8 poses each)
+            # 主持人未绑定角色时额外生成独立主持人图集
+            _cutout_keys = ["char_a", "char_b"]
+            if not getattr(args, "host_character", ""):
+                _cutout_keys.append("host")
+            _generate_quest_atlases(script, img_dir, tts_thread,
                                     max_workers=args.image_concurrency,
                                     style_prompt=style_prompt,
-                                    char_keys=_portrait_keys)
-                _generate_quest_atlases(script, img_dir, tts_thread,
-                                        max_workers=args.image_concurrency,
-                                        style_prompt=style_prompt,
-                                        char_keys=["host"])
-            else:
-                # original_cutout: per-character pose atlas (char_a + char_b, 8 poses each)
-                # 主持人未绑定角色时额外生成独立主持人图集
-                _cutout_keys = ["char_a", "char_b"]
-                if not getattr(args, "host_character", ""):
-                    _cutout_keys.append("host")
-                _generate_quest_atlases(script, img_dir, tts_thread,
-                                        max_workers=args.image_concurrency,
-                                        style_prompt=style_prompt,
-                                        char_keys=_cutout_keys)
+                                    char_keys=_cutout_keys)
 
         if is_quest or is_original_cutout:
             # 全新生成路径：姿势图集只落本地。此处把 char_a 参考图补传 CDN 写入
             # image_urls，供 Step 4.5 缩略图做角色参考（与 --resume 路径行为一致）。
             _ref_path = img_dir / "pose_char_a_0.png"
-            if not _ref_path.exists() and getattr(args, "animation", "") == "digital_human":
-                _ref_path = img_dir / "portrait_char_a.png"
             if _ref_path.exists():
                 _ref_url = _reupload_for_cdn(str(_ref_path), _ref_path.name)
                 if _ref_url:
@@ -888,24 +865,15 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
         )
     elif args.structure == "original_cutout":
         from original_cutout_compose import compose_original_cutout
-        _is_dh = getattr(args, "animation", "") == "digital_human"
         # Build per-character pose map (char_a/char_b only, 8 poses each)
         char_pose_map = {}
-        if _is_dh:
-            # digital_human：1 张正面像/角色（缺图回退 stop_motion 图集）
-            for ck in ("char_a", "char_b"):
-                p = str(dirs["images"] / f"portrait_{ck}.png")
-                if os.path.exists(p):
-                    char_pose_map[ck] = [p]
-        if not _is_dh or not char_pose_map:
-            for ck in ("char_a", "char_b"):
-                poses = [str(dirs["images"] / f"pose_{ck}_{j}.png") for j in range(8)]
-                if all(os.path.exists(p) for p in poses):
-                    char_pose_map[ck] = poses
+        for ck in ("char_a", "char_b"):
+            poses = [str(dirs["images"] / f"pose_{ck}_{j}.png") for j in range(8)]
+            if all(os.path.exists(p) for p in poses):
+                char_pose_map[ck] = poses
         if not char_pose_map:
             print("  [Cutout] WARNING: no pose images found, compose will use fallback statics")
-        # 主持人姿势：digital_human 恒用独立主持人图集（char 无图集可用）；
-        # 其余分支绑定角色时复用其图集，否则用独立主持人图集（8 姿势，缺则回退 4）
+        # 主持人姿势：绑定角色时复用其图集，否则用独立主持人图集（8 姿势，缺则回退 4）
         _host_bound = getattr(args, "host_character", "")
         if _host_bound and _host_bound in char_pose_map and len(char_pose_map[_host_bound]) > 1:
             host_poses = char_pose_map[_host_bound]
@@ -934,9 +902,6 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             pad=args.pad,
             render_fps=getattr(args, "render_fps", 12),
             workers=getattr(args, "workers", 1),
-            animation=getattr(args, "animation", "stop_motion"),
-            dh_quality=getattr(args, "dh_quality", "preview"),
-            dh_neural_fps=int(getattr(args, "dh_neural_fps", 3) or 3),
             show_zh=not getattr(args, "no_zh_subtitle", False),
             subtitle_font_size=args.subtitle_font_size,
             subtitle_style=sub_style,
@@ -1059,10 +1024,6 @@ def main():
     # original_cutout: quest-style TTS rate (0% = normal speed)
     if args.tts_rate is None and args.structure == "original_cutout":
         args.tts_rate = "0%"
-
-    # original_cutout + digital_human：DH 参数 clamp
-    if getattr(args, "dh_neural_fps", None):
-        args.dh_neural_fps = max(1, min(8, int(args.dh_neural_fps)))
 
     # original_static: always use static images (no landing/stop_motion animation)
     if args.structure == "original_static":

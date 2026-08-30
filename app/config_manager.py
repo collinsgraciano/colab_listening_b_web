@@ -50,22 +50,10 @@ PARAM_SPEC = {
                   "label": "动画类型", "options": {
                       "none": "None (静态，等效定格)",
                       "landing": "Landing (静态，等效定格)",
-                      "stop_motion": "Stop Motion (定格动画，默认)",
-                      "digital_human": "Digital Human (数字人说话)"},
+                      "stop_motion": "Stop Motion (定格动画，默认)"},
                   "help": "cutout 模式下 none/landing/stop_motion 渲染结果相同"
-                          "（都走双人定格动画）；digital_human=单人开口说话。"
+                          "（都走双人定格动画）。"
                           "original_static 模式动画被强制为 none（不显示此项）"},
-    "dh_quality": {"default": "preview", "type": "select", "group": "content",
-                   "modes": ["original_cutout"],
-                   "label": "数字人画质",
-                   "options": {"preview": "Preview (256px，快)",
-                               "quality": "Quality (512px，慢)"},
-                   "help": "数字人渲染分辨率；quality 约 1.25 倍耗时"},
-    "dh_neural_fps": {"default": 3, "type": "number", "group": "content",
-                      "modes": ["original_cutout"],
-                      "label": "数字人关键帧率",
-                      "help": "每秒 AI 渲染的关键帧数（1-8）：越高口型越流畅但越慢"
-                              "（CPU 约 4.4 秒/帧）；插帧后输出恒为 25fps"},
     "visual_style": {"default": "pixar3d", "type": "select", "group": "content",
                      "label": "画面风格",
                      "options": {"pixar3d": "3D 卡通（皮克斯）"},
@@ -569,8 +557,6 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--max-line-words", str(config["max_line_words"])]
     args += ["--structure", str(config.get("structure", "original"))]
     args += ["--animation", str(config.get("animation", "landing"))]
-    args += ["--dh-quality", str(config.get("dh_quality", "preview"))]
-    args += ["--dh-neural-fps", str(config.get("dh_neural_fps", 3))]
     if config.get("host_character"):
         args += ["--host-character", str(config["host_character"])]
     args += ["--visual-style", str(config.get("visual_style", "pixar3d"))]
