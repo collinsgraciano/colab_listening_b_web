@@ -97,7 +97,12 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
         voice_label = "kokoro"
 
     # Narration voice: check script for custom binding (from character_voices UI)
-    _narration_voice = script.get("narration_qwen_speaker", "").strip()
+    # kokoro 引擎读 narration_kokoro_voice（Kokoro 音色名），
+    # 其余引擎读 narration_qwen_speaker（qwen 音色名跨引擎通用会导致解析失败）
+    if tts_engine == "kokoro":
+        _narration_voice = script.get("narration_kokoro_voice", "").strip()
+    else:
+        _narration_voice = script.get("narration_qwen_speaker", "").strip()
     if _narration_voice:
         narration_voice = _narration_voice
     elif (script.get("host_character") or "").strip():

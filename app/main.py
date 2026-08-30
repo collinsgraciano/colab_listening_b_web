@@ -2070,6 +2070,8 @@ async def api_character_sources():
                     "gender": gender,
                     "role": role,
                     "qwen_speaker": qwen_speaker,
+                    "moss_voice": script.get(f"{key}_moss_voice", ""),
+                    "kokoro_voice": script.get(f"{key}_kokoro_voice", ""),
                     "image_url": f"/api/runs/{d.name}/images/{img_name}" if img_exists else "",
                 })
 
@@ -2091,7 +2093,7 @@ async def api_character_sources():
 CHARACTER_SETS_PATH = WEB_ROOT / "configs" / "character_sets.json"
 _SET_FIELDS = ["character_source", "character_reuse", "character_fixes",
                "character_library", "character_voices", "character_zh_voices",
-               "character_moss_voices", "_ui_descs"]
+               "character_moss_voices", "character_kokoro_voices", "_ui_descs"]
 
 
 def _load_char_sets() -> list:
@@ -2308,6 +2310,9 @@ async def api_library_save(request: Request):
     desc = script.get(f"{char_key}_description", "")
     gender = script.get(f"{char_key}_gender", "")
     role = script.get(f"{char_key}_role", "")
+    qwen_speaker = script.get(f"{char_key}_qwen_speaker", "")
+    moss_voice = script.get(f"{char_key}_moss_voice", "")
+    kokoro_voice = script.get(f"{char_key}_kokoro_voice", "")
     if not desc:
         return JSONResponse({"ok": False, "error": "角色描述为空"}, status_code=400)
 
@@ -2349,6 +2354,9 @@ async def api_library_save(request: Request):
         "description": desc,
         "gender": gender,
         "structure": structure,
+        "qwen_speaker": qwen_speaker,
+        "moss_voice": moss_voice,
+        "kokoro_voice": kokoro_voice,
         "source_run": run_name,
         "source_key": char_key,
         "created": time.time(),
@@ -2486,8 +2494,26 @@ async def api_library_set_voice(lib_id: str, request: Request):
     except (json.JSONDecodeError, OSError):
         return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
     data = await request.json()
-    speaker = data.get("qwen_speaker", "")
-    meta["qwen_speaker"] = speaker
+    speaker = data.get("moss_voice", "")
+    meta["moss_voice"] = speaker
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "meta": meta}
+
+
+@app.put("/api/character_library/{lib_id}/kokoro_voice")
+async def api_library_set_kokoro_voice(lib_id: str, request: Request):
+    """Set Kokoro TTS voice for a library character."""
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    meta_path = lib_dir / "meta.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+    data = await request.json()
+    voice = data.get("kokoro_voice", "")
+    meta["kokoro_voice"] = voice
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"ok": True, "meta": meta}
 
@@ -3165,6 +3191,76 @@ def _auto_freeze_pending_designed_voices() -> None:
         print(f"[startup] 设计音色自动冻结入队: {', '.join(pending)}（后台生成样本约 30-60 秒/个）")
         for n in pending:
             _enqueue_voice_freeze(n)
+
+
+# ===========================================================================
+# Kokoro TTS Voices (本地引擎，固定音色清单 + 试听)
+# ===========================================================================
+
+def _kokoro_preview_cache_path(speaker: str, text: str) -> Path:
+    import hashlib
+    safe = "".join(c for c in speaker if c.isalnum() or c in "-_") or "voice"
+    h = hashlib.md5(f"{speaker}|{text}".encode("utf-8")).hexdigest()[:8]
+    return VOICE_PREVIEWS_DIR / f"kokoro__{safe}__{h}.mp3"
+
+
+@app.get("/api/kokoro_voices/speakers")
+async def api_kokoro_speakers():
+    """List all Kokoro voices with cached flag (未缓存音色本机无法自动下载)."""
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+    from tts_engine import get_all_kokoro_voices
+    return {"speakers": get_all_kokoro_voices()}
+
+
+async def _kokoro_preview_common(speaker: str, text: str, regenerate: bool):
+    """Serve cached Kokoro preview if available, else synthesize & cache."""
+    cache_path = _kokoro_preview_cache_path(speaker, text)
+    if cache_path.exists() and not regenerate:
+        return FileResponse(str(cache_path), media_type="audio/mpeg")
+
+    import sys as _sys
+    _pipeline = str(PIPELINE_DIR)
+    if _pipeline not in _sys.path:
+        _sys.path.insert(0, _pipeline)
+
+    try:
+        from tts_engine import TTSEngine
+
+        def _synth() -> None:
+            engine = TTSEngine()
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with _TTS_SYNTH_LOCK:
+                engine.synth_english(text, speaker, str(cache_path), rate="+0%")
+
+        await asyncio.to_thread(_synth)
+        return FileResponse(str(cache_path), media_type="audio/mpeg",
+                            filename="preview.mp3",
+                            headers={"Content-Disposition": "attachment; filename=preview.mp3"})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/kokoro_voices/preview")
+async def api_kokoro_preview(request: Request):
+    """Preview a Kokoro voice: serve cached audio if available, else generate & cache."""
+    data = await request.json()
+    speaker = data.get("speaker", "af_sarah")
+    text = data.get("text", "") or _PREVIEW_TEXTS.get("english", "Hello, this is a voice preview test.")
+    regenerate = bool(data.get("regenerate", False))
+    return await _kokoro_preview_common(speaker, text, regenerate)
+
+
+@app.get("/api/kokoro_voices/preview/{voice}")
+async def api_kokoro_preview_cached(voice: str, language: str = "english"):
+    """Serve a cached preview if it exists (instant playback), 404 otherwise."""
+    text = _PREVIEW_TEXTS.get(language, _PREVIEW_TEXTS["english"])
+    p = _kokoro_preview_cache_path(voice, text)
+    if not p.exists():
+        return JSONResponse({"ok": False, "error": "no cached preview"}, status_code=404)
+    return FileResponse(str(p), media_type="audio/mpeg")
 
 
 # ===========================================================================
@@ -3884,6 +3980,7 @@ async def api_library_create(
     structure: str = Form("quest"),
     qwen_speaker: str = Form(""),
     moss_voice: str = Form(""),
+    kokoro_voice: str = Form(""),
     image: UploadFile | None = File(None),
 ):
     """Manually create a new character in the library.
@@ -3911,6 +4008,7 @@ async def api_library_create(
         "structure": structure,
         "qwen_speaker": qwen_speaker.strip(),
         "moss_voice": moss_voice.strip(),
+        "kokoro_voice": kokoro_voice.strip(),
         "source_run": "",
         "source_key": "char_a",
         "created": time.time(),
@@ -3934,7 +4032,7 @@ async def api_library_update(lib_id: str, request: Request):
         return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
 
     data = await request.json()
-    for key in ("name", "description", "gender", "structure", "qwen_speaker", "moss_voice"):
+    for key in ("name", "description", "gender", "structure", "qwen_speaker", "moss_voice", "kokoro_voice"):
         if key in data:
             meta[key] = data[key]
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

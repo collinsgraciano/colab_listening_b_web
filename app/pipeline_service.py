@@ -312,6 +312,7 @@ class PipelineService:
         lib_raw = config.get("character_library", "")
         voices_raw = config.get("character_voices", "")
         moss_voices_raw = config.get("character_moss_voices", "")
+        kokoro_voices_raw = config.get("character_kokoro_voices", "")
 
         reuse_map: dict = {}
         fixes_map: dict[str, str] = {}
@@ -342,6 +343,12 @@ class PipelineService:
         if moss_voices_raw:
             try:
                 moss_voices_map = json.loads(moss_voices_raw) if isinstance(moss_voices_raw, str) else moss_voices_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        kokoro_voices_map: dict[str, str] = {}
+        if kokoro_voices_raw:
+            try:
+                kokoro_voices_map = json.loads(kokoro_voices_raw) if isinstance(kokoro_voices_raw, str) else kokoro_voices_raw
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -386,7 +393,8 @@ class PipelineService:
                 if lib_meta_path.exists():
                     try:
                         lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
-                        for suffix in ["description", "gender", "qwen_speaker", "moss_voice"]:
+                        for suffix in ["description", "gender", "qwen_speaker",
+                                       "moss_voice", "kokoro_voice"]:
                             val = lib_meta.get(suffix, "")
                             if val:
                                 char_info[suffix] = val
@@ -403,7 +411,8 @@ class PipelineService:
                             char_info[suffix] = val
                 elif mode == "voice" and source_script:
                     # voice 模式：只固定音色+性别，外观由 LLM 按主题重新生成
-                    for suffix in ["gender", "qwen_speaker", "moss_voice"]:
+                    for suffix in ["gender", "qwen_speaker", "moss_voice",
+                                   "kokoro_voice"]:
                         val = source_script.get(f"{key}_{suffix}", "")
                         if val:
                             char_info[suffix] = val
@@ -429,6 +438,13 @@ class PipelineService:
                 if key not in overrides:
                     overrides[key] = {}
                 overrides[key]["moss_voice"] = moss_voice
+
+            # Priority 6: explicit Kokoro voice binding
+            kokoro_voice = kokoro_voices_map.get(key, "").strip()
+            if kokoro_voice:
+                if key not in overrides:
+                    overrides[key] = {}
+                overrides[key]["kokoro_voice"] = kokoro_voice
 
         return overrides
 
@@ -507,7 +523,7 @@ class PipelineService:
                             "（char_scene 为双人合图），当前仅选其一时不会复制图片")
                     for key in image_keys:
                         for suffix in ["description", "gender", "qwen_speaker",
-                                       "zh_voice", "moss_voice"]:
+                                       "zh_voice", "moss_voice", "kokoro_voice"]:
                             field = f"{key}_{suffix}"
                             val = source_script.get(field, "")
                             if val:
@@ -569,7 +585,7 @@ class PipelineService:
                         if reuse_map.get(key) != "desc":
                             continue
                         for suffix in ["description", "gender", "qwen_speaker",
-                                       "zh_voice", "moss_voice"]:
+                                       "zh_voice", "moss_voice", "kokoro_voice"]:
                             val = source_script.get(f"{key}_{suffix}", "")
                             if val:
                                 script[f"{key}_{suffix}"] = val
@@ -580,7 +596,8 @@ class PipelineService:
                     for key in all_char_keys:
                         if reuse_map.get(key) != "voice":
                             continue
-                        for suffix in ["gender", "qwen_speaker", "moss_voice", "zh_voice"]:
+                        for suffix in ["gender", "qwen_speaker", "moss_voice",
+                                       "kokoro_voice", "zh_voice"]:
                             val = source_script.get(f"{key}_{suffix}", "")
                             if val:
                                 script[f"{key}_{suffix}"] = val
@@ -608,7 +625,8 @@ class PipelineService:
                 lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
                 # Override description + gender（仅音色+性别角色 description 为空
                 # → 只注入 gender + qwen_speaker，外观每次由 LLM 重新生成）
-                for suffix in ["description", "gender", "qwen_speaker", "zh_voice", "moss_voice"]:
+                for suffix in ["description", "gender", "qwen_speaker",
+                               "zh_voice", "moss_voice", "kokoro_voice"]:
                     val = lib_meta.get(suffix, "")
                     if val:
                         script[f"{key}_{suffix}"] = val
@@ -723,6 +741,20 @@ class PipelineService:
             if moss_voice:
                 script[f"{key}_moss_voice"] = moss_voice
                 overridden.append(f"{key}_moss_voice")
+
+        # --- character_kokoro_voices: override kokoro_voice (Kokoro TTS voice binding) ---
+        kokoro_voices_raw = self.config.get("character_kokoro_voices", "")
+        kokoro_voices_map: dict[str, str] = {}
+        if kokoro_voices_raw:
+            try:
+                kokoro_voices_map = json.loads(kokoro_voices_raw) if isinstance(kokoro_voices_raw, str) else kokoro_voices_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        for key in all_char_keys:
+            kokoro_voice = kokoro_voices_map.get(key, "").strip()
+            if kokoro_voice:
+                script[f"{key}_kokoro_voice"] = kokoro_voice
+                overridden.append(f"{key}_kokoro_voice")
 
         script_path = work_dir / "script.json"
         script_path.write_text(

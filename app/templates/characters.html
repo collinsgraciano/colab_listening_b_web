@@ -96,6 +96,13 @@
                         <option value="">不绑定 (按性别默认)</option>
                     </select>
                 </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Kokoro 音色</label>
+                    <select id="new-kokoro-voice"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                        <option value="">不绑定 (按性别默认)</option>
+                    </select>
+                </div>
             </div>
             <div id="new-image-wrap" class="mb-4">
                     <label class="block text-xs text-slate-400 mb-1">参考图片 (可选)</label>
@@ -141,6 +148,7 @@
 <script>
 let ALL_VOICES = [];
 let ALL_MOSS_VOICES = [];
+let ALL_KOKORO_VOICES = [];
 let _libraryChars = [];
 let _charSources = [];
 let _editingId = null;
@@ -149,6 +157,7 @@ let _editingId = null;
 window.addEventListener('load', function() {
     loadQwenVoices();
     loadMossVoices();
+    loadKokoroVoices();
     loadLibrary();
     loadCharSources();
 });
@@ -178,6 +187,21 @@ function loadMossVoices() {
                 `<option value="${v.name}">${v.name}${v.preset ? ' (预设)' : (v.custom ? ' (克隆)' : '')} · ${v.desc || ''}</option>`
             ).join('');
             const sel = document.getElementById('new-moss-voice');
+            if (sel) sel.innerHTML = '<option value="">不绑定 (按性别默认)</option>' + opts;
+        })
+        .catch(() => {});
+}
+
+// --- Load Kokoro voices for dropdowns ---
+function loadKokoroVoices() {
+    fetch('/api/kokoro_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            ALL_KOKORO_VOICES = data.speakers || [];
+            const opts = ALL_KOKORO_VOICES.map(v =>
+                `<option value="${v.name}">${v.name}${v.cached ? '' : ' (未缓存)'} · ${v.desc || ''}</option>`
+            ).join('');
+            const sel = document.getElementById('new-kokoro-voice');
             if (sel) sel.innerHTML = '<option value="">不绑定 (按性别默认)</option>' + opts;
         })
         .catch(() => {});
@@ -327,6 +351,7 @@ function createCharCard(char) {
             : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">${char.structure || '?'}</span>`}
         ${char.qwen_speaker ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">🎤 ${char.qwen_speaker}</span>` : ''}
         ${char.moss_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">🔊 ${char.moss_voice}</span>` : ''}
+        ${char.kokoro_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-900/50 text-fuchsia-300">🎵 ${char.kokoro_voice}</span>` : ''}
         ${!voiceOnly && char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
     `;
 
@@ -384,6 +409,9 @@ function createCharCard(char) {
         </select>
         <select id="edit-moss-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
             <option value="">不绑定 MOSS 音色</option>
+        </select>
+        <select id="edit-kokoro-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
+            <option value="">不绑定 Kokoro 音色</option>
         </select>
         <div class="flex gap-2">
             <input type="file" id="edit-image-${char.id}" accept="image/*"
@@ -456,6 +484,13 @@ function toggleEdit(libId) {
                 ALL_MOSS_VOICES.map(v => `<option value="${v.name}">${v.name}${v.preset ? ' (预设)' : (v.custom ? ' (克隆)' : '')} · ${v.desc || ''}</option>`).join('');
             if (char && char.moss_voice) mossSel.value = char.moss_voice;
         }
+        // Populate Kokoro voice dropdown
+        const kokoroSel = document.getElementById(`edit-kokoro-voice-${libId}`);
+        if (kokoroSel) {
+            kokoroSel.innerHTML = '<option value="">不绑定 Kokoro 音色</option>' +
+                ALL_KOKORO_VOICES.map(v => `<option value="${v.name}">${v.name}${v.cached ? '' : ' (未缓存)'} · ${v.desc || ''}</option>`).join('');
+            if (char && char.kokoro_voice) kokoroSel.value = char.kokoro_voice;
+        }
     } else {
         cancelEdit(libId);
     }
@@ -474,6 +509,7 @@ function saveEdit(libId) {
         description: document.getElementById(`edit-desc-${libId}`).value.trim(),
         qwen_speaker: document.getElementById(`edit-voice-${libId}`).value,
         moss_voice: document.getElementById(`edit-moss-voice-${libId}`).value,
+        kokoro_voice: document.getElementById(`edit-kokoro-voice-${libId}`).value,
     };
     fetch(`/api/character_library/${libId}`, {
         method: 'PUT',
@@ -514,6 +550,7 @@ function createCharacter(autoGenerate) {
     const structure = document.getElementById('new-structure').value;
     const qwen_speaker = document.getElementById('new-voice').value;
     const moss_voice = document.getElementById('new-moss-voice').value;
+    const kokoro_voice = document.getElementById('new-kokoro-voice').value;
     const imageInput = document.getElementById('new-image');
 
     if (!name) { alert('请填写名称'); return; }
@@ -526,6 +563,7 @@ function createCharacter(autoGenerate) {
     formData.append('structure', structure);
     formData.append('qwen_speaker', qwen_speaker);
     formData.append('moss_voice', moss_voice);
+    formData.append('kokoro_voice', kokoro_voice);
     if (!isVoice && imageInput.files[0]) {
         formData.append('image', imageInput.files[0]);
     }

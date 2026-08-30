@@ -438,28 +438,88 @@ class TTSEngine:
 
 
 # Voice configuration helpers
+
+# Kokoro-82M 官方英文音色（af/am=美式，bf/bm=英式）。
+# 中文台词走 edge-tts（zh_voice 绑定 / get_zh_voice），故中文音色不在此列
+# （英文 KPipeline 无法识别 zf_/zm_ 音色名）。
+KOKORO_VOICES = [
+    {"name": "af_bella", "gender": "female", "desc": "美式·热情女声"},
+    {"name": "af_heart", "gender": "female", "desc": "美式·温暖女声"},
+    {"name": "af_nicole", "gender": "female", "desc": "美式·轻柔女声"},
+    {"name": "af_sarah", "gender": "female", "desc": "美式·清晰女声"},
+    {"name": "af_sky", "gender": "female", "desc": "美式·知性女声"},
+    {"name": "am_adam", "gender": "male", "desc": "美式·沉稳男声"},
+    {"name": "am_michael", "gender": "male", "desc": "美式·浑厚男声"},
+    {"name": "am_fenrir", "gender": "male", "desc": "美式·低沉男声"},
+    {"name": "am_puck", "gender": "male", "desc": "美式·活泼男声"},
+    {"name": "bf_alice", "gender": "female", "desc": "英式·优雅女声"},
+    {"name": "bf_emma", "gender": "female", "desc": "英式·柔和女声"},
+    {"name": "bf_isabella", "gender": "female", "desc": "英式·清亮女声"},
+    {"name": "bf_lily", "gender": "female", "desc": "英式·端庄女声"},
+    {"name": "bm_fable", "gender": "male", "desc": "英式·叙事男声"},
+    {"name": "bm_george", "gender": "male", "desc": "英式·醇厚男声"},
+    {"name": "bm_lewis", "gender": "male", "desc": "英式·干练男声"},
+    {"name": "af_alloy", "gender": "female", "desc": "美式·中性女声"},
+    {"name": "af_aoede", "gender": "female", "desc": "美式·柔美女声"},
+    {"name": "af_jessica", "gender": "female", "desc": "美式·活泼女声"},
+    {"name": "af_kore", "gender": "female", "desc": "美式·沉稳女声"},
+    {"name": "af_nova", "gender": "female", "desc": "美式·清新女声"},
+    {"name": "af_river", "gender": "female", "desc": "美式·自然女声"},
+    {"name": "am_echo", "gender": "male", "desc": "美式·清亮男声"},
+    {"name": "am_eric", "gender": "male", "desc": "美式·随和男声"},
+    {"name": "am_liam", "gender": "male", "desc": "美式·年轻男声"},
+    {"name": "am_onyx", "gender": "male", "desc": "美式·深沉男声"},
+    {"name": "am_santa", "gender": "male", "desc": "美式·老者男声"},
+    {"name": "bm_daniel", "gender": "male", "desc": "英式·沉稳男声"},
+]
+
+
+def get_all_kokoro_voices() -> list[dict]:
+    """All Kokoro English voices with a cached flag (.pt in HF cache).
+
+    cached 音色排前：本机 HF 镜像不可达时未缓存音色无法自动下载，
+    只能手动放置 .pt 或从 ModelScope 镜像下载。
+    """
+    out = []
+    for v in KOKORO_VOICES:
+        item = dict(v)
+        item["cached"] = _find_voice_in_cache(f"{v['name']}.pt") is not None
+        out.append(item)
+    out.sort(key=lambda v: (not v["cached"], v["name"]))
+    return out
+
+
 def build_voice_map(script: dict) -> dict:
     """Build voice_map from char_a_gender/char_b_gender.
 
-    Male -> am_adam, Female -> af_sarah.
+    Priority 1: script['{key}_kokoro_voice'] (素材库 / Kokoro 音色绑定).
+    Priority 2: by gender — Male -> am_adam, Female -> af_sarah.
     """
     voice_map = {}
-    char_a_gender = script.get("char_a_gender", "male").lower()
-    char_b_gender = script.get("char_b_gender", "female").lower()
-    voice_map["char_a"] = "am_adam" if char_a_gender == "male" else "af_sarah"
-    voice_map["char_b"] = "am_adam" if char_b_gender == "male" else "af_sarah"
+    for key in ["char_a", "char_b", "char_c", "host"]:
+        bound = script.get(f"{key}_kokoro_voice", "").strip()
+        if bound:
+            voice_map[key] = bound
+    if "char_a" not in voice_map:
+        char_a_gender = script.get("char_a_gender", "male").lower()
+        voice_map["char_a"] = "am_adam" if char_a_gender == "male" else "af_sarah"
+    if "char_b" not in voice_map:
+        char_b_gender = script.get("char_b_gender", "female").lower()
+        voice_map["char_b"] = "am_adam" if char_b_gender == "male" else "af_sarah"
     # Quest mode third character (staff/interviewer) — only present in quest scripts
-    char_c_gender = script.get("char_c_gender", "").lower()
-    if char_c_gender:
-        voice_map["char_c"] = "am_adam" if char_c_gender == "male" else "af_sarah"
+    if "char_c" not in voice_map:
+        char_c_gender = script.get("char_c_gender", "").lower()
+        if char_c_gender:
+            voice_map["char_c"] = "am_adam" if char_c_gender == "male" else "af_sarah"
     # Quest mode host (节目主) — appears in welcome/hook/outro segments
-    host_gender = script.get("host_gender", "").lower()
-    if host_gender:
-        voice_map["host"] = "am_adam" if host_gender == "male" else "af_sky"
-    else:
-        print("  [TTS] WARNING: host_gender not set, defaulting to af_sky (female). "
-              "Check CHARACTER_OVERRIDES or script.json host_gender.")
-        voice_map["host"] = "af_sky"
+    if "host" not in voice_map:
+        host_gender = script.get("host_gender", "").lower()
+        if host_gender:
+            voice_map["host"] = "am_adam" if host_gender == "male" else "af_sky"
+        else:
+            print("  [TTS] WARNING: host_gender not set, defaulting to af_sky (female). "
+                  "Check CHARACTER_OVERRIDES or script.json host_gender.")
+            voice_map["host"] = "af_sky"
     return voice_map
 
 

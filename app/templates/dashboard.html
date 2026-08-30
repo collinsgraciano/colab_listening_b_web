@@ -511,8 +511,28 @@ function loadMossVoices() {
         .catch(() => {});
 }
 
+// --- Kokoro voices (for voice binding dropdowns) ---
+let _kokoroVoiceOptions = '';
+let _kokoroVoices = [];
+
+function loadKokoroVoices() {
+    fetch('/api/kokoro_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            const voices = data.speakers || [];
+            _kokoroVoices = voices;
+            _kokoroVoiceOptions = voices.map(v =>
+                `<option value="${v.name}">${v.name}${v.cached ? '' : ' (未缓存)'} · ${v.desc || ''}</option>`
+            ).join('');
+            const sel = document.getElementById('char-source');
+            if (sel && sel.value) onCharSourceChange();
+            renderLibrary();
+        })
+        .catch(() => {});
+}
+
 // --- 试听绑定音色（素材库卡片） ---
-// engine: 'qwen' or 'moss' — selects which preview API to call
+// engine: 'qwen' or 'moss' or 'kokoro' — selects which preview API to call
 function previewVoice(speaker, language, regenerate = false, btn = null, engine = 'qwen') {
     const text = language === 'chinese' ?
         '你好，这是音色试听测试。' :
@@ -520,7 +540,8 @@ function previewVoice(speaker, language, regenerate = false, btn = null, engine 
     const origText = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = regenerate ? '⏳ 生成中...' : '⏳ 加载中...'; }
 
-    const apiBase = engine === 'moss' ? '/api/moss_voices' : '/api/qwen_voices';
+    const apiBase = engine === 'moss' ? '/api/moss_voices'
+        : engine === 'kokoro' ? '/api/kokoro_voices' : '/api/qwen_voices';
     const cacheFetch = regenerate
         ? Promise.reject(new Error('regenerate'))
         : fetch(`${apiBase}/preview/${encodeURIComponent(speaker)}?language=${language}`, {cache: 'no-store'})
@@ -706,6 +727,13 @@ function onCharSourceChange() {
         mossVoiceSelect.innerHTML = '<option value="">🔊 MOSS音色→</option>' + _mossVoiceOptions;
         if (char.moss_voice) mossVoiceSelect.value = char.moss_voice;
 
+        // Kokoro voice binding dropdown
+        const kokoroVoiceSelect = document.createElement('select');
+        kokoroVoiceSelect.className = 'char-kokoro-voice w-full bg-slate-900 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-white';
+        kokoroVoiceSelect.dataset.charKey = char.key;
+        kokoroVoiceSelect.innerHTML = '<option value="">🎵 Kokoro音色→</option>' + _kokoroVoiceOptions;
+        if (char.kokoro_voice) kokoroVoiceSelect.value = char.kokoro_voice;
+
         // Save to library button
         const saveBtn = document.createElement('button');
         saveBtn.className = 'text-[10px] text-indigo-400 hover:text-indigo-300';
@@ -718,6 +746,7 @@ function onCharSourceChange() {
         card.appendChild(modeSelect);
         card.appendChild(voiceSelect);
         card.appendChild(mossVoiceSelect);
+        card.appendChild(kokoroVoiceSelect);
         card.appendChild(saveBtn);
         cardsContainer.appendChild(card);
     });
@@ -730,10 +759,11 @@ function onCharSourceChange() {
 // 回显当前模式持久化的复用模式/音色/描述，并挂接变更保存
 function applySavedCharBindings() {
     const cfg = MODE_CONFIGS[ACTIVE_MODE];
-    let reuse = {}; let voices = {}; let mossVoices = {};
+    let reuse = {}; let voices = {}; let mossVoices = {}; let kokoroVoices = {};
     try { reuse = cfg.character_reuse ? JSON.parse(cfg.character_reuse) : {}; } catch (e) {}
     try { voices = cfg.character_voices ? JSON.parse(cfg.character_voices) : {}; } catch (e) {}
     try { mossVoices = cfg.character_moss_voices ? JSON.parse(cfg.character_moss_voices) : {}; } catch (e) {}
+    try { kokoroVoices = cfg.character_kokoro_voices ? JSON.parse(cfg.character_kokoro_voices) : {}; } catch (e) {}
     const descs = cfg._ui_descs || {};
 
     document.querySelectorAll('.char-reuse-mode').forEach(dd => {
@@ -748,6 +778,11 @@ function applySavedCharBindings() {
     });
     document.querySelectorAll('.char-moss-voice').forEach(dd => {
         const v = mossVoices[dd.dataset.charKey];
+        if (v) dd.value = v;
+        dd.addEventListener('change', saveCharState);
+    });
+    document.querySelectorAll('.char-kokoro-voice').forEach(dd => {
+        const v = kokoroVoices[dd.dataset.charKey];
         if (v) dd.value = v;
         dd.addEventListener('change', saveCharState);
     });
@@ -768,7 +803,7 @@ function _debounceCharSave() {
 // 捕获角色区状态并持久化到当前模式配置
 function saveCharState() {
     const source = document.getElementById('char-source')?.value || '';
-    const reuse = {}; const descs = {}; const voices = {}; const mossVoices = {};
+    const reuse = {}; const descs = {}; const voices = {}; const mossVoices = {}; const kokoroVoices = {};
     document.querySelectorAll('.char-reuse-mode').forEach(dd => {
         if (dd.value) reuse[dd.dataset.charKey] = dd.value;
     });
@@ -777,6 +812,9 @@ function saveCharState() {
     });
     document.querySelectorAll('.char-moss-voice').forEach(dd => {
         if (dd.value) mossVoices[dd.dataset.charKey] = dd.value;
+    });
+    document.querySelectorAll('.char-kokoro-voice').forEach(dd => {
+        if (dd.value) kokoroVoices[dd.dataset.charKey] = dd.value;
     });
     document.querySelectorAll('[data-char-desc]').forEach(ta => {
         const val = ta.value.trim();
@@ -793,6 +831,7 @@ function saveCharState() {
     cfg.character_fixes = Object.keys(fixes).length ? JSON.stringify(fixes) : '';
     cfg.character_voices = Object.keys(voices).length ? JSON.stringify(voices) : '';
     cfg.character_moss_voices = Object.keys(mossVoices).length ? JSON.stringify(mossVoices) : '';
+    cfg.character_kokoro_voices = Object.keys(kokoroVoices).length ? JSON.stringify(kokoroVoices) : '';
     cfg._ui_descs = descs;
 
     const mode = ACTIVE_MODE;
@@ -803,6 +842,7 @@ function saveCharState() {
         character_fixes: cfg.character_fixes,
         character_voices: cfg.character_voices,
         character_moss_voices: cfg.character_moss_voices,
+        character_kokoro_voices: cfg.character_kokoro_voices,
         _ui_descs: cfg._ui_descs,
     };
     fetch('/api/config/save', {
@@ -884,7 +924,7 @@ function renderRoleBadges() {
                 <img src="${bound.image_url || ''}" class="w-5 h-5 rounded object-cover bg-slate-800"
                     onerror="this.style.opacity=0.3">
                 <span class="text-[11px] text-indigo-200 truncate max-w-[200px]">素材库 · ${escapeHtml(bound.name || bound.id)}</span>
-                <span class="text-[10px] text-slate-500">${escapeHtml(bound.gender || '')}${bound.qwen_speaker ? ' · 🎤' + escapeHtml(bound.qwen_speaker) : ''}${bound.moss_voice ? ' · 🔊' + escapeHtml(bound.moss_voice) : ''}</span>
+                <span class="text-[10px] text-slate-500">${escapeHtml(bound.gender || '')}${bound.qwen_speaker ? ' · 🎤' + escapeHtml(bound.qwen_speaker) : ''}${bound.moss_voice ? ' · 🔊' + escapeHtml(bound.moss_voice) : ''}${bound.kokoro_voice ? ' · 🎵' + escapeHtml(bound.kokoro_voice) : ''}</span>
                 <button onclick="unbindLibChar('${key}')" class="text-red-400 hover:text-red-300 text-xs px-0.5" title="解除绑定">✕</button>
             </div>`;
     });
@@ -929,6 +969,7 @@ function collectCharacterConfig() {
         character_library: collectLibraryAssignments(),
         character_voices: collectVoiceBindings(),
         character_moss_voices: collectMossVoiceBindings(),
+        character_kokoro_voices: collectKokoroVoiceBindings(),
     };
 }
 
@@ -966,6 +1007,27 @@ function collectMossVoiceBindings() {
         if (assignSel.value) {
             const libId = assignSel.dataset.libId;
             const voiceSel = document.querySelector('.lib-moss-voice[data-lib-id="' + libId + '"]');
+            if (voiceSel && voiceSel.value) {
+                map[assignSel.value] = voiceSel.value;
+            }
+        }
+    });
+    return Object.keys(map).length ? JSON.stringify(map) : '';
+}
+
+function collectKokoroVoiceBindings() {
+    const map = {};
+    // From reuse cards (keyed by char key)
+    document.querySelectorAll('.char-kokoro-voice').forEach(sel => {
+        if (sel.value) {
+            map[sel.dataset.charKey] = sel.value;
+        }
+    });
+    // From library cards (keyed by assigned role)
+    document.querySelectorAll('.lib-assign').forEach(assignSel => {
+        if (assignSel.value) {
+            const libId = assignSel.dataset.libId;
+            const voiceSel = document.querySelector('.lib-kokoro-voice[data-lib-id="' + libId + '"]');
             if (voiceSel && voiceSel.value) {
                 map[assignSel.value] = voiceSel.value;
             }
@@ -1077,7 +1139,7 @@ function renderLibrary() {
         const meta = document.createElement('div');
         meta.className = 'text-[10px] text-slate-500';
         meta.textContent = voiceOnly
-            ? `${char.gender || '?'} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}${char.moss_voice ? ' · 🔊' + char.moss_voice : ''}`
+            ? `${char.gender || '?'} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}${char.moss_voice ? ' · 🔊' + char.moss_voice : ''}${char.kokoro_voice ? ' · 🎵' + char.kokoro_voice : ''}`
             : `${char.gender || '?'} · ${char.structure || '?'}`;
 
         // Assign dropdown (绑定状态持久化，回显当前绑定)
@@ -1153,11 +1215,40 @@ function renderLibrary() {
         };
         mossVoiceRow.appendChild(mossPvBtn);
 
+        // Kokoro voice binding dropdown + 试听按钮
+        const kokoroVoiceRow = document.createElement('div');
+        kokoroVoiceRow.className = 'flex gap-1 w-full';
+        const kokoroVoiceSel = document.createElement('select');
+        kokoroVoiceSel.className = 'lib-kokoro-voice flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white';
+        kokoroVoiceSel.dataset.libId = char.id;
+        kokoroVoiceSel.innerHTML = '<option value="">🎵 Kokoro→</option>' + _kokoroVoiceOptions;
+        if (char.kokoro_voice) kokoroVoiceSel.value = char.kokoro_voice;
+        kokoroVoiceSel.onchange = function() {
+            fetch('/api/character_library/' + char.id + '/kokoro_voice', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({kokoro_voice: this.value})
+            }).then(r => r.json()).then(d => { if (d.ok) renderRoleBadges(); });
+        };
+        kokoroVoiceRow.appendChild(kokoroVoiceSel);
+
+        const kokoroPvBtn = document.createElement('button');
+        kokoroPvBtn.className = 'px-1.5 py-0.5 bg-slate-700 hover:bg-fuchsia-600 rounded text-[10px] text-white transition shrink-0';
+        kokoroPvBtn.textContent = '▶';
+        kokoroPvBtn.title = '试听 Kokoro 音色';
+        kokoroPvBtn.onclick = function() {
+            const speaker = kokoroVoiceSel.value;
+            if (!speaker) { alert('该角色尚未绑定 Kokoro 音色，请先在下拉框选择'); return; }
+            previewVoice(speaker, 'english', false, kokoroPvBtn, 'kokoro');
+        };
+        kokoroVoiceRow.appendChild(kokoroPvBtn);
+
         card.appendChild(name);
         card.appendChild(meta);
         card.appendChild(assignDiv);
         card.appendChild(voiceRow);
         card.appendChild(mossVoiceRow);
+        card.appendChild(kokoroVoiceRow);
         grid.appendChild(card);
     });
 
@@ -1260,6 +1351,7 @@ function saveCharSet() {
             character_fixes: cfg.character_fixes || '',
             character_voices: cfg.character_voices || '',
             character_moss_voices: cfg.character_moss_voices || '',
+            character_kokoro_voices: cfg.character_kokoro_voices || '',
             character_library: cfg.character_library || '',
             _ui_descs: cfg._ui_descs || {},
         })
@@ -1300,6 +1392,7 @@ function applyCharSet(set) {
     cfg.character_fixes = set.character_fixes || '';
     cfg.character_voices = set.character_voices || '';
     cfg.character_moss_voices = set.character_moss_voices || '';
+    cfg.character_kokoro_voices = set.character_kokoro_voices || '';
     cfg.character_library = set.character_library || '';
     cfg._ui_descs = set._ui_descs || {};
     // 持久化到当前模式配置
@@ -1314,6 +1407,7 @@ function applyCharSet(set) {
             character_fixes: cfg.character_fixes,
             character_voices: cfg.character_voices,
             character_moss_voices: cfg.character_moss_voices,
+            character_kokoro_voices: cfg.character_kokoro_voices,
             character_library: cfg.character_library,
             _ui_descs: cfg._ui_descs,
         })
@@ -1347,6 +1441,7 @@ window.addEventListener('load', function() {
     renderCharEditor(null);
     loadQwenVoices();
     loadMossVoices();
+    loadKokoroVoices();
     loadCharSources();
     loadLibrary();
     loadCharSets();
