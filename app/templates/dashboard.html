@@ -1407,6 +1407,18 @@ function pickRandomTopic() {
 }
 
 function startPipeline(resume) {
+    // 启动前先拉取服务端最新配置刷新快照：配置页刚保存的参数
+    // （如生图 Provider）不能被页面加载时的旧快照覆盖，否则会以过期配置启动
+    fetch('/api/config/all')
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.modes) Object.assign(MODE_CONFIGS, data.modes);
+            _doStartPipeline(resume);
+        })
+        .catch(() => _doStartPipeline(resume));
+}
+
+function _doStartPipeline(resume) {
     // Gather quick config overrides (当前激活模式)
     const overrides = {
         topic: document.getElementById('quick-topic').value,

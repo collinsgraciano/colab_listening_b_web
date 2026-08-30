@@ -798,6 +798,7 @@ class PipelineService:
             subtitle_style=str(config.get("subtitle_style", "") or ""),
             no_zh_subtitle=bool(config.get("no_zh_subtitle", False)),
             no_4k=bool(config.get("no_4k", False)),
+            no_thumbnail=bool(config.get("no_thumbnail", False)),
             tts_engine=config.get("tts_engine", "kokoro"),
             tts_rate=tts_rate,
             qwen_model_path=config.get("qwen_model_path", ""),

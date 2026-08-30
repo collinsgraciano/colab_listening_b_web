@@ -215,6 +215,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint in output dir")
     parser.add_argument("--no-4k", dest="no_4k", action="store_true", help="Skip the final 4K upscaling step")
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
+    parser.add_argument("--no-thumbnail", dest="no_thumbnail", action="store_true",
+                        help="Skip thumbnail image generation (step 4.5 still saves YouTube metadata)")
     parser.add_argument("--subtitle-font-size", type=int, default=60, help="English subtitle font size in pixels (default 60). ZH subtitle is auto-scaled to 85%% of EN size.")
     parser.add_argument("--subtitle-style", default="", help="Subtitle style id from subtitle_style_manager (web 字幕样式页). Empty = legacy behavior driven by --subtitle-font-size.")
     parser.add_argument("--tts-rate", default=None, help="Override dialogue English TTS rate (e.g. '-15%%', '0%%'). Default: mode-dependent (quest '0%%', others '-15%%')")
@@ -726,7 +728,8 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
 
     thumb_path = str(work_dir / "thumbnail.jpg")
     yt_meta_path = str(work_dir / "youtube_metadata.json")
-    if _step_done(checkpoint, "step4.5_thumbnail") and os.path.exists(yt_meta_path) and os.path.exists(thumb_path):
+    if (_step_done(checkpoint, "step4.5_thumbnail") and os.path.exists(yt_meta_path)
+            and (args.no_thumbnail or os.path.exists(thumb_path))):
         print("  [Resume] Thumbnail + YouTube metadata already exist, skipping...")
         return
 
@@ -739,17 +742,20 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
         char_scene_cdn = ctx["image_urls"].get("pose_char_a_0.png", "")
     else:
         char_scene_cdn = ctx["image_urls"].get("char_scene.png", "")
-    generate_thumbnail(
-        script=script,
-        scene_img=scene_img_full,
-        output_path=thumb_path,
-        mcp_call_tool=call_tool,
-        mcp_parse_task_id=parse_task_id,
-        mcp_poll_task=poll_task,
-        mcp_download_file=download_file,
-        structure=args.structure,
-        char_scene_url=char_scene_cdn,
-    )
+    if args.no_thumbnail:
+        print("  [Thumbnail] 跳过缩略图生成（no_thumbnail）——仅生成 YouTube 元数据")
+    else:
+        generate_thumbnail(
+            script=script,
+            scene_img=scene_img_full,
+            output_path=thumb_path,
+            mcp_call_tool=call_tool,
+            mcp_parse_task_id=parse_task_id,
+            mcp_poll_task=poll_task,
+            mcp_download_file=download_file,
+            structure=args.structure,
+            char_scene_url=char_scene_cdn,
+        )
     save_youtube_metadata(
         script=script,
         timeline=timeline,

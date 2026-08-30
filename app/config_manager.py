@@ -167,6 +167,9 @@ PARAM_SPEC = {
     "image_provider": {"default": "mcp", "type": "select", "group": "mcp",
                        "label": "生图 Provider", "options": ["mcp", "sensenova"],
                        "help": "mcp=TJGenerators(积分)；sensenova=SenseNova U1.5 Lite(API 计费, 复用 SenseNova API Key)"},
+    "no_thumbnail": {"default": False, "type": "checkbox", "group": "mcp",
+                     "label": "跳过缩略图",
+                     "help": "勾选后 Step 4.5 只生成 YouTube 元数据，不生成缩略图图片（不消耗生图 API）"},
     "clip_duration": {"default": 15, "type": "number", "group": "mcp",
                       "modes": ["original"],
                       "label": "视频片段时长(秒)", "help": "4-15"},
@@ -659,6 +662,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--subtitle-font-size", str(config.get("subtitle_font_size", 60))]
     if config.get("no_zh_subtitle"):
         args.append("--no-zh-subtitle")
+    if config.get("no_thumbnail"):
+        args.append("--no-thumbnail")
     if config.get("no_4k"):
         args.append("--no-4k")
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]
