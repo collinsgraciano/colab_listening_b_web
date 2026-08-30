@@ -19,6 +19,7 @@ import subprocess
 import shutil
 import tempfile
 import random
+import threading
 from pathlib import Path
 
 _PARENT = str(Path(__file__).parent.parent.resolve())
@@ -266,7 +267,46 @@ def _build_pose_schedule(n_poses: int, total_frames: int, fps: float,
     return schedule
 
 
+def _atomic_save(img, target: Path) -> None:
+    """原子写 PNG 缓存：先写进程/线程唯一的 .tmp 再 os.replace。
+
+    防止并发 worker 线程在读缓存时读到写到一半的半截文件
+    （曾导致某句对白整段渲染失败、成片插入无声背景占位段）。
+    """
+    tmp = target.with_name(f"{target.stem}.{os.getpid()}_{threading.get_ident()}.tmp.png")
+    img.save(str(tmp))
+    os.replace(str(tmp), str(target))
+
+
 def _render_sm_segment(
+    char_layers: list[dict],
+    bg_img_path: str,
+    audio_file: str | None,
+    out_path: str,
+    duration: float,
+    frames_dir: Path,
+    cache_dir: Path,
+    render_fps: int = 12,
+    overlay_path: str | None = None,
+    seed: int = 0,
+    direction: int = 1,
+    fade_af: str = "",
+    stop_check=None,
+) -> bool:
+    """渲染定格动画段。无论成功还是中途异常，frames_dir 一律清理（防残留）。"""
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        return _render_sm_segment_inner(
+            char_layers, bg_img_path, audio_file, out_path, duration,
+            frames_dir, cache_dir,
+            render_fps=render_fps, overlay_path=overlay_path, seed=seed,
+            direction=direction, fade_af=fade_af, stop_check=stop_check,
+        )
+    finally:
+        shutil.rmtree(frames_dir, ignore_errors=True)
+
+
+def _render_sm_segment_inner(
     char_layers: list[dict],
     bg_img_path: str,
     audio_file: str | None,
@@ -317,17 +357,27 @@ def _render_sm_segment(
             if not os.path.exists(p_path):
                 continue
             cache_path = cache_dir / f"cutout_{Path(p_path).stem}.png"
+            norm = None
             if cache_path.exists():
-                processed.append(PILImage.open(cache_path).convert("RGBA"))
-            else:
+                try:
+                    norm = PILImage.open(cache_path).convert("RGBA")
+                except Exception:
+                    # 缓存可能损坏或被并发线程写到一半：删掉后走重新处理
+                    try:
+                        cache_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    norm = None
+            if norm is None:
                 try:
                     raw = PILImage.open(p_path)
                     alpha = remove_bg(raw)
                     norm = normalize_pose(alpha)
-                    norm.save(str(cache_path))
-                    processed.append(norm)
+                    _atomic_save(norm, cache_path)
                 except Exception as e:
                     print(f"  [Quest] pose process error for {p_path}: {e}")
+                    continue
+            processed.append(norm)
         if not processed:
             processed = [PILImage.new("RGBA", (1280, 720), (0, 0, 0, 0))]
         processed_layers.append({

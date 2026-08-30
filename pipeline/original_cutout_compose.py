@@ -63,6 +63,27 @@ def _run_ffmpeg(cmd: list[str], label: str, out_path: str,
             pass
 
 
+def _resolve_seg_audio(seg_type: str, audio_idx: int, narration: dict,
+                       normal_paths: list[str], zh_paths: list[str]) -> str | None:
+    """按段型解析该段的音频文件（_prepare_segment 与占位段循环共用）。"""
+    narration = narration or {}
+    normal_paths = normal_paths or []
+    zh_paths = zh_paths or []
+    if seg_type in ("dialogue", "listen_en"):
+        return normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
+    if seg_type == "listen_zh":
+        return zh_paths[audio_idx] if audio_idx < len(zh_paths) and zh_paths[audio_idx] else None
+    narration_map = {
+        "welcome": "welcome",
+        "hook_intro": "hook",
+        "practice_intro": "practice_intro",
+        "outro": "outro",
+        "title_card": "intro",
+    }
+    key = narration_map.get(seg_type)
+    return narration.get(key) if key else None
+
+
 def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | None,
                          host_bg: str, audio_file: str | None, out_path: str,
                          duration: float, sm_root: Path, render_fps: int,
@@ -80,7 +101,7 @@ def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | No
 
     from quest.video_compose_quest import _render_sm_segment
 
-    return _render_sm_segment(
+    ok = _render_sm_segment(
         char_layers, host_bg, audio_file, out_path, duration,
         frames_dir, sm_root,
         render_fps=render_fps,
@@ -88,6 +109,17 @@ def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | No
         direction=direction, fade_af=fade_af,
         stop_check=stop_check,
     )
+    if not ok:
+        # 偶发失败（缓存竞态/IO 抖动）重试一次
+        ok = _render_sm_segment(
+            char_layers, host_bg, audio_file, out_path, duration,
+            frames_dir, sm_root,
+            render_fps=render_fps,
+            seed=hash(seg_type) % 1000 + seg_idx,
+            direction=direction, fade_af=fade_af,
+            stop_check=stop_check,
+        )
+    return ok
 
 
 def _prepare_segment(
@@ -124,23 +156,9 @@ def _prepare_segment(
     if os.path.exists(out_path) and os.path.getsize(out_path) >= 1000:
         return out_path, seg_type
 
-    audio_file = None
+    audio_file = _resolve_seg_audio(seg_type, audio_idx, narration,
+                                    normal_paths, zh_paths)
     audio_dur = seg.get("audio_dur", duration - pad)
-
-    if seg_type == "dialogue":
-        audio_file = normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
-    elif seg_type in ("welcome", "hook_intro"):
-        audio_file = narration.get("welcome" if seg_type == "welcome" else "hook")
-    elif seg_type == "listen_en":
-        audio_file = normal_paths[audio_idx] if audio_idx < len(normal_paths) else None
-    elif seg_type == "listen_zh":
-        audio_file = zh_paths[audio_idx] if audio_idx < len(zh_paths) and zh_paths[audio_idx] else None
-    elif seg_type == "practice_intro":
-        audio_file = narration.get("practice_intro")
-    elif seg_type == "outro":
-        audio_file = narration.get("outro")
-    elif seg_type == "title_card":
-        audio_file = narration.get("intro")
 
     fade_af = f"afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, audio_dur-0.05):.2f}:d=0.05"
 
@@ -184,13 +202,23 @@ def _prepare_segment(
             char_layers.append({"poses": char_pose_map[other], "is_speaker": False})
 
         if not char_layers:
-            # No pose images — fallback to static scene
-            _run_ffmpeg(
-                ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                 "-i", audio_file] if audio_file else
-                ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                 "-f", "lavfi", "-i", "anullsrc=stereo:44100"],
-                f"dialogue_{audio_idx}", out_path, scene_img, duration)
+            # 无姿势图 — 回退静态场景（保留有效音频）
+            if audio_file and os.path.exists(audio_file):
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                       "-i", audio_file,
+                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", f"{VF_NORM},fps=25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
+                       out_path]
+            else:
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
+                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", f"{VF_NORM},fps=25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       out_path]
+            _run_ffmpeg(cmd, f"dialogue_{audio_idx}", out_path, scene_img, duration)
             return out_path if os.path.exists(out_path) else None, seg_type
 
         # Scene background rotation
@@ -214,15 +242,34 @@ def _prepare_segment(
             stop_check=stop_check,
         )
         if not success:
-            _run_ffmpeg(
-                ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                 "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                 "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps=25",
-                 "-map", "0:v:0", "-map", "1:a:0",
-                 "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                 "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                 out_path],
-                f"dialogue_{audio_idx}", out_path, scene_img, duration)
+            # 偶发失败（缓存竞态/IO 抖动）重试一次
+            success = _render_sm_segment(
+                char_layers, line_bg, audio_file, out_path, duration,
+                frames_dir, sm_root,
+                render_fps=render_fps,
+                seed=audio_idx * 7 + 13,
+                direction=direction, fade_af=fade_af,
+                stop_check=stop_check,
+            )
+        if not success:
+            # 回退：静态场景；有音频必须带上（避免成片出现无声空段）
+            if audio_file and os.path.exists(audio_file):
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                       "-i", audio_file,
+                       "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", f"{VF_NORM},fps=25",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
+                       out_path]
+            else:
+                cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                       "-f", "lavfi", "-i", "anullsrc=stereo:44100",
+                       "-t", f"{duration:.3f}", "-vf", f"{VF_NORM},fps=25",
+                       "-map", "0:v:0", "-map", "1:a:0",
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                       "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                       out_path]
+            _run_ffmpeg(cmd, f"dialogue_{audio_idx}", out_path, scene_img, duration)
 
     # --- Static frame segments (Ch3 practice) ---
     elif seg_type in ("listen_en", "listen_zh", "practice"):
@@ -562,15 +609,30 @@ def compose_original_cutout(
     for i in missing:
         seg = timeline[i]
         ph_path = str(tmp_dir / f"ph_{i:03d}.mp4")
-        ph_cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
-                  "-f", "lavfi", "-i", "anullsrc=stereo:44100",
-                  "-t", f"{seg['duration']:.3f}", "-vf", f"{VF_NORM},fps=25",
-                  "-map", "0:v:0", "-map", "1:a:0",
-                  "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                  "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-                  ph_path]
+        ph_audio = _resolve_seg_audio(seg.get("type"), seg.get("audio_index", 0),
+                                      narration, normal_paths, zh_paths)
+        if ph_audio and os.path.exists(ph_audio):
+            # 占位段尽量带上该段的有效音频（避免成片出现无声空段）
+            ph_audio_dur = seg.get("audio_dur", seg["duration"] - pad)
+            ph_fade = f"afade=t=in:st=0:d=0.05,afade=t=out:st={max(0, ph_audio_dur - 0.05):.2f}:d=0.05"
+            ph_cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                      "-i", ph_audio,
+                      "-t", f"{seg['duration']:.3f}", "-map", "0:v:0", "-map", "1:a:0",
+                      "-vf", f"{VF_NORM},fps=25",
+                      "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                      "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                      "-af", f"{ph_fade},apad=whole_dur={seg['duration']:.3f}",
+                      ph_path]
+        else:
+            ph_cmd = ["ffmpeg", "-y", "-loop", "1", "-i", scene_img,
+                      "-f", "lavfi", "-i", "anullsrc=stereo:44100",
+                      "-t", f"{seg['duration']:.3f}", "-vf", f"{VF_NORM},fps=25",
+                      "-map", "0:v:0", "-map", "1:a:0",
+                      "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                      "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+                      ph_path]
         print(f"  [Cutout] WARNING: segment {i + 1} ({seg['type']}) failed — "
-              f"inserting silent placeholder ({seg['duration']:.2f}s)")
+              f"inserting placeholder ({seg['duration']:.2f}s)")
         _run_ffmpeg(ph_cmd, f"placeholder_{i}", ph_path, scene_img, seg["duration"])
         if os.path.exists(ph_path) and os.path.getsize(ph_path) >= 1000:
             segments[i] = ph_path
