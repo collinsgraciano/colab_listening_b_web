@@ -11,6 +11,11 @@ Env vars (set by pipeline.py / pipeline_service.py):
   MOSS_TTS_TEMPERATURE  — audio sampling temperature, lower = more stable (default: 0.8)
   MOSS_TTS_RETRY        — per-sentence retry attempts with re-seed (default: 3)
   MOSS_TTS_GAP_MS       — inter-sentence silence in ms (default: 120)
+  MOSS_TTS_TOP_P            — audio top-p sampling (default: 0.95)
+  MOSS_TTS_TOP_K            — audio top-k sampling (default: 25)
+  MOSS_TTS_REP_PENALTY      — audio repetition penalty (default: 1.2)
+  MOSS_TTS_TEXT_TEMPERATURE — text sampling temperature (default: 1.0)
+  MOSS_TTS_GREEDY           — "1" = greedy decoding (do_sample=False, most stable)
 """
 import json
 import math
@@ -381,7 +386,11 @@ class MossTTSEngine(TTSEngine):
 
     def __init__(self, model_path: str = "", device: str = "cpu",
                  tokenizer_path: str = "", repo_dir: str = "",
-                 temperature: float | None = None, retry: int | None = None):
+                 temperature: float | None = None, retry: int | None = None,
+                 top_p: float | None = None, top_k: int | None = None,
+                 rep_penalty: float | None = None,
+                 text_temperature: float | None = None,
+                 greedy: bool | None = None):
         self._model_path = model_path
         self._tokenizer_path = tokenizer_path
         self._repo_dir = repo_dir
@@ -403,6 +412,34 @@ class MossTTSEngine(TTSEngine):
             self._gap_ms = max(0, int(os.environ.get("MOSS_TTS_GAP_MS", "120")))
         except (TypeError, ValueError):
             self._gap_ms = 120
+        # Sampling knobs (exposed via config page; defaults = former hardcoded values)
+        if top_p is None:
+            top_p = os.environ.get("MOSS_TTS_TOP_P", "0.95")
+        try:
+            self._top_p = max(0.05, min(1.0, float(top_p)))
+        except (TypeError, ValueError):
+            self._top_p = 0.95
+        if top_k is None:
+            top_k = os.environ.get("MOSS_TTS_TOP_K", "25")
+        try:
+            self._top_k = max(1, int(top_k))
+        except (TypeError, ValueError):
+            self._top_k = 25
+        if rep_penalty is None:
+            rep_penalty = os.environ.get("MOSS_TTS_REP_PENALTY", "1.2")
+        try:
+            self._rep_penalty = max(1.0, float(rep_penalty))
+        except (TypeError, ValueError):
+            self._rep_penalty = 1.2
+        if text_temperature is None:
+            text_temperature = os.environ.get("MOSS_TTS_TEXT_TEMPERATURE", "1.0")
+        try:
+            self._text_temperature = max(0.05, min(2.0, float(text_temperature)))
+        except (TypeError, ValueError):
+            self._text_temperature = 1.0
+        if greedy is None:
+            greedy = os.environ.get("MOSS_TTS_GREEDY", "")
+        self._greedy = str(greedy).strip().lower() in ("1", "true", "yes", "on")
 
     @classmethod
     def _get_service(cls, model_path: str, tokenizer_path: str,
@@ -583,9 +620,11 @@ class MossTTSEngine(TTSEngine):
                     "seed": seed,
                     "max_new_frames": max_frames,
                     "audio_temperature": self._temperature,
-                    "audio_top_p": 0.95,
-                    "audio_top_k": 25,
-                    "audio_repetition_penalty": 1.2,
+                    "audio_top_p": self._top_p,
+                    "audio_top_k": self._top_k,
+                    "audio_repetition_penalty": self._rep_penalty,
+                    "text_temperature": self._text_temperature,
+                    "do_sample": not self._greedy,
                 }
                 if is_preset:
                     kwargs["voice"] = voice

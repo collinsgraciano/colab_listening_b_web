@@ -146,6 +146,21 @@ PARAM_SPEC = {
     "moss_tts_retry": {"default": 3, "type": "number", "group": "tts",
                        "label": "MOSS-TTS 重试次数",
                        "help": "每句合成失败/校验不达标时换 seed 重试的次数（1=不重试）"},
+    "moss_tts_top_p": {"default": 0.95, "type": "number", "group": "tts",
+                       "label": "MOSS-TTS Top-P",
+                       "help": "音频核采样阈值（0.05-1.0），越低越稳定；修改后自动重新生成 TTS 缓存"},
+    "moss_tts_top_k": {"default": 25, "type": "number", "group": "tts",
+                       "label": "MOSS-TTS Top-K",
+                       "help": "音频采样候选数（≥1），越小越稳定；修改后自动重新生成 TTS 缓存"},
+    "moss_tts_rep_penalty": {"default": 1.2, "type": "number", "group": "tts",
+                             "label": "MOSS-TTS 重复惩罚",
+                             "help": "≥1.0，抑制重复/卡顿，过高会压音质；修改后自动重新生成 TTS 缓存"},
+    "moss_tts_text_temperature": {"default": 1.0, "type": "number", "group": "tts",
+                                  "label": "MOSS-TTS 文本温度",
+                                  "help": "文本 token 采样温度（0.05-2.0），一般保持 1.0；修改后自动重新生成 TTS 缓存"},
+    "moss_tts_greedy": {"default": False, "type": "checkbox", "group": "tts",
+                        "label": "MOSS-TTS 贪心解码（最稳定）",
+                        "help": "关闭随机采样，音色最稳定但语调略机械；勾选后温度/Top-P/Top-K 不生效；修改后自动重新生成 TTS 缓存"},
 
     # --- MCP / Image ---
     "mcp_tokens": {"default": "", "type": "textarea", "group": "mcp",
@@ -603,6 +618,16 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--moss-tts-temperature", str(config["moss_tts_temperature"])]
     if config.get("moss_tts_retry"):
         args += ["--moss-tts-retry", str(config["moss_tts_retry"])]
+    if config.get("moss_tts_top_p"):
+        args += ["--moss-tts-top-p", str(config["moss_tts_top_p"])]
+    if config.get("moss_tts_top_k"):
+        args += ["--moss-tts-top-k", str(config["moss_tts_top_k"])]
+    if config.get("moss_tts_rep_penalty"):
+        args += ["--moss-tts-rep-penalty", str(config["moss_tts_rep_penalty"])]
+    if config.get("moss_tts_text_temperature"):
+        args += ["--moss-tts-text-temperature", str(config["moss_tts_text_temperature"])]
+    if config.get("moss_tts_greedy"):
+        args.append("--moss-tts-greedy")
 
     # MCP
     tokens_raw = config.get("mcp_tokens", "").strip()

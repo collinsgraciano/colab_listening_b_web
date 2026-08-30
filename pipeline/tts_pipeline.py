@@ -136,9 +136,14 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
     # 检测 tts_rate / 引擎参数变化，必要时清除旧缓存
     extra_sig = ""
     if tts_engine == "moss":
-        # MOSS 温度/句间停顿影响输出 — 参数变化时自动重新生成
+        # MOSS 温度/句间停顿/采样参数影响输出 — 参数变化时自动重新生成
         extra_sig = (f"{os.environ.get('MOSS_TTS_TEMPERATURE', '0.8')}"
-                     f"|{os.environ.get('MOSS_TTS_GAP_MS', '120')}")
+                     f"|{os.environ.get('MOSS_TTS_GAP_MS', '120')}"
+                     f"|{os.environ.get('MOSS_TTS_TOP_P', '0.95')}"
+                     f"|{os.environ.get('MOSS_TTS_TOP_K', '25')}"
+                     f"|{os.environ.get('MOSS_TTS_REP_PENALTY', '1.2')}"
+                     f"|{os.environ.get('MOSS_TTS_TEXT_TEMPERATURE', '1.0')}"
+                     f"|{os.environ.get('MOSS_TTS_GREEDY', '0')}")
     _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine,
                                       f"{extra_sig}|host:{int(host_narration)}")
 

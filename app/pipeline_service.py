@@ -268,6 +268,16 @@ class PipelineService:
             os.environ["MOSS_TTS_TEMPERATURE"] = str(config["moss_tts_temperature"])
         if config.get("moss_tts_retry"):
             os.environ["MOSS_TTS_RETRY"] = str(config["moss_tts_retry"])
+        if config.get("moss_tts_top_p"):
+            os.environ["MOSS_TTS_TOP_P"] = str(config["moss_tts_top_p"])
+        if config.get("moss_tts_top_k"):
+            os.environ["MOSS_TTS_TOP_K"] = str(config["moss_tts_top_k"])
+        if config.get("moss_tts_rep_penalty"):
+            os.environ["MOSS_TTS_REP_PENALTY"] = str(config["moss_tts_rep_penalty"])
+        if config.get("moss_tts_text_temperature"):
+            os.environ["MOSS_TTS_TEXT_TEMPERATURE"] = str(config["moss_tts_text_temperature"])
+        if config.get("moss_tts_greedy"):
+            os.environ["MOSS_TTS_GREEDY"] = "1"
 
         # Qwen-TTS env vars（与 CLI main() 注入保持一致；不设则引擎用内置默认）
         if config.get("qwen_model_path"):
@@ -811,6 +821,11 @@ class PipelineService:
             moss_repo_dir=config.get("moss_repo_dir", ""),
             moss_tts_temperature=config.get("moss_tts_temperature", 0.8),
             moss_tts_retry=config.get("moss_tts_retry", 3),
+            moss_tts_top_p=config.get("moss_tts_top_p", 0.95),
+            moss_tts_top_k=config.get("moss_tts_top_k", 25),
+            moss_tts_rep_penalty=config.get("moss_tts_rep_penalty", 1.2),
+            moss_tts_text_temperature=config.get("moss_tts_text_temperature", 1.0),
+            moss_tts_greedy=bool(config.get("moss_tts_greedy", False)),
             upscale_timeout=int(config.get("upscale_timeout", 3600)),
             upscale_engine=str(config.get("upscale_engine", "ffmpeg")),
             matting_engine=str(config.get("matting_engine", "auto")),

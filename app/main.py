@@ -3281,13 +3281,34 @@ async def api_moss_preview(request: Request):
         moss_retry = int(config.get("moss_tts_retry") or 3)
     except (TypeError, ValueError):
         moss_retry = 3
+    try:
+        moss_top_p = float(config.get("moss_tts_top_p") or 0.95)
+    except (TypeError, ValueError):
+        moss_top_p = 0.95
+    try:
+        moss_top_k = int(config.get("moss_tts_top_k") or 25)
+    except (TypeError, ValueError):
+        moss_top_k = 25
+    try:
+        moss_rep_penalty = float(config.get("moss_tts_rep_penalty") or 1.2)
+    except (TypeError, ValueError):
+        moss_rep_penalty = 1.2
+    try:
+        moss_text_temperature = float(config.get("moss_tts_text_temperature") or 1.0)
+    except (TypeError, ValueError):
+        moss_text_temperature = 1.0
+    moss_greedy = bool(config.get("moss_tts_greedy", False))
 
     try:
         from moss_tts_engine import MossTTSEngine
 
         def _synth() -> None:
             engine = MossTTSEngine(model_path, device, tokenizer_path, repo_dir,
-                                   temperature=moss_temperature, retry=moss_retry)
+                                   temperature=moss_temperature, retry=moss_retry,
+                                   top_p=moss_top_p, top_k=moss_top_k,
+                                   rep_penalty=moss_rep_penalty,
+                                   text_temperature=moss_text_temperature,
+                                   greedy=moss_greedy)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             out_path = str(cache_path)
             with _TTS_SYNTH_LOCK:

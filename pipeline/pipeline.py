@@ -241,6 +241,16 @@ def _parse_args() -> argparse.Namespace:
                         help="MOSS-TTS audio sampling temperature, lower = more stable (default 0.8)")
     parser.add_argument("--moss-tts-retry", type=int, default=3,
                         help="MOSS-TTS per-sentence retry attempts with re-seed (default 3)")
+    parser.add_argument("--moss-tts-top-p", type=float, default=0.95,
+                        help="MOSS-TTS audio top-p sampling (default 0.95)")
+    parser.add_argument("--moss-tts-top-k", type=int, default=25,
+                        help="MOSS-TTS audio top-k sampling (default 25)")
+    parser.add_argument("--moss-tts-rep-penalty", type=float, default=1.2,
+                        help="MOSS-TTS audio repetition penalty (default 1.2)")
+    parser.add_argument("--moss-tts-text-temperature", type=float, default=1.0,
+                        help="MOSS-TTS text sampling temperature (default 1.0)")
+    parser.add_argument("--moss-tts-greedy", dest="moss_tts_greedy", action="store_true",
+                        help="MOSS-TTS greedy decoding (do_sample=False, most stable)")
     parser.add_argument("--upscale-timeout", type=int, default=3600, help="Timeout in seconds for 4K upscale (default 3600)")
     parser.add_argument("--upscale-engine", default="ffmpeg", choices=["ffmpeg", "ai"],
                         help="4K upscale engine: ffmpeg (lanczos, default) or ai (realesr-animevideov3, torch CUDA)")
@@ -1073,6 +1083,16 @@ def main():
         os.environ["MOSS_TTS_TEMPERATURE"] = str(args.moss_tts_temperature)
     if args.moss_tts_retry:
         os.environ["MOSS_TTS_RETRY"] = str(args.moss_tts_retry)
+    if args.moss_tts_top_p:
+        os.environ["MOSS_TTS_TOP_P"] = str(args.moss_tts_top_p)
+    if args.moss_tts_top_k:
+        os.environ["MOSS_TTS_TOP_K"] = str(args.moss_tts_top_k)
+    if args.moss_tts_rep_penalty:
+        os.environ["MOSS_TTS_REP_PENALTY"] = str(args.moss_tts_rep_penalty)
+    if args.moss_tts_text_temperature:
+        os.environ["MOSS_TTS_TEXT_TEMPERATURE"] = str(args.moss_tts_text_temperature)
+    if args.moss_tts_greedy:
+        os.environ["MOSS_TTS_GREEDY"] = "1"
 
     # SenseNova key：LLM(sensenova) 与 生图 provider=sensenova 共用；提前注入，与 LLM provider 解耦
     if args.api_key:
