@@ -557,7 +557,7 @@ def _render_sm_segment_inner(
                "-framerate", str(render_fps), "-i", frame_pattern,
                "-i", audio_file,
                "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "fps=25",
                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                "-af", f"{fade_af},apad=whole_dur={duration:.3f}",
                out_path]
@@ -566,7 +566,7 @@ def _render_sm_segment_inner(
                "-framerate", str(render_fps), "-i", frame_pattern,
                "-f", "lavfi", "-i", "anullsrc=stereo:44100",
                "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "fps=25",
                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
                out_path]
 

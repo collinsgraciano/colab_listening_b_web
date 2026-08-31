@@ -559,11 +559,34 @@ def make_silent_fallback_cmd(scene_img: str, duration: float,
 # Segment concat
 # ---------------------------------------------------------------------------
 
+def _probe_audio_duration(path: str) -> float | None:
+    """探测音频流容器时长（秒）。容器时长含 edit list 裁剪，代表真实内容时长。"""
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a:0",
+         "-show_entries", "stream=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True)
+    try:
+        return float(r.stdout.strip().splitlines()[0])
+    except (ValueError, IndexError):
+        return None
+
+
 def concat_segments(segment_paths: list[str], output_path: str,
                     tmp_dir: str | Path = None) -> str:
-    """Concatenate segment files via FFmpeg concat demuxer (-c copy).
+    """Concatenate segment files (video stream copy + audio filter re-encode).
 
-    All segments must have uniform format (libx264/yuv420p/24fps/aac/44100Hz/stereo).
+    All segments must have uniform format (libx264/yuv420p/25fps/aac/44100Hz/stereo).
+
+    为什么不能直接 concat demuxer + -c copy：段的 AAC 轨道含 encoder priming
+    （约 46ms），MP4 edit list 把展示时长裁剪到内容时长，但 demuxer copy 拼接
+    推进下一段时按轨道原始时长计算 → 每段边界音频多推进约 40ms，几百段后累积
+    2 秒以上，字幕（按 timeline 计划时间烧录）相对音频越来越提前。
+    因此音频走逐段解码路径（起点 priming 由 edit list 生效裁掉），再按容器
+    时长字节级裁尾后拼接 PCM 一次编码；视频流无此问题，仍 demuxer 纯 copy
+    零重编码。注意仅解码重编码不够：edit list 不裁尾部，解码会保留编码器
+    补齐到 AAC 帧边界的静音样本（平均 ~11ms/段，数百段仍累积秒级），且
+    atrim 等 filter 裁剪是整帧粒度裁不掉，必须在 PCM 字节层裁剪。
+
     Returns the output path on success, raises RuntimeError on failure.
     """
     tmp_dir = Path(tmp_dir).resolve() if tmp_dir else Path(output_path).resolve().parent / "tmp"
@@ -574,17 +597,69 @@ def concat_segments(segment_paths: list[str], output_path: str,
             p = str(Path(s).resolve()).replace("'", "'\\''")
             f.write(f"file '{p}'\n")
 
-    result = subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
-        "-c", "copy",
-        "-fflags", "+genpts",
-        "-avoid_negative_ts", "make_zero",
-        output_path,
-    ], capture_output=True)
+    def _run(args: list, what: str) -> None:
+        r = subprocess.run(["ffmpeg", "-y"] + args, capture_output=True)
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"Concat {what} failed: {r.stderr.decode(errors='replace')[-2000:]}")
 
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Concat failed: {result.stderr.decode(errors='replace')[-2000:]}")
+    v_only = tmp_dir / "concat_video_only.mp4"
+    a_only = tmp_dir / "concat_audio_only.m4a"
+    _run(["-f", "concat", "-safe", "0", "-i", str(concat_list),
+          "-c:v", "copy", "-an", v_only], "video pass")
+
+    # 音频：逐段解码 → 按容器时长裁掉 AAC 帧尾补齐 → 拼 PCM → 一次编码
+    _SR, _CH, _SW = 44100, 2, 2  # s16le stereo 每样本帧 4 字节
+    pcm_path = tmp_dir / "concat_audio.pcm"
+    audio_ok = True
+    try:
+        with open(pcm_path, "wb") as out_f:
+            for s in segment_paths:
+                r = subprocess.run(
+                    ["ffmpeg", "-v", "error", "-i", str(Path(s).resolve()),
+                     "-map", "0:a:0", "-ar", str(_SR), "-ac", str(_CH),
+                     "-f", "s16le", "-"],
+                    capture_output=True)
+                if r.returncode != 0:
+                    audio_ok = False
+                    break
+                data = r.stdout
+                seg_dur = _probe_audio_duration(str(s))
+                if seg_dur is not None and seg_dur > 0:
+                    want = int(round(seg_dur * _SR)) * _CH * _SW
+                    if want < len(data):
+                        data = data[:want]
+                    elif want > len(data):
+                        # 解码短于容器时长（罕见）：补静音保持段网格对齐
+                        data += b"\x00" * (want - len(data))
+                out_f.write(data)
+        if audio_ok:
+            _run(["-f", "s16le", "-ar", str(_SR), "-ac", str(_CH),
+                  "-i", str(pcm_path),
+                  "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+                  a_only], "audio pass")
+    except Exception:
+        audio_ok = False
+    finally:
+        try:
+            os.remove(pcm_path)
+        except OSError:
+            pass
+    if not audio_ok:
+        # 兜底：整轨解码重编码（保留每段 ~11ms 补齐误差，但保证产出）
+        _run(["-f", "concat", "-safe", "0", "-i", str(concat_list),
+              "-vn", "-af", "asetpts=N/SR/TB",
+              "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+              a_only], "audio fallback pass")
+
+    _run(["-i", v_only, "-i", a_only,
+          "-c", "copy", "-map", "0:v:0", "-map", "1:a:0",
+          output_path], "mux pass")
+    for t in (v_only, a_only):
+        try:
+            os.remove(t)
+        except OSError:
+            pass
 
     return output_path
 
