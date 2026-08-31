@@ -305,13 +305,21 @@ class TTSEngine:
 
         Args:
             text: English text to speak
-            voice: Kokoro voice ID (af_sarah, am_adam, af_sky, etc.)
+            voice: Kokoro voice ID (af_sarah, am_adam, af_sky, etc.) or local .pt path
             out_path: output MP3 file path
             rate: speed adjustment ('+0%'=normal, '-15%'=slow, '+10%'=fast)
         """
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         speed = _rate_to_speed(rate)
         pipeline = self._get_kokoro()
+        # Resolve voice name to local .pt path and pass the path directly:
+        # hf_hub_download only finds voices in the standard HF snapshot layout,
+        # so voices downloaded to other locations (or any offline lookup) would
+        # fail with network retries swallowed as empty audio. Path mode
+        # (load_single_voice supports '*.pt') bypasses that entirely — same
+        # pattern as _synth_chinese_kokoro below.
+        if not voice.endswith(".pt"):
+            voice = _resolve_voice(f"{voice}.pt")
 
         import soundfile as sf
         import numpy as np
