@@ -379,7 +379,12 @@ class ModeTestService:
                 "workers": args.workers,
                 "host_character": args.host_character,
                 "tts_engine": args.tts_engine,
-                "tts_rate": args.tts_rate,
+                "tts_rates": {
+                    "en": getattr(args, "tts_rate_en", None),
+                    "zh": getattr(args, "tts_rate_zh", None),
+                    "narration": getattr(args, "tts_rate_narration", None),
+                    "legacy": args.tts_rate,
+                },
                 "dialogue_durations": ctx["tts_results"].get(
                     "dialogue_durations", []),
                 "n_groups": len(group_info),

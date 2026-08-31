@@ -12,12 +12,42 @@ def _audio_exists(path: str) -> bool:
     return bool(path) and os.path.exists(path) and os.path.getsize(path) > 100
 
 
-def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, extra_sig=""):
-    """如果 tts_rate / 引擎参数配置变化，清除 audio_dir 中所有 .mp3 缓存文件。"""
+# ---------------------------------------------------------------------------
+# TTS 语速默认值（唯一权威定义）+ 解析
+# kind: dialogue=对话英文 / zh=中文台词 / narration=旁白
+# structure: quest / original / original_static / original_cutout（'_' 为兜底行）
+# ---------------------------------------------------------------------------
+TTS_RATE_DEFAULTS = {
+    "dialogue":  {"quest": "0%", "original_cutout": "0%", "_": "-15%"},
+    "zh":        {"original_cutout": "0%", "_": "-10%"},   # quest 不生成中文
+    "narration": {"quest": "-10%", "original_cutout": "0%", "_": "+0%"},
+}
+
+
+def resolve_tts_rate(kind: str, structure: str,
+                     override: str | None = None,
+                     legacy: str | None = None) -> str:
+    """解析某类内容的实际语速。
+
+    优先级: 分项 override > 旧全局 legacy(--tts-rate) > 模式默认。
+    """
+    if override:
+        return str(override)
+    if legacy:
+        return str(legacy)
+    table = TTS_RATE_DEFAULTS.get(kind, {})
+    return table.get(structure) or table.get("_", "+0%")
+
+
+def _invalidate_cache_if_rate_changed(audio_dir, rates, quest, tts_engine, extra_sig=""):
+    """如果语速 / 引擎参数配置变化，清除 audio_dir 中所有 .mp3 缓存文件。
+
+    rates 为解析后的实际语速 dict（含模式默认），任何来源的变化都会触发清缓存。
+    """
     audio_path = Path(audio_dir)
     meta_path = audio_path / ".tts_meta.json"
     sig = {
-        "tts_rate": tts_rate or "",
+        "rates": rates,
         "quest": quest,
         "engine": tts_engine,
     }
@@ -47,8 +77,9 @@ def _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine, ex
 
 
 def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narration=False,
-                 tts_rate=None, tts_engine="kokoro", stop_check=None,
-                 include_zh=True):
+                 tts_rate=None, tts_rate_en=None, tts_rate_zh=None, tts_rate_narration=None,
+                 tts_engine="kokoro", stop_check=None,
+                 include_zh=True, structure=None):
     """Generate all TTS audio. Runs in a thread.
 
     Produces narration and dialogue EN/ZH audio.
@@ -59,12 +90,24 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                         （original_cutout 主持人开场/结尾用），但仍生成中文对话。
         include_zh: 生成对话中文音频 zh_{i}.mp3（Ch3 中文跟读专用）。
                     ch3_zh_repeats=0 时时间轴无 listen_zh 段，传 False 跳过以省时。
-        tts_rate: Override dialogue English TTS rate (e.g. '-15%', '0%').
-                  If None, uses mode default (quest: '0%', non-quest: '-15%').
+        tts_rate: Legacy global override — applies to ALL content types when set.
+                  Per-type args take precedence.
+        tts_rate_en / tts_rate_zh / tts_rate_narration: Per-type rate override
+                  (e.g. '-15%'). If None, uses mode default (TTS_RATE_DEFAULTS).
+        structure: Mode id for rate defaults ('quest'/'original_cutout'/...).
+                   Derived from quest/host_narration flags when omitted.
         tts_engine: 'kokoro' (default, local Kokoro TTS) or 'qwen'
                     (Qwen3-TTS local GPU).
         stop_check: Optional callable returning True to abort early.
     """
+    # --- 语速解析：分项覆盖 > 旧全局覆盖 > 模式默认（唯一来源 TTS_RATE_DEFAULTS）---
+    _structure = structure or ("quest" if quest
+                               else ("original_cutout" if host_narration else "original"))
+    rates = {
+        "dialogue": resolve_tts_rate("dialogue", _structure, tts_rate_en, tts_rate),
+        "zh": resolve_tts_rate("zh", _structure, tts_rate_zh, tts_rate),
+        "narration": resolve_tts_rate("narration", _structure, tts_rate_narration, tts_rate),
+    }
     # --- Engine + voice map setup ---
     if tts_engine == "qwen":
         from qwen_tts_engine import (QwenTTSEngine, build_qwen_voice_map,
@@ -149,7 +192,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                      f"|{os.environ.get('MOSS_TTS_REP_PENALTY', '1.2')}"
                      f"|{os.environ.get('MOSS_TTS_TEXT_TEMPERATURE', '1.0')}"
                      f"|{os.environ.get('MOSS_TTS_GREEDY', '0')}")
-    _invalidate_cache_if_rate_changed(audio_dir, tts_rate, quest, tts_engine,
+    _invalidate_cache_if_rate_changed(audio_dir, rates, quest, tts_engine,
                                       f"{extra_sig}|host:{int(host_narration)}")
 
     narration = {}
@@ -166,7 +209,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
             texts.append(("practice_intro",
                           script.get("practice_intro_en",
                                      "Now let's practice. Listen and repeat each sentence.")))
-        quest_narration_rate = tts_rate if tts_rate else "-10%"
+        quest_narration_rate = rates["narration"]
         for name, text in texts:
             if stop_check and stop_check():
                 print("  [TTS] Stop requested, aborting narration.", flush=True)
@@ -187,7 +230,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
         outro_text = script.get("outro", "That's all for today. Keep practicing!")
         practice_intro_text = script.get("practice_intro_en", "Now let's practice. Listen and repeat each sentence.")
 
-        narration_rate = tts_rate if tts_rate else "+0%"
+        narration_rate = rates["narration"]
         # 注：不再生成 intro.mp3（story_hook 仅作标题卡文字，时间轴从不消费其音频）
         for name, text in [("outro", outro_text), ("practice_intro", practice_intro_text)]:
             if stop_check and stop_check():
@@ -206,8 +249,8 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
                 narration[name] = path
                 print(f"  [TTS] {name}: {dur:.1f}s")
 
-    # Dialogue English (character voices; tts_rate overrides mode default)
-    dialogue_rate = tts_rate if tts_rate else ("0%" if quest else "-15%")
+    # Dialogue English (character voices; per-type override > legacy global > mode default)
+    dialogue_rate = rates["dialogue"]
     normal_paths = []
     dialogue_durations = []
     for i, line in enumerate(dialogue):
@@ -233,7 +276,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
     # Dialogue Chinese (quest skips entirely; ch3_zh_repeats=0 时无 listen_zh 段，同样跳过)
     zh_paths = []
     if not quest and include_zh:
-        zh_rate = tts_rate if tts_rate else "-10%"
+        zh_rate = rates["zh"]
         for i, line in enumerate(dialogue):
             if stop_check and stop_check():
                 print("  [TTS] Stop requested, aborting dialogue ZH.", flush=True)

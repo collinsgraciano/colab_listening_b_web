@@ -218,7 +218,10 @@ def _parse_args() -> argparse.Namespace:
                         help="Skip thumbnail image generation (step 4.5 still saves YouTube metadata)")
     parser.add_argument("--subtitle-font-size", type=int, default=60, help="English subtitle font size in pixels (default 60). ZH subtitle is auto-scaled to 85%% of EN size.")
     parser.add_argument("--subtitle-style", default="", help="Subtitle style id from subtitle_style_manager (web 字幕样式页). Empty = legacy behavior driven by --subtitle-font-size.")
-    parser.add_argument("--tts-rate", default=None, help="Override dialogue English TTS rate (e.g. '-15%%', '0%%'). Default: mode-dependent (quest '0%%', others '-15%%')")
+    parser.add_argument("--tts-rate", default=None, help="Legacy: override ALL TTS rates (dialogue EN/ZH/narration). Per-type flags take precedence. Default: mode-dependent")
+    parser.add_argument("--tts-rate-en", default=None, help="Override dialogue English TTS rate (e.g. '-15%%'). Default: mode-dependent (quest/cutout '0%%', others '-15%%')")
+    parser.add_argument("--tts-rate-zh", default=None, help="Override dialogue Chinese TTS rate (e.g. '-10%%'). Default: mode-dependent (cutout '0%%', others '-10%%')")
+    parser.add_argument("--tts-rate-narration", default=None, help="Override narration TTS rate (e.g. '-10%%'). Default: mode-dependent (original '+0%%', quest '-10%%', cutout '0%%')")
     parser.add_argument("--tts-engine", default="kokoro", choices=["kokoro", "qwen", "moss"],
                         help="TTS engine: 'kokoro' (default, local) or 'qwen' (Qwen3-TTS local GPU) or 'moss' (MOSS-TTS-Nano local CPU)")
     parser.add_argument("--qwen-model-path", default=r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
@@ -449,6 +452,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                               quest=is_quest,
                               host_narration=is_original_cutout,
                               tts_rate=args.tts_rate,
+                              tts_rate_en=getattr(args, "tts_rate_en", None),
+                              tts_rate_zh=getattr(args, "tts_rate_zh", None),
+                              tts_rate_narration=getattr(args, "tts_rate_narration", None),
+                              structure=args.structure,
                               tts_engine=args.tts_engine,
                               stop_check=stop_check,
                               include_zh=include_zh)
@@ -1030,10 +1037,6 @@ def main():
     # Ch3 跟读次数：clamp 到 0-10，防止误填导致视频长度失控
     args.ch3_en_repeats = max(0, min(10, int(args.ch3_en_repeats)))
     args.ch3_zh_repeats = max(0, min(10, int(args.ch3_zh_repeats)))
-
-    # original_cutout: quest-style TTS rate (0% = normal speed)
-    if args.tts_rate is None and args.structure == "original_cutout":
-        args.tts_rate = "0%"
 
     # original_static: always use static images (no landing/stop_motion animation)
     if args.structure == "original_static":

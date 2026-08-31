@@ -89,8 +89,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1">TTS 语速</label>
-                        <input type="text" id="qc-tts_rate" oninput="onQuickInput('tts_rate', this.value)"
+                        <label class="block text-xs text-slate-400 mb-1">对话英文语速</label>
+                        <input type="text" id="qc-tts_rate_en" oninput="onQuickInput('tts_rate_en', this.value)"
                             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
                             placeholder="留空=模式默认，如 -15%">
                     </div>
@@ -390,7 +390,7 @@ function applyQuickConfigFields() {
         if (el) el.checked = !!v;
     };
     setVal('qc-tts_engine', cfg.tts_engine || 'kokoro');
-    setVal('qc-tts_rate', cfg.tts_rate || '');
+    setVal('qc-tts_rate_en', cfg.tts_rate_en || '');
     setVal('qc-num_lines', cfg.num_lines ?? '');
     setVal('qc-visual_style', cfg.visual_style || 'pixar3d');
     setVal('qc-practice_duration', cfg.practice_duration ?? 3);

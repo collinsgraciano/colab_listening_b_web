@@ -112,8 +112,16 @@ PARAM_SPEC = {
                        "kokoro": "Kokoro (本地)",
                        "qwen": "Qwen3-TTS (本地 GPU)",
                        "moss": "MOSS-TTS-Nano (本地 CPU)"}},
-    "tts_rate": {"default": "", "type": "text", "group": "tts",
-                 "label": "TTS 语速", "help": "如 -15%, 0% (留空=模式默认)"},
+    "tts_rate_en": {"default": "", "type": "text", "group": "tts",
+                    "label": "对话英文语速",
+                    "help": "如 -15%、0%（留空=模式默认：original/static -15%，quest/cutout 0%）"},
+    "tts_rate_zh": {"default": "", "type": "text", "group": "tts",
+                    "modes": ["original", "original_static", "original_cutout"],
+                    "label": "中文台词语速",
+                    "help": "如 -10%（留空=模式默认：original/static -10%，cutout 0%）"},
+    "tts_rate_narration": {"default": "", "type": "text", "group": "tts",
+                           "label": "旁白语速",
+                           "help": "如 +0%、-10%（留空=模式默认：original +0%，quest -10%，cutout 0%）"},
     "qwen_model_path": {"default": r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice",
                         "type": "text", "group": "tts",
                         "label": "Qwen3-TTS 模型路径",
@@ -597,7 +605,12 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     # TTS
     args += ["--tts-engine", str(config.get("tts_engine", "kokoro"))]
     if config.get("tts_rate"):
-        args += ["--tts-rate", config["tts_rate"]]
+        args += ["--tts-rate", str(config["tts_rate"])]  # 旧全局覆盖（兼容遗留配置）
+    for _rate_key, _rate_flag in (("tts_rate_en", "--tts-rate-en"),
+                                  ("tts_rate_zh", "--tts-rate-zh"),
+                                  ("tts_rate_narration", "--tts-rate-narration")):
+        if config.get(_rate_key):
+            args += [_rate_flag, str(config[_rate_key])]
     if config.get("qwen_model_path"):
         args += ["--qwen-model-path", config["qwen_model_path"]]
     if config.get("qwen_base_model_path"):

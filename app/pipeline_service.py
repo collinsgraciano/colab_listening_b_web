@@ -793,10 +793,8 @@ class PipelineService:
         if structure == "original_static":
             animation = "none"
 
-        # original_cutout: quest-style TTS rate (0% = normal speed)
+        # tts_rate 为旧全局覆盖（兼容）；分项参数优先（tts_pipeline.resolve_tts_rate）
         tts_rate = config.get("tts_rate", "") or None
-        if tts_rate is None and structure == "original_cutout":
-            tts_rate = "0%"
 
         tokens_raw = config.get("mcp_tokens", "").strip()
         mcp_tokens = ",".join(
@@ -843,6 +841,9 @@ class PipelineService:
             no_thumbnail=bool(config.get("no_thumbnail", False)),
             tts_engine=config.get("tts_engine", "kokoro"),
             tts_rate=tts_rate,
+            tts_rate_en=config.get("tts_rate_en", "") or None,
+            tts_rate_zh=config.get("tts_rate_zh", "") or None,
+            tts_rate_narration=config.get("tts_rate_narration", "") or None,
             qwen_model_path=config.get("qwen_model_path", ""),
             qwen_base_model_path=config.get("qwen_base_model_path", ""),
             qwen_voicedesign_model_path=config.get("qwen_voicedesign_model_path", ""),
