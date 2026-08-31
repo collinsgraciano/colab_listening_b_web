@@ -119,6 +119,7 @@ def _download_voice(filename: str) -> str:
     if os.path.exists(dest) and os.path.getsize(dest) > 1000:
         return dest
     urls = [
+        f"https://www.modelscope.cn/models/AI-ModelScope/Kokoro-82M/resolve/master/voices/{filename}",
         f"https://hf-mirror.com/hexgrad/Kokoro-82M/resolve/main/voices/{filename}",
         f"https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/{filename}",
     ]
@@ -489,12 +490,36 @@ def get_all_kokoro_voices() -> list[dict]:
     return out
 
 
+def _load_kokoro_voice_config() -> dict:
+    """Load configs/kokoro_voice_config.json 默认音色（与 Web 音色页配置共享）.
+
+    缺文件/缺键回退内置默认值（与原硬编码行为一致）。
+    """
+    defaults = {
+        "default_male": "am_adam",
+        "default_female": "af_sarah",
+        "default_host_female": "af_sky",
+    }
+    config_path = Path(__file__).parent.parent / "configs" / "kokoro_voice_config.json"
+    if config_path.exists():
+        try:
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+            for k in defaults:
+                if k in saved and saved[k]:
+                    defaults[k] = saved[k]
+        except (json.JSONDecodeError, OSError):
+            pass
+    return defaults
+
+
 def build_voice_map(script: dict) -> dict:
     """Build voice_map from char_a_gender/char_b_gender.
 
     Priority 1: script['{key}_kokoro_voice'] (素材库 / Kokoro 音色绑定).
-    Priority 2: by gender — Male -> am_adam, Female -> af_sarah.
+    Priority 2: by gender — 读 configs/kokoro_voice_config.json 默认音色
+    （未配置时 male -> am_adam, female -> af_sarah）。
     """
+    defaults = _load_kokoro_voice_config()
     voice_map = {}
     for key in ["char_a", "char_b", "char_c", "host"]:
         bound = script.get(f"{key}_kokoro_voice", "").strip()
@@ -502,24 +527,24 @@ def build_voice_map(script: dict) -> dict:
             voice_map[key] = bound
     if "char_a" not in voice_map:
         char_a_gender = script.get("char_a_gender", "male").lower()
-        voice_map["char_a"] = "am_adam" if char_a_gender == "male" else "af_sarah"
+        voice_map["char_a"] = defaults["default_male"] if char_a_gender == "male" else defaults["default_female"]
     if "char_b" not in voice_map:
         char_b_gender = script.get("char_b_gender", "female").lower()
-        voice_map["char_b"] = "am_adam" if char_b_gender == "male" else "af_sarah"
+        voice_map["char_b"] = defaults["default_male"] if char_b_gender == "male" else defaults["default_female"]
     # Quest mode third character (staff/interviewer) — only present in quest scripts
     if "char_c" not in voice_map:
         char_c_gender = script.get("char_c_gender", "").lower()
         if char_c_gender:
-            voice_map["char_c"] = "am_adam" if char_c_gender == "male" else "af_sarah"
+            voice_map["char_c"] = defaults["default_male"] if char_c_gender == "male" else defaults["default_female"]
     # Quest mode host (节目主) — appears in welcome/hook/outro segments
     if "host" not in voice_map:
         host_gender = script.get("host_gender", "").lower()
         if host_gender:
-            voice_map["host"] = "am_adam" if host_gender == "male" else "af_sky"
+            voice_map["host"] = defaults["default_male"] if host_gender == "male" else defaults["default_host_female"]
         else:
-            print("  [TTS] WARNING: host_gender not set, defaulting to af_sky (female). "
+            print(f"  [TTS] WARNING: host_gender not set, defaulting to {defaults['default_host_female']} (female). "
                   "Check CHARACTER_OVERRIDES or script.json host_gender.")
-            voice_map["host"] = "af_sky"
+            voice_map["host"] = defaults["default_host_female"]
     return voice_map
 
 

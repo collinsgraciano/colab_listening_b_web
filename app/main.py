@@ -3263,6 +3263,76 @@ async def api_kokoro_preview_cached(voice: str, language: str = "english"):
     return FileResponse(str(p), media_type="audio/mpeg")
 
 
+# Kokoro voice defaults config (性别自动分配的默认音色，与 Qwen/MOSS 对齐)
+KOKORO_VOICE_CONFIG_PATH = WEB_ROOT / "configs" / "kokoro_voice_config.json"
+
+
+def _load_kokoro_voice_config() -> dict:
+    """Load kokoro_voice_config.json with defaults (文件首次保存时创建)."""
+    defaults = {
+        "default_male": "am_adam",
+        "default_female": "af_sarah",
+        "default_host_female": "af_sky",
+    }
+    if KOKORO_VOICE_CONFIG_PATH.exists():
+        try:
+            saved = json.loads(KOKORO_VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
+            for k in defaults:
+                if k in saved:
+                    defaults[k] = saved[k]
+        except (json.JSONDecodeError, OSError):
+            pass
+    return defaults
+
+
+def _save_kokoro_voice_config(config: dict) -> None:
+    KOKORO_VOICE_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    KOKORO_VOICE_CONFIG_PATH.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.get("/kokoro_voices", response_class=HTMLResponse)
+async def kokoro_voices_page(request: Request):
+    """Kokoro voice management page."""
+    config = load_config()
+    library_chars = []
+    if LIBRARY_DIR.exists():
+        for d in sorted(LIBRARY_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            meta_path = d / "meta.json"
+            if not meta_path.exists():
+                continue
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                thumb = d / "thumb.png"
+                meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
+                library_chars.append(meta)
+            except (json.JSONDecodeError, OSError):
+                continue
+    return templates.TemplateResponse(request, "kokoro_voices.html", {
+        "config": config,
+        "library_chars": library_chars,
+        "active_page": "kokoro_voices",
+    })
+
+
+@app.get("/api/kokoro_voices/defaults")
+async def api_kokoro_defaults_get():
+    """Get Kokoro default voice configuration."""
+    return _load_kokoro_voice_config()
+
+
+@app.put("/api/kokoro_voices/defaults")
+async def api_kokoro_defaults_put(request: Request):
+    """Update Kokoro default voice configuration."""
+    data = await request.json()
+    config = _load_kokoro_voice_config()
+    for key in ["default_male", "default_female", "default_host_female"]:
+        if key in data:
+            config[key] = data[key]
+    _save_kokoro_voice_config(config)
+    return {"ok": True, "config": config}
+
+
 # ===========================================================================
 # MOSS-TTS Voice Management
 # ===========================================================================

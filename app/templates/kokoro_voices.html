@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="voices-page p-6 max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-white">🎵 Kokoro 音色管理</h2>
+            <p class="text-sm text-slate-400 mt-1">
+                当前 TTS 引擎:
+                {% if config.tts_engine == 'kokoro' %}
+                    <span class="text-green-400 font-medium">Kokoro ✓</span>
+                {% else %}
+                    <span class="text-amber-400">{{ config.tts_engine }}</span>
+                    <a href="/config" class="text-indigo-400 hover:underline ml-2">→ 去切换</a>
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+            <span class="text-xs text-slate-400 whitespace-nowrap">卡片大小</span>
+            <input type="range" id="card-scale" min="40" max="150" step="5" value="50"
+                class="w-28 accent-indigo-500 cursor-pointer" title="拖动调整卡片大小（双击恢复 50%）">
+            <span id="card-scale-label" class="text-xs text-slate-300 w-9 text-right">50%</span>
+        </div>
+    </div>
+
+    <!-- 区域 A: 音色列表 (28 个英文音色，已缓存的排前) -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>📋</span> 音色列表
+            <span id="voice-count" class="text-[10px] text-slate-500 font-normal"></span>
+        </h3>
+        <div id="preset-grid" class="vc-grid grid">
+        </div>
+    </section>
+
+    <!-- 区域 B: 角色素材库音色绑定 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>🔗</span> 角色素材库音色绑定
+        </h3>
+        <div id="binding-grid" class="vc-grid vc-grid-wide grid">
+            {% if not library_chars %}
+            <p class="text-xs text-slate-500 col-span-full">素材库为空。请先在控制台收藏角色。</p>
+            {% endif %}
+            {% for char in library_chars %}
+            <div class="bcard bg-slate-800 border border-slate-700">
+                {% if char.image_url %}
+                <img src="{{ char.image_url }}" class="bcard-img max-w-full object-cover bg-slate-800" onerror="this.style.opacity='0.3'">
+                {% else %}
+                <div class="bcard-img bg-slate-700 flex items-center justify-center" style="font-size: max(14px, calc(28px * var(--vc)));">👤</div>
+                {% endif %}
+                <div class="bcard-name font-medium text-slate-300 text-center truncate w-full" title="{{ char.description }}">{{ char.name }}</div>
+                <div class="bcard-meta text-slate-500">{{ char.gender or '?' }} · {{ char.structure or '?' }}</div>
+                <select class="bcard-select kokoro-voice-bind w-full bg-slate-900 border border-slate-600 rounded text-white"
+                    data-lib-id="{{ char.id }}">
+                    <option value="">音色→</option>
+                </select>
+                <button class="bcard-btn lib-preview-btn w-full bg-slate-700 hover:bg-indigo-600 text-white transition"
+                    data-lib-id="{{ char.id }}">▶ 试听音色</button>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- 区域 C: 默认音色配置 -->
+    <section class="mb-8">
+        <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span>⚙️</span> 默认音色配置
+        </h3>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <p class="text-xs text-slate-400 mb-4">非库角色按性别自动分配以下默认音色：</p>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">默认男声</label>
+                    <select id="default-male" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">默认女声</label>
+                    <select id="default-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">默认旁白女声</label>
+                    <select id="default-host-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+            </div>
+            <button onclick="saveDefaults()" class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存默认配置</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ALL_VOICES = [];
+
+const CARD_SCALE_KEY = 'kokoro_voices_card_scale_v1';
+
+function applyCardScale(pct) {
+    const v = Math.min(150, Math.max(40, Number(pct) || 50)) / 100;
+    document.querySelector('.voices-page').style.setProperty('--vc', String(v));
+    const slider = document.getElementById('card-scale');
+    slider.value = Math.round(v * 100);
+    document.getElementById('card-scale-label').textContent = Math.round(v * 100) + '%';
+    localStorage.setItem(CARD_SCALE_KEY, String(Math.round(v * 100)));
+}
+
+function initCardScale() {
+    const slider = document.getElementById('card-scale');
+    applyCardScale(localStorage.getItem(CARD_SCALE_KEY) || 50);
+    slider.addEventListener('input', () => applyCardScale(slider.value));
+    slider.addEventListener('dblclick', () => applyCardScale(50));
+}
+
+function loadVoices() {
+    fetch('/api/kokoro_voices/speakers')
+        .then(r => r.json())
+        .then(data => {
+            ALL_VOICES = data.speakers || [];
+            renderVoices();
+            populateDropdowns();
+            loadDefaults();
+        });
+}
+
+function renderVoices() {
+    const grid = document.getElementById('preset-grid');
+    grid.innerHTML = '';
+    document.getElementById('voice-count').textContent =
+        `共 ${ALL_VOICES.length} 个 · 已缓存 ${ALL_VOICES.filter(v => v.cached).length} 个`;
+    ALL_VOICES.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'vcard bg-slate-800 border border-slate-700';
+
+        const icon = document.createElement('div');
+        icon.className = 'vcard-icon ' +
+            (v.gender === 'female' ? 'bg-pink-900/50' : 'bg-blue-900/50');
+        icon.textContent = v.gender === 'female' ? '♀' : '♂';
+
+        const name = document.createElement('div');
+        name.className = 'vcard-name font-medium text-white';
+        name.textContent = v.name;
+
+        const desc = document.createElement('div');
+        desc.className = 'vcard-desc text-slate-400';
+        desc.textContent = v.desc;
+
+        const cached = document.createElement('div');
+        if (v.cached) {
+            cached.className = 'vcard-meta px-2 py-0.5 rounded-full bg-green-900/50 text-green-300';
+            cached.textContent = '✓ 已缓存';
+        } else {
+            cached.className = 'vcard-meta px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-300';
+            cached.textContent = '⚠ 未缓存';
+            cached.title = '本机未缓存 .pt 音色文件，试听需联网下载（hf-mirror 不可达时会失败）。可从 ModelScope 镜像 modelscope.cn/models/AI-ModelScope/Kokoro-82M 手动下载放置。';
+        }
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-1';
+
+        const btn = document.createElement('button');
+        btn.className = 'vbtn bg-slate-700 hover:bg-indigo-600 text-white transition';
+        btn.textContent = '▶ 试听';
+        btn.onclick = () => previewVoice(v.name, false, btn);
+
+        const regenBtn = document.createElement('button');
+        regenBtn.className = 'vbtn bg-slate-700 hover:bg-amber-600 text-amber-300 transition';
+        regenBtn.textContent = '🔄';
+        regenBtn.title = '重新生成试听';
+        regenBtn.onclick = () => previewVoice(v.name, true, regenBtn);
+
+        btnRow.appendChild(btn);
+        btnRow.appendChild(regenBtn);
+
+        card.appendChild(icon);
+        card.appendChild(name);
+        card.appendChild(desc);
+        card.appendChild(cached);
+        card.appendChild(btnRow);
+        grid.appendChild(card);
+    });
+}
+
+function populateDropdowns() {
+    const options = ALL_VOICES.map(v =>
+        `<option value="${v.name}">${v.name} · ${v.desc || ''}${v.cached ? '' : ' (未缓存)'}</option>`
+    ).join('');
+
+    document.querySelectorAll('.kokoro-voice-bind').forEach(sel => {
+        const libId = sel.dataset.libId;
+        sel.innerHTML = '<option value="">音色→</option>' + options;
+        {% for char in library_chars %}
+        if (libId === '{{ char.id }}' && '{{ char.kokoro_voice }}') {
+            sel.value = '{{ char.kokoro_voice }}';
+        }
+        {% endfor %}
+        sel.onchange = function() {
+            fetch('/api/character_library/' + libId + '/kokoro_voice', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({kokoro_voice: this.value})
+            }).then(r => r.json()).then(d => {
+                if (d.ok) { /* saved */ }
+            });
+        };
+    });
+
+    ['default-male', 'default-female', 'default-host-female'].forEach(id => {
+        document.getElementById(id).innerHTML = options;
+    });
+
+    document.querySelectorAll('.lib-preview-btn').forEach(btn => {
+        btn.onclick = function() {
+            const sel = document.querySelector('.kokoro-voice-bind[data-lib-id="' + btn.dataset.libId + '"]');
+            const speaker = sel ? sel.value : '';
+            if (!speaker) { alert('该角色尚未绑定音色，请先在下拉框选择'); return; }
+            previewVoice(speaker, false, btn);
+        };
+    });
+}
+
+function loadDefaults() {
+    fetch('/api/kokoro_voices/defaults')
+        .then(r => r.json())
+        .then(config => {
+            if (config.default_male) document.getElementById('default-male').value = config.default_male;
+            if (config.default_female) document.getElementById('default-female').value = config.default_female;
+            if (config.default_host_female) document.getElementById('default-host-female').value = config.default_host_female;
+        });
+}
+
+function saveDefaults() {
+    const data = {
+        default_male: document.getElementById('default-male').value,
+        default_female: document.getElementById('default-female').value,
+        default_host_female: document.getElementById('default-host-female').value,
+    };
+    fetch('/api/kokoro_voices/defaults', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.ok) alert('默认音色配置已保存');
+    });
+}
+
+function previewVoice(speaker, regenerate = false, btnEl = null) {
+    const text = 'Hello, this is a voice preview test.';
+    const btn = btnEl;
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = regenerate ? '⏳ 重新生成中...' : '⏳ 加载中...'; }
+
+    const cacheFetch = regenerate
+        ? Promise.reject(new Error('regenerate'))
+        : fetch(`/api/kokoro_voices/preview/${encodeURIComponent(speaker)}?language=english`, {cache: 'no-store'})
+            .then(r => { if (!r.ok) throw new Error('no cache'); return r.blob(); });
+
+    cacheFetch
+        .catch(() => fetch('/api/kokoro_voices/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({speaker, text, regenerate})
+        }).then(r => {
+            if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
+            return r.blob();
+        }))
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.play();
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        })
+        .catch(err => {
+            alert('试听失败: ' + err.message);
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        });
+}
+
+window.addEventListener('load', () => {
+    initCardScale();
+    loadVoices();
+});
+</script>
+{% endblock %}
