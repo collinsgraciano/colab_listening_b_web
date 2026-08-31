@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from .config_manager import resolve_provider, load_config, find_run_dir
+from .config_manager import MODES, resolve_provider, load_config, find_run_dir
 from . import run_mutex
 
 # Add pipeline source to path (local copy — fully independent)
@@ -1231,6 +1231,149 @@ class PipelineService:
             return True, f"已重新生成: {Path(out).name}"
         except Exception as e:
             return False, f"生成失败: {e}"
+
+    def regenerate_thumbnail(self, run_name: str, mode: str = "") -> tuple[bool, str]:
+        """为已有运行再生成一张缩略图（thumbnail_N.jpg 递增，旧图全部保留）。
+
+        复用 thumbnail_gen.generate_thumbnail 与当前配置的生图 Provider
+        （mcp / sensenova），角色参考图从本地 images/ 取。照 recompose 模式
+        在后台线程执行；期间 is_running=True 与主 pipeline / 模式测试互斥。
+        返回 (ok, message)。
+        """
+        if self.is_running:
+            return False, "Pipeline 正在运行中，请等待完成后再生成"
+
+        config = load_config()
+        output_dir = Path(config.get("output_dir", "./output"))
+        run_dir = find_run_dir(output_dir, run_name, mode)
+        if not run_dir:
+            return False, f"运行不存在: {run_name}"
+        script_path = run_dir / "script.json"
+        if not script_path.exists():
+            return False, "缺少 script.json"
+        try:
+            script = json.loads(script_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            return False, f"script.json 读取失败: {e}"
+
+        structure = script.get("structure", "")
+        if structure not in MODES:
+            structure = run_dir.parent.name if run_dir.parent.name in MODES else "original"
+
+        # env 注入（_set_env 的最小子集）：生图 Provider / SenseNova key / 画面风格
+        # （thumbnail_gen._build_thumbnail_prompt 经 style_manager 读后两个 env）
+        os.environ["IMAGE_PROVIDER"] = str(config.get("image_provider", "mcp"))
+        if str(config.get("sensenova_api_key") or "").strip():
+            os.environ["SENSENOVA_API_KEY"] = str(config["sensenova_api_key"]).strip()
+        from style_manager import resolve_style_prompt
+        style_id = str(config.get("visual_style", "pixar3d"))
+        os.environ["VISUAL_STYLE_ID"] = style_id
+        os.environ["VISUAL_STYLE_PROMPT"] = resolve_style_prompt(style_id)
+
+        # 角色参考图本地路径（线程内再决定转 CDN URL 还是 base64）
+        if structure in ("quest", "original_cutout"):
+            ref_img = run_dir / "images" / "pose_char_a_0.png"
+        else:
+            ref_img = run_dir / "images" / "char_scene.png"
+
+        # 输出文件名：无主图时补 thumbnail.jpg，否则 thumbnail_N.jpg 递增（旧图全保留）
+        if not (run_dir / "thumbnail.jpg").exists():
+            out_name = "thumbnail.jpg"
+        else:
+            n = 2
+            while (run_dir / f"thumbnail_{n}.jpg").exists():
+                n += 1
+            out_name = f"thumbnail_{n}.jpg"
+
+        if not run_mutex.try_acquire("thumbnail_regen"):
+            return False, (f"资源被占用：{run_mutex.current_owner()}"
+                           f"（主 pipeline / 模式测试运行中请等待完成）")
+
+        self._stop_flag.clear()
+        with self._lock:
+            self.log_lines = []
+            self.status = "running"
+            self.current_step = ""
+            self.current_step_label = "缩略图重生成"
+            self.started_at = time.time()
+            self.finished_at = 0
+            self.error = ""
+            self.work_dir = str(run_dir)
+            self.final_path = ""
+
+        self._thread = threading.Thread(
+            target=self._thumbnail_regen_run,
+            args=(run_dir, script, structure, out_name,
+                  str(ref_img) if ref_img.exists() else ""),
+            daemon=True)
+        self._thread.start()
+        return True, f"缩略图生成已启动（将保存为 {out_name}）"
+
+    def _thumbnail_regen_run(self, run_dir: Path, script: dict, structure: str,
+                             out_name: str, ref_img_path: str):
+        """后台线程：复用 Step 4.5 的 generate_thumbnail 生成一张新缩略图。"""
+        old_stdout = sys.stdout
+        buf = _LineBuffer(self._on_log_line)
+        sys.stdout = buf
+        try:
+            print("=" * 60)
+            print(f"ThumbnailRegen: {run_dir.name} -> {out_name}")
+            provider = os.environ.get("IMAGE_PROVIDER", "mcp")
+            if provider == "mcp":
+                mcp_initialize()
+            char_scene_url = ""
+            if ref_img_path:
+                if provider == "sensenova":
+                    # sensenova edit_image 内部 _to_image_url 把本地路径转 base64
+                    char_scene_url = ref_img_path
+                else:
+                    from image_gen import reupload_for_cdn
+                    try:
+                        char_scene_url = reupload_for_cdn(
+                            ref_img_path, Path(ref_img_path).name) or ""
+                    except Exception as e:
+                        print(f"[ThumbnailRegen] 参考图上传失败，退回无参考图生成: {e}")
+
+            from pipeline import call_tool, parse_task_id, poll_task, download_file
+            from thumbnail_gen import generate_thumbnail
+
+            # 场景图：仅 Pillow 兜底分支需要；AI 分支纯 prompt 生成不受影响
+            if structure == "quest":
+                scene_img = run_dir / "images" / "scene_0.png"
+                if not scene_img.exists():
+                    scene_img = run_dir / "images" / "scene.png"
+            else:
+                scene_img = run_dir / "images" / "scene.png"
+
+            out_path = generate_thumbnail(
+                script=script,
+                scene_img=str(scene_img),
+                output_path=str(run_dir / out_name),
+                mcp_call_tool=call_tool,
+                mcp_parse_task_id=parse_task_id,
+                mcp_poll_task=poll_task,
+                mcp_download_file=download_file,
+                structure=structure,
+                char_scene_url=char_scene_url,
+            )
+            if out_path and Path(out_path).exists():
+                with self._lock:
+                    self.status = "done"
+                    self.finished_at = time.time()
+                print("=" * 60)
+                print(f"ThumbnailRegen DONE! {out_name}")
+            else:
+                self._fail("缩略图生成失败：AI 生成与 Pillow 兜底均未产出文件"
+                           "（检查生图 Provider 配置 / MCP token / images 场景图）")
+        except Exception as e:
+            self._fail(f"ThumbnailRegen {type(e).__name__}: {e}")
+            import traceback
+            for line in traceback.format_exc().split("\n"):
+                self._on_log_line(line)
+        finally:
+            sys.stdout = old_stdout
+            buf.flush()
+            run_mutex.release("thumbnail_regen")
 
     def recompose(self, run_name: str, subtitle_style: str = "", font_size: int = 60,
                   show_zh: bool = True, regen_4k: bool = False,

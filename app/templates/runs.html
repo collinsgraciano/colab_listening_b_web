@@ -8,6 +8,11 @@
     <a href="{{ gallery_url }}" class="block aspect-video bg-slate-900 relative group" title="打开画廊">
         <img src="{{ run.thumbnail_url }}" alt="{{ run.title }}" class="w-full h-full object-cover">
         <span class="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/40 text-white text-sm font-medium">打开画廊 →</span>
+        {% if run.thumbnail_count and run.thumbnail_count > 1 %}
+        <button onclick="openThumbsModal(event, '{{ run.name }}', '{{ run.structure }}')"
+            class="absolute bottom-2 right-2 z-10 px-2 py-1 bg-black/60 hover:bg-black/80 rounded-lg text-xs text-white"
+            title="浏览全部缩略图">🖼 {{ run.thumbnail_count }} 张</button>
+        {% endif %}
     </a>
     {% else %}
     <div class="aspect-video bg-slate-900 flex items-center justify-center">
@@ -41,6 +46,8 @@
             {% endif %}
             <a href="{{ gallery_url }}"
                 class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs text-white text-center">画廊</a>
+            <button id="thumb-btn-{{ run.name }}" onclick="regenThumbnail('{{ run.name }}', '{{ run.structure }}')"
+                class="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 rounded-lg text-xs text-white">＋缩略图</button>
             <button id="upload-btn-{{ run.name }}" onclick="toggleUploaded('{{ run.name }}')"
                 class="px-3 py-1.5 rounded-lg text-xs text-white {% if run.uploaded %}bg-emerald-600 hover:bg-emerald-500{% else %}bg-amber-600/80 hover:bg-amber-500{% endif %}">
                 {% if run.uploaded %}已上传 ✓{% else %}标记已上传{% endif %}
@@ -164,6 +171,21 @@
                 <button onclick="closeScriptModal()" class="text-slate-400 hover:text-white">✕</button>
             </div>
             <pre id="script-content" class="overflow-y-auto text-xs text-slate-300 font-mono bg-slate-950 p-4 rounded-lg flex-1"></pre>
+        </div>
+    </div>
+
+    <!-- Thumbnails browser modal（浏览全部缩略图 + 设为主图） -->
+    <div id="thumbs-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8" onclick="closeThumbsModal(event)">
+        <div class="bg-slate-800 rounded-xl p-4 max-w-5xl w-full max-h-[85vh] flex flex-col" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-semibold text-white">缩略图 — <span id="thumbs-run-name" class="text-indigo-300"></span></h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="regenThumbnail(_thumbsRun, _thumbsMode)"
+                        class="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 rounded-lg text-xs text-white">＋ 再生成一张</button>
+                    <button onclick="closeThumbsModal()" class="text-slate-400 hover:text-white">✕</button>
+                </div>
+            </div>
+            <div id="thumbs-grid" class="overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 pr-1"></div>
         </div>
     </div>
 
@@ -476,6 +498,121 @@ function pollRecompose() {
             }
         })
         .catch(() => { _recomposeTimer = setTimeout(pollRecompose, 2000); });
+}
+
+// ---------------------------------------------------------------------------
+// 缩略图：再生成一张（thumbnail_N.jpg 递增，旧图全保留）/ 浏览全部 / 设为主图
+// ---------------------------------------------------------------------------
+let _thumbRegenBusy = false;
+let _thumbRegenRun = '';
+let _thumbRegenMode = '';
+let _thumbsLogIdx = 0;
+let _thumbsTimer = null;
+let _thumbsRun = '';
+let _thumbsMode = '';
+
+function regenThumbnail(runName, mode) {
+    if (_thumbRegenBusy) { alert('已有缩略图生成任务进行中，请等待完成'); return; }
+    if (!confirm('为该运行再生成一张缩略图？\n按当前生图 Provider 计费（MCP 积分 / SenseNova），约 1 分钟；旧缩略图全部保留。')) return;
+    _thumbRegenBusy = true;
+    _thumbRegenRun = runName;
+    _thumbRegenMode = mode || '';
+    _thumbsLogIdx = 0;
+    const btn = document.getElementById(`thumb-btn-${runName}`);
+    if (btn) { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.textContent = '生成中...'; }
+    const q = _thumbRegenMode ? `?mode=${_thumbRegenMode}` : '';
+    fetch(`/api/runs/${runName}/thumbnail_regenerate${q}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                alert('启动失败: ' + (data.error || '未知错误'));
+                _resetThumbBtn(runName);
+                return;
+            }
+            pollThumbRegen();
+        })
+        .catch(() => { _resetThumbBtn(runName); });
+}
+
+function _resetThumbBtn(runName) {
+    _thumbRegenBusy = false;
+    if (_thumbsTimer) { clearTimeout(_thumbsTimer); _thumbsTimer = null; }
+    const btn = document.getElementById(`thumb-btn-${runName}`);
+    if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.textContent = '＋缩略图'; }
+}
+
+function pollThumbRegen() {
+    fetch(`/api/run/logs/since/${_thumbsLogIdx}`)
+        .then(r => r.json())
+        .then(logData => {
+            _thumbsLogIdx = logData.total || 0;
+            const st = logData.status || {};
+            if (st.status === 'running') {
+                _thumbsTimer = setTimeout(pollThumbRegen, 1500);
+                return;
+            }
+            const runName = _thumbRegenRun;
+            if (st.status === 'error') {
+                _resetThumbBtn(runName);
+                alert('❌ 缩略图生成失败: ' + (st.error || '未知错误'));
+                return;
+            }
+            _thumbRegenBusy = false;
+            if (_thumbsTimer) { clearTimeout(_thumbsTimer); _thumbsTimer = null; }
+            location.reload();
+        })
+        .catch(() => { _thumbsTimer = setTimeout(pollThumbRegen, 2500); });
+}
+
+function openThumbsModal(e, runName, mode) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    _thumbsRun = runName;
+    _thumbsMode = mode || '';
+    document.getElementById('thumbs-run-name').textContent = runName;
+    document.getElementById('thumbs-modal').classList.remove('hidden');
+    loadThumbs();
+}
+
+function loadThumbs() {
+    const q = _thumbsMode ? `?mode=${_thumbsMode}` : '';
+    fetch(`/api/runs/${_thumbsRun}/thumbnails${q}`)
+        .then(r => r.json())
+        .then(data => {
+            const grid = document.getElementById('thumbs-grid');
+            grid.innerHTML = '';
+            (data.thumbnails || []).forEach(t => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-900 rounded-lg border border-slate-700 overflow-hidden';
+                card.innerHTML = `
+                    <img src="${t.url}" alt="${t.name}" class="w-full aspect-video object-cover cursor-pointer" onclick="window.open('${t.url}')" title="点击查看大图">
+                    <div class="p-2 flex items-center justify-between gap-2">
+                        <span class="text-xs text-slate-400 truncate" title="${t.name}">${t.name}</span>
+                        ${t.is_main
+                            ? '<span class="text-xs px-2 py-0.5 bg-emerald-600/30 text-emerald-300 rounded shrink-0">当前主图</span>'
+                            : `<button onclick="setMainThumb('${t.name}')" class="px-2 py-1 bg-amber-600/80 hover:bg-amber-500 rounded text-xs text-white shrink-0">设为主图</button>`}
+                    </div>`;
+                grid.appendChild(card);
+            });
+        });
+}
+
+function setMainThumb(filename) {
+    const q = _thumbsMode ? `?mode=${_thumbsMode}` : '';
+    fetch(`/api/runs/${_thumbsRun}/thumbnail_set_main${q}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: filename}),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.ok) { alert('设置失败: ' + (data.error || '未知错误')); return; }
+        loadThumbs();
+    });
+}
+
+function closeThumbsModal(e) {
+    if (e && e.target !== document.getElementById('thumbs-modal')) return;
+    document.getElementById('thumbs-modal').classList.add('hidden');
 }
 
 // 初始渲染筛选状态

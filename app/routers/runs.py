@@ -1,6 +1,7 @@
 """Runs API — 运行列表/素材文件/回收站/重渲/元数据刷新（Runs + Script editor + Gallery 三区合并）."""
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -60,15 +61,99 @@ async def api_get_script(name: str, mode: str = ""):
     return json.loads(script_path.read_text(encoding="utf-8"))
 
 
+# 缩略图文件名白名单（thumbnail.jpg + thumbnail_N.jpg），防路径穿越
+_THUMB_NAME_RE = re.compile(r"thumbnail(?:_\d+)?\.jpg")
+
+
+def _resolve_main_thumbnail(run_dir: Path) -> Path:
+    """主缩略图：thumb_main.txt 记录「设为主图」的选择；缺失/非法/文件不存在时回退 thumbnail.jpg。"""
+    thumb = run_dir / "thumbnail.jpg"
+    meta = run_dir / "thumb_main.txt"
+    if meta.exists():
+        try:
+            name = meta.read_text(encoding="utf-8").strip()
+            if _THUMB_NAME_RE.fullmatch(name) and (run_dir / name).exists():
+                return run_dir / name
+        except OSError:
+            pass
+    return thumb
+
+
 @router.get("/api/runs/{name}/thumbnail")
 async def api_get_thumbnail(name: str, mode: str = ""):
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     run_dir = find_run_dir(output_dir, name, mode)
-    thumb = run_dir / "thumbnail.jpg" if run_dir else None
+    thumb = _resolve_main_thumbnail(run_dir) if run_dir else None
     if not thumb or not thumb.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(thumb), media_type="image/jpeg")
+
+
+@router.get("/api/runs/{name}/thumbnails")
+async def api_list_thumbnails(name: str, mode: str = ""):
+    """列出运行的全部缩略图（thumbnail.jpg + thumbnail_N.jpg，旧图全保留）。"""
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    files = [f.name for f in run_dir.glob("thumbnail*.jpg")
+             if _THUMB_NAME_RE.fullmatch(f.name)]
+
+    def _thumb_sort_key(fname: str):
+        # thumbnail.jpg 主图排最前，其余按编号升序
+        if fname == "thumbnail.jpg":
+            return (0, 0)
+        num = fname[len("thumbnail_"):-len(".jpg")]
+        return (1, int(num) if num.isdigit() else 0)
+
+    files.sort(key=_thumb_sort_key)
+    main_name = _resolve_main_thumbnail(run_dir).name
+    return {"thumbnails": [
+        {"name": f, "url": f"/api/runs/{name}/thumbnail/{f}", "is_main": f == main_name}
+        for f in files
+    ]}
+
+
+@router.get("/api/runs/{name}/thumbnail/{filename}")
+async def api_get_thumbnail_file(name: str, filename: str, mode: str = ""):
+    """按文件名提供单张缩略图（白名单校验防路径穿越）。"""
+    if not _THUMB_NAME_RE.fullmatch(filename):
+        return JSONResponse({"error": "Invalid filename"}, status_code=400)
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = find_run_dir(output_dir, name, mode)
+    thumb = run_dir / filename if run_dir else None
+    if not thumb or not thumb.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(thumb), media_type="image/jpeg")
+
+
+@router.post("/api/runs/{name}/thumbnail_regenerate")
+async def api_regen_thumbnail(name: str, mode: str = ""):
+    """为已有运行再生成一张缩略图（thumbnail_N.jpg 递增，旧图全保留；走 AI 生图）。"""
+    service = get_service()
+    ok, msg = service.regenerate_thumbnail(name, mode=mode)
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg}
+
+
+@router.post("/api/runs/{name}/thumbnail_set_main")
+async def api_set_main_thumbnail(name: str, request: Request, mode: str = ""):
+    """设置「主图」：卡片封面显示所选缩略图（thumb_main.txt 记录，不改动任何文件）。"""
+    data = await request.json()
+    filename = str(data.get("filename", "")).strip()
+    if not _THUMB_NAME_RE.fullmatch(filename):
+        return JSONResponse({"ok": False, "error": f"非法缩略图文件名: {filename}"}, status_code=400)
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir or not (run_dir / filename).exists():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    (run_dir / "thumb_main.txt").write_text(filename, encoding="utf-8")
+    return {"ok": True, "main": filename}
 
 
 @router.get("/api/runs/{name}/video/{video_name}")

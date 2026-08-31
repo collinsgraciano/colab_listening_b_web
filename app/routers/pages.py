@@ -20,6 +20,7 @@ from ..templating import templates
 import style_manager as style_lib
 import subtitle_style_manager as subtitle_style_lib
 from .ai_test import _load_ai_test_config
+from .runs import _THUMB_NAME_RE
 from .subtitle_styles import _current_subtitle_style_ctx
 
 router = APIRouter()
@@ -218,6 +219,8 @@ async def runs_page(request: Request):
             "has_script": script_path.exists(),
             "has_thumbnail": thumbnail.exists(),
             "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
+            "thumbnail_count": sum(1 for f in d.glob("thumbnail*.jpg")
+                                   if _THUMB_NAME_RE.fullmatch(f.name)),
             "uploaded": (d / "uploaded.flag").exists(),
             "has_4k": has_4k,
             "recomposable": recomposable,
