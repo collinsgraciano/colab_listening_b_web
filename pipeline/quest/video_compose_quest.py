@@ -661,9 +661,13 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
 
     elif seg_type == "dialogue":
         # Pre-compute dialogue position for scene_bg rotation
+        # 节奏自适应（与 original_cutout_compose 同款）：cadence = 总对话段数 // 背景数，
+        # 全部场景背景都会出场（48 行 × 8 背景 → 每 6 行轮换）
         dialogue_seg_count = sum(1 for s in timeline[:timeline.index(seg)] if s["type"] == "dialogue")
+        total_dialogue = sum(1 for s in timeline if s["type"] == "dialogue")
         n_scene_bgs = max(1, len(scene_bgs))
-        bg_idx = (dialogue_seg_count // 5) % n_scene_bgs
+        cadence = max(1, total_dialogue // n_scene_bgs)
+        bg_idx = (dialogue_seg_count // cadence) % n_scene_bgs
         line_bg = scene_bgs[bg_idx]
 
         line_data = dialogue[audio_idx] if audio_idx < len(dialogue) else {}

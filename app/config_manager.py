@@ -76,6 +76,10 @@ PARAM_SPEC = {
                        "label": "主持人形象绑定",
                        "options": {"": "独立主持人（新生成）", "char_a": "角色 A", "char_b": "角色 B"},
                        "help": "开场/结尾主持人复用所选角色的姿势图集与音色，不再单独生成主持人"},
+    "host_bg_prompt": {"default": "", "type": "text", "group": "content",
+                       "modes": ["quest", "original_cutout"],
+                       "label": "主持人演播室背景 Prompt",
+                       "help": "留空=LLM 按本期主题自动生成；填写后每期固定用该描述生成演播室背景（主持人开场/结尾段）"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -582,6 +586,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--animation", str(config.get("animation", "landing"))]
     if config.get("host_character"):
         args += ["--host-character", str(config["host_character"])]
+    if config.get("host_bg_prompt"):
+        args += ["--host-bg-prompt", str(config["host_bg_prompt"])]
     args += ["--visual-style", str(config.get("visual_style", "pixar3d"))]
 
     # LLM

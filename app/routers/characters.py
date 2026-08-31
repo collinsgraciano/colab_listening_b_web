@@ -92,6 +92,7 @@ async def api_character_sources():
                 "name": d.name,
                 "title": script.get("youtube_title", script.get("title", d.name)),
                 "structure": structure,
+                "has_host_bg": (img_dir / "host_bg.png").exists(),
                 "characters": characters,
             })
         except (json.JSONDecodeError, OSError):
@@ -186,6 +187,7 @@ async def api_library_list():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             thumb = d / "thumb.png"
             meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
+            meta["has_host_bg"] = (d / "host_bg.png").exists()
             chars.append(meta)
         except (json.JSONDecodeError, OSError):
             continue

@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from .config_manager import MODES, resolve_provider, load_config, find_run_dir
+from .paths import LIBRARY_DIR
 from . import run_mutex
 
 # Add pipeline source to path (local copy — fully independent)
@@ -765,6 +766,39 @@ class PipelineService:
         if copied:
             self._on_log_line(f"  [Reuse] Files: {', '.join(copied[:10])}")
 
+    def _apply_host_bg_binding(self, dirs: dict):
+        """主持人演播室背景绑定（quest/cutout）：把固定背景图复制进本运行 images/。
+
+        host_bg_source 取值：lib:<素材库ID> / run:<运行名>；空=不绑定（每期自动生成）。
+        已存在时不覆盖（与角色复用语义一致，改绑定需删除运行目录中的 host_bg.png）。
+        """
+        import shutil
+
+        src_val = str(self.config.get("host_bg_source", "") or "").strip()
+        if not src_val:
+            return
+        structure = self.config.get("structure", "original")
+        if structure not in ("quest", "original_cutout"):
+            return
+        dst = dirs["images"] / "host_bg.png"
+        if dst.exists():
+            self._on_log_line("  [HostBG] images/host_bg.png 已存在，跳过绑定复制")
+            return
+        src: Path | None = None
+        if src_val.startswith("lib:"):
+            src = LIBRARY_DIR / src_val[4:] / "host_bg.png"
+        elif src_val.startswith("run:"):
+            output_dir = Path(self.config.get("output_dir", "./output"))
+            run_dir = find_run_dir(output_dir, src_val[4:])
+            if run_dir:
+                src = run_dir / "images" / "host_bg.png"
+        if not src or not src.exists():
+            self._on_log_line(f"  [HostBG] 绑定源不存在: {src_val}，回退自动生成")
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(src), str(dst))
+        self._on_log_line(f"  [HostBG] 已绑定演播室背景 ← {src}")
+
     def _build_args(self, config: dict) -> SimpleNamespace:
         """Convert config dict → SimpleNamespace matching pipeline.py args."""
         # Resolve LLM provider (handles custom: prefix → openai)
@@ -863,6 +897,7 @@ class PipelineService:
             upscale_engine=str(config.get("upscale_engine", "ffmpeg")),
             matting_engine=str(config.get("matting_engine", "auto")),
             host_character=str(config.get("host_character", "") or ""),
+            host_bg_prompt=str(config.get("host_bg_prompt", "") or ""),
             resume=False,
         )
 
@@ -1028,6 +1063,9 @@ class PipelineService:
             char_lib = config.get("character_library", "")
             if (char_source or char_fixes or char_lib) and not resume:
                 self._reuse_characters(char_source, work_dir, script, dirs)
+
+            # --- Host studio background binding (quest/cutout，幂等，resume 亦生效) ---
+            self._apply_host_bg_binding(dirs)
 
             if self._stop_flag.is_set():
                 self._set_stopped()

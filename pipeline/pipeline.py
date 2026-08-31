@@ -207,6 +207,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation)")
     parser.add_argument("--host-character", default="", choices=["", "char_a", "char_b"],
                         help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
+    parser.add_argument("--host-bg-prompt", default="",
+                        help="Quest/Cutout: fixed TV-studio background prompt for host segments. Empty = per-topic LLM-generated (script.host_bg_prompt)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
     parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
@@ -428,14 +430,17 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             (f"Scene background, {scene}, wide shot, showing all key elements of the scene, {style_prompt}, no characters, no text, 16:9", "scene.png"))
     if is_quest:
         char_c_desc = script.get("char_c_description", "friendly staff member")
-        # Host background (TV studio)
-        host_bg_prompt = script.get("host_bg_prompt", "a bright modern TV studio set with a large screen behind, warm lighting")
+        # Host background (TV studio)：Web 固定覆盖 > 脚本字段（LLM 每期按主题）> 默认
+        host_bg_prompt = (getattr(args, "host_bg_prompt", "")
+                          or script.get("host_bg_prompt",
+                                        "a bright modern TV studio set with a large screen behind, warm lighting"))
         image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
         # Scene backgrounds generated as 2×2 atlas in _generate_scene_atlas below
     elif is_original_cutout:
-        # 主持人开场/结尾的演播室背景（quest 同款）；脚本无该字段时回退默认
-        host_bg_prompt = script.get("host_bg_prompt",
-                                    "a bright modern TV studio set with a large screen behind, warm lighting")
+        # 主持人开场/结尾的演播室背景（quest 同款）；覆盖优先级同 quest 分支
+        host_bg_prompt = (getattr(args, "host_bg_prompt", "")
+                          or script.get("host_bg_prompt",
+                                        "a bright modern TV studio set with a large screen behind, warm lighting"))
         image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
 
     # --- Resume check ---

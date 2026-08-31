@@ -178,6 +178,13 @@
                             <option value="char_b">角色 B</option>
                         </select>
                     </div>
+                    <div data-qc-group="hostbg">
+                        <label class="block text-xs text-slate-400 mb-1">主持人演播室背景</label>
+                        <select id="qc-host_bg_source" onchange="onQuickInput('host_bg_source', this.value)"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                            <option value="">每期自动生成（按主题）</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -416,6 +423,9 @@ function applyQuickConfigFields() {
     const isCutout = ACTIVE_MODE === 'original_cutout';
     document.querySelectorAll('[data-qc-group="host"]').forEach(el => el.style.display = isCutout ? '' : 'none');
     if (isCutout) setVal('qc-host_character', cfg.host_character || '');
+    // 主持人演播室背景：quest + cutout（选项由 refreshHostBgOptions 异步填充）
+    document.querySelectorAll('[data-qc-group="hostbg"]').forEach(el => el.style.display = (isQuest || isCutout) ? '' : 'none');
+    refreshHostBgOptions();
 }
 
 // 折叠面板展开/收起（默认收起，localStorage 记住状态）
@@ -639,11 +649,45 @@ function getCharKeys() {
     return keys;
 }
 
+// 主持人演播室背景下拉：素材库 host 条目 + 含 host_bg.png 的历史运行
+// （值 lib:<id> / run:<name>，启动时由服务端 _apply_host_bg_binding 复制进运行目录）
+function refreshHostBgOptions() {
+    const sel = document.getElementById('qc-host_bg_source');
+    if (!sel) return;
+    const saved = MODE_CONFIGS[ACTIVE_MODE].host_bg_source || '';
+    sel.innerHTML = '<option value="">每期自动生成（按主题）</option>';
+    const libGroup = document.createElement('optgroup');
+    libGroup.label = '素材库';
+    _libraryChars.filter(c => c.has_host_bg).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = 'lib:' + c.id;
+        opt.textContent = '📚 ' + c.name;
+        libGroup.appendChild(opt);
+    });
+    if (libGroup.children.length) sel.appendChild(libGroup);
+    const STRUCT_TAGS = {
+        'original': '[视频]', 'original_static': '[静态]',
+        'original_cutout': '[抠图]', 'quest': '[Quest]',
+    };
+    const runGroup = document.createElement('optgroup');
+    runGroup.label = '历史运行';
+    _charSources.filter(s => s.has_host_bg).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = 'run:' + s.name;
+        opt.textContent = (STRUCT_TAGS[s.structure] || '[' + (s.structure || '?') + '] ') + s.title;
+        runGroup.appendChild(opt);
+    });
+    if (runGroup.children.length) sel.appendChild(runGroup);
+    const values = [...sel.querySelectorAll('option')].map(o => o.value);
+    sel.value = values.includes(saved) ? saved : '';
+}
+
 function loadCharSources() {
     fetch('/api/character_sources')
         .then(r => r.json())
         .then(data => {
             _charSources = data.sources || [];
+            refreshHostBgOptions();
             const sel = document.getElementById('char-source');
             const current = sel.value;
             sel.innerHTML = '<option value="">生成新角色</option>';
@@ -1098,6 +1142,7 @@ function loadLibrary() {
             }
             if (changed) saveLibAssignments();
             renderLibrary();
+            refreshHostBgOptions();
         });
 }
 
