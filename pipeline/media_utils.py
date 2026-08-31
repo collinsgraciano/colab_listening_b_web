@@ -716,10 +716,13 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
             zh = seg.get("subtitle_zh", "")
             audio_d = seg.get("audio_dur", dur - pad)
             if en or zh:
-                # 段内候选语音起点：静音终点落在语音窗口内（避开首尾 fade）
+                # 段内候选语音起点：仅取真正的句间停顿——
+                # ss > 段首+0.15 排除与上一段尾 pad 合并的段首 lead-in 静音
+                # （其终点=首句自身语音起点，吸附它会让字幕比音频提前一句）；
+                # se < 段尾-0.15 排除段尾静音（避开首尾 fade）
                 seg_pauses = [
-                    se for (_, se) in all_pauses
-                    if t_cursor + 0.15 < se < t_cursor + audio_d - 0.15
+                    se for (ss, se) in all_pauses
+                    if ss > t_cursor + 0.15 and se < t_cursor + audio_d - 0.15
                 ]
                 subtitle_entries.extend(
                     _split_subtitles(en, zh, audio_d, t_cursor,
