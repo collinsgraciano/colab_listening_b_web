@@ -74,10 +74,49 @@ def _rate_to_speed(rate: str) -> float:
         return 1.0
 
 
+# Natural inter-sentence pause inserted between Kokoro sentence chunks.
+# Concatenating split sentences back-to-back sounds rushed otherwise; 0.12s
+# keeps narration pacing natural without double-gapping (chunks carry their
+# own trailing silence). Internal prosody constant, not a config option.
+_SENTENCE_GAP_SEC = 0.12
+
+# Negative lookbehinds block splits right after common abbreviations
+# ("Mr.", "Dr.", "a.m."-style ...) so "I saw Dr. Smith yesterday." stays
+# one sentence. Ported from moss_tts_engine (battle-tested there).
+_ABBR_LOOKBEHIND = (
+    r'(?<![A-Za-z]\.[A-Za-z]\.)'
+    r'(?<!\bMr\.)'
+    r'(?<!\bMrs\.)'
+    r'(?<!\bMs\.)'
+    r'(?<!\bDr\.)'
+    r'(?<!\bProf\.)'
+    r'(?<!\bSt\.)'
+    r'(?<!\bvs\.)'
+    r'(?<!\betc\.)'
+    r'(?<!\bJr\.)'
+    r'(?<!\bInc\.)'
+)
+_SENT_SPLIT_RE = re.compile(_ABBR_LOOKBEHIND + r'(?<=[.!?])\s+')
+
+
 def _split_sentences(text: str) -> list[str]:
-    """Split text into sentences for Kokoro processing."""
-    parts = re.split(r'(?<=[.!?])\s+', text.strip())
-    return [p for p in parts if p.strip()]
+    """Split text into sentences for Kokoro processing.
+
+    Abbreviation periods (Dr./Mr./a.m./...) do not trigger a split;
+    fragments that start lowercase (unknown abbreviations) are merged back.
+    """
+    parts = _SENT_SPLIT_RE.split(text.strip())
+    merged: list[str] = []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if merged and part[:1].isascii() and part[:1].islower():
+            # lowercase start = artificial split (e.g. "approx. three days")
+            merged[-1] = merged[-1].rstrip() + " " + part
+        else:
+            merged.append(part)
+    return merged
 
 
 def _clean_text_for_kokoro(text: str) -> str:
@@ -91,6 +130,66 @@ def _clean_text_for_kokoro(text: str) -> str:
     text = re.sub(r'[^\w\s.,!?\']', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
+
+
+_UNITS = ["zero", "one", "two", "three", "four", "five", "six", "seven",
+          "eight", "nine", "ten", "eleven", "twelve"]
+_TENS = {1: "ten", 2: "twenty", 3: "thirty", 4: "forty", 5: "fifty",
+         6: "sixty", 7: "seventy", 8: "eighty", 9: "ninety"}
+
+
+def _two_digit_words(n: int) -> str:
+    """10-99 → English words (26 → 'twenty six'); assumes 10 <= n <= 99."""
+    t, u = divmod(n, 10)
+    return _TENS[t] if u == 0 else f"{_TENS[t]} {_UNITS[u]}"
+
+
+def _normalize_tts_text_en(text: str) -> str:
+    """Normalize numbers/symbols Kokoro's G2P reads unreliably.
+
+    Runs BEFORE _clean_text_for_kokoro, which strips $ % : — converting
+    '$20' to '20' loses 'dollars' and '10%' loses 'percent'. Plain integers
+    are kept as digits (misaki reads those fine); only symbol semantics are
+    added: currency, percent, clock times, and 4-digit years.
+    """
+    # Currency with cents: $19.99 → 19 dollars and 99 cents
+    def _money_cents(m: re.Match) -> str:
+        d, c = m.group(1), m.group(2)
+        dollars = "dollar" if d == "1" else "dollars"
+        cents = "cent" if c.lstrip("0") == "1" else "cents"
+        return f"{d} {dollars} and {c} {cents}"
+
+    text = re.sub(r'\$(\d+)\.(\d{2})(?!\d)', _money_cents, text)
+    # Plain currency: $20 → 20 dollars
+    text = re.sub(
+        r'\$(\d+)(?!\d|\.\d)',
+        lambda m: f"{m.group(1)} dollar{'s' if m.group(1) != '1' else ''}",
+        text)
+    # Clock times: 8:30 → eight 30 (read 'eight thirty'), 8:05 → eight oh 5,
+    # 9:00 → nine o'clock. Hours 13-23 keep digits (read fine as-is).
+    def _clock(m: re.Match) -> str:
+        h, mm = int(m.group(1)), m.group(2)
+        hour = _UNITS[h] if 0 <= h <= 12 else str(h)
+        if mm == "00":
+            return f"{hour} o'clock"
+        if 1 <= int(mm) <= 9:
+            return f"{hour} oh {_UNITS[int(mm)]}"
+        return f"{hour} {mm}"
+
+    text = re.sub(r'(?<!\d)(\d{1,2}):(\d{2})(?!\d)', _clock, text)
+    # 4-digit years: 2026 → twenty twenty six, 1999 → nineteen ninety nine.
+    # 2000-2009 stay digits (read 'two thousand ...' which is fine).
+    def _year(m: re.Match) -> str:
+        s = m.group(0)
+        first = {"19": "nineteen", "20": "twenty"}.get(s[:2])
+        if not first or int(s[2:]) < 10:
+            return s
+        return f"{first} {_two_digit_words(int(s[2:]))}"
+
+    text = re.sub(r'(?<!\d)(19|20)\d{2}(?!\d)', _year, text)
+    # Percent: 50% → 50 percent
+    text = re.sub(r'(\d+(?:\.\d+)?)\s*%', r'\1 percent', text)
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +347,59 @@ class TTSEngine:
             pass
 
     @staticmethod
+    def _normalize_wav(wav_path: str):
+        """Loudness-normalize a WAV in place (PCM domain, pre-MP3-encode).
+
+        Same targets/fallbacks as _loudnorm but applied before the single
+        lossy encode, so each Kokoro clip goes through MP3 encoding exactly
+        once (was: MP3 → loudnorm re-encode → optional boost re-encode).
+        """
+        tmp = wav_path.replace(".wav", "_norm.wav")
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", wav_path,
+             "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+             "-c:a", "pcm_s16le", "-ar", "24000", tmp],
+            capture_output=True, timeout=30,
+        )
+        if result.returncode == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 1000:
+            os.replace(tmp, wav_path)
+        else:
+            # Fallback: simple volume boost (+6dB)
+            fallback = wav_path.replace(".wav", "_vol.wav")
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", wav_path,
+                 "-af", "volume=6dB",
+                 "-c:a", "pcm_s16le", "-ar", "24000", fallback],
+                capture_output=True, timeout=30,
+            )
+            if os.path.exists(fallback) and os.path.getsize(fallback) > 1000:
+                os.replace(fallback, wav_path)
+
+        # Boost again if still too quiet (target ~-16 dB), same as _loudnorm
+        try:
+            detect = subprocess.run(
+                ["ffmpeg", "-i", wav_path, "-af", "volumedetect",
+                 "-f", "null", "-"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=15)
+            m = re.search(r"mean_volume:\s*(-?\d+\.?\d*)\s*dB", detect.stderr)
+            if m:
+                mean_db = float(m.group(1))
+                if mean_db < -20:
+                    boost = -16 - mean_db
+                    boosted = wav_path.replace(".wav", "_boost.wav")
+                    subprocess.run(
+                        ["ffmpeg", "-y", "-i", wav_path,
+                         "-af", f"volume={boost}dB,alimiter=limit=0.95",
+                         "-c:a", "pcm_s16le", "-ar", "24000", boosted],
+                        capture_output=True, timeout=30)
+                    if os.path.exists(boosted) and os.path.getsize(boosted) > 1000:
+                        os.replace(boosted, wav_path)
+                        print(f"    [loudnorm] Extra boost: +{boost:.1f}dB (was {mean_db:.1f}dB)")
+        except Exception:
+            pass
+
+    @staticmethod
     def _kokoro_synth_chunk(pipeline, text: str, voice: str,
                             speed: float) -> list:
         """Try synthesizing text with Kokoro, progressively splitting on failure.
@@ -329,30 +481,37 @@ class TTSEngine:
             sentence = sentence.strip()
             if not sentence:
                 continue
-            # Apply phonetic fixes FIRST (before cleaning removes hyphens)
+            # Apply phonetic fixes FIRST (before cleaning removes hyphens),
+            # then normalize numbers/symbols, then strip problem characters.
             fixed = _apply_phonetic_fixes(sentence)
-            cleaned = _clean_text_for_kokoro(fixed)
-            all_audio.extend(
-                self._kokoro_synth_chunk(pipeline, cleaned, voice, speed)
-            )
+            normalized = _normalize_tts_text_en(fixed)
+            cleaned = _clean_text_for_kokoro(normalized)
+            parts = self._kokoro_synth_chunk(pipeline, cleaned, voice, speed)
+            if not parts:
+                continue
+            # Natural inter-sentence pause, only between sentences that
+            # actually produced audio (single-sentence lines unaffected)
+            if all_audio and _SENTENCE_GAP_SEC > 0:
+                all_audio.append(
+                    np.zeros(int(24000 * _SENTENCE_GAP_SEC), dtype=np.float32))
+            all_audio.extend(parts)
 
         if not all_audio:
             raise RuntimeError(f"Kokoro produced no audio for: {text[:50]}")
 
         final_audio = all_audio[0] if len(all_audio) == 1 else np.concatenate(all_audio)
 
-        # Write WAV (24kHz), then convert to MP3 via ffmpeg
+        # Write WAV (24kHz) → loudness-normalize in PCM domain → single MP3
+        # encode (loudnorm used to re-encode the MP3, up to 3 lossy passes)
         wav_path = out_path.replace('.mp3', '_tmp.wav')
         sf.write(wav_path, final_audio, 24000)
+        self._normalize_wav(wav_path)
         subprocess.run(
             ["ffmpeg", "-y", "-i", wav_path, "-c:a", "libmp3lame", "-b:a", "128k",
              "-ar", "24000", "-ac", "1", out_path],
             check=True, capture_output=True
         )
         os.remove(wav_path)
-
-        # Apply loudnorm
-        self._loudnorm(out_path)
 
         return self.get_duration(out_path)
 
@@ -436,13 +595,13 @@ class TTSEngine:
 
         wav_path = out_path.replace('.mp3', '_tmp.wav')
         sf.write(wav_path, final_audio, 24000)
+        self._normalize_wav(wav_path)
         subprocess.run(
             ["ffmpeg", "-y", "-i", wav_path, "-c:a", "libmp3lame", "-b:a", "128k",
              "-ar", "24000", "-ac", "1", out_path],
             check=True, capture_output=True
         )
         os.remove(wav_path)
-        self._loudnorm(out_path)
         return self.get_duration(out_path)
 
 
