@@ -58,6 +58,11 @@ from .topics_io import (
     load_used_topic_names as _load_used_topic_names,
 )
 from .tts_state import TTS_SYNTH_LOCK as _TTS_SYNTH_LOCK, PREVIEW_TEXTS as _PREVIEW_TEXTS
+from .routers import config as config_routes
+from .routers import health as health_routes
+from .routers import mcp_tokens as mcp_tokens_routes
+from .routers import mode_test as mode_test_routes
+from .routers import run as run_routes
 
 # FastAPI app
 app = FastAPI(title="Listening Video Generator")
@@ -352,178 +357,13 @@ async def runs_page(request: Request):
 # Config API
 # ===========================================================================
 
-@app.post("/api/config/save")
-async def api_save_config(request: Request):
-    data = await request.json()
-    mode = data.pop("_mode", "") or get_active_mode()
-    if mode not in MODES:
-        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
-    config = load_mode_config(mode)
-    config.update(data)
-    config["structure"] = mode
-    save_mode_config(mode, config)
-    return {"ok": True, "mode": mode}
-
-
-@app.post("/api/config/save_all")
-async def api_save_all_config(request: Request):
-    data = await request.json()
-    mode = data.pop("_mode", "") or get_active_mode()
-    if mode not in MODES:
-        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
-    data["structure"] = mode
-    save_mode_config(mode, data)
-    return {"ok": True, "mode": mode}
-
-
-@app.get("/api/config")
-async def api_get_config(mode: str = ""):
-    return load_mode_config(mode) if mode in MODES else load_config()
-
-
-@app.get("/api/config/all")
-async def api_get_all_configs():
-    """一次性返回 3 个模式的完整配置 + 当前激活模式（控制台预载用）。"""
-    return {
-        "active_mode": get_active_mode(),
-        "modes": load_all_mode_configs(),
-        "mode_labels": MODE_LABELS,
-    }
-
-
-@app.post("/api/config/active")
-async def api_set_active_mode(request: Request):
-    data = await request.json()
-    mode = data.get("mode", "")
-    if mode not in MODES:
-        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
-    set_active_mode(mode)
-    return {"ok": True, "active_mode": mode}
-
-
-@app.get("/api/config/defaults")
-async def api_get_defaults():
-    return get_default_config()
-
-
-@app.post("/api/config/preset/save")
-async def api_save_preset(request: Request):
-    data = await request.json()
-    name = data.get("name", "")
-    config = data.get("config", {})
-    if not name:
-        return JSONResponse({"ok": False, "error": "名称不能为空"}, status_code=400)
-    save_preset(name, config)
-    return {"ok": True, "name": name}
-
-
-@app.get("/api/config/preset/load/{name}")
-async def api_load_preset(name: str):
-    try:
-        return load_preset(name)
-    except FileNotFoundError:
-        return JSONResponse({"error": "Preset not found"}, status_code=404)
-
-
-@app.delete("/api/config/preset/{name}")
-async def api_delete_preset(name: str):
-    delete_preset(name)
-    return {"ok": True}
-
-
-@app.get("/api/config/presets")
-async def api_list_presets():
-    return {"presets": list_presets()}
-
+app.include_router(config_routes.router)
 
 # ===========================================================================
 # Pipeline Run API
 # ===========================================================================
 
-@app.post("/api/run/start")
-async def api_run_start(request: Request):
-    service = get_service()
-    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    config = data.get("config") or load_config()
-    resume = data.get("resume", False)
-    step_mode = data.get("step_mode", False)
-    ok = service.start(config, resume=resume, step_mode=step_mode)
-    return {"ok": ok, "status": service.status}
-
-
-@app.post("/api/run/continue")
-async def api_run_continue():
-    """Continue to next step in step mode."""
-    service = get_service()
-    service.continue_step()
-    return {"ok": True, "status": service.status}
-
-
-@app.post("/api/run/stop")
-async def api_run_stop():
-    service = get_service()
-    service.stop()
-    return {"ok": True, "status": service.status}
-
-
-@app.get("/api/run/status")
-async def api_run_status():
-    service = get_service()
-    return service.get_progress()
-
-
-@app.get("/api/run/logs")
-async def api_run_logs():
-    """SSE endpoint for streaming logs."""
-    service = get_service()
-
-    async def event_stream():
-        last_idx = 0
-        # Send existing logs first
-        existing = service.get_logs_since(last_idx)
-        last_idx = len(service.log_lines)
-        for line in existing:
-            yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
-
-        # Stream new logs
-        while True:
-            status = service.get_progress()
-            # Send new logs
-            new_logs = service.get_logs_since(last_idx)
-            last_idx = len(service.log_lines)
-            for line in new_logs:
-                yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
-
-            # Send status update
-            yield f"data: {json.dumps({'type': 'status', **status})}\n\n"
-
-            if status["status"] not in ("running", "paused"):
-                break
-            await asyncio.sleep(0.5)
-
-        # Final status
-        status = service.get_progress()
-        yield f"data: {json.dumps({'type': 'done', **status})}\n\n"
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-@app.get("/api/run/logs/since/{since}")
-async def api_run_logs_since(since: int):
-    """Get logs since a given index (for non-SSE polling)."""
-    service = get_service()
-    logs = service.get_logs_since(since)
-    total = len(service.log_lines)
-    return {"logs": logs, "total": total, "status": service.get_progress()}
-
+app.include_router(run_routes.router)
 
 # ===========================================================================
 # 模式效果测试（一次性生成迷你素材 + 零消耗本地合成）
@@ -539,94 +379,7 @@ async def mode_test_page(request: Request):
     })
 
 
-@app.get("/api/mode_test/status")
-async def api_mode_test_status():
-    return get_mode_test_service().full_status()
-
-
-@app.post("/api/mode_test/generate")
-async def api_mode_test_generate(request: Request):
-    """生成指定模式的迷你测试素材（消耗积分，与主 pipeline 互斥）。"""
-    data = await request.json()
-    mode = data.get("mode", "")
-    topic = str(data.get("topic", "") or "")
-    force = bool(data.get("force", False))
-    ok, msg = get_mode_test_service().start_generate(mode, topic=topic, force=force)
-    return {"ok": ok, "message": msg}
-
-
-@app.post("/api/mode_test/compose")
-async def api_mode_test_compose(request: Request):
-    """对已生成素材批量本地合成测试视频（零积分）。"""
-    data = await request.json()
-    modes = data.get("modes") or []
-    ok, msg = get_mode_test_service().start_compose(modes)
-    return {"ok": ok, "message": msg}
-
-
-@app.post("/api/mode_test/stop")
-async def api_mode_test_stop():
-    service = get_mode_test_service()
-    service.stop()
-    return {"ok": True}
-
-
-@app.get("/api/mode_test/logs")
-async def api_mode_test_logs():
-    """SSE endpoint for mode-test logs."""
-    service = get_mode_test_service()
-
-    async def event_stream():
-        last_idx = 0
-        existing = service.get_logs_since(last_idx)
-        last_idx = len(service.log_lines)
-        for line in existing:
-            yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
-
-        while True:
-            status = service.get_progress()
-            new_logs = service.get_logs_since(last_idx)
-            last_idx = len(service.log_lines)
-            for line in new_logs:
-                yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
-            yield f"data: {json.dumps({'type': 'status', **status})}\n\n"
-            if status["status"] not in ("running", "paused"):
-                break
-            await asyncio.sleep(0.5)
-
-        status = service.get_progress()
-        yield f"data: {json.dumps({'type': 'done', **status})}\n\n"
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-@app.get("/api/mode_test/video/{mode}/{video_name}")
-async def api_mode_test_video(mode: str, video_name: str):
-    """播放测试视频（仅限 active 素材集目录内，防路径穿越）。"""
-    service = get_mode_test_service()
-    if mode not in ("original", "original_static", "original_cutout", "quest"):
-        return JSONResponse({"error": "未知模式"}, status_code=400)
-    # 路径穿越防护：只允许纯文件名
-    if "/" in video_name or "\\" in video_name or ".." in video_name:
-        return JSONResponse({"error": "非法路径"}, status_code=400)
-    set_dir = service._active_set(mode)
-    if set_dir is None:
-        return JSONResponse({"error": "素材集不存在"}, status_code=404)
-    video_path = set_dir / video_name
-    if not video_path.exists():
-        video_path = set_dir / "videos" / video_name
-    if not video_path.exists():
-        return JSONResponse({"error": "Not found"}, status_code=404)
-    return FileResponse(str(video_path), media_type="video/mp4")
-
+app.include_router(mode_test_routes.router)
 
 # ===========================================================================
 # Topics API
@@ -1876,79 +1629,7 @@ async def api_open_folder(name: str, mode: str = ""):
 # MCP Token detection
 # ===========================================================================
 
-@app.get("/api/mcp/detect_token")
-async def api_detect_token():
-    token = detect_local_mcp_token()
-    if token:
-        # Mask for display but return full for use
-        return {"ok": True, "token": token}
-    return {"ok": False, "error": "未检测到本地 MCP Token"}
-
-
-# --- 页面专属 MCP Tokens（🎨画面风格 / 👥人物素材库 独立设置）---
-
-@app.get("/api/mcp/page_tokens")
-async def api_page_tokens_get():
-    """页面专属 MCP Token 设置 + 当前生效来源。
-
-    tokens_text 为本页存储的原文（供编辑回填）；masked 仅掩码（供生效来源展示）。
-    """
-    saved = load_page_tokens()
-    pages: dict[str, dict] = {}
-    for page in MCP_PAGES:
-        resolved = resolve_page_tokens(page)
-        saved_tokens = saved.get(page, [])
-        pages[page] = {
-            "tokens_text": "\n".join(saved_tokens),
-            "saved_count": len(saved_tokens),
-            "source": resolved["source"],
-            "source_label": MCP_SOURCE_LABELS[resolved["source"]],
-            "mode": resolved["mode"],
-            "effective_count": len(resolved["tokens"]),
-            "masked": [mask_token(t) for t in resolved["tokens"][:5]],
-        }
-    return {"pages": pages}
-
-
-@app.post("/api/mcp/page_tokens")
-async def api_page_tokens_save(request: Request):
-    """保存页面专属 MCP Tokens（多行文本，每行一个）。留空 = 回落模式配置。"""
-    data = await request.json()
-    page = str(data.get("page", "")).strip()
-    if page not in MCP_PAGES:
-        return JSONResponse({"ok": False, "error": f"未知页面: {page}"}, status_code=400)
-    tokens_text = str(data.get("tokens", ""))
-    try:
-        tokens = await asyncio.to_thread(save_page_tokens, page, tokens_text)
-    except (OSError, ValueError) as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-    return {"ok": True, "page": page, "count": len(tokens)}
-
-
-@app.post("/api/mcp/page_tokens/test")
-async def api_page_tokens_test(request: Request):
-    """用解析后的 token 建独立会话 + tools/list（0 积分）验证可用性。"""
-    data = await request.json()
-    page = str(data.get("page", "")).strip()
-    if page not in MCP_PAGES:
-        return JSONResponse({"ok": False, "error": f"未知页面: {page}"}, status_code=400)
-
-    def _do_test() -> dict:
-        resolved = resolve_page_tokens(page)
-        if not resolved["tokens"]:
-            return {"ok": False, "source": resolved["source"],
-                    "error": "未配置 MCP Token（本页专属 / 模式配置 / 本地检测均为空）"}
-        mcp = PageMcpSession(resolved["tokens"]).initialize()
-        tools = mcp.list_tools()
-        return {"ok": True, "source": resolved["source"],
-                "source_label": MCP_SOURCE_LABELS[resolved["source"]],
-                "token_count": len(resolved["tokens"]), "tools": len(tools)}
-
-    try:
-        return await asyncio.to_thread(_do_test)
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
+app.include_router(mcp_tokens_routes.router)
 
 # ===========================================================================
 # Character reuse API
@@ -2102,11 +1783,7 @@ async def api_char_sets_delete(set_id: str):
 # Health check
 # ===========================================================================
 
-@app.get("/api/health")
-async def health():
-    return {"ok": True, "pipeline_dir": str(PIPELINE_DIR),
-            "pipeline_exists": PIPELINE_DIR.exists()}
-
+app.include_router(health_routes.router)
 
 # ===========================================================================
 # Script editor API
