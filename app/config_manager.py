@@ -15,10 +15,10 @@ DEFAULT_CONFIG_PATH = CONFIGS_DIR / "default.json"
 # 不再依赖旧的外部 colab_listening_b 目录）
 PIPELINE_DIR = WEB_ROOT / "pipeline"
 
-# pipeline 模块目录（style_manager 在其中）
-_LOCAL_PIPELINE_DIR = PIPELINE_DIR
-if str(_LOCAL_PIPELINE_DIR) not in sys.path:
-    sys.path.insert(0, str(_LOCAL_PIPELINE_DIR))
+# pipeline 模块目录（style_manager 在其中）——sys.path 注入委托给 paths.ensure_pipeline_on_path
+from .paths import ensure_pipeline_on_path
+
+ensure_pipeline_on_path()
 
 # All configurable parameters with defaults, types, and metadata
 #

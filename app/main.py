@@ -14,7 +14,6 @@ from fastapi.responses import (
     FileResponse, RedirectResponse, PlainTextResponse, Response,
 )
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 # Suppress noisy Windows ConnectionResetError on video stream disconnect
 logging.getLogger("asyncio").setLevel(logging.CRITICAL)
@@ -45,11 +44,20 @@ from . import script_library
 import style_manager as style_lib
 import subtitle_style_manager as subtitle_style_lib
 
-# Paths
-WEB_ROOT = Path(__file__).parent.parent.resolve()
-TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
-PIPELINE_DIR = WEB_ROOT / "pipeline"
+# 共享基础设施（路径 / 模板 / SSE / 话题文件 IO / TTS 共享状态）
+from .paths import (
+    WEB_ROOT, TEMPLATES_DIR, STATIC_DIR, PIPELINE_DIR, LIBRARY_DIR,
+    TRASH_META_FILENAME, SCRIPTS_FORM_PATH, CHARACTER_SETS_PATH, AI_TEST_CONFIG_PATH,
+    QWEN_VOICE_CONFIG_PATH, CUSTOM_VOICES_DIR, VOICE_PREVIEWS_DIR,
+    KOKORO_VOICE_CONFIG_PATH, MOSS_VOICE_CONFIG_PATH, MOSS_VOICES_DIR, MOSS_PREVIEWS_DIR,
+)
+from .templating import templates
+from .sse import sse_line as _sse, SSE_HEADERS as _SSE_HEADERS
+from .topics_io import (
+    load_topics_data as _load_topics_data,
+    load_used_topic_names as _load_used_topic_names,
+)
+from .tts_state import TTS_SYNTH_LOCK as _TTS_SYNTH_LOCK, PREVIEW_TEXTS as _PREVIEW_TEXTS
 
 # FastAPI app
 app = FastAPI(title="Listening Video Generator")
@@ -65,31 +73,6 @@ class _NoCacheStaticFiles(StaticFiles):
 
 
 app.mount("/static", _NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-
-# Custom Jinja2 filter for date formatting
-def _datestr(ts):
-    if not ts:
-        return ""
-    try:
-        from datetime import datetime
-        d = datetime.fromtimestamp(float(ts))
-        now = datetime.now()
-        diff = (now - d).total_seconds()
-        if diff < 3600:
-            return f"{int(diff/60)}分钟前"
-        elif diff < 86400:
-            return f"{int(diff/3600)}小时前"
-        elif diff < 604800:
-            return f"{int(diff/86400)}天前"
-        else:
-            return d.strftime("%m-%d")
-    except (ValueError, TypeError):
-        return ""
-
-
-templates.env.filters["datestr"] = _datestr
 
 
 # ===========================================================================
@@ -787,41 +770,6 @@ async def api_reset_used():
 # Topics AI — generation & review
 # ===========================================================================
 
-def _load_topics_data(config: dict) -> dict:
-    """Load topics.json → {category: [topics]} (empty dict on missing/broken)."""
-    topics_file = config.get("topics_file", "")
-    if topics_file and Path(topics_file).exists():
-        try:
-            return json.loads(Path(topics_file).read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
-    return {}
-
-
-def _load_used_topic_names(config: dict) -> list[str]:
-    """Load used_topics.json → list of topic names."""
-    used_file = config.get("used_topics_file", "")
-    if not used_file:
-        output_dir = config.get("output_dir", "./output")
-        used_file = str(Path(output_dir) / "used_topics.json")
-    if Path(used_file).exists():
-        try:
-            return list(json.loads(Path(used_file).read_text(encoding="utf-8")).keys())
-        except (json.JSONDecodeError, OSError):
-            return []
-    return []
-
-
-def _sse(payload: dict) -> str:
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-
-
-_SSE_HEADERS = {
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive",
-    "X-Accel-Buffering": "no",
-}
-
 
 @app.post("/api/topics/ai/generate")
 async def api_topics_ai_generate(request: Request):
@@ -1300,9 +1248,6 @@ async def scripts_page(request: Request):
     })
 
 
-SCRIPTS_FORM_PATH = WEB_ROOT / "configs" / "scripts_form.json"
-
-
 def _load_scripts_form() -> dict:
     """Remember the last-used provider/model on the scripts page."""
     if SCRIPTS_FORM_PATH.exists():
@@ -1664,7 +1609,6 @@ async def api_list_images(name: str, mode: str = ""):
 
 # 回收站：删除运行先移入 output/_recycle_bin，回收站内再次删除才真正删文件
 # （RECYCLE_DIRNAME / LEGACY_RECYCLE_DIRNAME 定义见 config_manager.py）
-TRASH_META_FILENAME = ".trash_meta.json"
 
 
 def _move_run_to_recycle_bin(output_dir: Path, run_dir: Path) -> str:
@@ -2090,7 +2034,6 @@ async def api_character_sources():
 # Character Sets API (角色套装：整套角色配置命名保存 / 一键应用)
 # ===========================================================================
 
-CHARACTER_SETS_PATH = WEB_ROOT / "configs" / "character_sets.json"
 _SET_FIELDS = ["character_source", "character_reuse", "character_fixes",
                "character_library", "character_voices", "character_zh_voices",
                "character_moss_voices", "character_kokoro_voices", "_ui_descs"]
@@ -2263,8 +2206,6 @@ async def api_get_srt(name: str, mode: str = ""):
 # Character Library API
 # ===========================================================================
 
-LIBRARY_DIR = WEB_ROOT / "configs" / "character_library"
-
 
 @app.get("/api/character_library")
 async def api_library_list():
@@ -2389,16 +2330,6 @@ async def api_library_image(lib_id: str):
 # ===========================================================================
 # QwenTTS Voice Management
 # ===========================================================================
-
-QWEN_VOICE_CONFIG_PATH = WEB_ROOT / "configs" / "qwen_voice_config.json"
-CUSTOM_VOICES_DIR = WEB_ROOT / "configs" / "custom_voices"
-VOICE_PREVIEWS_DIR = WEB_ROOT / "configs" / "voice_previews"
-
-# Must match the defaults used in voices.html JS
-_PREVIEW_TEXTS = {
-    "english": "Hello, this is a voice preview test.",
-    "chinese": "你好，这是音色试听测试。",
-}
 
 
 def _preview_cache_path(speaker: str, language: str, text: str) -> Path:
@@ -2897,9 +2828,6 @@ async def api_qwen_candidates_delete_batch(request: Request):
 
 # --- 一键生成所有候选试听音频（后台线程 + 轮询进度）---
 
-# 串行化 GPU 合成：批量试听任务与单次试听共用同一模型实例，防并发冲突
-_TTS_SYNTH_LOCK = threading.Lock()
-
 _CANDIDATE_PREVIEW_JOB: dict = {
     "running": False,
     "total": 0,
@@ -3264,7 +3192,6 @@ async def api_kokoro_preview_cached(voice: str, language: str = "english"):
 
 
 # Kokoro voice defaults config (性别自动分配的默认音色，与 Qwen/MOSS 对齐)
-KOKORO_VOICE_CONFIG_PATH = WEB_ROOT / "configs" / "kokoro_voice_config.json"
 
 
 def _load_kokoro_voice_config() -> dict:
@@ -3336,10 +3263,6 @@ async def api_kokoro_defaults_put(request: Request):
 # ===========================================================================
 # MOSS-TTS Voice Management
 # ===========================================================================
-
-MOSS_VOICE_CONFIG_PATH = WEB_ROOT / "configs" / "moss_voice_config.json"
-MOSS_VOICES_DIR = WEB_ROOT / "configs" / "moss_voices"
-MOSS_PREVIEWS_DIR = WEB_ROOT / "configs" / "moss_previews"
 
 
 def _moss_preview_cache_path(speaker: str, language: str, text: str) -> Path:
@@ -3592,8 +3515,6 @@ async def api_library_set_moss_voice(lib_id: str, request: Request):
 # ===========================================================================
 # AI Test — LLM Playground
 # ===========================================================================
-
-AI_TEST_CONFIG_PATH = WEB_ROOT / "configs" / "ai_test_config.json"
 
 
 def _load_ai_test_config() -> dict:
