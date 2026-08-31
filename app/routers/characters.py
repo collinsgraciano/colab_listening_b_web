@@ -8,8 +8,9 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from ..config_manager import (
     MODES, find_run_dir, get_active_mode, iter_run_dirs, load_config,
+    resolve_provider,
 )
-from ..library_io import write_library_meta
+from ..library_io import list_library_chars, write_library_meta
 from ..page_mcp import (
     SOURCE_LABELS as MCP_SOURCE_LABELS,
     PageMcpSession, mask_token, resolve_page_tokens,
@@ -532,6 +533,150 @@ async def api_library_create(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return {"ok": True, "id": lib_id, "meta": meta}
+
+
+# ===========================================================================
+# AI Character Generation (LLM 一键生成通用角色：描述先行 → 用户审核后再生图)
+# ===========================================================================
+
+_ai_gen_status: dict = {"status": "idle", "count": 0, "error": "", "created": []}
+
+
+def _generate_ai_characters(structure: str, count: int = 5) -> None:
+    """后台线程：LLM 生成通用角色候选并直接入库（仅描述无图，生图由用户在卡片上触发）。"""
+    import urllib.request
+
+    _ai_gen_status.update({"status": "generating", "count": 0, "error": "", "created": []})
+    try:
+        p_type, base_url, api_key, model = resolve_provider(load_config())
+        if not api_key:
+            raise RuntimeError(f"未配置 {p_type} 的 API Key，请在参数配置页面填写")
+        if not model:
+            raise RuntimeError("未指定模型（该 Provider 未配置模型列表）")
+
+        # 防重复：把现有角色清单交给 LLM 规避
+        existing = list_library_chars()
+        avoid_lines = "\n".join(
+            f"- {c.get('name', '')}: {c.get('description', '')[:80]}"
+            for c in existing[:30]) or "(none)"
+
+        prompt = f"""You are a character designer for an English listening-practice video channel (audience: overseas Chinese ESL learners). The videos are everyday conversations set in common daily scenarios (coffee shop, pharmacy, airport, bank, restaurant, hotel, school, office, shopping mall, clinic, gas station, post office, gym, library...).
+
+Design exactly {count} GENERIC, REUSABLE human characters that could plausibly appear in many of those daily scenarios.
+
+Requirements:
+- Mix genders (about half female, half male); mix ages (young adult / 30s / middle-aged / senior) and occupations
+- "description": APPEARANCE ONLY in English, 25-45 words (age, hair, face, clothing, accessories, one distinctive trait). NEVER mention any location or scene — the character image is generated on a plain white background. Must be detailed enough to be the sole input for AI image generation.
+- "role": the character's occupation/identity in 1-3 English words (e.g. "coffee shop barista")
+- "scenarios": 3-5 short CHINESE scenario labels (2-6 Chinese characters each, e.g. "咖啡店点单", "药店买药") — the common scenarios this character fits
+- Do NOT duplicate these existing characters:
+{avoid_lines}
+
+Output valid JSON only (no markdown, no explanations):
+{{"characters": [{{"name": "...", "gender": "female", "role": "...", "description": "...", "scenarios": ["..."]}}]}}"""
+
+        from llm_client import _extract_json  # pipeline/ 已在 sys.path
+
+        body = {
+            "model": model,
+            "messages": [
+                {"role": "system",
+                 "content": "You are an expert character designer. Output valid JSON only — no markdown, no explanations."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.9,
+            "max_tokens": 4096,
+        }
+        if p_type != "openai":
+            body["reasoning_effort"] = "low"
+
+        print(f"  [CharAI] Requesting {count} generic characters from {model} ({p_type})...")
+        req = urllib.request.Request(
+            f"{base_url}/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            method="POST",
+        )
+        req.add_header("Authorization", f"Bearer {api_key}")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", "CodelyLLM/1.0")
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+        content = result["choices"][0]["message"]["content"]
+        chars = _extract_json(content).get("characters") or []
+        print(f"  [CharAI] LLM returned {len(chars)} candidates")
+
+        gender_map = {"female": "female", "male": "male",
+                      "woman": "female", "man": "male", "f": "female", "m": "male"}
+        saved = []
+        base_ms = int(time.time() * 1000)
+        for i, c in enumerate(chars):
+            if not isinstance(c, dict):
+                continue
+            name = str(c.get("name", "")).strip()
+            gender = gender_map.get(str(c.get("gender", "")).strip().lower(), "")
+            desc = str(c.get("description", "")).strip()
+            role = str(c.get("role", "")).strip()
+            scenarios = [str(s).strip() for s in (c.get("scenarios") or [])
+                         if str(s).strip()]
+            if not name or not gender or not desc:
+                continue
+            lib_id = f"char_{base_ms + i}_{gender}"  # 毫秒+序号，批量入库不撞 ID
+            lib_dir = LIBRARY_DIR / lib_id
+            lib_dir.mkdir(parents=True, exist_ok=True)
+            meta = {
+                "id": lib_id,
+                "name": f"{name} ({role})" if role else name,
+                "description": desc,
+                "gender": gender,
+                "structure": structure,
+                "role": role,
+                "scenarios": scenarios,
+                "origin": "ai",
+                "qwen_speaker": "",
+                "moss_voice": "",
+                "kokoro_voice": "",
+                "source_run": "",
+                "source_key": "char_a",
+                "created": time.time(),
+            }
+            (lib_dir / "meta.json").write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+            saved.append(lib_id)
+        print(f"  [CharAI] Saved {len(saved)} characters to library")
+
+        if not saved:
+            raise RuntimeError("LLM 返回内容中没有有效角色（字段缺失或解析失败）")
+        _ai_gen_status.update({"status": "done", "count": len(saved),
+                               "created": saved, "error": ""})
+    except Exception as e:  # noqa: BLE001 — 错误信息原样落状态供前端展示
+        print(f"  [CharAI] ERROR: {e}")
+        _ai_gen_status.update({"status": "error", "count": 0, "created": [],
+                               "error": str(e)[:300]})
+
+
+@router.post("/api/character_library/ai_generate")
+async def api_library_ai_generate(request: Request):
+    """LLM 一键生成通用角色（静态路径，须注册在 {lib_id} 通配路由之前防遮蔽）。"""
+    if _ai_gen_status.get("status") == "generating":
+        return JSONResponse({"ok": False, "error": "已有生成任务进行中，请稍候"}, status_code=409)
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    structure = data.get("structure", "quest")
+    if structure not in ("quest", "original"):
+        structure = "quest"
+
+    import threading
+    threading.Thread(target=_generate_ai_characters, args=(structure, 5),
+                     daemon=True).start()
+    return {"ok": True, "message": "LLM 生成中..."}
+
+
+@router.get("/api/character_library/ai_generate_status")
+async def api_library_ai_generate_status():
+    """Poll AI character generation status."""
+    return _ai_gen_status
 
 
 @router.put("/api/character_library/{lib_id}")

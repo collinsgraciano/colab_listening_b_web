@@ -20,6 +20,28 @@
 
     {% with page_key = 'characters' %}{% include "partials/mcp_token_panel.html" %}{% endwith %}
 
+    <!-- Section 0: AI 一键生成通用角色 -->
+    <section class="mb-8">
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="text-sm font-semibold text-slate-300">🤖 AI 一键生成通用角色</span>
+                <select id="ai-structure"
+                    class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="quest">Quest (8 姿势图集)</option>
+                    <option value="original">Original (单张场景图)</option>
+                </select>
+                <button id="btn-ai-generate" onclick="startAiGenerate()"
+                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium text-sm">
+                    ⚡ 生成 5 个角色
+                </button>
+                <span class="text-[10px] text-slate-500">
+                    LLM 先生成人物文字描述并直接入库（无图）→ 满意后点卡片上的 🎨 生成图片
+                </span>
+            </div>
+            <div id="ai-gen-status" class="hidden mt-3"></div>
+        </div>
+    </section>
+
     <!-- Section A: Character Grid -->
     <section class="mb-8">
         <div class="flex items-center justify-between mb-3">
@@ -160,6 +182,7 @@ window.addEventListener('load', function() {
     loadKokoroVoices();
     loadLibrary();
     loadCharSources();
+    checkAiGenStatus();
 });
 
 // --- Load Qwen voices for dropdowns ---
@@ -352,6 +375,7 @@ function createCharCard(char) {
         ${char.qwen_speaker ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">🎤 ${char.qwen_speaker}</span>` : ''}
         ${char.moss_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">🔊 ${char.moss_voice}</span>` : ''}
         ${char.kokoro_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-900/50 text-fuchsia-300">🎵 ${char.kokoro_voice}</span>` : ''}
+        ${(char.scenarios || []).map(s => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-300">📍 ${s}</span>`).join('')}
         ${!voiceOnly && char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
     `;
 
@@ -588,6 +612,99 @@ function createCharacter(autoGenerate) {
 
 function createAndGenerate() {
     createCharacter(true);
+}
+
+// --- AI 一键生成通用角色 (LLM 描述 → 直接入库，生图由用户在卡片上触发) ---
+let _aiGenPolling = false;
+
+function startAiGenerate() {
+    if (_aiGenPolling) return;
+    const structure = document.getElementById('ai-structure').value;
+    const btn = document.getElementById('btn-ai-generate');
+    btn.disabled = true;
+    _aiGenPolling = true;
+    showAiGenStatus('generating', '');
+    fetch('/api/character_library/ai_generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({structure})
+    })
+    .then(r => r.json().then(d => ({ok: r.ok, d})))
+    .then(({ok, d}) => {
+        if (!ok || !d.ok) {
+            _aiGenPolling = false;
+            btn.disabled = false;
+            showAiGenStatus('error', d.error || '启动失败');
+            return;
+        }
+        pollAiGenerateStatus();
+    })
+    .catch(err => {
+        _aiGenPolling = false;
+        btn.disabled = false;
+        showAiGenStatus('error', err.message);
+    });
+}
+
+function pollAiGenerateStatus() {
+    if (!_aiGenPolling) return;
+    fetch('/api/character_library/ai_generate_status')
+        .then(r => r.json())
+        .then(data => {
+            const btn = document.getElementById('btn-ai-generate');
+            if (data.status === 'done') {
+                _aiGenPolling = false;
+                btn.disabled = false;
+                showAiGenStatus('done', '', data.count || 0);
+                loadLibrary();
+            } else if (data.status === 'error') {
+                _aiGenPolling = false;
+                btn.disabled = false;
+                showAiGenStatus('error', data.error);
+            } else {
+                showAiGenStatus('generating', '');
+                setTimeout(pollAiGenerateStatus, 3000);
+            }
+        })
+        .catch(() => setTimeout(pollAiGenerateStatus, 5000));
+}
+
+function checkAiGenStatus() {
+    // 页面刷新时恢复进行中的生成任务轮询
+    fetch('/api/character_library/ai_generate_status')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'generating') {
+                _aiGenPolling = true;
+                document.getElementById('btn-ai-generate').disabled = true;
+                showAiGenStatus('generating', '');
+                pollAiGenerateStatus();
+            }
+        })
+        .catch(() => {});
+}
+
+function showAiGenStatus(status, error, count) {
+    const area = document.getElementById('ai-gen-status');
+    if (!area) return;
+    area.classList.remove('hidden');
+    if (status === 'generating') {
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-indigo-700 rounded-lg p-3 flex items-center gap-3">
+                <div class="animate-spin text-xl">⚙️</div>
+                <div class="text-xs text-indigo-300">LLM 正在设计通用角色（约 30-90 秒，请稍候）...</div>
+            </div>`;
+    } else if (status === 'done') {
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-emerald-700 rounded-lg p-3 text-xs text-emerald-300">
+                ✅ 已生成 ${count || 0} 个通用角色（仅描述）。描述合适就点卡片上的 🎨 生成图片；不合适可删除或编辑描述后重新生成
+            </div>`;
+    } else {
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-red-700 rounded-lg p-3 text-xs text-red-300">
+                ❌ 生成失败: ${error || '未知错误'}
+            </div>`;
+    }
 }
 
 // --- Delete ---
