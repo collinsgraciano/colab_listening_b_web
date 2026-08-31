@@ -746,7 +746,7 @@ Generate JSON with these fields:
   "welcome_zh": "繁中",
   "hook_intro_en": "narrator opening 70-110 words. Must include: greeting, topic intro, the listening question, and a CTA. Vary the structure — don't always start with greeting. Write in SHORT sentences — every sentence at most {mw} words.",
   "hook_intro_zh": "繁中",
-  "outro": "narrator closing 80-110 words: how was it→repeat question→comment CTA→channel description→subscribe→bye. Write in SHORT sentences — every sentence at most {mw} words.",
+  "outro": "narrator closing 80-110 words: how was it→repeat question→comment CTA→channel description→like→subscribe→bye. Write in SHORT sentences — every sentence at most {mw} words.",
   "outro_zh": "繁中",
   "host_bg_prompt": "TV studio background prompt (no people)",
   "youtube_title": "高CTR繁中标题 with 【】and ｜ format. Pattern D: 【英文聽力挑戰】{{emoji}}{{topic 繁中}}｜❓你能聽出答案嗎？｜{{CEFR}}慢速英文｜{{English topic}}. Total length MUST be ≤95 chars (YouTube hard limit is 100) — drop middle segments if needed to fit.",
