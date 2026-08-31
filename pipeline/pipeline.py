@@ -433,9 +433,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
         # Scene backgrounds generated as 2×2 atlas in _generate_scene_atlas below
     elif is_original_cutout:
-        # 主持人开场/结尾的演播室背景（quest 同款，listening 脚本无 host_bg_prompt 字段）
-        image_prompts.append((f"a bright modern TV studio set with a large screen behind, warm lighting, "
-                              f"{style_prompt}, no people, no text, 16:9", "host_bg.png"))
+        # 主持人开场/结尾的演播室背景（quest 同款）；脚本无该字段时回退默认
+        host_bg_prompt = script.get("host_bg_prompt",
+                                    "a bright modern TV studio set with a large screen behind, warm lighting")
+        image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
 
     # --- Resume check ---
     resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest,
@@ -498,6 +499,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                                     max_workers=args.image_concurrency,
                                     style_prompt=style_prompt,
                                     char_keys=_cutout_keys)
+            # Ch2 对话多场景背景（quest 同款 2×2 atlas）；scene.png 主背景照旧生成
+            _scene_images = script.get("scene_images", [])
+            _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
+                                   style_prompt=style_prompt)
 
         if is_quest or is_original_cutout:
             # 全新生成路径：姿势图集只落本地。此处把 char_a 参考图补传 CDN 写入
@@ -902,7 +907,16 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
         host_bg = str(dirs["images"] / "host_bg.png")
         if not os.path.exists(host_bg):
             host_bg = scene_img
+        # Multiple scene backgrounds for dialogue variety（quest 同款收集；
+        # 缺失的 scene_N 回退主场景图，旧脚本无 scene_images 时行为不变）
         scene_bg_list = [scene_img]
+        si_list = script.get("scene_images", [])
+        for si in range(len(si_list)):
+            p = str(dirs["images"] / f"scene_{si}.png")
+            if os.path.exists(p):
+                scene_bg_list.append(p)
+            else:
+                scene_bg_list.append(scene_img)
         final_path = compose_original_cutout(
             work_dir=str(work_dir),
             char_pose_map=char_pose_map,

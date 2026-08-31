@@ -445,13 +445,26 @@ Do NOT create dialogue that is too similar to these. Use a DIFFERENT situation, 
 """
     style_prompt = get_active_style_prompt()
     thumb_hint = get_active_thumbnail_hint()
+    # cutout 无行级视觉字段，但 host_bg_prompt/scene_images 同样需要 style 约束
+    style_targets = ' and '.join(prompt_fields) if prompt_fields else (
+        "host_bg_prompt and scene_images" if pf == "original_cutout" else "")
     style_section = ""
-    if prompt_fields:
+    if style_targets:
         style_section = f"""
 VISUAL STYLE (CRITICAL): The video's art style is: "{style_prompt}".
-- EVERY {' and '.join(prompt_fields)} entry MUST include this EXACT style descriptor phrase (copy it verbatim).
+- EVERY {style_targets} entry MUST include this EXACT style descriptor phrase (copy it verbatim).
 - Do NOT use any other art style, do NOT mix styles, do NOT add contradicting style words (e.g. photorealistic, sketch).
 """
+    cutout_meta_section = ""
+    cutout_schema_fields = ""
+    if pf == "original_cutout":
+        cutout_meta_section = f"""
+- "host_bg_prompt": a detailed English prompt for the TV-studio background used by the host in the opening/ending segments. It MUST visually relate to today's topic (e.g. the large studio screen shows imagery of the "{topic}" scene). No people. Include the style phrase verbatim.
+- "scene_images": an array of EXACTLY 8 objects {{"prompt": string, "label": string}}. All 8 are DIFFERENT angles and details of the SAME "{topic}" location (e.g. exterior, counter, menu board, equipment, seating area, product close-up, decoration). Each prompt: a specific scene description with details, 16:9, no people, and MUST include the style phrase verbatim. "label" is a short English label (e.g. "Exterior", "Counter")."""
+        cutout_schema_fields = (
+            '\n  "host_bg_prompt": string,\n'
+            '  "scene_images": [{"prompt": string, "label": string}],'
+        )
     return f"""You are an expert ESL teacher creating ENGLISH LISTENING PRACTICE content for overseas Chinese learners.
 
 CORE MISSION: 帮助海外华人用最地道最日常的英语，搞定真实生活中的每一个场景.
@@ -512,6 +525,7 @@ TECHNICAL REQUIREMENTS:
 - "practice_intro_en": English instruction before the 跟讀 section (at most {mw} words)
 - "practice_intro_zh": Traditional Chinese translation of the practice intro
 - ALL Chinese text MUST be in Traditional Chinese (繁體中文)
+{cutout_meta_section}
 
 {style_section}CONSISTENCY RULES (CRITICAL):
 - Gender: char_a_gender/char_b_gender MUST match the description text. If female, description MUST say "a young woman" and ALL her prompts MUST say so. NEVER mix genders.{_consistency_prompt_rules(pf)}
@@ -546,7 +560,7 @@ JSON schema:
   "youtube_tags": [string],
   "youtube_title_ref": string,
   "youtube_description_ref": string,
-  "scene": string,
+  "scene": string,{cutout_schema_fields}
   "thumbnail_expression": string,
   "thumbnail_action": string,
   "thumbnail_subtitle": string,
@@ -699,6 +713,10 @@ def generate_listening_script(topic: str, cefr: str = "A2",
     script.setdefault("thumbnail_action", "looking toward the camera and gesturing naturally")
     script.setdefault("thumbnail_subtitle", "18句聽力練習")
     script.setdefault("thumbnail_icons", [])
+    # cutout 视觉增强字段：LLM 未生成时兜底（与 pipeline.py 硬编码默认一致，老脚本零影响）
+    script.setdefault("host_bg_prompt",
+                      "a bright modern TV studio set with a large screen behind, warm lighting")
+    script.setdefault("scene_images", [])
 
     # Ensure dialogue has all required fields（行级 prompt 字段按结构裁剪）
     for line in script.get("dialogue", []):
