@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from ..paths import KOKORO_VOICE_CONFIG_PATH, PIPELINE_DIR, VOICE_PREVIEWS_DIR
+from ..paths import KOKORO_VOICE_CONFIG_PATH, VOICE_PREVIEWS_DIR
 from ..tts_state import TTS_SYNTH_LOCK as _TTS_SYNTH_LOCK, PREVIEW_TEXTS as _PREVIEW_TEXTS
 
 router = APIRouter()
@@ -22,10 +22,6 @@ def _kokoro_preview_cache_path(speaker: str, text: str) -> Path:
 @router.get("/api/kokoro_voices/speakers")
 async def api_kokoro_speakers():
     """List all Kokoro voices with cached flag (未缓存音色本机无法自动下载)."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from tts_engine import get_all_kokoro_voices
     return {"speakers": get_all_kokoro_voices()}
 
@@ -36,10 +32,6 @@ async def _kokoro_preview_common(speaker: str, text: str, regenerate: bool):
     if cache_path.exists() and not regenerate:
         return FileResponse(str(cache_path), media_type="audio/mpeg")
 
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     try:
         from tts_engine import TTSEngine

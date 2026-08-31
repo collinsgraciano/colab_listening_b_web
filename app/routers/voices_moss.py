@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from ..config_manager import load_config
 from ..paths import (
-    MOSS_PREVIEWS_DIR, MOSS_VOICES_DIR, MOSS_VOICE_CONFIG_PATH, PIPELINE_DIR,
+    MOSS_PREVIEWS_DIR, MOSS_VOICES_DIR, MOSS_VOICE_CONFIG_PATH,
 )
 from ..tts_state import TTS_SYNTH_LOCK as _TTS_SYNTH_LOCK, PREVIEW_TEXTS as _PREVIEW_TEXTS
 
@@ -58,10 +58,6 @@ def _save_moss_voice_config(config: dict) -> None:
 @router.get("/api/moss_voices/speakers")
 async def api_moss_speakers():
     """List all available MOSS voices (preset + custom)."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from moss_tts_engine import MOSS_PRESET_VOICES, get_all_moss_voices
     return {"speakers": get_all_moss_voices(), "presets": MOSS_PRESET_VOICES}
 
@@ -69,10 +65,6 @@ async def api_moss_speakers():
 @router.post("/api/moss_voices/preview")
 async def api_moss_preview(request: Request):
     """Preview a MOSS voice: serve cached audio if available, else generate & cache."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     data = await request.json()
     speaker = data.get("speaker", "Ava")

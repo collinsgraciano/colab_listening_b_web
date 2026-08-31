@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from ..config_manager import load_config, resolve_provider
 from ..paths import (
-    CUSTOM_VOICES_DIR, PIPELINE_DIR, QWEN_VOICE_CONFIG_PATH, VOICE_PREVIEWS_DIR,
+    CUSTOM_VOICES_DIR, QWEN_VOICE_CONFIG_PATH, VOICE_PREVIEWS_DIR,
 )
 from ..tts_state import TTS_SYNTH_LOCK as _TTS_SYNTH_LOCK, PREVIEW_TEXTS as _PREVIEW_TEXTS
 
@@ -65,10 +65,6 @@ def _save_qwen_voice_config(config: dict) -> None:
 @router.get("/api/qwen_voices/speakers")
 async def api_qwen_speakers():
     """List all available voices (preset + custom)."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from qwen_tts_engine import QWEN_SPEAKERS, get_all_voices
     return {"speakers": get_all_voices(), "presets": QWEN_SPEAKERS}
 
@@ -76,10 +72,6 @@ async def api_qwen_speakers():
 @router.post("/api/qwen_voices/preview")
 async def api_qwen_preview(request: Request):
     """Preview a voice: serve cached audio if available, else generate & cache."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     data = await request.json()
     speaker = data.get("speaker", "Vivian")
@@ -206,10 +198,6 @@ async def api_qwen_custom_delete(name: str):
     # Remove from config
     config["custom_voices"] = [v for v in config["custom_voices"] if v["name"] != name]
     # 删除冻结内置音色 → 记入 dismissed，防止下次启动自动冻结"复活"
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
     if target.get("frozen_from") == "designed" and \
             name in {v["name"] for v in DESIGNED_VOICES_BUILTIN}:
@@ -223,10 +211,6 @@ async def api_qwen_custom_delete(name: str):
 @router.post("/api/qwen_voices/designed")
 async def api_qwen_designed_create(request: Request):
     """Create a VoiceDesign voice from a natural-language instruct description."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     data = await request.json()
     name = (data.get("name", "") or "").strip()
@@ -271,10 +255,6 @@ async def api_qwen_designed_create(request: Request):
 @router.delete("/api/qwen_voices/designed/{name}")
 async def api_qwen_designed_delete(name: str):
     """Delete a user-created designed voice (builtin ones are protected)."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
     if name in {v["name"] for v in DESIGNED_VOICES_BUILTIN}:
@@ -333,10 +313,6 @@ async def api_qwen_candidates_list():
 @router.post("/api/qwen_voices/candidates/generate")
 async def api_qwen_candidates_generate(request: Request):
     """Generate a batch of random voice designs via LLM (replaces current candidates)."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     data = await request.json()
     try:
@@ -383,10 +359,6 @@ async def api_qwen_candidates_generate(request: Request):
 @router.post("/api/qwen_voices/candidates/{name}/save")
 async def api_qwen_candidate_save(name: str):
     """Save a candidate voice as a user-designed voice."""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     config = _load_qwen_voice_config()
     target = next((c for c in config.get("candidate_voices", []) if c["name"] == name), None)
@@ -464,10 +436,6 @@ _CANDIDATE_PREVIEW_LOCK = threading.Lock()
 
 def _run_candidate_previews(candidates: list[dict]) -> None:
     """后台线程：逐个为候选音色生成试听音频（跳过已缓存，串行 GPU 合成）。"""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from qwen_tts_engine import QwenTTSEngine
 
     config = load_config()
@@ -527,10 +495,6 @@ def _run_candidate_previews(candidates: list[dict]) -> None:
 @router.post("/api/qwen_voices/candidates/previews/generate")
 async def api_qwen_candidates_previews_generate():
     """一键为所有候选音色后台生成试听音频（已缓存的直接计入完成）。"""
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
 
     with _CANDIDATE_PREVIEW_LOCK:
         if _CANDIDATE_PREVIEW_JOB["running"]:
@@ -642,10 +606,6 @@ def _freeze_voice_impl(name: str) -> None:
     失败：音色保留在 designed_voices（仍以设计模式可用，只是不稳定）。
     """
     import subprocess as _sp
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from qwen_tts_engine import QwenTTSEngine
 
     config = _load_qwen_voice_config()
@@ -723,10 +683,6 @@ def auto_freeze_pending_designed_voices() -> None:
     残留的未冻结条目（此前冻结失败的会借此重试）。
     已冻结（custom_voices 同名存在）或已删除（builtin_voice_dismissed）的跳过。
     """
-    import sys as _sys
-    _pipeline = str(PIPELINE_DIR)
-    if _pipeline not in _sys.path:
-        _sys.path.insert(0, _pipeline)
     from qwen_tts_engine import DESIGNED_VOICES_BUILTIN
 
     config = _load_qwen_voice_config()

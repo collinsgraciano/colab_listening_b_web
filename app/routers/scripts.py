@@ -1,7 +1,6 @@
 """Scripts Library — 批量生成 / AI 审查 / 修复（页面路由在 pages.py）."""
 import asyncio
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse

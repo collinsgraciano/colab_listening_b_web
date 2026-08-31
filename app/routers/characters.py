@@ -1,6 +1,5 @@
 """Characters API — 角色复用来源 / 角色套装 / 素材库 CRUD + AI 姿势图生成 + 三引擎音色绑定."""
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from ..page_mcp import (
     SOURCE_LABELS as MCP_SOURCE_LABELS,
     PageMcpSession, mask_token, resolve_page_tokens,
 )
-from ..paths import CHARACTER_SETS_PATH, LIBRARY_DIR, PIPELINE_DIR
+from ..paths import CHARACTER_SETS_PATH, LIBRARY_DIR
 
 router = APIRouter()
 
@@ -366,10 +365,6 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
     _gen_status[lib_id] = {"status": "generating", "error": "", "poses": [], "started_at": time.time()}
 
     try:
-        # Add pipeline to sys.path for atlas_split imports
-        _pipeline = str(PIPELINE_DIR)
-        if _pipeline not in sys.path:
-            sys.path.insert(0, _pipeline)
         from atlas_split import split_atlas
 
         # 独立 MCP 会话（不动 pipeline 全局会话）
