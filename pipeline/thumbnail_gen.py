@@ -139,12 +139,12 @@ def generate_thumbnail(script: dict, scene_img: str, output_path: str,
         try:
             gen_args = {
                 "prompt": prompt,
-                # seedream 普通通道：frontier 属高成本配置（~50 积分/张），
-                # 不带 confirm_cost=true 时 MCP 只返回确认提示不建任务，
-                # 曾因此静默落 Pillow 兜底（task_id 解析为空）
-                "provider": "seedream",
+                # frontier 高质量通道（~50 积分/张），须 confirm_cost=true 才真正建任务
+                "provider": "frontier",
+                "quality": "high",
                 "image_size": '{"width": 1280, "height": 720}',
                 "output_format": "jpeg",
+                "confirm_cost": True,
             }
             if char_scene_url:
                 gen_args["image_urls"] = char_scene_url
