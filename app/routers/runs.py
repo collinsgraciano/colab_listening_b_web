@@ -86,6 +86,15 @@ def _resolve_main_thumbnail(run_dir: Path) -> Path:
     return run_dir / "thumbnail.jpg"  # 不存在时仍返回此路径（调用方 .exists() 判 False）
 
 
+def _thumb_mtime_url(run_dir: Path, base: str, filename: str) -> str:
+    """缩略图 URL + mtime_ns 版本参数：文件删除/更换后 URL 随之变化，绕开浏览器缓存。"""
+    try:
+        v = (run_dir / filename).stat().st_mtime_ns
+    except OSError:
+        v = 0
+    return f"{base}?v={v}"
+
+
 @router.get("/api/runs/{name}/thumbnail")
 async def api_get_thumbnail(name: str, mode: str = ""):
     config = load_config()
@@ -94,7 +103,9 @@ async def api_get_thumbnail(name: str, mode: str = ""):
     thumb = _resolve_main_thumbnail(run_dir) if run_dir else None
     if not thumb or not thumb.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
-    return FileResponse(str(thumb), media_type="image/jpeg")
+    # no-cache：每次强制与服务器校验（配合 ETag），删图后同 URL 立即呈现新回落图
+    return FileResponse(str(thumb), media_type="image/jpeg",
+                        headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/api/runs/{name}/thumbnails")
@@ -117,10 +128,12 @@ async def api_list_thumbnails(name: str, mode: str = ""):
 
     files.sort(key=_thumb_sort_key)
     main_name = _resolve_main_thumbnail(run_dir).name
-    return {"thumbnails": [
-        {"name": f, "url": f"/api/runs/{name}/thumbnail/{f}", "is_main": f == main_name}
+    return JSONResponse({"thumbnails": [
+        {"name": f,
+         "url": _thumb_mtime_url(run_dir, f"/api/runs/{name}/thumbnail/{f}", f),
+         "is_main": f == main_name}
         for f in files
-    ]}
+    ]}, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/api/runs/{name}/thumbnail/{filename}")
@@ -134,7 +147,8 @@ async def api_get_thumbnail_file(name: str, filename: str, mode: str = ""):
     thumb = run_dir / filename if run_dir else None
     if not thumb or not thumb.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
-    return FileResponse(str(thumb), media_type="image/jpeg")
+    return FileResponse(str(thumb), media_type="image/jpeg",
+                        headers={"Cache-Control": "no-cache"})
 
 
 @router.post("/api/runs/{name}/thumbnail_regenerate")

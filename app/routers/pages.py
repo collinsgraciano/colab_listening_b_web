@@ -219,7 +219,9 @@ async def runs_page(request: Request):
             "created": d.stat().st_mtime,
             "has_script": script_path.exists(),
             "has_thumbnail": thumb_count > 0,
-            "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumb_count > 0 else "",
+            # mtime_ns 版本参数：删图/换主图后 URL 变化，绕开浏览器缓存
+            "thumbnail_url": (f"/api/runs/{d.name}/thumbnail?v={thumbnail.stat().st_mtime_ns}"
+                              if thumb_count > 0 else ""),
             "thumbnail_count": thumb_count,
             "uploaded": (d / "uploaded.flag").exists(),
             "has_4k": has_4k,
