@@ -127,8 +127,11 @@ class ThumbnailRegenService:
             }
 
         threading.Thread(target=self._read_loop, args=(proc,), daemon=True).start()
+        # ensure_ascii=True（默认）：payload 全 ASCII，子进程 stdin 无论用什么
+        # 编码解码（GBK/locale）都得到同一字符串——run 名含中文/emoji 时
+        # 子进程管道默认 GBK 解码 UTF-8 字节会产生乱码路径（FileNotFoundError）
         try:
-            proc.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            proc.stdin.write(json.dumps(payload) + "\n")
             proc.stdin.flush()
         except (OSError, ValueError):
             pass  # 读线程按退出码收尾

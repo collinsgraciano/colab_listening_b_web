@@ -17,6 +17,10 @@ from pathlib import Path
 # Windows GBK 控制台安全输出
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+# stdin 显式 UTF-8：Windows 子进程管道默认按 locale（GBK）解码，而父进程
+# 写入的是 UTF-8 字节——中文 run 名会变乱码、emoji 变 \udcXX 代理转义，
+# 导致 run_dir 路径 FileNotFoundError（双保险：父进程还用 ensure_ascii=True）
+sys.stdin.reconfigure(encoding="utf-8", errors="replace")
 
 _PARENT = str(Path(__file__).parent.resolve())
 if _PARENT not in sys.path:
@@ -35,6 +39,9 @@ def main() -> int:
 
     print("=" * 60)
     print(f"ThumbnailRegen: {run_dir.name} -> {out_name}")
+
+    # 先读脚本（路径错误快速失败，不白初始化 MCP / 上传参考图）
+    script = json.loads((run_dir / "script.json").read_text(encoding="utf-8"))
 
     # env 注入（与 Web 端 _set_env 的最小子集一致）
     os.environ["IMAGE_PROVIDER"] = provider
@@ -71,7 +78,7 @@ def main() -> int:
         scene_img = run_dir / "images" / "scene.png"
 
     out_path = generate_thumbnail(
-        script=json.loads((run_dir / "script.json").read_text(encoding="utf-8")),
+        script=script,
         scene_img=str(scene_img),
         output_path=str(run_dir / out_name),
         mcp_call_tool=call_tool,
