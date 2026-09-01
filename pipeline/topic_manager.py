@@ -10,26 +10,34 @@ used_topics.json format:
     {"Making Breakfast": {"used_at": "2026-08-10 18:00:00"}, ...}
 """
 import json
+import os
 import random
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 
 def load_topics(topics_file: str) -> dict:
-    """Load topics.json — returns {category: [topic, ...]}."""
+    """Load topics.json — returns {category: [topic, ...]} (empty dict on missing/broken)."""
     p = Path(topics_file)
     if not p.exists():
         return {}
-    return json.loads(p.read_text(encoding="utf-8"))
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def load_used_topics(used_file: str) -> dict:
-    """Load used_topics.json — returns {topic: {used_at: ...}}."""
+    """Load used_topics.json — returns {topic: {used_at: ...}} (empty dict on missing/broken)."""
     p = Path(used_file)
     if not p.exists():
         return {}
-    return json.loads(p.read_text(encoding="utf-8"))
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def get_all_topics(topics: dict) -> list[str]:
@@ -41,11 +49,20 @@ def get_all_topics(topics: dict) -> list[str]:
 
 
 def _mark_used(used_file: str, topic: str) -> None:
-    """Record a topic as used in used_topics.json (idempotent)."""
+    """Record a topic as used in used_topics.json (idempotent, atomic write)."""
     used = load_used_topics(used_file)
     used[topic] = {"used_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-    Path(used_file).parent.mkdir(parents=True, exist_ok=True)
-    Path(used_file).write_text(json.dumps(used, ensure_ascii=False, indent=2), encoding="utf-8")
+    p = Path(used_file)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(used, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, str(p))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def mark_topic_used(used_file: str, topic: str) -> None:
@@ -73,10 +90,10 @@ def pick_random_topic(topics_file: str, used_file: str, mark: bool = True) -> st
     available = [t for t in all_topics if t not in used]
 
     if not available:
-        # All topics used — reset and start over
-        print(f"  [Topic] All {len(all_topics)} topics have been used. Resetting used_topics.json.")
-        Path(used_file).write_text("{}", encoding="utf-8")
-        available = all_topics
+        # All topics used — raise instead of silently wiping history
+        raise ValueError(
+            f"所有 {len(all_topics)} 个主题均已使用完毕。"
+            "请在主题管理页面重置已用主题或添加新主题。")
 
     chosen = random.choice(available)
     print(f"  [Topic] Randomly selected: '{chosen}' (from {len(available)} available)")

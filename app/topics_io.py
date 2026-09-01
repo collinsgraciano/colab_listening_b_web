@@ -1,5 +1,7 @@
 """Topic library file I/O shared by topics and scripts endpoints."""
 import json
+import os
+import tempfile
 from pathlib import Path
 
 
@@ -26,3 +28,33 @@ def load_used_topic_names(config: dict) -> list[str]:
         except (json.JSONDecodeError, OSError):
             return []
     return []
+
+
+def save_topics_data(topics_file: str, data: dict) -> None:
+    """原子写入 topics.json（tempfile + os.replace，防并发写丢失）。"""
+    p = Path(topics_file)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, str(p))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def save_used_topics(used_file: str, data: dict) -> None:
+    """原子写入 used_topics.json（tempfile + os.replace，防并发写丢失）。"""
+    p = Path(used_file)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, str(p))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise

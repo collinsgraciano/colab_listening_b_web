@@ -12,6 +12,8 @@ from ..sse import sse_line as _sse, SSE_HEADERS as _SSE_HEADERS
 from ..topics_io import (
     load_topics_data as _load_topics_data,
     load_used_topic_names as _load_used_topic_names,
+    save_topics_data as _save_topics_data,
+    save_used_topics as _save_used_topics,
 )
 from .. import topics_ai
 
@@ -39,22 +41,29 @@ async def api_add_topic(request: Request):
     if not topics_file:
         return JSONResponse({"ok": False, "error": "未配置主题库文件"}, status_code=400)
 
-    topics_data = {}
-    if Path(topics_file).exists():
-        topics_data = json.loads(Path(topics_file).read_text(encoding="utf-8"))
+    try:
+        topics_data = _load_topics_data(config)
+    except (json.JSONDecodeError, OSError):
+        topics_data = {}
 
     category = data.get("category", "").strip()
     topic = data.get("topic", "").strip()
     if not category or not topic:
         return JSONResponse({"ok": False, "error": "分类和主题不能为空"}, status_code=400)
 
+    # 跨分类去重检查（归一化比较）
+    norm_topic = topics_ai._norm(topic)
+    for cat, topics in topics_data.items():
+        for existing in topics:
+            if topics_ai._norm(existing) == norm_topic:
+                return JSONResponse({"ok": False, "error": f"主题已存在于分类 [{cat}]"}, status_code=400)
+
     if category not in topics_data:
         topics_data[category] = []
     if topic not in topics_data[category]:
         topics_data[category].append(topic)
 
-    Path(topics_file).write_text(
-        json.dumps(topics_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _save_topics_data(topics_file, topics_data)
     return {"ok": True, "topics": topics_data}
 
 
@@ -65,11 +74,14 @@ async def api_delete_topic(category: str, index: int):
     if not topics_file or not Path(topics_file).exists():
         return JSONResponse({"ok": False, "error": "主题库不存在"}, status_code=404)
 
-    topics_data = json.loads(Path(topics_file).read_text(encoding="utf-8"))
+    try:
+        topics_data = json.loads(Path(topics_file).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "主题库文件损坏"}, status_code=500)
+
     if category in topics_data and 0 <= index < len(topics_data[category]):
         topics_data[category].pop(index)
-        Path(topics_file).write_text(
-            json.dumps(topics_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _save_topics_data(topics_file, topics_data)
         return {"ok": True, "topics": topics_data}
     return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
 
@@ -82,37 +94,44 @@ async def api_add_category(request: Request):
     if not topics_file:
         return JSONResponse({"ok": False, "error": "未配置主题库文件"}, status_code=400)
 
-    topics_data = {}
-    if Path(topics_file).exists():
-        topics_data = json.loads(Path(topics_file).read_text(encoding="utf-8"))
+    try:
+        topics_data = _load_topics_data(config)
+    except (json.JSONDecodeError, OSError):
+        topics_data = {}
 
     category = data.get("category", "").strip()
     if not category:
         return JSONResponse({"ok": False, "error": "分类名不能为空"}, status_code=400)
     if category not in topics_data:
         topics_data[category] = []
-        Path(topics_file).write_text(
-            json.dumps(topics_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _save_topics_data(topics_file, topics_data)
     return {"ok": True, "topics": topics_data}
 
 
 @router.get("/api/topics/random")
-async def api_random_topic():
-    """Pick a random topic from topics.json (excluding used)."""
+async def api_random_topic(request: Request):
+    """Pick a random topic from topics.json (excluding used).
+
+    ?mark=true will mark the topic as used (atomic write).
+    """
     config = load_config()
     topics_file = config.get("topics_file", "")
     if not topics_file or not Path(topics_file).exists():
         return JSONResponse({"ok": False, "error": "主题库不存在"}, status_code=404)
 
-    import random
-    topics_data = json.loads(Path(topics_file).read_text(encoding="utf-8"))
+    try:
+        topics_data = json.loads(Path(topics_file).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "主题库文件损坏"}, status_code=500)
+
     used_file = config.get("used_topics_file", "")
     if not used_file:
         output_dir = config.get("output_dir", "./output")
         used_file = str(Path(output_dir) / "used_topics.json")
-    used = []
-    if Path(used_file).exists():
-        used = json.loads(Path(used_file).read_text(encoding="utf-8"))
+    try:
+        used = json.loads(Path(used_file).read_text(encoding="utf-8")) if Path(used_file).exists() else {}
+    except (json.JSONDecodeError, OSError):
+        used = {}
 
     all_topics = []
     for cat, topics in topics_data.items():
@@ -120,8 +139,18 @@ async def api_random_topic():
             if t not in used:
                 all_topics.append(t)
     if not all_topics:
-        return {"ok": False, "error": "没有可用主题"}
-    return {"ok": True, "topic": random.choice(all_topics)}
+        return {"ok": False, "error": "没有可用主题（所有主题均已使用，请重置已用列表或添加新主题）"}
+
+    import random
+    from datetime import datetime as _dt
+    chosen = random.choice(all_topics)
+
+    mark = request.query_params.get("mark", "").lower() in ("1", "true", "yes")
+    if mark:
+        used[chosen] = {"used_at": _dt.now().strftime("%Y-%m-%d %H:%M:%S")}
+        _save_used_topics(used_file, used)
+
+    return {"ok": True, "topic": chosen}
 
 
 @router.get("/api/topics/used")
@@ -173,7 +202,7 @@ async def api_topics_ai_generate(request: Request):
             yield _sse({"type": "progress", "message": "正在调用 AI 生成话题，请稍候..."})
             if mode == "new_category":
                 result = await asyncio.to_thread(
-                    topics_ai.suggest_category, count, topics_data, hint)
+                    topics_ai.suggest_category, count, topics_data, used, hint)
             else:
                 if not category or category not in topics_data:
                     yield _sse({"type": "error", "error": f"分类不存在: {category}"})

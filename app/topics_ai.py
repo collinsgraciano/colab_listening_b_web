@@ -6,7 +6,6 @@ Blocking work should be executed by callers via asyncio.to_thread.
 """
 import json
 import re
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -14,11 +13,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config_manager import load_config, resolve_provider
+from .paths import ensure_pipeline_on_path
 
 # Reuse pipeline's robust JSON extraction (markdown fences + truncation repair)
-_PIPELINE_DIR = Path(__file__).parent.parent.resolve() / "pipeline"
-if str(_PIPELINE_DIR) not in sys.path:
-    sys.path.insert(0, str(_PIPELINE_DIR))
+ensure_pipeline_on_path()
 from llm_client import _enforce_rate_limit, _extract_json  # noqa: E402
 
 _REVIEW_BATCH_SIZE = 50
@@ -228,10 +226,12 @@ Already-used topics (videos already made — also avoid):
     return {"topics": topics, "note": (data.get("note", "") if isinstance(data, dict) else "")}
 
 
-def suggest_category(count: int, topics_data: dict[str, list[str]], hint: str = "") -> dict:
+def suggest_category(count: int, topics_data: dict[str, list[str]],
+                    used_topics: list[str] | None = None, hint: str = "") -> dict:
     """Let the AI suggest ONE new complementary category + starter topics.
 
     Returns {"category": "中文 English", "reason": "...", "topics": [...]}.
+    Topics are filtered against existing/used (normalized) and internally deduped.
     """
     cats = "\n".join(f"  - {c}" for c in topics_data.keys()) or "  (none)"
     hint_block = (f"EXTRA REQUIREMENTS from the channel owner (follow strictly):\n{hint}\n"
@@ -260,8 +260,23 @@ CATEGORY RULES:
 
     category = str(data.get("category", "")).strip()
     raw = data.get("topics", [])
-    topics = [t.strip() for t in raw
-              if isinstance(t, str) and t.strip() and len(t.strip()) <= 80]
+    # Filter against existing/used topics (normalized) and internally dedupe
+    existing_all = [t for _, t in _flatten(topics_data)]
+    existing_norm = {_norm(t) for t in existing_all}
+    used_norm = {_norm(t) for t in (used_topics or [])}
+    seen = set()
+    topics = []
+    for t in raw:
+        if not isinstance(t, str):
+            continue
+        t = t.strip()
+        if not t or len(t) > 80:
+            continue
+        n = _norm(t)
+        if n in existing_norm or n in used_norm or n in seen:
+            continue
+        seen.add(n)
+        topics.append(t)
     return {"category": category, "reason": str(data.get("reason", "")), "topics": topics}
 
 
@@ -387,8 +402,13 @@ def apply_suggestions(topics_file: str, actions: list[dict]) -> dict:
     String matching (not index) keeps this safe when several actions land at once.
     Returns {"applied": n, "skipped": [reasons], "topics": updated_data}.
     """
+    from .topics_io import save_topics_data
+
     p = Path(topics_file)
-    topics_data: dict[str, list[str]] = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    try:
+        topics_data: dict[str, list[str]] = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        topics_data = {}
     applied = 0
     skipped: list[str] = []
     for a in actions:
@@ -407,7 +427,8 @@ def apply_suggestions(topics_file: str, actions: list[dict]) -> dict:
             if not new_topic:
                 skipped.append(f"缺少新名称 [{cat}] {topic}")
                 continue
-            if any(new_topic in lst2 for lst2 in topics_data.values()):
+            # 归一化比较去重（不区分大小写/空格/标点）
+            if any(_norm(new_topic) == _norm(t) for lst2 in topics_data.values() for t in lst2):
                 skipped.append(f"已存在，跳过重命名 → {new_topic}")
                 continue
             lst[lst.index(topic)] = new_topic
@@ -415,5 +436,5 @@ def apply_suggestions(topics_file: str, actions: list[dict]) -> dict:
         else:
             skipped.append(f"未知操作 {act}: [{cat}] {topic}")
     if p.exists():
-        p.write_text(json.dumps(topics_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        save_topics_data(topics_file, topics_data)
     return {"applied": applied, "skipped": skipped, "topics": topics_data}
