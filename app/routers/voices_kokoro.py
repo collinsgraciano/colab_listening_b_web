@@ -74,6 +74,7 @@ async def api_kokoro_preview_cached(voice: str, language: str = "english"):
 
 # 按模式分套默认音色的合法键（与 pipeline/tts_engine.KOKORO_VOICE_DEFAULTS 同名）
 _KOKORO_DEFAULT_KEYS = ("default_male", "default_female", "default_host_female",
+                        "default_host_male",
                         "default_male2", "default_female2",
                         "default_male3", "default_female3")
 

@@ -93,6 +93,7 @@ QWEN_VOICE_DEFAULTS = {
     "default_male": _DEFAULT_MALE,
     "default_female": _DEFAULT_FEMALE,
     "default_host_female": _DEFAULT_HOST_FEMALE,
+    "default_host_male": _DEFAULT_MALE,  # 主持人默认男声（主持人性别为男时用；默认与第一男声相同，可自行错开）
     "default_male2": "Aiden",
     "default_female2": "Ella",
     "default_male3": "Aiden",   # en 男预设仅 Ryan/Aiden，第三默认回退同第二（UI 可改绑自定义/设计音色）
@@ -259,7 +260,8 @@ def build_qwen_voice_map(script: dict, structure: str | None = None) -> dict:
         if not gender:
             continue
         if key == "host":
-            voice_map[key] = defaults["default_host_female"] if gender == "female" else defaults["default_male"]
+            voice_map[key] = (defaults["default_host_female"] if gender == "female"
+                              else _gender_default(defaults, "default_host_male", 0))
         else:
             base = "default_female" if gender == "female" else "default_male"
             voice_map[key] = _gender_default(defaults, base, ranks.get(key, 0))

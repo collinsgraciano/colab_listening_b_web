@@ -124,6 +124,7 @@ async def api_qwen_preview_cached(voice: str, language: str = "english"):
 _QWEN_DEFAULT_KEYS = ("default_male", "default_female", "default_host_female",
                       "default_male2", "default_female2",
                       "default_male3", "default_female3",
+                      "default_host_male",
                       "default_male_zh", "default_female_zh",
                       "default_male_zh2", "default_female_zh2")
 

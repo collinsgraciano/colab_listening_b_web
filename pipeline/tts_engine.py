@@ -668,6 +668,7 @@ KOKORO_VOICE_DEFAULTS = {
     "default_male": "am_adam",
     "default_female": "af_sarah",
     "default_host_female": "af_sky",
+    "default_host_male": "am_adam",  # 主持人默认男声（主持人性别为男时用；默认与第一男声相同，可自行错开）
     "default_male2": "am_liam",      # 第二默认男声（同性别冲突时第二个角色用）
     "default_female2": "af_nova",
     "default_male3": "am_echo",      # 第三默认（仅 quest 三个同性别角色时用）
@@ -778,7 +779,9 @@ def build_voice_map(script: dict, structure: str | None = None) -> dict:
     if "host" not in voice_map:
         host_gender = script.get("host_gender", "").lower()
         if host_gender:
-            voice_map["host"] = defaults["default_male"] if host_gender == "male" else defaults["default_host_female"]
+            voice_map["host"] = (_gender_default(defaults, "default_host_male", 0)
+                                 if host_gender == "male"
+                                 else defaults["default_host_female"])
         else:
             print(f"  [TTS] WARNING: host_gender not set, defaulting to {defaults['default_host_female']} (female). "
                   "Check CHARACTER_OVERRIDES or script.json host_gender.")

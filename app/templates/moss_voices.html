@@ -105,7 +105,7 @@
             <span>⚙️</span> 默认音色配置
         </h3>
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
-            <p class="text-xs text-slate-400 mb-3">非库角色按性别自动分配以下默认音色（按视频模式分别保存；未绑定的同性别角色依次用第一/第二/第三默认）：</p>
+            <p class="text-xs text-slate-400 mb-3">非库角色按性别自动分配以下默认音色（按视频模式分别保存；未绑定的同性别角色依次用第一/第二/第三默认；主持人按其性别取对应主持人默认音色）：</p>
             <div id="defaults-mode-tabs" class="flex flex-wrap gap-2 mb-4"></div>
             <div class="grid grid-cols-3 gap-4">
                 <div>
@@ -117,8 +117,8 @@
                     <select id="default-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
                 <div>
-                    <label class="text-xs text-slate-400 block mb-1">默认旁白女声</label>
-                    <select id="default-host-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                    <label class="text-xs text-slate-400 block mb-1">主持人默认音色（男）</label>
+                    <select id="default-host-male" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
             </div>
             <div class="grid grid-cols-3 gap-4 mt-4">
@@ -129,6 +129,10 @@
                 <div>
                     <label class="text-xs text-slate-400 block mb-1">第二默认女声（同性别冲突时）</label>
                     <select id="default-female2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">主持人默认音色（女）</label>
+                    <select id="default-host-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
             </div>
             <div class="grid grid-cols-3 gap-4 mt-4">
@@ -345,7 +349,7 @@ function populateDropdowns() {
         };
     });
 
-    ['default-male', 'default-female', 'default-host-female',
+    ['default-male', 'default-female', 'default-host-male', 'default-host-female',
      'default-male2', 'default-female2',
      'default-male-zh', 'default-female-zh', 'default-male-zh2', 'default-female-zh2',
      'default-male3', 'default-female3'].forEach(id => {
@@ -371,8 +375,8 @@ const DEFAULT_MODE_LABELS = {
     original_cutout: '原版（抠图）', quest: 'Quest（任务听力）'
 };
 const DEFAULTS_MODE_KEY = 'moss_defaults_mode_v1';
-const DEFAULT_SELECT_IDS = ['default-male', 'default-female', 'default-host-female',
-                            'default-male2', 'default-female2',
+const DEFAULT_SELECT_IDS = ['default-male', 'default-female', 'default-host-male',
+                            'default-host-female', 'default-male2', 'default-female2',
                             'default-male-zh', 'default-female-zh',
                             'default-male-zh2', 'default-female-zh2',
                             'default-male3', 'default-female3'];
