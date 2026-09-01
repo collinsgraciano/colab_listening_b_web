@@ -295,6 +295,36 @@ async def api_library_image(lib_id: str):
     return FileResponse(str(thumb), media_type="image/png")
 
 
+@router.get("/api/character_library/{lib_id}/atlas")
+async def api_library_atlas(lib_id: str):
+    """Serve the character's full-size image for the atlas viewer modal.
+
+    优先级：pose_atlas_{source_key}.png → 任意 pose_atlas_*.png →
+    char_scene.png（original 结构）→ thumb.png。
+    """
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists() or not lib_dir.is_dir():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    source_key = "char_a"
+    meta_path = lib_dir / "meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            source_key = meta.get("source_key") or "char_a"
+        except (json.JSONDecodeError, OSError):
+            pass
+    candidates = [lib_dir / f"pose_atlas_{source_key}.png"]
+    candidates += sorted(lib_dir.glob("pose_atlas_*.png"))
+    candidates.append(lib_dir / "char_scene.png")
+    for p in candidates:
+        if p.exists():
+            return FileResponse(str(p), media_type="image/png")
+    thumb = lib_dir / "thumb.png"
+    if thumb.exists():
+        return FileResponse(str(thumb), media_type="image/png")
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
+
 @router.put("/api/character_library/{lib_id}/voice")
 async def api_library_set_voice(lib_id: str, request: Request):
     """Set Qwen TTS speaker for a library character."""
@@ -542,8 +572,12 @@ async def api_library_create(
 _ai_gen_status: dict = {"status": "idle", "count": 0, "error": "", "created": []}
 
 
-def _generate_ai_characters(structure: str, count: int = 5) -> None:
-    """后台线程：LLM 生成通用角色候选并直接入库（仅描述无图，生图由用户在卡片上触发）。"""
+def _generate_ai_characters(structure: str, count: int = 5, gender: str = "",
+                            age: str = "", skin: str = "", extra: str = "") -> None:
+    """后台线程：LLM 生成通用角色候选并直接入库（仅描述无图，生图由用户在卡片上触发）。
+
+    gender/age/skin/extra 为用户勾选的筛选维度（空 = 随机），注入 prompt 硬约束。
+    """
     import urllib.request
 
     _ai_gen_status.update({"status": "generating", "count": 0, "error": "", "created": []})
@@ -560,6 +594,23 @@ def _generate_ai_characters(structure: str, count: int = 5) -> None:
             f"- {c.get('name', '')}: {c.get('description', '')[:80]}"
             for c in existing[:30]) or "(none)"
 
+        # 用户勾选的维度 → 硬约束（空维度 = 不约束，走随机多样化）
+        constraint_lines = []
+        if gender in ("female", "male"):
+            constraint_lines.append(
+                f'- ALL {count} characters MUST be {gender} — ignore the "mix genders" requirement.')
+        if age:
+            constraint_lines.append(
+                f'- ALL characters MUST be {age} — ignore the "mix ages" requirement for the age band (still vary exact age).')
+        if skin:
+            constraint_lines.append(f'- ALL characters MUST have {skin}.')
+        if extra:
+            constraint_lines.append(
+                f'- Additional user requirements (follow strictly, keep them out of "scenarios"): {extra}')
+        constraints_block = (
+            "\n\nUSER CONSTRAINTS (highest priority — override any requirement above):\n"
+            + "\n".join(constraint_lines)) if constraint_lines else ""
+
         prompt = f"""You are a character designer for an English listening-practice video channel (audience: overseas Chinese ESL learners). The videos are everyday conversations set in common daily scenarios (coffee shop, pharmacy, airport, bank, restaurant, hotel, school, office, shopping mall, clinic, gas station, post office, gym, library...).
 
 Design exactly {count} GENERIC, REUSABLE human characters that could plausibly appear in many of those daily scenarios.
@@ -570,7 +621,7 @@ Requirements:
 - "role": the character's occupation/identity in 1-3 English words (e.g. "coffee shop barista")
 - "scenarios": 3-5 short CHINESE scenario labels (2-6 Chinese characters each, e.g. "咖啡店点单", "药店买药") — the common scenarios this character fits
 - Do NOT duplicate these existing characters:
-{avoid_lines}
+{avoid_lines}{constraints_block}
 
 Output valid JSON only (no markdown, no explanations):
 {{"characters": [{{"name": "...", "gender": "female", "role": "...", "description": "...", "scenarios": ["..."]}}]}}"""
@@ -667,8 +718,17 @@ async def api_library_ai_generate(request: Request):
     if structure not in ("quest", "original"):
         structure = "quest"
 
+    def _opt(val: object, limit: int) -> str:
+        return str(val or "").strip().replace("\n", " ")[:limit]
+
+    gender = data.get("gender") if data.get("gender") in ("female", "male") else ""
+    age = _opt(data.get("age"), 60)
+    skin = _opt(data.get("skin"), 60)
+    extra = _opt(data.get("extra"), 300)
+
     import threading
-    threading.Thread(target=_generate_ai_characters, args=(structure, 5),
+    threading.Thread(target=_generate_ai_characters,
+                     args=(structure, 5, gender, age, skin, extra),
                      daemon=True).start()
     return {"ok": True, "message": "LLM 生成中..."}
 

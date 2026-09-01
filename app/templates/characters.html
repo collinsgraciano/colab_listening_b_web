@@ -38,6 +38,43 @@
                     LLM 先生成人物文字描述并直接入库（无图）→ 满意后点卡片上的 🎨 生成图片
                 </span>
             </div>
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-slate-700/60">
+                <span class="text-[10px] text-slate-500">筛选维度（不勾选 = 随机）：</span>
+                <label class="flex items-center gap-1.5 text-xs text-slate-300">
+                    <input type="checkbox" id="ai-gender-on" class="accent-indigo-500"
+                        onchange="document.getElementById('ai-gender').disabled=!this.checked">性别
+                    <select id="ai-gender" disabled
+                        class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white disabled:opacity-40">
+                        <option value="female">女</option>
+                        <option value="male">男</option>
+                    </select>
+                </label>
+                <label class="flex items-center gap-1.5 text-xs text-slate-300">
+                    <input type="checkbox" id="ai-age-on" class="accent-indigo-500"
+                        onchange="document.getElementById('ai-age').disabled=!this.checked">年龄
+                    <select id="ai-age" disabled
+                        class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white disabled:opacity-40">
+                        <option value="young adults (20s)">年轻人 (20 代)</option>
+                        <option value="in their 30s">三十岁上下</option>
+                        <option value="middle-aged (45-60)">中年</option>
+                        <option value="senior (60+)">老年</option>
+                    </select>
+                </label>
+                <label class="flex items-center gap-1.5 text-xs text-slate-300">
+                    <input type="checkbox" id="ai-skin-on" class="accent-indigo-500"
+                        onchange="document.getElementById('ai-skin').disabled=!this.checked">肤色
+                    <select id="ai-skin" disabled
+                        class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white disabled:opacity-40">
+                        <option value="fair/light skin">白皙</option>
+                        <option value="tan/olive skin">浅棕</option>
+                        <option value="brown skin">棕色</option>
+                        <option value="dark/black skin">深色</option>
+                        <option value="East Asian features">东亚面孔</option>
+                    </select>
+                </label>
+                <input type="text" id="ai-extra" placeholder="其他要求（可选，如：戴眼镜、微胖、运动风…）"
+                    class="flex-1 min-w-[220px] bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none">
+            </div>
             <div id="ai-gen-status" class="hidden mt-3"></div>
         </div>
     </section>
@@ -163,6 +200,26 @@
             <div id="import-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
         </div>
     </section>
+</div>
+
+<!-- 图集查看器弹窗（点角色图片/姿势图打开） -->
+<div id="atlas-modal" class="hidden fixed inset-0 z-50 bg-black/80 items-center justify-center p-4"
+    onclick="if(event.target===this) closeAtlasViewer()">
+    <div class="max-w-[95vw] max-h-[92vh] flex flex-col gap-3">
+        <div class="flex items-center justify-between gap-4">
+            <div id="atlas-modal-name" class="text-sm font-medium text-white truncate max-w-[60vw]"></div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button onclick="toggleAtlasZoom()" id="atlas-zoom-btn"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white">🔍 原始尺寸</button>
+                <button onclick="closeAtlasViewer()"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded text-xs text-white">✕ 关闭</button>
+            </div>
+        </div>
+        <div id="atlas-modal-body" class="flex-1 overflow-auto rounded-lg bg-slate-900 flex items-center justify-center min-h-0">
+            <img id="atlas-modal-img" src="" alt="atlas" class="max-w-none">
+        </div>
+        <div class="text-[10px] text-slate-500 text-center">滚轮/拖动滚动查看 · ESC 关闭</div>
+    </div>
 </div>
 {% endblock %}
 
@@ -348,12 +405,21 @@ function createCharCard(char) {
         ph.textContent = '🎤';
         ph.title = '仅音色+性别 · 外观每次按内容重新生成';
         header.appendChild(ph);
-    } else {
+    } else if (char.image_url) {
+        // 有图：点击弹出完整图集查看器
         const img = document.createElement('img');
-        img.src = char.image_url || '';
-        img.className = 'w-20 h-20 rounded-lg object-cover bg-slate-700 shrink-0';
-        img.onerror = function() { this.style.opacity = '0.3'; this.alt = '👤'; };
+        img.src = char.image_url;
+        img.className = 'w-20 h-20 rounded-lg object-cover bg-slate-700 shrink-0 cursor-zoom-in hover:opacity-80 transition-opacity';
+        img.title = '点击查看完整图集';
+        img.onclick = function() { openAtlasViewer(char); };
         header.appendChild(img);
+    } else {
+        // 仅描述无图（如 AI 生成后未生图）：👤 占位提示
+        const ph = document.createElement('div');
+        ph.className = 'w-20 h-20 rounded-lg bg-slate-900/60 border border-slate-600 flex items-center justify-center text-3xl shrink-0';
+        ph.textContent = '👤';
+        ph.title = '尚未生成图片 · 描述合适请点下方 🎨 生成图片';
+        header.appendChild(ph);
     }
 
     const info = document.createElement('div');
@@ -617,9 +683,80 @@ function createAndGenerate() {
 // --- AI 一键生成通用角色 (LLM 描述 → 直接入库，生图由用户在卡片上触发) ---
 let _aiGenPolling = false;
 
+// --- 图集查看器弹窗 ---
+let _atlasZoomed = false;
+
+function openAtlasViewer(char) {
+    const modal = document.getElementById('atlas-modal');
+    const img = document.getElementById('atlas-modal-img');
+    document.getElementById('atlas-modal-name').textContent =
+        `${char.name || char.id} · 完整图集`;
+    img.src = `/api/character_library/${char.id}/atlas?t=${Date.now()}`;
+    img.onerror = function() {
+        document.getElementById('atlas-modal-name').textContent = '图片加载失败';
+        img.onerror = null;
+    };
+    _atlasZoomed = false;
+    _applyAtlasZoom();
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function openAtlasById(libId) {
+    const char = _libraryChars.find(c => c.id === libId);
+    if (char) openAtlasViewer(char);
+}
+
+function closeAtlasViewer() {
+    const modal = document.getElementById('atlas-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.getElementById('atlas-modal-img').src = '';
+}
+
+function _applyAtlasZoom() {
+    const img = document.getElementById('atlas-modal-img');
+    const btn = document.getElementById('atlas-zoom-btn');
+    if (_atlasZoomed) {
+        // 原始尺寸：弹窗内滚动查看
+        img.className = 'max-w-none';
+        btn.textContent = '🔍 适应窗口';
+    } else {
+        // 适应窗口
+        img.className = 'max-w-full max-h-[75vh] object-contain rounded';
+        btn.textContent = '🔍 原始尺寸';
+    }
+}
+
+function toggleAtlasZoom() {
+    _atlasZoomed = !_atlasZoomed;
+    _applyAtlasZoom();
+}
+
+document.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('atlas-modal');
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+        closeAtlasViewer();
+    }
+});
+
 function startAiGenerate() {
     if (_aiGenPolling) return;
     const structure = document.getElementById('ai-structure').value;
+    // 筛选维度：勾选才传，不勾选 = 随机
+    const payload = {structure};
+    if (document.getElementById('ai-gender-on').checked) {
+        payload.gender = document.getElementById('ai-gender').value;
+    }
+    if (document.getElementById('ai-age-on').checked) {
+        payload.age = document.getElementById('ai-age').value;
+    }
+    if (document.getElementById('ai-skin-on').checked) {
+        payload.skin = document.getElementById('ai-skin').value;
+    }
+    const extra = document.getElementById('ai-extra').value.trim();
+    if (extra) payload.extra = extra;
+
     const btn = document.getElementById('btn-ai-generate');
     btn.disabled = true;
     _aiGenPolling = true;
@@ -627,7 +764,7 @@ function startAiGenerate() {
     fetch('/api/character_library/ai_generate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({structure})
+        body: JSON.stringify(payload)
     })
     .then(r => r.json().then(d => ({ok: r.ok, d})))
     .then(({ok, d}) => {
@@ -810,8 +947,8 @@ function loadPoses(libId) {
             div.classList.remove('hidden');
             div.className = 'grid grid-cols-4 gap-1';
             div.innerHTML = poses.map(p =>
-                `<img src="${p.url}" class="w-full aspect-square object-cover rounded bg-slate-700" onerror="this.style.opacity='0.3'">`
-            ).join('') + `<div class="col-span-4 text-[10px] text-slate-500 mt-1">${poses.length} 张姿势图 · <a href="#" onclick="generateImages('${libId}');return false;" class="text-emerald-400 hover:text-emerald-300">重新生成</a></div>`;
+                `<img src="${p.url}" class="w-full aspect-square object-cover rounded bg-slate-700 cursor-zoom-in hover:opacity-80 transition-opacity" title="点击查看完整图集" onclick="openAtlasById('${libId}')" onerror="this.style.opacity='0.3'">`
+            ).join('') + `<div class="col-span-4 text-[10px] text-slate-500 mt-1">${poses.length} 张姿势图 · <a href="#" onclick="openAtlasById('${libId}');return false;" class="text-indigo-400 hover:text-indigo-300">查看完整图集</a> · <a href="#" onclick="generateImages('${libId}');return false;" class="text-emerald-400 hover:text-emerald-300">重新生成</a></div>`;
         });
 }
 
