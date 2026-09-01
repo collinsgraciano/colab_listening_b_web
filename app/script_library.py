@@ -37,7 +37,9 @@ _PIPELINE_DIR = WEB_ROOT / "pipeline"
 if str(_PIPELINE_DIR) not in sys.path:
     sys.path.insert(0, str(_PIPELINE_DIR))
 
-from llm_client import _enforce_rate_limit, _extract_json, set_llm_env_override  # noqa: E402
+from llm_client import (  # noqa: E402
+    _enforce_rate_limit, _extract_json, resolve_max_line_words,
+    set_llm_env_override)
 
 DEFAULT_LINES = {"original": 18, "original_static": 18, "original_cutout": 18, "quest": 48}
 
@@ -563,7 +565,8 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
 
     # 简体检测（中文文案必须繁體中文）
     zh_texts = [script.get(k, "") or "" for k in
-                ("intro_zh", "outro_zh", "practice_intro_zh", "title_zh", "scene_zh")]
+                ("intro_zh", "welcome_zh", "outro_zh", "practice_intro_zh",
+                 "title_zh", "scene_zh")]
     for ln in script.get("dialogue", []) or []:
         zh_texts.append(ln.get("zh", "") or "")
     simp_hits = sorted({c for t in zh_texts for c in _SIMP_ONLY_CHARS if c in t})
@@ -573,13 +576,17 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
                        "comment": f"检测到简体字（应为繁體中文）: {''.join(simp_hits[:10])}",
                        "suggestion": "改为对应繁体字"})
 
-    # 行长度（对话行要求 <15 词）
+    # 行长度（与 QA 门禁同源 max_line_words：线程局部 override → os.environ → 默认 10）
+    env_name = ("QUEST_MAX_LINE_WORDS" if structure == "quest"
+                else "LISTENING_MAX_LINE_WORDS")
+    cap = resolve_max_line_words(env_name)
     for i, ln in enumerate(script.get("dialogue", []) or []):
         words = len((ln.get("text") or "").split())
-        if words > 15:
-            issues.append({"type": "line_too_long", "severity": "low",
+        if words > cap:
+            issues.append({"type": "line_too_long", "severity": "medium",
                            "line": i + 1,
-                           "comment": f"第 {i + 1} 行超过 15 词（{words} 词）",
+                           "comment": f"第 {i + 1} 行 {words} 词，超过上限 {cap} 词"
+                                      f"（运行时 QA 门禁将按此拦截）",
                            "suggestion": "拆分为两行或精简"})
 
     # 性别 vs 描述一致性
@@ -713,12 +720,14 @@ def ai_review_script(sid: str, provider_id: str, model: str) -> dict | None:
     structure = doc.get("structure", "original")
     cefr = doc.get("cefr", script.get("cefr", "A2"))
 
+    prompt_field = _line_prompt_field(structure)
     lines_ref = []
     for i, ln in enumerate(script.get("dialogue", []) or []):
-        img = (ln.get("image_prompt") or "")[:250]
-        lines_ref.append(
-            f"{i + 1}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
-            f"   zh: {ln.get('zh', '')}\n   img: {img}")
+        entry = (f"{i + 1}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
+                 f"   zh: {ln.get('zh', '')}")
+        if prompt_field:
+            entry += f"\n   prompt: {(ln.get(prompt_field) or '')[:250]}"
+        lines_ref.append(entry)
     chars = []
     for key in ("char_a", "char_b", "char_c", "host"):
         if script.get(f"{key}_description"):
@@ -744,7 +753,7 @@ CHECK DIMENSIONS:
 1. naturalness — 对话是否自然地道（缩略、口语填充词、真实交流模式），有无教科书味
 2. cefr — 难度是否匹配 {cefr}（句子长度、词汇）
 3. translation — 繁體中文翻译是否准确自然
-4. consistency — 角色外观/性别描述在各行 image prompt 中是否一致；场景是否一致
+4. consistency — 角色外观/性别描述在各行视觉 prompt（上方 prompt: 字段，若列出）中是否一致；场景是否一致
 5. usefulness — 每行是否有教学价值（可立即套用的表达）
 6. metadata — YouTube 标题质量（含繁中、结构完整）
 
@@ -862,21 +871,39 @@ def start_review_thread(ids: list[str], provider_id: str, model: str, q) -> thre
 # Selected-issue AI fix (patch-based, line-count preserving)
 # ===========================================================================
 
-_PATCHABLE_LINE_KEYS = ("text", "zh", "phonetic", "image_prompt", "video_prompt",
-                       "poses", "speaker")
+def _line_prompt_field(structure: str) -> str:
+    """该模式行级视觉 prompt 字段（对齐 quality_gate_listening.PROMPT_FIELDS）：
+    original→video_prompt, original_static→image_prompt, 其余（cutout/quest）→''。"""
+    return {"original": "video_prompt",
+            "original_static": "image_prompt"}.get(structure, "")
 
-def _apply_patch(script: dict, patch: dict) -> dict:
+
+def _patchable_line_keys(structure: str) -> tuple[str, ...]:
+    """按结构允许 AI patch 的行级字段。poses 已废弃（管线零消费方）彻底移除；
+    quest 行无 phonetic（_validate_script 对 quest 不查 phonetic）。"""
+    keys = ["text", "zh", "speaker"]
+    if structure != "quest":
+        keys.append("phonetic")
+    prompt_field = _line_prompt_field(structure)
+    if prompt_field:
+        keys.append(prompt_field)
+    return tuple(keys)
+
+
+def _apply_patch(script: dict, patch: dict,
+                 structure: str = "original") -> dict:
     """Apply an LLM JSON patch to a deep copy of the script. Returns the copy."""
     import copy
     patched = copy.deepcopy(script)
     dialogue = patched.get("dialogue") or []
+    patchable = _patchable_line_keys(structure)
     for p in (patch.get("dialogue") or []):
         if not isinstance(p, dict):
             continue
         idx = p.get("index")
         if not isinstance(idx, int) or not (0 <= idx < len(dialogue)):
             continue
-        for k in _PATCHABLE_LINE_KEYS:
+        for k in patchable:
             if k in p and p[k] is not None:
                 dialogue[idx][k] = p[k]
     for k, v in (patch.get("fields") or {}).items():
@@ -920,11 +947,25 @@ def _fix_script_inner(sid: str, issues: list[dict], provider_id: str, model: str
         q.put(None)
         return
 
+    prompt_field = _line_prompt_field(structure)
+    fields_note = "/".join(_patchable_line_keys(structure))
+    if prompt_field:
+        prompt_rule = (f'- "prompt:" in the dialogue listing shows the current '
+                       f'{prompt_field} — use it as context when fixing '
+                       f'consistency issues')
+        link_rule = (f"- If you change a character description, also patch that "
+                     f"character's affected dialogue lines' {prompt_field} "
+                     f"to keep the description consistent")
+    else:
+        prompt_rule = ("- This structure has NO line-level visual prompt fields — "
+                       "do NOT patch or invent image_prompt/video_prompt/poses")
+        link_rule = ("- If you change a character description, no dialogue-line "
+                     "visual prompt updates are needed in this structure")
     lines_ref = "\n".join(
         f"{i}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
-        f"   zh: {ln.get('zh', '')}\n"
-        f"   phonetic: {ln.get('phonetic', '')}\n"
-        f"   img: {(ln.get('image_prompt') or '')[:200]}"
+        f"   zh: {ln.get('zh', '')}"
+        + (f"\n   phonetic: {ln.get('phonetic', '')}" if structure != "quest" else "")
+        + (f"\n   prompt: {(ln.get(prompt_field) or '')[:200]}" if prompt_field else "")
         for i, ln in enumerate(dialogue))
     chars = "\n".join(
         f"- {k}: {script.get(k + '_description', '')} "
@@ -962,11 +1003,11 @@ OUTPUT a JSON PATCH ONLY (no markdown, no explanation):
 
 RULES:
 - The dialogue MUST keep exactly {n} lines — never add or remove lines
-- Include ONLY dialogue lines that change; within a line include ONLY the fields that change (text/zh/phonetic/image_prompt/video_prompt/poses)
-- "img:" in the dialogue listing shows the current image_prompt — use it as context when fixing consistency issues
+- Include ONLY dialogue lines that change; within a line include ONLY the fields that change ({fields_note})
+{prompt_rule}
 - Do NOT change "speaker" unless an issue explicitly requires it
 - "fields" may contain top-level script fields (char_a_description, char_b_description, youtube_title, title, title_zh, intro_zh, outro_zh, ...)
-- If you change a character description, also patch that character's affected dialogue lines' image_prompt/video_prompt to keep the description consistent
+{link_rule}
 - All Chinese output MUST be Traditional Chinese (繁體中文)
 - If an issue cannot be fixed without changing the line count, skip it (it will be handled manually)"""
 
@@ -987,7 +1028,7 @@ RULES:
         q.put(None)
         return
 
-    patched = _apply_patch(script, data)
+    patched = _apply_patch(script, data, structure)
     valid, msg = _validate_script(patched, n, quest=(structure == "quest"))
     if not valid:
         q.put(("fatal", f"修复后校验未通过（原稿已保留）: {msg}"))
