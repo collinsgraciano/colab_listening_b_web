@@ -906,6 +906,8 @@ def _apply_patch(script: dict, patch: dict,
         if not isinstance(p, dict):
             continue
         idx = p.get("index")
+        if isinstance(idx, str) and idx.strip().isdigit():
+            idx = int(idx.strip())  # LLM 偶尔把 index 输出成字符串
         if not isinstance(idx, int) or not (0 <= idx < len(dialogue)):
             continue
         for k in patchable:
@@ -928,12 +930,38 @@ def fix_script(sid: str, issues: list[dict], provider_id: str, model: str,
         q.put(None)
 
 
+_FIX_MAX_ROUNDS = 3
+
+
+def _detect_remaining_issues(script: dict, selected: list[dict],
+                             structure: str, n: int) -> list[dict]:
+    """一轮修复后复查：返回仍能被本地校验检出的选中问题。
+
+    只有本地检查产生的问题带 type 字段、可确定性复核；AI 审查维度问题
+    （只有 dimension）无法本地验证，发送一轮后视为已处理，由修复后的
+    自动复审兜底重新标记。
+    """
+    new_local = local_checks(script, structure, n)
+    remaining: list[dict] = []
+    for it in selected:
+        t = it.get("type")
+        if not t:
+            continue
+        line = it.get("line")
+        if any(x.get("type") == t and (line is None or x.get("line") in (None, line))
+               for x in new_local):
+            remaining.append(it)
+    return remaining
+
+
 def _fix_script_inner(sid: str, issues: list[dict], provider_id: str, model: str,
                       re_review: bool, q, stop_event: threading.Event) -> None:
     """Fix SELECTED issues on one script via LLM patch, then optionally re-review.
 
     Emits ("progress"/"fixed"/"reviewed"/"done"/"fatal") + None terminator.
     Original script is preserved unless the patched version passes validation.
+    迭代修复：勾选的问题全部送入补丁 prompt（不截断条数），每轮保存后
+    复查本地可验证项，仍未解决的进入下一轮（最多 _FIX_MAX_ROUNDS 轮）。
     """
     from pipeline import _validate_script
 
@@ -966,33 +994,49 @@ def _fix_script_inner(sid: str, issues: list[dict], provider_id: str, model: str
                        "do NOT patch or invent image_prompt/video_prompt/poses")
         link_rule = ("- If you change a character description, no dialogue-line "
                      "visual prompt updates are needed in this structure")
-    lines_ref = "\n".join(
-        f"{i}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
-        f"   zh: {ln.get('zh', '')}"
-        + (f"\n   phonetic: {ln.get('phonetic', '')}" if structure != "quest" else "")
-        + (f"\n   prompt: {(ln.get(prompt_field) or '')[:200]}" if prompt_field else "")
-        for i, ln in enumerate(dialogue))
-    chars = "\n".join(
-        f"- {k}: {script.get(k + '_description', '')} "
-        f"(gender={script.get(k + '_gender', '')}, role={script.get(k + '_role', '')})"
-        for k in ("char_a", "char_b", "char_c", "host")
-        if script.get(k + "_description"))
-    issues_ref = "\n".join(
-        f"- [{it.get('dimension') or it.get('type') or '?'}/"
-        f"{it.get('severity', '?')}"
-        f"{'/line ' + str(it['line']) if it.get('line') else ''}] "
-        f"{it.get('comment', '')} → {it.get('suggestion', '')}"
-        for it in issues[:12])
 
-    q.put(("progress", "AI 正在修复选中的问题（补丁式，行数保持不变）..."))
-    prompt = f"""You are an expert ESL script editor. Apply ONLY the selected fixes below to a listening-video script. Change nothing else.
+    def _issues_ref(items: list[dict]) -> str:
+        return "\n".join(
+            f"- [{it.get('dimension') or it.get('type') or '?'}/"
+            f"{it.get('severity', '?')}"
+            f"{'/line ' + str(it['line']) if it.get('line') else ''}] "
+            f"{(it.get('comment') or '')[:200]}"
+            f" → {(it.get('suggestion') or '')[:160]}"
+            for it in items)
+
+    remaining = [it for it in issues if isinstance(it, dict)]
+    if not remaining:
+        q.put(("fatal", "没有可修复的问题"))
+        q.put(None)
+        return
+    total_selected = len(remaining)
+    saved = False
+    round_no = 0
+    while remaining and round_no < _FIX_MAX_ROUNDS and not stop_event.is_set():
+        round_no += 1
+        dialogue = script.get("dialogue") or []
+        lines_ref = "\n".join(
+            f"{i}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
+            f"   zh: {ln.get('zh', '')}"
+            + (f"\n   phonetic: {ln.get('phonetic', '')}" if structure != "quest" else "")
+            + (f"\n   prompt: {(ln.get(prompt_field) or '')[:200]}" if prompt_field else "")
+            for i, ln in enumerate(dialogue))
+        chars = "\n".join(
+            f"- {k}: {script.get(k + '_description', '')} "
+            f"(gender={script.get(k + '_gender', '')}, role={script.get(k + '_role', '')})"
+            for k in ("char_a", "char_b", "char_c", "host")
+            if script.get(k + "_description"))
+        q.put(("progress",
+               f"AI 正在修复选中的问题（第 {round_no}/{_FIX_MAX_ROUNDS} 轮，"
+               f"剩余 {len(remaining)}/{total_selected} 个，补丁式，行数保持不变）..."))
+        prompt = f"""You are an expert ESL script editor. Apply ONLY the selected fixes below to a listening-video script. Change nothing else.
 
 Topic: {doc.get('topic', '')}
 Structure: {structure}
 Target CEFR: {cefr}
 
 SELECTED ISSUES TO FIX:
-{issues_ref}
+{_issues_ref(remaining)}
 
 CURRENT SCRIPT:
 Characters:
@@ -1016,50 +1060,70 @@ RULES:
 - All Chinese output MUST be Traditional Chinese (繁體中文)
 - If an issue cannot be fixed without changing the line count, skip it (it will be handled manually)"""
 
-    try:
-        data = _chat_json_provider(
-            provider_id, model, structure,
-            [{"role": "system",
-              "content": "You are a precise ESL script editor. Output valid JSON patches only."},
-             {"role": "user", "content": prompt}],
-            temperature=0.3, max_tokens=4096)
-    except Exception as e:  # noqa: BLE001
-        q.put(("fatal", f"修复调用失败: {e}"))
-        q.put(None)
-        return
+        try:
+            data = _chat_json_provider(
+                provider_id, model, structure,
+                [{"role": "system",
+                  "content": "You are a precise ESL script editor. Output valid JSON patches only."},
+                 {"role": "user", "content": prompt}],
+                temperature=0.3, max_tokens=4096)
+        except Exception as e:  # noqa: BLE001
+            if saved:
+                q.put(("progress",
+                       f"⚠ 第 {round_no} 轮修复调用失败，保留已完成结果: {str(e)[:120]}"))
+                break
+            q.put(("fatal", f"修复调用失败: {e}"))
+            q.put(None)
+            return
+        if not isinstance(data, dict):
+            if saved:
+                q.put(("progress", f"⚠ 第 {round_no} 轮补丁格式无效，保留已完成结果"))
+                break
+            q.put(("fatal", "AI 返回的补丁格式无效（非 JSON 对象）"))
+            q.put(None)
+            return
+        patched = _apply_patch(script, data, structure)
+        valid, msg = _validate_script(patched, n, quest=(structure == "quest"))
+        if not valid:
+            if saved:
+                q.put(("progress",
+                       f"⚠ 第 {round_no} 轮补丁校验未通过（保留上一轮结果）: {msg}"))
+                break
+            q.put(("fatal", f"修复后校验未通过（原稿已保留）: {msg}"))
+            q.put(None)
+            return
+        # 保存：清掉过时的 AI 审查结论，重算本地校验
+        script = patched
+        saved = True
+        doc["script"] = patched
+        review = doc.get("review") or {}
+        for k in ("score", "verdict", "issues", "summary_zh", "reviewed_at", "model"):
+            review.pop(k, None)
+        review["local_issues"] = local_checks(patched, structure, n)
+        doc["review"] = review
+        if doc.get("status") != "used":
+            doc["status"] = "draft"
+        _write_doc(doc)
+        q.put(("progress", f"✅ 第 {round_no} 轮修复已保存"))
+        q.put(("fixed", _doc_meta(doc)))
+        before = len(remaining)
+        remaining = _detect_remaining_issues(patched, remaining, structure, n)
+        if len(remaining) >= before:
+            break  # 本轮无进展，避免空转
 
-    if not isinstance(data, dict):
-        q.put(("fatal", "AI 返回的补丁格式无效（非 JSON 对象）"))
-        q.put(None)
-        return
-
-    patched = _apply_patch(script, data, structure)
-    valid, msg = _validate_script(patched, n, quest=(structure == "quest"))
-    if not valid:
-        q.put(("fatal", f"修复后校验未通过（原稿已保留）: {msg}"))
-        q.put(None)
-        return
-
-    # 保存：清掉过时的 AI 审查结论，重算本地校验
-    doc["script"] = patched
-    review = doc.get("review") or {}
-    for k in ("score", "verdict", "issues", "summary_zh", "reviewed_at", "model"):
-        review.pop(k, None)
-    review["local_issues"] = local_checks(patched, structure, n)
-    doc["review"] = review
-    if doc.get("status") != "used":
-        doc["status"] = "draft"
-    _write_doc(doc)
-    q.put(("progress", "✅ 修复已保存"))
-    q.put(("fixed", _doc_meta(doc)))
-
-    if re_review and not stop_event.is_set():
+    if remaining:
+        q.put(("progress",
+               f"⚠ {len(remaining)} 个问题经 {round_no} 轮修复仍未解决"
+               f"（AI 维度问题以复审结果为准，其余可手动处理）"))
+    if re_review and saved and not stop_event.is_set():
         try:
             meta = ai_review_script(sid, provider_id, model)
             q.put(("reviewed", meta or _doc_meta(doc)))
         except Exception as e:  # noqa: BLE001
             q.put(("progress", f"⚠ 自动复审失败: {str(e)[:120]}"))
-    q.put(("done", {"fixed": 1, "re_reviewed": bool(re_review)}))
+    q.put(("done", {"fixed": 1 if saved else 0,
+                    "re_reviewed": bool(re_review),
+                    "remaining": len(remaining)}))
     q.put(None)
 
 

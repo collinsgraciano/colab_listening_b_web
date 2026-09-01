@@ -886,7 +886,8 @@ async function fixSelected() {
                     if (i >= 0) SCRIPTS[i] = ev.data;
                     renderList();
                 } else if (ev.type === 'done') {
-                    prog.textContent = '✅ 修复完成';
+                    const left = ev.data && ev.data.remaining;
+                    prog.textContent = left ? `⚠ 修复完成，${left} 个问题多轮修复后仍未解决` : '✅ 修复完成';
                 } else if (ev.type === 'error') {
                     prog.textContent = '❌ ' + ev.error;
                 }
