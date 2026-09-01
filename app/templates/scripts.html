@@ -504,6 +504,20 @@ function scoreBadge(meta) {
     return `<span class="px-2 py-0.5 rounded-full text-[10px] ${cls}">★ ${meta.score}</span>`;
 }
 
+function genderBadge(g, label) {
+    if (!g) return '';
+    if (g === 'female')
+        return `<span class="px-2 py-0.5 rounded-full text-[10px] bg-pink-900/60 text-pink-300" title="角色${label}性别：女">♀ ${label}</span>`;
+    if (g === 'male')
+        return `<span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-900/60 text-blue-300" title="角色${label}性别：男">♂ ${label}</span>`;
+    return '';
+}
+
+function genderBadges(meta) {
+    const g = meta.genders || {};
+    return genderBadge(g.char_a, 'A') + genderBadge(g.char_b, 'B');
+}
+
 function renderList() {
     const box = document.getElementById('script-list');
     if (!SCRIPTS.length) {
@@ -522,6 +536,7 @@ function renderList() {
                 ${m.stale && m.reviewed ? '<span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-900/60 text-purple-300" title="保存编辑后 AI 审查结论可能过期">✎ 审查过期</span>' : ''}
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${STRUCT_LABEL[m.structure] || m.structure}</span>
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">${escapeHtml(m.cefr)}</span>
+                ${genderBadges(m)}
                 ${m.local_issues ? '<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-900/60 text-amber-300">⚠ 本地' + m.local_issues + '</span>' : ''}
             </div>
             <div>

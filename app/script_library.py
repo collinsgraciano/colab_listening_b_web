@@ -107,6 +107,11 @@ def _doc_meta(doc: dict) -> dict:
         "lines": len(dialogue),
         "preview": (preview or "")[:80],
         "local_issues": len(review.get("local_issues", []) or []),
+        # 角色性别（绑定时对照，防止绑定角色与脚本人物性别相反）
+        "genders": {
+            "char_a": (script.get("char_a_gender") or ""),
+            "char_b": (script.get("char_b_gender") or ""),
+        },
     }
 
 

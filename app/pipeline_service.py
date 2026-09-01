@@ -766,6 +766,135 @@ class PipelineService:
         if copied:
             self._on_log_line(f"  [Reuse] Files: {', '.join(copied[:10])}")
 
+    # ------------------------------------------------------------------
+    # 性别冲突处理（脚本库运行）：绑定角色性别与脚本槽位相反时自动交换 A/B
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _swap_script_characters(script: dict) -> None:
+        """交换脚本 char_a/char_b：顶层角色字段 + 对白行 speaker。
+
+        行级 video_prompt/image_prompt 有意保持不动：画面人物随原脚本设定，
+        音色/图片/描述槽位经交换后与绑定角色性别对齐（音画一致）。
+        """
+        suffixes = {k[len("char_a_"):] for k in script if k.startswith("char_a_")}
+        suffixes |= {k[len("char_b_"):] for k in script if k.startswith("char_b_")}
+        for suffix in suffixes:
+            a_key, b_key = f"char_a_{suffix}", f"char_b_{suffix}"
+            va = script.pop(a_key, None)
+            vb = script.pop(b_key, None)
+            if va is not None:
+                script[b_key] = va
+            if vb is not None:
+                script[a_key] = vb
+        for line in script.get("dialogue", []):
+            sp = line.get("speaker")
+            if sp == "char_a":
+                line["speaker"] = "char_b"
+            elif sp == "char_b":
+                line["speaker"] = "char_a"
+
+    def _resolve_gender_conflicts(self, script: dict, work_dir: Path) -> None:
+        """脚本库运行时检测绑定角色与脚本槽位性别冲突，可交换则自动交换 A/B。
+
+        绑定性别来源：素材库 meta.json（character_library）或源运行
+        script.json（character_reuse 的 image/desc/voice 模式）。
+        交换仅写运行副本 script.json，脚本库原稿不动；resume 不触发。
+        """
+        structure = self.config.get("structure", "original")
+        if structure == "quest":
+            keys = ["char_a", "char_b", "char_c"]
+        elif structure == "original_cutout":
+            keys = ["char_a", "char_b", "host"]
+        else:
+            keys = ["char_a", "char_b"]
+
+        # --- 收集绑定性别 ---
+        bound: dict[str, str] = {}
+        lib_map: dict = {}
+        lib_raw = self.config.get("character_library", "")
+        if lib_raw:
+            try:
+                lib_map = json.loads(lib_raw) if isinstance(lib_raw, str) else lib_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        for key, lib_id in lib_map.items():
+            if not lib_id or key not in keys:
+                continue
+            meta_path = LIBRARY_DIR / str(lib_id) / "meta.json"
+            if not meta_path.exists():
+                continue
+            try:
+                g = (json.loads(meta_path.read_text(encoding="utf-8"))
+                     .get("gender") or "").strip().lower()
+            except (json.JSONDecodeError, OSError):
+                continue
+            if g:
+                bound[key] = g
+
+        reuse_map: dict = {}
+        reuse_raw = self.config.get("character_reuse", "")
+        if reuse_raw:
+            try:
+                reuse_map = json.loads(reuse_raw) if isinstance(reuse_raw, str) else reuse_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        source_run = str(self.config.get("character_source", "") or "").strip()
+        if source_run and reuse_map:
+            source_dir = find_run_dir(
+                Path(self.config.get("output_dir", "./output")), source_run)
+            sp = source_dir / "script.json" if source_dir else None
+            source_script: dict = {}
+            if sp and sp.exists():
+                try:
+                    source_script = json.loads(sp.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    pass
+            for key in keys:
+                if reuse_map.get(key) in ("image", "desc", "voice"):
+                    g = (source_script.get(f"{key}_gender") or "").strip().lower()
+                    if g:
+                        bound[key] = g
+
+        if not bound:
+            return
+
+        sg = {k: (script.get(f"{k}_gender") or "").strip().lower() for k in keys}
+        if not sg.get("char_a") or not sg.get("char_b"):
+            return  # 脚本未标注 A/B 性别，无法判断
+
+        def _zh(g: str) -> str:
+            return {"female": "女", "male": "男"}.get(g, g or "-")
+
+        def _ok(key: str, slot_gender: str) -> bool:
+            return key not in bound or bound[key] == slot_gender
+
+        script_desc = f"脚本 char_a={_zh(sg['char_a'])}/char_b={_zh(sg['char_b'])}"
+        bound_desc = "绑定 " + "/".join(
+            f"{k}={_zh(v)}" for k, v in bound.items() if k in ("char_a", "char_b"))
+
+        if _ok("char_a", sg["char_a"]) and _ok("char_b", sg["char_b"]):
+            pass  # 无冲突
+        elif _ok("char_a", sg["char_b"]) and _ok("char_b", sg["char_a"]):
+            self._swap_script_characters(script)
+            (work_dir / "script.json").write_text(
+                json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            self._on_log_line(
+                f"  [GenderSwap] {bound_desc} 与{script_desc}槽位相反"
+                f" → 已自动交换角色A/B（脚本库原稿不变，画面人物随脚本、声音随绑定性别）")
+        else:
+            self._on_log_line(
+                f"  [GenderSwap] ⚠ {bound_desc} 无法通过交换匹配{script_desc}"
+                f" → 视频人物性别可能与绑定不符，请调整绑定或改用其他脚本")
+
+        # 未参与交换的角色（quest char_c / cutout host）绑定性别不匹配 → 仅提示
+        for key in keys:
+            if key in ("char_a", "char_b"):
+                continue
+            if key in bound and sg.get(key) and bound[key] != sg[key]:
+                self._on_log_line(
+                    f"  [GenderSwap] ⚠ 绑定 {key}={_zh(bound[key])} 与脚本 {key}={_zh(sg[key])} 性别不一致（不自动交换）")
+
     def _apply_host_bg_binding(self, dirs: dict):
         """主持人演播室背景绑定（quest/cutout）：把固定背景图复制进本运行 images/。
 
@@ -1061,6 +1190,9 @@ class PipelineService:
             char_source = config.get("character_source", "")
             char_fixes = config.get("character_fixes", "")
             char_lib = config.get("character_library", "")
+            # 性别冲突：脚本库脚本 + 角色绑定时，绑定性别与脚本槽位相反则自动交换 A/B
+            if script_id and not resume and (char_source or char_lib):
+                self._resolve_gender_conflicts(script, work_dir)
             if (char_source or char_fixes or char_lib) and not resume:
                 self._reuse_characters(char_source, work_dir, script, dirs)
 

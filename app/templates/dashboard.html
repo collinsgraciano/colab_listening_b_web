@@ -582,6 +582,12 @@ let _scriptLibScripts = [];
 let _selectedScript = null;
 let _pendingPreselect = null;  // ?script_id= 带入的预选（跳转自脚本页「到控制台」）
 
+function genderSymbol(g) {
+    if (g === 'female') return '♀';
+    if (g === 'male') return '♂';
+    return '';
+}
+
 function loadScriptLibrary() {
     return fetch('/api/scripts?status=unused&structure=' + ACTIVE_MODE)
         .then(r => r.json())
@@ -592,9 +598,12 @@ function loadScriptLibrary() {
             sel.innerHTML = '<option value="">— 不使用（AI 新生成）—</option>';
             _scriptLibScripts.forEach(s => {
                 const score = (s.score !== null && s.score !== undefined) ? ` · ★${s.score}` : '';
+                const g = s.genders || {};
+                const gA = genderSymbol(g.char_a), gB = genderSymbol(g.char_b);
+                const gTxt = (gA || gB) ? ` · ${gA || '?'}${gB || '?'}` : '';
                 const opt = document.createElement('option');
                 opt.value = s.id;
-                opt.textContent = `${s.topic}${score} · ${s.lines}行 · ${s.cefr}`;
+                opt.textContent = `${s.topic}${score} · ${s.lines}行 · ${s.cefr}${gTxt}`;
                 sel.appendChild(opt);
             });
             if (prev && _scriptLibScripts.some(s => s.id === prev)) sel.value = prev;
@@ -615,7 +624,10 @@ function onScriptLibChange() {
         topicInput.readOnly = true;
         if (_selectedScript.cefr) cefrSel.value = _selectedScript.cefr;
         cefrSel.disabled = true;
-        info.textContent = `将使用脚本库脚本「${_selectedScript.topic}」· ${_selectedScript.lines} 行 · ${_selectedScript.title}`;
+        const gi = _selectedScript.genders || {};
+        const gA = genderSymbol(gi.char_a), gB = genderSymbol(gi.char_b);
+        const gInfo = (gA || gB) ? ` · 角色A ${gA || '?'} / 角色B ${gB || '?'}` : '';
+        info.textContent = `将使用脚本库脚本「${_selectedScript.topic}」· ${_selectedScript.lines} 行 · ${_selectedScript.title}${gInfo}`;
         info.classList.remove('hidden');
     } else {
         topicInput.readOnly = false;
@@ -1183,9 +1195,10 @@ function renderLibrary() {
 
         const meta = document.createElement('div');
         meta.className = 'text-[10px] text-slate-500';
+        const gSym = char.gender === 'female' ? '♀女' : char.gender === 'male' ? '♂男' : (char.gender || '?');
         meta.textContent = voiceOnly
-            ? `${char.gender || '?'} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}${char.moss_voice ? ' · 🔊' + char.moss_voice : ''}${char.kokoro_voice ? ' · 🎵' + char.kokoro_voice : ''}`
-            : `${char.gender || '?'} · ${char.structure || '?'}`;
+            ? `${gSym} · 仅音色${char.qwen_speaker ? ' · 🎤' + char.qwen_speaker : ''}${char.moss_voice ? ' · 🔊' + char.moss_voice : ''}${char.kokoro_voice ? ' · 🎵' + char.kokoro_voice : ''}`
+            : `${gSym} · ${char.structure || '?'}`;
 
         // Assign dropdown (绑定状态持久化，回显当前绑定)
         const assignDiv = document.createElement('div');
