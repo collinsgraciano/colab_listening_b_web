@@ -16,6 +16,7 @@ from ..config_manager import (
 )
 from ..paths import TRASH_META_FILENAME
 from ..pipeline_service import get_service
+from ..thumbnail_regen_service import get_thumb_regen_service
 import subtitle_style_manager as subtitle_style_lib
 
 router = APIRouter()
@@ -132,12 +133,21 @@ async def api_get_thumbnail_file(name: str, filename: str, mode: str = ""):
 
 @router.post("/api/runs/{name}/thumbnail_regenerate")
 async def api_regen_thumbnail(name: str, mode: str = ""):
-    """为已有运行再生成一张缩略图（thumbnail_N.jpg 递增，旧图全保留；走 AI 生图）。"""
-    service = get_service()
-    ok, msg = service.regenerate_thumbnail(name, mode=mode)
+    """为已有运行再生成一张缩略图（thumbnail_N.jpg 递增，旧图全保留；走 AI 生图）。
+
+    独立子进程执行，不与主 pipeline / 模式测试互斥，可并行运行。
+    """
+    service = get_thumb_regen_service()
+    ok, msg = service.start(name, mode=mode)
     if not ok:
         return JSONResponse({"ok": False, "error": msg}, status_code=409)
     return {"ok": True, "message": msg}
+
+
+@router.get("/api/thumbnail_regen/status")
+async def api_thumb_regen_status(since: int = 0):
+    """缩略图重生成子进程任务状态 + 增量日志（形状对齐 /api/run/logs/since）。"""
+    return get_thumb_regen_service().get_status(since=since)
 
 
 @router.post("/api/runs/{name}/thumbnail_set_main")

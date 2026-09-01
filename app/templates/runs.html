@@ -546,7 +546,8 @@ function _resetThumbBtn(runName) {
 }
 
 function pollThumbRegen() {
-    fetch(`/api/run/logs/since/${_thumbsLogIdx}`)
+    // 独立子进程任务端点（与主 pipeline 日志流分离，可并行运行）
+    fetch(`/api/thumbnail_regen/status?since=${_thumbsLogIdx}`)
         .then(r => r.json())
         .then(logData => {
             _thumbsLogIdx = logData.total || 0;
@@ -561,6 +562,7 @@ function pollThumbRegen() {
                 alert('❌ 缩略图生成失败: ' + (st.error || '未知错误'));
                 return;
             }
+            // done 或 idle（服务重启后无任务记录）都视为结束
             _thumbRegenBusy = false;
             if (_thumbsTimer) { clearTimeout(_thumbsTimer); _thumbsTimer = null; }
             location.reload();
