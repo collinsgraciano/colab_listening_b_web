@@ -1545,6 +1545,141 @@ class PipelineService:
             buf.flush()
             run_mutex.release("thumbnail_regen")
 
+    def generate_4k(self, run_name: str, mode: str = "") -> tuple[bool, str]:
+        """为已完成运行生成（或重新生成）4K 版本（复用 Step 6 超分逻辑，本地渲染零积分）。
+
+        源视频 = 运行目录根部烧好字幕的成片；upscale_engine 跟随当前配置
+        （ffmpeg lanczos / AI 超分，权重缺失自动回退 ffmpeg）。照 recompose
+        模式在后台线程执行；期间与主 pipeline / 模式测试 / 缩略图重生成互斥。
+        返回 (ok, message)。
+        """
+        if self.is_running:
+            return False, "Pipeline 正在运行中，请等待完成后再生成 4K"
+
+        config = load_config()
+        output_dir = Path(config.get("output_dir", "./output"))
+        run_dir = find_run_dir(output_dir, run_name, mode)
+        if not run_dir:
+            return False, f"运行不存在: {run_name}"
+        script_path = run_dir / "script.json"
+        if not script_path.exists():
+            return False, "缺少 script.json"
+        try:
+            script = json.loads(script_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            return False, f"script.json 读取失败: {e}"
+
+        # 成片定位：优先按脚本标题还原文件名（与 burn_subtitles 命名一致），
+        # 否则取根部排除中间产物/旧 4K 后最新的 mp4
+        safe_vid_name = _safe_dirname(
+            script.get("youtube_title", script.get("title", run_name)), run_name)
+        final_path = run_dir / f"{safe_vid_name}.mp4"
+        if not final_path.exists():
+            candidates = [v for v in run_dir.glob("*.mp4")
+                          if not v.name.startswith(("final_no_sub", "final_video_norm"))
+                          and not v.name.endswith("_4K.mp4")]
+            if not candidates:
+                return False, "未找到成片视频（运行目录根部无 final mp4）"
+            final_path = max(candidates, key=lambda v: v.stat().st_mtime)
+            safe_vid_name = final_path.stem
+
+        try:
+            upscale_timeout = max(60, int(config.get("upscale_timeout", 3600) or 3600))
+        except (TypeError, ValueError):
+            upscale_timeout = 3600
+        upscale_engine = str(config.get("upscale_engine", "ffmpeg") or "ffmpeg")
+
+        if not run_mutex.try_acquire("4k_gen"):
+            return False, (f"资源被占用：{run_mutex.current_owner()}"
+                           f"（主 pipeline / 模式测试运行中请等待完成）")
+
+        self._stop_flag.clear()
+        self._step_mode = False
+        self._paused_after_step = ""
+        with self._lock:
+            self.log_lines = []
+            self.status = "running"
+            self.current_step = ""
+            self.current_step_label = "生成 4K 版本（本地渲染）"
+            self.started_at = time.time()
+            self.finished_at = 0
+            self.error = ""
+            self.work_dir = str(run_dir)
+            self.final_path = ""
+
+        self._thread = threading.Thread(
+            target=self._generate_4k_run,
+            args=(run_dir, str(final_path), safe_vid_name,
+                  upscale_engine, upscale_timeout),
+            daemon=True)
+        self._thread.start()
+        return True, "4K 生成已启动"
+
+    def _generate_4k_run(self, run_dir: Path, final_path: str, safe_vid_name: str,
+                         upscale_engine: str, upscale_timeout: int):
+        """后台线程：按 Step 6 同款逻辑生成 4K，写临时文件成功后原子替换旧 4K。"""
+        import subprocess as _sp
+        old_stdout = sys.stdout
+        buf = _LineBuffer(self._on_log_line)
+        sys.stdout = buf
+        four_k_path = run_dir / f"{safe_vid_name}_4K.mp4"
+        tmp_path = run_dir / f"{safe_vid_name}_4K_tmp.mp4"
+        try:
+            print("=" * 60)
+            print(f"Generate4K: {run_dir.name}")
+            print(f"  源视频: {Path(final_path).name}")
+            tmp_path.unlink(missing_ok=True)
+            r = None
+            ai_done = False
+            if upscale_engine == "ai":
+                from sr_upscale import upscale_video_ai, model_available
+                if not model_available():
+                    print("  [4K] AI 超分不可用（权重缺失或无 CUDA），回退 ffmpeg lanczos")
+                else:
+                    print("  [4K] AI 超分引擎：realesr-animevideov3 (torch CUDA fp16)")
+                    upscale_video_ai(final_path, str(tmp_path), timeout=upscale_timeout)
+                    ai_done = True
+            if not ai_done:
+                print("  [4K] ffmpeg lanczos 放大中（scale=3840:2160）...")
+                r = _sp.run(
+                    ["ffmpeg", "-i", final_path,
+                     "-vf", "scale=3840:2160:flags=lanczos",
+                     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-threads", "0",
+                     "-c:a", "copy",
+                     str(tmp_path), "-y"],
+                    capture_output=True, timeout=upscale_timeout)
+            if ai_done or (r is not None and r.returncode == 0 and tmp_path.exists()):
+                os.replace(str(tmp_path), str(four_k_path))
+                size_mb = four_k_path.stat().st_size / (1024 * 1024)
+                with self._lock:
+                    self.status = "done"
+                    self.finished_at = time.time()
+                print("=" * 60)
+                print(f"Generate4K DONE! {four_k_path.name} ({size_mb:.1f}MB)")
+            else:
+                tmp_path.unlink(missing_ok=True)
+                stderr = (r.stderr.decode("utf-8", errors="replace")[-500:]
+                          if r is not None and r.stderr else "")
+                self._fail("4K 生成失败（720p 版本仍可用）"
+                           + (f" ffmpeg stderr: {stderr}" if stderr else ""))
+        except _sp.TimeoutExpired:
+            tmp_path.unlink(missing_ok=True)
+            self._fail(f"4K 生成超时（>{upscale_timeout}s），720p 版本仍可用")
+        except Exception as e:
+            tmp_path.unlink(missing_ok=True)
+            self._fail(f"Generate4K {type(e).__name__}: {e}")
+            import traceback
+            for line in traceback.format_exc().split("\n"):
+                self._on_log_line(line)
+        finally:
+            sys.stdout = old_stdout
+            buf.flush()
+            with self._lock:
+                if self.status == "running":
+                    self.status = "done"
+                self.finished_at = time.time()
+            run_mutex.release("4k_gen")
+
     def recompose(self, run_name: str, subtitle_style: str = "", font_size: int = 60,
                   show_zh: bool = True, regen_4k: bool = False,
                   mode: str = "") -> tuple[bool, str]:

@@ -56,6 +56,10 @@
             <button onclick="openRecompose('{{ run.name }}', {{ 'true' if run.has_4k else 'false' }})"
                 class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs text-white">重渲字幕</button>
             {% endif %}
+            {% if run.videos %}
+            <button id="fourk-btn-{{ run.name }}" onclick="generate4k('{{ run.name }}', '{{ run.structure }}')"
+                class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs text-white">生成4K</button>
+            {% endif %}
             <button onclick="openFolder('{{ run.name }}')"
                 class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">打开目录</button>
             {% if run.has_script %}
@@ -613,6 +617,66 @@ function setMainThumb(filename) {
 function closeThumbsModal(e) {
     if (e && e.target !== document.getElementById('thumbs-modal')) return;
     document.getElementById('thumbs-modal').classList.add('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// 生成 4K（复用 Step 6 超分逻辑，本地渲染零积分；成功后原子替换旧 4K）
+// ---------------------------------------------------------------------------
+let _fourKBusy = false;
+let _fourKRun = '';
+let _fourKTimer = null;
+let _fourKLogIdx = 0;
+
+function generate4k(runName, mode) {
+    if (_fourKBusy) { alert('已有 4K 生成任务进行中，请等待完成'); return; }
+    if (!confirm('为该运行生成 4K 版本？\n本地渲染不消耗积分，已有 4K 将被覆盖；耗时几分钟到几十分钟。')) return;
+    _fourKBusy = true;
+    _fourKRun = runName;
+    _fourKLogIdx = 0;
+    const btn = document.getElementById(`fourk-btn-${runName}`);
+    if (btn) { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.textContent = '生成中...'; }
+    const q = mode ? `?mode=${mode}` : '';
+    fetch(`/api/runs/${runName}/generate_4k${q}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                alert('启动失败: ' + (data.error || '未知错误'));
+                _reset4kBtn(runName);
+                return;
+            }
+            poll4kGen();
+        })
+        .catch(() => { _reset4kBtn(runName); });
+}
+
+function _reset4kBtn(runName) {
+    _fourKBusy = false;
+    if (_fourKTimer) { clearTimeout(_fourKTimer); _fourKTimer = null; }
+    const btn = document.getElementById(`fourk-btn-${runName}`);
+    if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.textContent = '生成4K'; }
+}
+
+function poll4kGen() {
+    fetch(`/api/run/logs/since/${_fourKLogIdx}`)
+        .then(r => r.json())
+        .then(logData => {
+            _fourKLogIdx = logData.total || 0;
+            const st = logData.status || {};
+            if (st.status === 'running') {
+                _fourKTimer = setTimeout(poll4kGen, 2000);
+                return;
+            }
+            const runName = _fourKRun;
+            if (st.status === 'error') {
+                _reset4kBtn(runName);
+                alert('❌ 4K 生成失败: ' + (st.error || '未知错误'));
+                return;
+            }
+            _fourKBusy = false;
+            if (_fourKTimer) { clearTimeout(_fourKTimer); _fourKTimer = null; }
+            location.reload();
+        })
+        .catch(() => { _fourKTimer = setTimeout(poll4kGen, 3000); });
 }
 
 // 初始渲染筛选状态

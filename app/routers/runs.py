@@ -369,6 +369,16 @@ async def api_recompose(name: str, request: Request, mode: str = ""):
     return {"ok": True, "message": msg, "status": service.status}
 
 
+@router.post("/api/runs/{name}/generate_4k")
+async def api_generate_4k(name: str, mode: str = ""):
+    """为已完成运行生成（或重新生成）4K 版本（复用 Step 6 超分逻辑，本地渲染零积分）。"""
+    service = get_service()
+    ok, msg = service.generate_4k(name, mode=mode)
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg, "status": service.status}
+
+
 @router.post("/api/runs/{name}/yt_meta_refresh")
 async def api_yt_meta_refresh(name: str, mode: str = ""):
     """重新生成 youtube_metadata.json（脚本编辑后刷新标题/简介/章节，零 AI 成本）。"""
