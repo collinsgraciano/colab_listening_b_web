@@ -139,8 +139,10 @@ def generate_thumbnail(script: dict, scene_img: str, output_path: str,
         try:
             gen_args = {
                 "prompt": prompt,
-                "provider": "frontier",
-                "quality": "high",
+                # seedream 普通通道：frontier 属高成本配置（~50 积分/张），
+                # 不带 confirm_cost=true 时 MCP 只返回确认提示不建任务，
+                # 曾因此静默落 Pillow 兜底（task_id 解析为空）
+                "provider": "seedream",
                 "image_size": '{"width": 1280, "height": 720}',
                 "output_format": "jpeg",
             }
@@ -161,6 +163,14 @@ def generate_thumbnail(script: dict, scene_img: str, output_path: str,
                         print(f"  [Thumbnail] AI image too small ({size_kb}KB), falling back")
                 else:
                     print("  [Thumbnail] AI generation returned no URL, falling back to Pillow")
+            else:
+                # 不再静默：打印原始响应文本便于定位（高成本确认提示/参数错误等）
+                raw = ""
+                for item in result.get("result", {}).get("content", []):
+                    if item.get("type") == "text":
+                        raw = str(item.get("text", ""))[:300].replace("\n", " ")
+                        break
+                print(f"  [Thumbnail] MCP 未返回任务 ID（响应: {raw}），falling back to Pillow")
         except Exception as e:
             print(f"  [Thumbnail] AI generation failed: {e}, falling back to Pillow")
 

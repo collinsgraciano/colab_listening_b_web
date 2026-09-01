@@ -593,13 +593,47 @@ function loadThumbs() {
                     <img src="${t.url}" alt="${t.name}" class="w-full aspect-video object-cover cursor-pointer" onclick="window.open('${t.url}')" title="点击查看大图">
                     <div class="p-2 flex items-center justify-between gap-2">
                         <span class="text-xs text-slate-400 truncate" title="${t.name}">${t.name}</span>
-                        ${t.is_main
-                            ? '<span class="text-xs px-2 py-0.5 bg-emerald-600/30 text-emerald-300 rounded shrink-0">当前主图</span>'
-                            : `<button onclick="setMainThumb('${t.name}')" class="px-2 py-1 bg-amber-600/80 hover:bg-amber-500 rounded text-xs text-white shrink-0">设为主图</button>`}
+                        <div class="flex items-center gap-1 shrink-0">
+                            ${t.is_main
+                                ? '<span class="text-xs px-2 py-0.5 bg-emerald-600/30 text-emerald-300 rounded">当前主图</span>'
+                                : `<button onclick="setMainThumb('${t.name}')" class="px-2 py-1 bg-amber-600/80 hover:bg-amber-500 rounded text-xs text-white">设为主图</button>`}
+                            <button onclick="deleteThumb('${t.name}', ${t.is_main})" title="删除该缩略图"
+                                class="px-2 py-1 bg-red-600/70 hover:bg-red-500 rounded text-xs text-white">删除</button>
+                        </div>
                     </div>`;
                 grid.appendChild(card);
             });
+            _syncThumbBadge((data.thumbnails || []).length);
         });
+}
+
+function _syncThumbBadge(count) {
+    // 同步运行卡片上的「🖼 N 张」角标（删除后无需整页刷新）
+    const card = document.querySelector(`.run-card[data-run="${CSS.escape(_thumbsRun)}"]`);
+    if (!card) return;
+    const badge = card.querySelector('button[title="浏览全部缩略图"]');
+    if (count > 1) {
+        if (badge) badge.innerHTML = `🖼 ${count} 张`;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+function deleteThumb(filename, isMain) {
+    if (!confirm(`确定删除 ${filename}？\n删除后不可恢复（如需要可用「＋缩略图」重新生成）。`)) return;
+    const q = _thumbsMode ? `?mode=${_thumbsMode}` : '';
+    fetch(`/api/runs/${_thumbsRun}/thumbnail_delete${q}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: filename}),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.ok) { alert('删除失败: ' + (data.error || '未知错误')); return; }
+        // 主图被删 → 封面回落 thumbnail.jpg，整页刷新卡片；非主图只刷新弹窗列表+角标
+        if (isMain) { location.reload(); return; }
+        loadThumbs();
+    });
 }
 
 function setMainThumb(filename) {

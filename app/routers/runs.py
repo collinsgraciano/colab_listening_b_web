@@ -166,6 +166,48 @@ async def api_set_main_thumbnail(name: str, request: Request, mode: str = ""):
     return {"ok": True, "main": filename}
 
 
+@router.post("/api/runs/{name}/thumbnail_delete")
+async def api_delete_thumbnail(name: str, request: Request, mode: str = ""):
+    """删除一张缩略图（白名单校验防路径穿越）。
+
+    删除的是主图时清除 thumb_main.txt 记录（回落 thumbnail.jpg 默认）；
+    该文件正被重生成子进程写入时拒绝删除。
+    """
+    data = await request.json()
+    filename = str(data.get("filename", "")).strip()
+    if not _THUMB_NAME_RE.fullmatch(filename):
+        return JSONResponse({"ok": False, "error": f"非法缩略图文件名: {filename}"}, status_code=400)
+
+    # 正在生成中的同名文件不可删（子进程可能正写到一半）
+    st = get_thumb_regen_service().get_status(0)["status"]
+    if (st.get("status") == "running" and st.get("run_name") == name
+            and st.get("mode") == (mode or "") and st.get("out_name") == filename):
+        return JSONResponse({"ok": False, "error": "该缩略图正在生成中，请等待完成后再删除"},
+                            status_code=409)
+
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = find_run_dir(output_dir, name, mode)
+    if not run_dir or not (run_dir / filename).exists():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    try:
+        (run_dir / filename).unlink()
+    except OSError as e:
+        return JSONResponse({"ok": False, "error": f"删除失败: {e}"}, status_code=500)
+
+    # 删除的是主图 → 清除主图记录（_resolve_main_thumbnail 回落 thumbnail.jpg）
+    meta = run_dir / "thumb_main.txt"
+    was_main = False
+    if meta.exists():
+        try:
+            was_main = meta.read_text(encoding="utf-8").strip() == filename
+        except OSError:
+            was_main = False
+        if was_main:
+            meta.unlink(missing_ok=True)
+    return {"ok": True, "deleted": filename, "was_main": was_main}
+
+
 @router.get("/api/runs/{name}/video/{video_name}")
 async def api_get_video(name: str, video_name: str, mode: str = ""):
     config = load_config()
