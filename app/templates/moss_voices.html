@@ -105,19 +105,60 @@
             <span>⚙️</span> 默认音色配置
         </h3>
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
-            <p class="text-xs text-slate-400 mb-4">非库角色按性别自动分配以下默认音色：</p>
+            <p class="text-xs text-slate-400 mb-3">非库角色按性别自动分配以下默认音色（按视频模式分别保存；未绑定的同性别角色依次用第一/第二/第三默认）：</p>
+            <div id="defaults-mode-tabs" class="flex flex-wrap gap-2 mb-4"></div>
             <div class="grid grid-cols-3 gap-4">
                 <div>
-                    <label class="text-xs text-slate-400 block mb-1">默认男声</label>
+                    <label class="text-xs text-slate-400 block mb-1">默认男声（第一）</label>
                     <select id="default-male" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
                 <div>
-                    <label class="text-xs text-slate-400 block mb-1">默认女声</label>
+                    <label class="text-xs text-slate-400 block mb-1">默认女声（第一）</label>
                     <select id="default-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
                 <div>
                     <label class="text-xs text-slate-400 block mb-1">默认旁白女声</label>
                     <select id="default-host-female" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 mt-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">第二默认男声（同性别冲突时）</label>
+                    <select id="default-male2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">第二默认女声（同性别冲突时）</label>
+                    <select id="default-female2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 mt-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">中文默认男声（第一）</label>
+                    <select id="default-male-zh" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">中文默认女声（第一）</label>
+                    <select id="default-female-zh" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 mt-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">中文第二默认男声（同性别冲突时）</label>
+                    <select id="default-male-zh2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">中文第二默认女声（同性别冲突时）</label>
+                    <select id="default-female-zh2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+            </div>
+            <div id="third-default-row" class="grid grid-cols-3 gap-4 mt-4 hidden">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">第三默认男声（quest 三个同性别角色）</label>
+                    <select id="default-male3" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">第三默认女声（quest 三个同性别角色）</label>
+                    <select id="default-female3" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"></select>
                 </div>
             </div>
             <button onclick="saveDefaults()" class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">保存默认配置</button>
@@ -304,7 +345,10 @@ function populateDropdowns() {
         };
     });
 
-    ['default-male', 'default-female', 'default-host-female'].forEach(id => {
+    ['default-male', 'default-female', 'default-host-female',
+     'default-male2', 'default-female2',
+     'default-male-zh', 'default-female-zh', 'default-male-zh2', 'default-female-zh2',
+     'default-male3', 'default-female3'].forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = options;
     });
@@ -320,28 +364,72 @@ function populateDropdowns() {
     });
 }
 
+// --- 默认音色按模式分套 ---
+const DEFAULT_MODES = ['original', 'original_static', 'original_cutout', 'quest'];
+const DEFAULT_MODE_LABELS = {
+    original: '原版（AI 视频）', original_static: '原版（静态图）',
+    original_cutout: '原版（抠图）', quest: 'Quest（任务听力）'
+};
+const DEFAULTS_MODE_KEY = 'moss_defaults_mode_v1';
+const DEFAULT_SELECT_IDS = ['default-male', 'default-female', 'default-host-female',
+                            'default-male2', 'default-female2',
+                            'default-male-zh', 'default-female-zh',
+                            'default-male-zh2', 'default-female-zh2',
+                            'default-male3', 'default-female3'];
+let defaultsMode = localStorage.getItem(DEFAULTS_MODE_KEY) || 'original';
+if (!DEFAULT_MODES.includes(defaultsMode)) defaultsMode = 'original';
+let lastDefaultsConfig = null;
+
+function renderDefaultsModeTabs() {
+    const tabs = document.getElementById('defaults-mode-tabs');
+    tabs.innerHTML = '';
+    DEFAULT_MODES.forEach(m => {
+        const btn = document.createElement('button');
+        btn.textContent = DEFAULT_MODE_LABELS[m];
+        btn.className = m === defaultsMode
+            ? 'px-3 py-1.5 rounded-lg text-xs bg-indigo-600 text-white'
+            : 'px-3 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-600 text-slate-300 hover:border-indigo-500';
+        btn.onclick = () => {
+            defaultsMode = m;
+            localStorage.setItem(DEFAULTS_MODE_KEY, m);
+            renderDefaultsModeTabs();
+            fillDefaults();
+        };
+        tabs.appendChild(btn);
+    });
+    document.getElementById('third-default-row').classList.toggle('hidden', defaultsMode !== 'quest');
+}
+
+function fillDefaults() {
+    if (!lastDefaultsConfig) return;
+    const sec = (lastDefaultsConfig.modes && lastDefaultsConfig.modes[defaultsMode]) || {};
+    DEFAULT_SELECT_IDS.forEach(id => {
+        const key = id.replace(/-/g, '_');
+        if (sec[key]) document.getElementById(id).value = sec[key];
+    });
+}
+
 function loadDefaults() {
     fetch('/api/moss_voices/defaults')
         .then(r => r.json())
         .then(config => {
-            if (config.default_male) document.getElementById('default-male').value = config.default_male;
-            if (config.default_female) document.getElementById('default-female').value = config.default_female;
-            if (config.default_host_female) document.getElementById('default-host-female').value = config.default_host_female;
+            lastDefaultsConfig = config;
+            renderDefaultsModeTabs();
+            fillDefaults();
         });
 }
 
 function saveDefaults() {
-    const data = {
-        default_male: document.getElementById('default-male').value,
-        default_female: document.getElementById('default-female').value,
-        default_host_female: document.getElementById('default-host-female').value,
-    };
+    const data = {mode: defaultsMode};
+    DEFAULT_SELECT_IDS.forEach(id => {
+        data[id.replace(/-/g, '_')] = document.getElementById(id).value;
+    });
     fetch('/api/moss_voices/defaults', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     }).then(r => r.json()).then(d => {
-        if (d.ok) alert('默认音色配置已保存');
+        if (d.ok) alert(`默认音色配置已保存（${defaultsMode}）`);
     });
 }
 

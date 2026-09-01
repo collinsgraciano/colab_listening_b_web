@@ -41,9 +41,8 @@ def _load_moss_voice_config() -> dict:
     if MOSS_VOICE_CONFIG_PATH.exists():
         try:
             saved = json.loads(MOSS_VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
-            for k in defaults:
-                if k in saved:
-                    defaults[k] = saved[k]
+            # update 而非逐已知键回拷：保留未知键（如按模式分套的 modes）
+            defaults.update(saved)
         except (json.JSONDecodeError, OSError):
             pass
     return defaults
@@ -143,22 +142,47 @@ async def api_moss_preview_cached(voice: str, language: str = "english"):
     return FileResponse(str(p), media_type="audio/mpeg")
 
 
+# 按模式分套默认音色的合法键（与 pipeline/moss_tts_engine.MOSS_VOICE_DEFAULTS 同名）
+_MOSS_DEFAULT_KEYS = ("default_male", "default_female", "default_host_female",
+                      "default_male2", "default_female2",
+                      "default_male3", "default_female3",
+                      "default_male_zh", "default_female_zh",
+                      "default_male_zh2", "default_female_zh2")
+
+
+def _defaults_payload(saved: dict, builtin: dict) -> dict:
+    """原配置 + 补全的 modes（每键 modes[mode] → 平铺 legacy → 内置默认）."""
+    from tts_engine import VOICE_DEFAULT_MODES
+    filled = {}
+    for m in VOICE_DEFAULT_MODES:
+        section = (saved.get("modes") or {}).get(m) or {}
+        filled[m] = {k: section.get(k) or saved.get(k) or builtin[k] for k in builtin}
+    return {**saved, "modes": filled}
+
+
 @router.get("/api/moss_voices/defaults")
 async def api_moss_defaults_get():
-    """Get default voice configuration."""
-    return _load_moss_voice_config()
+    """Get default voice configuration (含按模式分套的 modes)."""
+    from moss_tts_engine import MOSS_VOICE_DEFAULTS
+    return _defaults_payload(_load_moss_voice_config(), MOSS_VOICE_DEFAULTS)
 
 
 @router.put("/api/moss_voices/defaults")
 async def api_moss_defaults_put(request: Request):
-    """Update default voice configuration."""
+    """Update default voice configuration（按模式写入 modes[mode]）."""
+    from tts_engine import VOICE_DEFAULT_MODES
     data = await request.json()
+    mode = data.get("mode")
+    if mode not in VOICE_DEFAULT_MODES:
+        return JSONResponse({"ok": False, "error": f"invalid mode: {mode}"},
+                            status_code=400)
     config = _load_moss_voice_config()
-    for key in ["default_male", "default_female", "default_host_female"]:
+    section = config.setdefault("modes", {}).setdefault(mode, {})
+    for key in _MOSS_DEFAULT_KEYS:
         if key in data:
-            config[key] = data[key]
+            section[key] = data[key]
     _save_moss_voice_config(config)
-    return {"ok": True, "config": config}
+    return {"ok": True, "mode": mode, "config": section}
 
 
 @router.post("/api/moss_voices/custom")

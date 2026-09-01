@@ -36,7 +36,8 @@ _PARENT = str(Path(__file__).parent.resolve())
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
-from tts_engine import TTSEngine, _rate_to_speed
+from tts_engine import (TTSEngine, _rate_to_speed,
+                        _same_gender_ranks, _gender_default, _resolve_mode_defaults)
 
 # ---------------------------------------------------------------------------
 # Built-in voice presets (from moss_tts_nano_runtime._DEFAULT_VOICE_FILES)
@@ -93,6 +94,21 @@ _PRESET_NAMES = {s["name"] for s in MOSS_PRESET_VOICES}
 _DEFAULT_MALE = "Adam"
 _DEFAULT_FEMALE = "Ava"
 _DEFAULT_HOST_FEMALE = "Bella"
+
+# 按模式分套默认音色的内置兜底（configs/moss_voice_config.json 的 modes 键同名）
+MOSS_VOICE_DEFAULTS = {
+    "default_male": _DEFAULT_MALE,
+    "default_female": _DEFAULT_FEMALE,
+    "default_host_female": _DEFAULT_HOST_FEMALE,
+    "default_male2": "Nathan",
+    "default_female2": "Bella",
+    "default_male3": "Nathan",   # en 男预设仅 Adam/Nathan，第三默认回退同第二（UI 可改绑自定义音色）
+    "default_female3": "Bella",
+    "default_male_zh": "Junhao",
+    "default_female_zh": "Xiaoyu",
+    "default_male_zh2": "Zhiming",
+    "default_female_zh2": "Yuewen",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -288,9 +304,8 @@ def _load_voice_config() -> dict:
     if path.exists():
         try:
             saved = json.loads(path.read_text(encoding="utf-8"))
-            for k in defaults:
-                if k in saved:
-                    defaults[k] = saved[k]
+            # update 而非逐已知键回拷：保留未知键（如按模式分套的 modes）
+            defaults.update(saved)
         except (json.JSONDecodeError, OSError):
             pass
     return defaults
@@ -331,25 +346,45 @@ def get_moss_voice_meta(name: str) -> dict | None:
     return None
 
 
-def get_moss_zh_default(gender: str) -> str:
-    """Default Chinese preset voice for Chinese lines, by gender.
+def get_moss_zh_default(gender: str, rank: int = 0,
+                        structure: str | None = None) -> str:
+    """Default Chinese preset voice for Chinese lines, by gender (+ 同性别错开).
 
     Chinese lines spoken with an English reference voice sound accented —
     default to native Chinese presets (Junhao male / Xiaoyu female).
+    rank 为同性别分组序号（0=第一默认, 1=第二默认），避免同性别两角色
+    中文台词撞音色。
     """
-    config = _load_voice_config()
+    defaults = _resolve_mode_defaults(_load_voice_config(), structure,
+                                      MOSS_VOICE_DEFAULTS)
     if str(gender).lower() == "female":
-        return config.get("default_female_zh", "Xiaoyu")
-    return config.get("default_male_zh", "Junhao")
+        return _gender_default(defaults, "default_female_zh", rank)
+    return _gender_default(defaults, "default_male_zh", rank)
 
 
-def build_moss_voice_map(script: dict) -> dict:
+def gender_default_ranks(script: dict) -> dict[str, int]:
+    """char_a/b/c 未绑定 moss 音色者的同性别分组序号（0=第一默认,1=第二,2=第三）."""
+    return _same_gender_ranks([
+        (key, (script.get(f"{key}_gender") or "").lower(),
+         bool((script.get(f"{key}_moss_voice") or "").strip()))
+        for key in ("char_a", "char_b", "char_c")
+    ])
+
+
+def build_moss_voice_map(script: dict, structure: str | None = None) -> dict:
     """Build voice_map for MOSS-TTS.
 
     Priority: script['char_X_moss_voice'] (from library binding) > auto by gender.
-    Default voices are read from moss_voice_config.json (preset names or custom voice names).
+    Default voices come from moss_voice_config.json 按模式分套默认音色
+    （preset names or custom voice names）：未绑定的同性别角色依次取
+    第一/第二/第三默认（char_a→char_b→char_c），性别不同时各自取第一默认。
+    structure 决定用哪个模式的默认套（缺省读 script['structure']，再兜底 original）。
     """
-    config = _load_voice_config()
+    if not structure:
+        structure = script.get("structure") or "original"
+    defaults = _resolve_mode_defaults(_load_voice_config(), structure,
+                                      MOSS_VOICE_DEFAULTS)
+    ranks = gender_default_ranks(script)
     voice_map = {}
     for key in ["char_a", "char_b", "char_c", "host"]:
         # Priority 1: moss_voice from script (set by library binding)
@@ -357,14 +392,15 @@ def build_moss_voice_map(script: dict) -> dict:
         if voice:
             voice_map[key] = voice
             continue
-        # Priority 2: auto by gender -> use default from config
+        # Priority 2: auto by gender -> use default from config (+ 同性别错开)
         gender = script.get(f"{key}_gender", "").lower()
         if not gender:
             continue
         if key == "host":
-            voice_map[key] = config["default_host_female"] if gender == "female" else config["default_male"]
+            voice_map[key] = defaults["default_host_female"] if gender == "female" else defaults["default_male"]
         else:
-            voice_map[key] = config["default_female"] if gender == "female" else config["default_male"]
+            base = "default_female" if gender == "female" else "default_male"
+            voice_map[key] = _gender_default(defaults, base, ranks.get(key, 0))
     return voice_map
 
 

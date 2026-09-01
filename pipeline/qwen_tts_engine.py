@@ -30,7 +30,8 @@ _PARENT = str(Path(__file__).parent.resolve())
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
-from tts_engine import TTSEngine, _split_sentences, _rate_to_speed
+from tts_engine import (TTSEngine, _split_sentences, _rate_to_speed,
+                        _same_gender_ranks, _gender_default, _resolve_mode_defaults)
 
 # --- 9 preset speakers ---
 QWEN_SPEAKERS = [
@@ -87,6 +88,21 @@ _PRESET_LANG = {s["name"]: s["lang"] for s in QWEN_SPEAKERS}
 _ZH_DEFAULT_MALE = "Dylan"
 _ZH_DEFAULT_FEMALE = "Vivian"
 
+# 按模式分套默认音色的内置兜底（configs/qwen_voice_config.json 的 modes 键同名）
+QWEN_VOICE_DEFAULTS = {
+    "default_male": _DEFAULT_MALE,
+    "default_female": _DEFAULT_FEMALE,
+    "default_host_female": _DEFAULT_HOST_FEMALE,
+    "default_male2": "Aiden",
+    "default_female2": "Ella",
+    "default_male3": "Aiden",   # en 男预设仅 Ryan/Aiden，第三默认回退同第二（UI 可改绑自定义/设计音色）
+    "default_female3": "Maya",
+    "default_male_zh": _ZH_DEFAULT_MALE,
+    "default_female_zh": _ZH_DEFAULT_FEMALE,
+    "default_male_zh2": "Eric",
+    "default_female_zh2": "Serena",
+}
+
 
 # ---------------------------------------------------------------------------
 # Config file helpers
@@ -110,9 +126,8 @@ def _load_voice_config() -> dict:
     if path.exists():
         try:
             saved = json.loads(path.read_text(encoding="utf-8"))
-            for k in defaults:
-                if k in saved:
-                    defaults[k] = saved[k]
+            # update 而非逐已知键回拷：保留未知键（如按模式分套的 modes）
+            defaults.update(saved)
         except (json.JSONDecodeError, OSError):
             pass
     return defaults
@@ -191,27 +206,46 @@ def get_custom_voice_meta(name: str) -> dict | None:
     return None
 
 
-def pick_zh_preset_fallback(name: str, gender: str = "") -> str:
-    """中文合成音色回退校正：绑定的预设为外语（en/ja/ko）时换成中文性别预设。
+def pick_zh_preset_fallback(name: str, gender: str = "", rank: int = 0,
+                            structure: str | None = None) -> str:
+    """中文合成音色回退校正 + 同性别错开。
 
-    背景：角色 voice_map 默认按性别给英文 speaker（Ryan/Vivian 混中文），
-    英文男声 Ryan 朗读中文台词带明显英文口音。克隆/设计音色不受影响
-    （非 _PRESET_LANG 成员，原样返回）。
+    绑定的预设为外语（en/ja/ko）时换成中文性别预设；rank 为同性别分组序号
+    （0=第一默认, 1=第二默认），避免同性别两角色中文台词撞音色。
+    克隆/设计音色不受影响（非 _PRESET_LANG 成员，原样返回）。
     """
     if _PRESET_LANG.get(name, "zh") == "zh":
         return name
+    defaults = _resolve_mode_defaults(_load_voice_config(), structure,
+                                      QWEN_VOICE_DEFAULTS)
     if (gender or "").lower() == "male":
-        return _ZH_DEFAULT_MALE
-    return _ZH_DEFAULT_FEMALE
+        return _gender_default(defaults, "default_male_zh", rank)
+    return _gender_default(defaults, "default_female_zh", rank)
 
 
-def build_qwen_voice_map(script: dict) -> dict:
+def gender_default_ranks(script: dict) -> dict[str, int]:
+    """char_a/b/c 未绑定 qwen 音色者的同性别分组序号（0=第一默认,1=第二,2=第三）."""
+    return _same_gender_ranks([
+        (key, (script.get(f"{key}_gender") or "").lower(),
+         bool((script.get(f"{key}_qwen_speaker") or "").strip()))
+        for key in ("char_a", "char_b", "char_c")
+    ])
+
+
+def build_qwen_voice_map(script: dict, structure: str | None = None) -> dict:
     """Build voice_map for Qwen-TTS.
 
     Priority: script['char_X_qwen_speaker'] (from library) > auto by gender.
-    Default speakers are read from qwen_voice_config.json.
+    Default speakers come from qwen_voice_config.json 按模式分套默认音色：
+    未绑定的同性别角色依次取第一/第二/第三默认（char_a→char_b→char_c），
+    性别不同时各自取第一默认。structure 决定用哪个模式的默认套
+    （缺省读 script['structure']，再兜底 original）。
     """
-    defaults = _load_voice_config()
+    if not structure:
+        structure = script.get("structure") or "original"
+    defaults = _resolve_mode_defaults(_load_voice_config(), structure,
+                                      QWEN_VOICE_DEFAULTS)
+    ranks = gender_default_ranks(script)
 
     voice_map = {}
     for key in ["char_a", "char_b", "char_c", "host"]:
@@ -220,14 +254,15 @@ def build_qwen_voice_map(script: dict) -> dict:
         if speaker:
             voice_map[key] = speaker
             continue
-        # Priority 2: auto by gender
+        # Priority 2: auto by gender (+ 同性别错开)
         gender = script.get(f"{key}_gender", "").lower()
         if not gender:
             continue
         if key == "host":
             voice_map[key] = defaults["default_host_female"] if gender == "female" else defaults["default_male"]
         else:
-            voice_map[key] = defaults["default_female"] if gender == "female" else defaults["default_male"]
+            base = "default_female" if gender == "female" else "default_male"
+            voice_map[key] = _gender_default(defaults, base, ranks.get(key, 0))
     return voice_map
 
 

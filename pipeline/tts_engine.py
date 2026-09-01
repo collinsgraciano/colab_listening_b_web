@@ -657,52 +657,123 @@ def get_all_kokoro_voices() -> list[dict]:
     return out
 
 
-def _load_kokoro_voice_config() -> dict:
-    """Load configs/kokoro_voice_config.json 默认音色（与 Web 音色页配置共享）.
+# ---------------------------------------------------------------------------
+# 默认音色按模式分套 + 同性别错开（共用 helper，qwen/moss 引擎 import 复用）
+# ---------------------------------------------------------------------------
 
-    缺文件/缺键回退内置默认值（与原硬编码行为一致）。
+# config["modes"] 的合法键（四种视频结构）
+VOICE_DEFAULT_MODES = ("original", "original_static", "original_cutout", "quest")
+
+KOKORO_VOICE_DEFAULTS = {
+    "default_male": "am_adam",
+    "default_female": "af_sarah",
+    "default_host_female": "af_sky",
+    "default_male2": "am_liam",      # 第二默认男声（同性别冲突时第二个角色用）
+    "default_female2": "af_nova",
+    "default_male3": "am_echo",      # 第三默认（仅 quest 三个同性别角色时用）
+    "default_female3": "af_jessica",
+}
+
+
+def _same_gender_ranks(entries: list[tuple[str, str, bool]]) -> dict[str, int]:
+    """未绑定音色的角色按同性别分组，组内按传入顺序给 0/1/2 序号.
+
+    entries: [(key, gender, bound), ...]；bound=True 或 gender 为空的不参与分组。
+    返回 {key: rank}，rank 0=第一默认, 1=第二默认, 2=第三默认。
     """
-    defaults = {
-        "default_male": "am_adam",
-        "default_female": "af_sarah",
-        "default_host_female": "af_sky",
-    }
+    ranks: dict[str, int] = {}
+    counts: dict[str, int] = {}
+    for key, gender, bound in entries:
+        if bound or not gender:
+            continue
+        rank = counts.get(gender, 0)
+        ranks[key] = rank
+        counts[gender] = rank + 1
+    return ranks
+
+
+def _gender_default(defaults: dict, base: str, rank: int) -> str:
+    """按 rank 取第一/第二/第三默认音色，缺键逐级回退（X3→X2→X，X2→X）."""
+    if rank >= 2:
+        v = defaults.get(f"{base}3") or defaults.get(f"{base}2") or defaults.get(base)
+        if v:
+            return v
+    if rank >= 1:
+        v = defaults.get(f"{base}2") or defaults.get(base)
+        if v:
+            return v
+    return defaults.get(base, "")
+
+
+def _resolve_mode_defaults(saved: dict, structure: str | None, builtin: dict) -> dict:
+    """默认音色解析：builtin ← 配置平铺键(legacy) ← config["modes"][structure] 覆盖."""
+    out = dict(builtin)
+    for k in builtin:
+        v = saved.get(k)
+        if v:
+            out[k] = v
+    if structure:
+        section = (saved.get("modes") or {}).get(structure) or {}
+        for k in builtin:
+            v = section.get(k)
+            if v:
+                out[k] = v
+    return out
+
+
+def _load_kokoro_voice_config() -> dict:
+    """Load configs/kokoro_voice_config.json 原始内容（与 Web 音色页配置共享）.
+
+    缺文件/坏 JSON 返回 {}（默认值由 _resolve_mode_defaults 兜底）。
+    """
     config_path = Path(__file__).parent.parent / "configs" / "kokoro_voice_config.json"
     if config_path.exists():
         try:
-            saved = json.loads(config_path.read_text(encoding="utf-8"))
-            for k in defaults:
-                if k in saved and saved[k]:
-                    defaults[k] = saved[k]
+            return json.loads(config_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
-    return defaults
+    return {}
 
 
-def build_voice_map(script: dict) -> dict:
-    """Build voice_map from char_a_gender/char_b_gender.
+def gender_default_ranks(script: dict) -> dict[str, int]:
+    """char_a/b/c 未绑定 kokoro 音色者的同性别分组序号（0=第一默认,1=第二,2=第三）."""
+    entries = []
+    for key in ("char_a", "char_b", "char_c"):
+        fallback = {"char_a": "male", "char_b": "female"}.get(key, "")
+        gender = (script.get(f"{key}_gender") or fallback).lower()
+        bound = bool((script.get(f"{key}_kokoro_voice") or "").strip())
+        entries.append((key, gender, bound))
+    return _same_gender_ranks(entries)
+
+
+def build_voice_map(script: dict, structure: str | None = None) -> dict:
+    """Build voice_map from char_a/char_b/char_c/host genders.
 
     Priority 1: script['{key}_kokoro_voice'] (素材库 / Kokoro 音色绑定).
-    Priority 2: by gender — 读 configs/kokoro_voice_config.json 默认音色
-    （未配置时 male -> am_adam, female -> af_sarah）。
+    Priority 2: by gender — configs/kokoro_voice_config.json 按模式分套的默认音色；
+    未绑定的同性别角色依次取第一/第二/第三默认（char_a→char_b→char_c），
+    性别不同时各自取第一默认。structure 决定用哪个模式的默认套
+    （缺省读 script['structure']，再兜底 original）。
     """
-    defaults = _load_kokoro_voice_config()
+    if not structure:
+        structure = script.get("structure") or "original"
+    defaults = _resolve_mode_defaults(_load_kokoro_voice_config(), structure,
+                                      KOKORO_VOICE_DEFAULTS)
+    ranks = gender_default_ranks(script)
     voice_map = {}
     for key in ["char_a", "char_b", "char_c", "host"]:
         bound = script.get(f"{key}_kokoro_voice", "").strip()
         if bound:
             voice_map[key] = bound
-    if "char_a" not in voice_map:
-        char_a_gender = script.get("char_a_gender", "male").lower()
-        voice_map["char_a"] = defaults["default_male"] if char_a_gender == "male" else defaults["default_female"]
-    if "char_b" not in voice_map:
-        char_b_gender = script.get("char_b_gender", "female").lower()
-        voice_map["char_b"] = defaults["default_male"] if char_b_gender == "male" else defaults["default_female"]
-    # Quest mode third character (staff/interviewer) — only present in quest scripts
-    if "char_c" not in voice_map:
-        char_c_gender = script.get("char_c_gender", "").lower()
-        if char_c_gender:
-            voice_map["char_c"] = defaults["default_male"] if char_c_gender == "male" else defaults["default_female"]
+    for key in ["char_a", "char_b", "char_c"]:
+        if key in voice_map:
+            continue
+        fallback = {"char_a": "male", "char_b": "female"}.get(key, "")
+        gender = (script.get(f"{key}_gender") or fallback).lower()
+        if not gender:
+            continue
+        base = "default_male" if gender == "male" else "default_female"
+        voice_map[key] = _gender_default(defaults, base, ranks.get(key, 0))
     # Quest mode host (节目主) — appears in welcome/hook/outro segments
     if "host" not in voice_map:
         host_gender = script.get("host_gender", "").lower()

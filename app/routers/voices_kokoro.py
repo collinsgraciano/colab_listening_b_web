@@ -72,23 +72,20 @@ async def api_kokoro_preview_cached(voice: str, language: str = "english"):
 
 # Kokoro voice defaults config (性别自动分配的默认音色，与 Qwen/MOSS 对齐)
 
+# 按模式分套默认音色的合法键（与 pipeline/tts_engine.KOKORO_VOICE_DEFAULTS 同名）
+_KOKORO_DEFAULT_KEYS = ("default_male", "default_female", "default_host_female",
+                        "default_male2", "default_female2",
+                        "default_male3", "default_female3")
+
 
 def _load_kokoro_voice_config() -> dict:
-    """Load kokoro_voice_config.json with defaults (文件首次保存时创建)."""
-    defaults = {
-        "default_male": "am_adam",
-        "default_female": "af_sarah",
-        "default_host_female": "af_sky",
-    }
+    """Load kokoro_voice_config.json raw content (文件不存在/坏 JSON 返回 {})."""
     if KOKORO_VOICE_CONFIG_PATH.exists():
         try:
-            saved = json.loads(KOKORO_VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
-            for k in defaults:
-                if k in saved:
-                    defaults[k] = saved[k]
+            return json.loads(KOKORO_VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
-    return defaults
+    return {}
 
 
 def _save_kokoro_voice_config(config: dict) -> None:
@@ -97,21 +94,38 @@ def _save_kokoro_voice_config(config: dict) -> None:
         json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _defaults_payload(saved: dict, builtin: dict) -> dict:
+    """原配置 + 补全的 modes（每键 modes[mode] → 平铺 legacy → 内置默认）."""
+    from tts_engine import VOICE_DEFAULT_MODES
+    filled = {}
+    for m in VOICE_DEFAULT_MODES:
+        section = (saved.get("modes") or {}).get(m) or {}
+        filled[m] = {k: section.get(k) or saved.get(k) or builtin[k] for k in builtin}
+    return {**saved, "modes": filled}
+
+
 @router.get("/api/kokoro_voices/defaults")
 async def api_kokoro_defaults_get():
-    """Get Kokoro default voice configuration."""
-    return _load_kokoro_voice_config()
+    """Get Kokoro default voice configuration (含按模式分套的 modes)."""
+    from tts_engine import KOKORO_VOICE_DEFAULTS
+    return _defaults_payload(_load_kokoro_voice_config(), KOKORO_VOICE_DEFAULTS)
 
 
 @router.put("/api/kokoro_voices/defaults")
 async def api_kokoro_defaults_put(request: Request):
-    """Update Kokoro default voice configuration."""
+    """Update Kokoro default voice configuration（按模式写入 modes[mode]）."""
+    from tts_engine import VOICE_DEFAULT_MODES
     data = await request.json()
+    mode = data.get("mode")
+    if mode not in VOICE_DEFAULT_MODES:
+        return JSONResponse({"ok": False, "error": f"invalid mode: {mode}"},
+                            status_code=400)
     config = _load_kokoro_voice_config()
-    for key in ["default_male", "default_female", "default_host_female"]:
+    section = config.setdefault("modes", {}).setdefault(mode, {})
+    for key in _KOKORO_DEFAULT_KEYS:
         if key in data:
-            config[key] = data[key]
+            section[key] = data[key]
     _save_kokoro_voice_config(config)
-    return {"ok": True, "config": config}
+    return {"ok": True, "mode": mode, "config": section}
 
 

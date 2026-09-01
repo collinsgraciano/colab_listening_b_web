@@ -109,9 +109,10 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
         "narration": resolve_tts_rate("narration", _structure, tts_rate_narration, tts_rate),
     }
     # --- Engine + voice map setup ---
+    zh_ranks: dict = {}  # 同性别冲突时中文默认音色错开用（qwen/moss）
     if tts_engine == "qwen":
         from qwen_tts_engine import (QwenTTSEngine, build_qwen_voice_map,
-                                     pick_zh_preset_fallback)
+                                     pick_zh_preset_fallback, gender_default_ranks)
 
         model_path = os.environ.get("QWEN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-0.6B-CustomVoice")
         base_model_path = os.environ.get("QWEN_BASE_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-1.7B-Base")
@@ -119,23 +120,26 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
             "QWEN_VOICEDSIGN_MODEL_PATH", r"H:\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign")
         device = os.environ.get("QWEN_DEVICE", "cuda:0")
         tts = QwenTTSEngine(model_path, device, base_model_path, voicedesign_model_path)
-        voice_map = build_qwen_voice_map(script)
+        voice_map = build_qwen_voice_map(script, _structure)
+        zh_ranks = gender_default_ranks(script)
         narration_voice = voice_map.get("narration", voice_map.get("host", "Serena"))
         voice_label = "qwen"
     elif tts_engine == "moss":
-        from moss_tts_engine import MossTTSEngine, build_moss_voice_map, get_moss_zh_default
+        from moss_tts_engine import (MossTTSEngine, build_moss_voice_map,
+                                     get_moss_zh_default, gender_default_ranks)
 
         model_path = os.environ.get("MOSS_MODEL_PATH") or r"H:\models\MOSS-TTS-Nano-Model"
         tokenizer_path = os.environ.get("MOSS_TOKENIZER_PATH") or r"H:\models\MOSS-Audio-Tokenizer-Nano"
         device = os.environ.get("MOSS_DEVICE") or "cpu"
         repo_dir = os.environ.get("MOSS_REPO_DIR") or r"H:\models\MOSS-TTS-Nano"
         tts = MossTTSEngine(model_path, device, tokenizer_path, repo_dir)
-        voice_map = build_moss_voice_map(script)
+        voice_map = build_moss_voice_map(script, _structure)
+        zh_ranks = gender_default_ranks(script)
         narration_voice = voice_map.get("narration", voice_map.get("host", "Bella"))
         voice_label = "moss"
     else:
         tts = TTSEngine()
-        voice_map = build_voice_map(script)
+        voice_map = build_voice_map(script, _structure)
         narration_voice = voice_map.get("narration", voice_map.get("host", "af_sky"))
         voice_label = "kokoro"
 
@@ -162,7 +166,7 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
             print("  [TTS][Fallback] Initializing Kokoro fallback engine...")
             _fb_state["engine"] = TTSEngine()
         if _fb_state["voice_map"] is None:
-            _fb_state["voice_map"] = build_voice_map(script)
+            _fb_state["voice_map"] = build_voice_map(script, _structure)
         return _fb_state["engine"], _fb_state["voice_map"]
 
     def _synth_line(method, text, voice, path, rate, speaker="char_a"):
@@ -295,14 +299,16 @@ def generate_tts(script, dialogue, audio_dir, results, quest=False, host_narrati
             if tts_engine == "qwen":
                 voice = zh_bind or pick_zh_preset_fallback(
                     voice_map.get(speaker, voice_map.get("char_a", "Vivian")),
-                    script.get(f"{speaker}_gender", ""))
+                    script.get(f"{speaker}_gender", ""),
+                    rank=zh_ranks.get(speaker, 0), structure=_structure)
             elif tts_engine == "moss":
                 moss_bind = script.get(f"{speaker}_moss_voice", "").strip()
                 if moss_bind:
                     voice = moss_bind
                 else:
                     gender = script.get(f"{speaker}_gender", "").lower()
-                    voice = get_moss_zh_default(gender)
+                    voice = get_moss_zh_default(gender, rank=zh_ranks.get(speaker, 0),
+                                                structure=_structure)
             else:
                 voice = zh_bind or get_zh_voice(speaker, script)
             path = str(audio_dir / f"zh_{i}.mp3")
