@@ -67,8 +67,7 @@ _THUMB_NAME_RE = re.compile(r"thumbnail(?:_\d+)?\.jpg")
 
 
 def _resolve_main_thumbnail(run_dir: Path) -> Path:
-    """主缩略图：thumb_main.txt 记录「设为主图」的选择；缺失/非法/文件不存在时回退 thumbnail.jpg。"""
-    thumb = run_dir / "thumbnail.jpg"
+    """主缩略图：thumb_main.txt 指定 > thumbnail.jpg > 编号最小的 thumbnail_N.jpg。"""
     meta = run_dir / "thumb_main.txt"
     if meta.exists():
         try:
@@ -77,7 +76,14 @@ def _resolve_main_thumbnail(run_dir: Path) -> Path:
                 return run_dir / name
         except OSError:
             pass
-    return thumb
+    # thumbnail.jpg 被删时，自动回落到第一张 thumbnail_N.jpg
+    if (run_dir / "thumbnail.jpg").exists():
+        return run_dir / "thumbnail.jpg"
+    for f in sorted(run_dir.glob("thumbnail_*.jpg"),
+                    key=lambda p: int(p.stem.split("_")[1]) if p.stem.split("_")[1].isdigit() else 0):
+        if _THUMB_NAME_RE.fullmatch(f.name):
+            return f
+    return run_dir / "thumbnail.jpg"  # 不存在时仍返回此路径（调用方 .exists() 判 False）
 
 
 @router.get("/api/runs/{name}/thumbnail")

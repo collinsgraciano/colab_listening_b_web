@@ -20,7 +20,7 @@ from ..templating import templates
 import style_manager as style_lib
 import subtitle_style_manager as subtitle_style_lib
 from .ai_test import _load_ai_test_config
-from .runs import _THUMB_NAME_RE
+from .runs import _THUMB_NAME_RE, _resolve_main_thumbnail
 from .subtitle_styles import _current_subtitle_style_ctx
 
 router = APIRouter()
@@ -205,11 +205,12 @@ async def runs_page(request: Request):
     for d in iter_run_dirs(output_dir):
         script_path = d / "script.json"
         videos_dir = d / "videos"
-        thumbnail = d / "thumbnail.jpg"
+        thumbnail = _resolve_main_thumbnail(d)
+        thumb_count = sum(1 for f in d.glob("thumbnail*.jpg")
+                          if _THUMB_NAME_RE.fullmatch(f.name))
         no_sub = videos_dir / "final_no_sub.mp4"
         meta_path = d / "subtitles" / "meta.json"
         has_4k = any(d.glob("*_4K.mp4"))
-        # 重渲条件：无字幕底片 + 时间轴元数据 + 脚本齐备（仅重跑字幕烧录环节）
         recomposable = (no_sub.exists() and no_sub.stat().st_size >= 1_000_000
                         and meta_path.exists() and script_path.exists())
         run_info = {
@@ -217,10 +218,9 @@ async def runs_page(request: Request):
             "path": str(d),
             "created": d.stat().st_mtime,
             "has_script": script_path.exists(),
-            "has_thumbnail": thumbnail.exists(),
-            "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumbnail.exists() else "",
-            "thumbnail_count": sum(1 for f in d.glob("thumbnail*.jpg")
-                                   if _THUMB_NAME_RE.fullmatch(f.name)),
+            "has_thumbnail": thumb_count > 0,
+            "thumbnail_url": f"/api/runs/{d.name}/thumbnail" if thumb_count > 0 else "",
+            "thumbnail_count": thumb_count,
             "uploaded": (d / "uploaded.flag").exists(),
             "has_4k": has_4k,
             "recomposable": recomposable,

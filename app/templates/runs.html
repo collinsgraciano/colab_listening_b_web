@@ -591,13 +591,13 @@ function loadThumbs() {
                 card.className = 'bg-slate-900 rounded-lg border border-slate-700 overflow-hidden';
                 card.innerHTML = `
                     <img src="${t.url}" alt="${t.name}" class="w-full aspect-video object-cover cursor-pointer" onclick="window.open('${t.url}')" title="点击查看大图">
-                    <div class="p-2 flex items-center justify-between gap-2">
-                        <span class="text-xs text-slate-400 truncate" title="${t.name}">${t.name}</span>
-                        <div class="flex items-center gap-1 shrink-0">
+                    <div class="p-2">
+                        <div class="text-xs text-slate-400 truncate mb-1.5" title="${t.name}">${t.name}</div>
+                        <div class="flex items-center gap-1.5">
                             ${t.is_main
-                                ? '<span class="text-xs px-2 py-0.5 bg-emerald-600/30 text-emerald-300 rounded">当前主图</span>'
+                                ? '<span class="text-xs px-2 py-1 bg-emerald-600/30 text-emerald-300 rounded">当前主图</span>'
                                 : `<button onclick="setMainThumb('${t.name}')" class="px-2 py-1 bg-amber-600/80 hover:bg-amber-500 rounded text-xs text-white">设为主图</button>`}
-                            <button onclick="deleteThumb('${t.name}', ${t.is_main})" title="删除该缩略图"
+                            <button onclick="deleteThumb('${t.name}')" title="删除该缩略图"
                                 class="px-2 py-1 bg-red-600/70 hover:bg-red-500 rounded text-xs text-white">删除</button>
                         </div>
                     </div>`;
@@ -617,9 +617,19 @@ function _syncThumbBadge(count) {
     } else if (badge) {
         badge.remove();
     }
+    // 删到 0 张 → 卡片封面换 🎬 占位
+    if (count === 0) {
+        const a = card.querySelector('a.block.aspect-video');
+        if (a) {
+            const div = document.createElement('div');
+            div.className = 'aspect-video bg-slate-900 flex items-center justify-center';
+            div.innerHTML = '<span class="text-slate-600 text-4xl">🎬</span>';
+            a.replaceWith(div);
+        }
+    }
 }
 
-function deleteThumb(filename, isMain) {
+function deleteThumb(filename) {
     if (!confirm(`确定删除 ${filename}？\n删除后不可恢复（如需要可用「＋缩略图」重新生成）。`)) return;
     const q = _thumbsMode ? `?mode=${_thumbsMode}` : '';
     fetch(`/api/runs/${_thumbsRun}/thumbnail_delete${q}`, {
@@ -630,9 +640,18 @@ function deleteThumb(filename, isMain) {
     .then(r => r.json())
     .then(data => {
         if (!data.ok) { alert('删除失败: ' + (data.error || '未知错误')); return; }
-        // 主图被删 → 封面回落 thumbnail.jpg，整页刷新卡片；非主图只刷新弹窗列表+角标
-        if (isMain) { location.reload(); return; }
+        // 主图被删 → 后端已清 thumb_main.txt，_resolve_main_thumbnail 自动回落；
+        // 刷新弹窗列表 + 卡片封面（loadThumbs 会重新拉 /api/runs/.../thumbnail）
         loadThumbs();
+        // 刷新卡片封面图（加时间戳绕缓存）
+        const card = document.querySelector(`.run-card[data-run="${CSS.escape(_thumbsRun)}"]`);
+        if (card) {
+            const img = card.querySelector('img[src*="/thumbnail"]');
+            if (img) {
+                const sep = img.src.includes('?') ? '&' : '?';
+                img.src = img.src.split(sep)[0] + sep + '_t=' + Date.now();
+            }
+        }
     });
 }
 
