@@ -210,7 +210,12 @@ async function aiSuggestCategories() {
             <button type="button" class="cat-chip text-left bg-slate-900 border border-slate-600 hover:border-indigo-400 rounded-lg px-3 py-2 max-w-xs transition" data-index="${i}">
                 <span class="block text-sm text-white font-medium">${esc(c.category)}</span>
                 <span class="block text-xs text-slate-400 mt-0.5">${esc(c.reason)}</span>
-            </button>`).join('');
+            </button>`).join('') + `
+            <div class="w-full mt-1 flex items-center gap-3">
+                <button onclick="aiAddSelectedCategories()" id="ai-cat-create-btn" disabled
+                    class="px-4 py-2 bg-green-700 hover:bg-green-600 rounded-lg text-sm text-white opacity-40">创建所选分类</button>
+                <span class="text-xs text-slate-400">点击候选分类可多选 / 取消，已自动排除已有分类</span>
+            </div>`;
     } catch (e) {
         box.innerHTML = '<p class="text-xs text-red-400 w-full">❌ 请求失败，请重试</p>';
     } finally {
@@ -221,13 +226,42 @@ async function aiSuggestCategories() {
 document.getElementById('ai-cat-suggestions').addEventListener('click', e => {
     const chip = e.target.closest('.cat-chip');
     if (!chip) return;
-    const c = aiCatCandidates[parseInt(chip.dataset.index, 10)];
-    if (!c) return;
-    document.getElementById('add-cat-name').value = c.category;
-    document.querySelectorAll('#ai-cat-suggestions .cat-chip').forEach(el =>
-        el.classList.remove('border-indigo-400', 'bg-indigo-900/40'));
-    chip.classList.add('border-indigo-400', 'bg-indigo-900/40');
+    chip.classList.toggle('border-indigo-400');
+    chip.classList.toggle('bg-indigo-900/40');
+    updateCatCreateBtn();
 });
+
+function updateCatCreateBtn() {
+    const btn = document.getElementById('ai-cat-create-btn');
+    if (!btn) return;
+    const n = document.querySelectorAll('#ai-cat-suggestions .cat-chip.border-indigo-400').length;
+    btn.textContent = n ? `创建所选分类 (${n})` : '创建所选分类';
+    btn.disabled = !n;
+    btn.classList.toggle('opacity-40', !n);
+}
+
+async function aiAddSelectedCategories() {
+    const selected = [...document.querySelectorAll('#ai-cat-suggestions .cat-chip.border-indigo-400')]
+        .map(el => aiCatCandidates[parseInt(el.dataset.index, 10)]?.category)
+        .filter(Boolean);
+    if (!selected.length) return;
+    const btn = document.getElementById('ai-cat-create-btn');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/topics/add_categories', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({categories: selected})
+        }).then(r => r.json());
+        if (!r.ok) { alert(r.error || '创建失败'); return; }
+        if ((r.created || []).length) { location.reload(); return; }
+        alert('所选分类均已存在，未创建任何新分类');
+    } catch (e) {
+        alert('请求失败，请重试');
+    } finally {
+        btn.disabled = false;
+        updateCatCreateBtn();
+    }
+}
 
 function addTopic() {
     const category = document.getElementById('add-topic-category').value;

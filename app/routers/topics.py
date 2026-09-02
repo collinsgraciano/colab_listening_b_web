@@ -108,6 +108,45 @@ async def api_add_category(request: Request):
     return {"ok": True, "topics": topics_data}
 
 
+@router.post("/api/topics/add_categories")
+async def api_add_categories(request: Request):
+    """批量新建分类：{categories: ["cat1", ...]} — 已存在（含归一化重复）的跳过。"""
+    data = await request.json()
+    cats = data.get("categories", [])
+    if not isinstance(cats, list) or not cats:
+        return JSONResponse({"ok": False, "error": "categories 不能为空"}, status_code=400)
+    if len(cats) > 20:
+        return JSONResponse({"ok": False, "error": "一次最多创建 20 个分类"}, status_code=400)
+    config = load_config()
+    topics_file = config.get("topics_file", "")
+    if not topics_file:
+        return JSONResponse({"ok": False, "error": "未配置主题库文件"}, status_code=400)
+
+    try:
+        topics_data = _load_topics_data(config)
+    except (json.JSONDecodeError, OSError):
+        topics_data = {}
+
+    created: list[str] = []
+    skipped: list[str] = []
+    existing_norm = {topics_ai._norm(c) for c in topics_data.keys()}
+    for category in cats:
+        category = str(category).strip()
+        if not category:
+            skipped.append("(空分类名)")
+            continue
+        n = topics_ai._norm(category)
+        if category in topics_data or n in existing_norm:
+            skipped.append(f"已存在 → {category}")
+            continue
+        topics_data[category] = []
+        existing_norm.add(n)
+        created.append(category)
+    if created:
+        _save_topics_data(topics_file, topics_data)
+    return {"ok": True, "created": created, "skipped": skipped, "topics": topics_data}
+
+
 @router.get("/api/topics/random")
 async def api_random_topic(request: Request):
     """Pick a random topic from topics.json (excluding used).
