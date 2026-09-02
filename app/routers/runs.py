@@ -442,14 +442,23 @@ async def api_trash_empty():
 
 
 @router.post("/api/runs/{name}/mark_uploaded")
-async def api_mark_uploaded(name: str, mode: str = ""):
-    """切换运行目录的 uploaded.flag 标记（记录视频已上传到 YouTube）。"""
+async def api_mark_uploaded(name: str, mode: str = "", state: str = ""):
+    """设置运行目录的 uploaded.flag 标记（记录视频已上传到 YouTube）。
+
+    state=uploaded/pending 直接设置（批量操作用）；缺省为切换。
+    """
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     run_dir = find_run_dir(output_dir, name, mode)
     if not run_dir or not run_dir.is_dir():
         return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     flag = run_dir / "uploaded.flag"
+    if state == "uploaded":
+        flag.touch()
+        return {"ok": True, "uploaded": True}
+    if state == "pending":
+        flag.unlink(missing_ok=True)
+        return {"ok": True, "uploaded": False}
     if flag.exists():
         flag.unlink()
         return {"ok": True, "uploaded": False}
