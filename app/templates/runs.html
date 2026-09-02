@@ -2,7 +2,7 @@
 {% macro run_card(run) %}
 {% set gallery_url = '/runs/' ~ run.name ~ '/gallery' %}{% if run.structure %}{% set gallery_url = gallery_url ~ '?mode=' ~ run.structure %}{% endif %}
 <div class="relative bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition run-card"
-     data-run="{{ run.name }}" data-uploaded="{% if run.uploaded %}1{% else %}0{% endif %}" data-structure="{{ run.structure }}" data-has-4k="{% if run.has_4k %}1{% else %}0{% endif %}">
+     data-run="{{ run.name }}" data-uploaded="{% if run.uploaded %}1{% else %}0{% endif %}" data-structure="{{ run.structure }}" data-has4k="{% if run.has_4k %}1{% else %}0{% endif %}">
     <!-- 多选框（批量操作用；叠在缩略图左上角，点击不会触发下层的画廊链接） -->
     <label class="absolute top-2 left-2 z-20 flex items-center justify-center w-7 h-7 bg-slate-900/70 hover:bg-slate-900/90 border border-slate-600 rounded-lg cursor-pointer"
         title="勾选后可批量操作">
