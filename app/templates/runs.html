@@ -61,6 +61,10 @@
                 class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs text-white">生成4K</button>
             <button id="bgm-btn-{{ run.name }}" onclick="generateBgm('{{ run.name }}', '{{ run.structure }}')"
                 class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 rounded-lg text-xs text-white">🎵 混BGM</button>
+            {% if run.has_4k %}
+            <button id="bgm4k-btn-{{ run.name }}" onclick="generateBgm('{{ run.name }}', '{{ run.structure }}', '4k')"
+                class="px-3 py-1.5 bg-rose-700 hover:bg-rose-600 rounded-lg text-xs text-white">🎵 混BGM 4K</button>
+            {% endif %}
             {% endif %}
             <button onclick="openFolder('{{ run.name }}')"
                 class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">打开目录</button>
@@ -741,19 +745,28 @@ function poll4kGen() {
 // ---------------------------------------------------------------------------
 let _bgmBusy = false;
 let _bgmRun = '';
+let _bgmTarget = 'final';
 let _bgmTimer = null;
 let _bgmLogIdx = 0;
 
-function generateBgm(runName, mode) {
+function _bgmBtnId(runName) {
+    return `${_bgmTarget === '4k' ? 'bgm4k' : 'bgm'}-btn-${runName}`;
+}
+
+function generateBgm(runName, mode, target = 'final') {
     if (_bgmBusy) { alert('已有 BGM 混音任务进行中，请等待完成'); return; }
-    if (!confirm('为该运行混入版权 BGM？\n按当前配置的 BGM 参数混音，输出「_bgm.mp4」新文件（原片保留，已有 _bgm 版本将被覆盖）；\n本地渲染不消耗积分，耗时取决于视频时长。')) return;
+    const outSuffix = target === '4k' ? '「_4K_bgm.mp4」（对 4K 版本混音）' : '「_bgm.mp4」';
+    const slowHint = target === '4k' ? '，4K 需整片重编码、耗时较长' : '';
+    if (!confirm(`为该运行混入版权 BGM？\n按当前配置的 BGM 参数混音，输出${outSuffix}新文件（原片保留，同名版本将被覆盖）；\n本地渲染不消耗积分，耗时取决于视频时长${slowHint}。`)) return;
     _bgmBusy = true;
     _bgmRun = runName;
+    _bgmTarget = target;
     _bgmLogIdx = 0;
-    const btn = document.getElementById(`bgm-btn-${runName}`);
+    const btn = document.getElementById(_bgmBtnId(runName));
     if (btn) { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.textContent = '混音中...'; }
     const q = mode ? `?mode=${mode}` : '';
-    fetch(`/api/runs/${runName}/bgm_mix${q}`, {method: 'POST'})
+    const url = target === '4k' ? `/api/runs/${runName}/bgm_mix_4k${q}` : `/api/runs/${runName}/bgm_mix${q}`;
+    fetch(url, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
             if (!data.ok) {
@@ -769,8 +782,8 @@ function generateBgm(runName, mode) {
 function _resetBgmBtn(runName) {
     _bgmBusy = false;
     if (_bgmTimer) { clearTimeout(_bgmTimer); _bgmTimer = null; }
-    const btn = document.getElementById(`bgm-btn-${runName}`);
-    if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.textContent = '🎵 混BGM'; }
+    const btn = document.getElementById(_bgmBtnId(runName));
+    if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.textContent = _bgmTarget === '4k' ? '🎵 混BGM 4K' : '🎵 混BGM'; }
 }
 
 function pollBgmGen() {

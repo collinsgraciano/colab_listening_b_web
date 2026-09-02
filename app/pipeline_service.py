@@ -1574,10 +1574,12 @@ class PipelineService:
     # BGM mix: mix copyright BGM into a finished run's audio
     # ------------------------------------------------------------------
 
-    def bgm_mix(self, run_name: str, mode: str = "") -> tuple[bool, str]:
+    def bgm_mix(self, run_name: str, mode: str = "", target: str = "final") -> tuple[bool, str]:
         """为已完成运行混入版权 BGM（输出 {标题}_bgm.mp4 新文件，原片保留）。
 
-        参数读取运行所在模式的当前配置（配置页改完即可对旧运行重混）。
+        target="final" 混 1080p 成片；target="4k" 混 4K 版本
+        （输出 {标题}_4K_bgm.mp4）。参数读取运行所在模式的当前配置
+        （配置页改完即可对旧运行重混）。
         照 generate_4k 模式在后台线程执行；期间与主 pipeline / 模式测试互斥。
         返回 (ok, message)。
         """
@@ -1600,16 +1602,28 @@ class PipelineService:
             return False, f"script.json 读取失败: {e}"
         safe_vid_name = _safe_dirname(
             script.get("youtube_title", script.get("title", run_name)), run_name)
-        final_path = run_dir / f"{safe_vid_name}.mp4"
-        if not final_path.exists():
-            candidates = [
-                v for v in run_dir.glob("*.mp4")
-                if not v.name.startswith(("final_no_sub", "final_video_norm"))
-                and not v.name.endswith(("_4K.mp4", "_bgm.mp4"))
-            ]
-            if not candidates:
-                return False, "未找到成片视频（运行目录根部无 final mp4）"
-            final_path = max(candidates, key=lambda v: v.stat().st_mtime)
+        if target == "4k":
+            # 4K 源定位：优先按脚本标题还原，否则取根部最新的 *_4K.mp4
+            # （{标题}_4K_bgm.mp4 以 _bgm.mp4 结尾，不匹配 *_4K.mp4，不会拿混音版再叠一层）
+            final_path = run_dir / f"{safe_vid_name}_4K.mp4"
+            if not final_path.exists():
+                candidates = list(run_dir.glob("*_4K.mp4"))
+                if not candidates:
+                    return False, "未找到 4K 视频（请先「生成4K」）"
+                final_path = max(candidates, key=lambda v: v.stat().st_mtime)
+        else:
+            # 成片定位：优先按脚本标题还原文件名，否则取根部最新的非中间产物 mp4
+            # （排除 _4K/_bgm 自身，避免拿 BGM 版再叠一层 BGM）
+            final_path = run_dir / f"{safe_vid_name}.mp4"
+            if not final_path.exists():
+                candidates = [
+                    v for v in run_dir.glob("*.mp4")
+                    if not v.name.startswith(("final_no_sub", "final_video_norm"))
+                    and not v.name.endswith(("_4K.mp4", "_bgm.mp4"))
+                ]
+                if not candidates:
+                    return False, "未找到成片视频（运行目录根部无 final mp4）"
+                final_path = max(candidates, key=lambda v: v.stat().st_mtime)
 
         music_dir = str(config.get("bgm_music_dir", "") or "").strip() \
             or str(Path(__file__).parent.parent / "bgm_music")
@@ -1628,7 +1642,8 @@ class PipelineService:
             self.log_lines = []
             self.status = "running"
             self.current_step = ""
-            self.current_step_label = "BGM 音乐混合（本地渲染）"
+            self.current_step_label = ("BGM 音乐混合 4K（本地渲染）"
+                                       if target == "4k" else "BGM 音乐混合（本地渲染）")
             self.started_at = time.time()
             self.finished_at = 0
             self.error = ""
@@ -1651,6 +1666,8 @@ class PipelineService:
             sc_attack_ms=int(config.get("bgm_sc_attack_ms", 5)),
             sc_release_ms=int(config.get("bgm_sc_release_ms", 400)),
             intro_outro_seconds=int(config.get("bgm_intro_outro_seconds", 5)),
+            # 4K 带 padding 时整片重编码，600s 默认值会超时
+            ffmpeg_timeout=3600 if target == "4k" else 600,
         )
         out_path = run_dir / f"{final_path.stem}_bgm.mp4"
         self._thread = threading.Thread(

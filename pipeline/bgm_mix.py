@@ -449,8 +449,13 @@ def mix_bgm_into_video(
     sc_attack_ms: int = 5,
     sc_release_ms: int = 400,
     intro_outro_seconds: int = 5,
+    ffmpeg_timeout: int = 600,
 ) -> bool:
-    """把版权 BGM 混入视频音轨（视频流 copy，仅音频重编码）。失败返回 False 不抛异常。"""
+    """把版权 BGM 混入视频音轨（视频流 copy，仅音频重编码）。失败返回 False 不抛异常。
+
+    ffmpeg_timeout: 内部 ffmpeg 进程超时上限（秒）。4K 等高分辨率带 padding 时
+    需整片重编码，调用方应传入更大的值（如 3600）。
+    """
     narr_temp_path: str | None = None
     bgm_temp_path: str | None = None
     try:
@@ -552,6 +557,7 @@ def mix_bgm_into_video(
                 sc_release_ms=sc_release_ms,
                 narr_path=narr_temp_path,
                 pad_seconds=pad_seconds,
+                timeout=ffmpeg_timeout,
             )
             if ok_mix:
                 del orig_audio, bgm_music
@@ -577,7 +583,9 @@ def mix_bgm_into_video(
         gc.collect()
         load_music_segment_cached.cache_clear()
 
-        ok_mix = _remux_video_audio(video_path, mixed, output_path, pad_seconds=pad_seconds)
+        ok_mix = _remux_video_audio(video_path, mixed, output_path,
+                                    pad_seconds=pad_seconds,
+                                    timeout=ffmpeg_timeout)
         del mixed
         gc.collect()
         _cleanup(narr_temp_path)
@@ -600,10 +608,11 @@ def _cleanup(path: str | None) -> None:
 
 
 def _remux_video_audio(video_path: str, mixed_audio: AudioSegment, output_path: str,
-                       pad_seconds: int = 0) -> bool:
+                       pad_seconds: int = 0, timeout: int = 600) -> bool:
     """pydub 回退路径：把混音后的音频与原视频合成为新 mp4。
 
     pad_seconds > 0 时音频已加首尾静音，视频同步 tpad 冻结延展（需重编码）。
+    start_mode 必须显式 clone：默认 add 会补黑色帧（前 N 秒黑屏 bug）。
     """
     mixed_temp_path: str | None = None
     try:
@@ -619,8 +628,8 @@ def _remux_video_audio(video_path: str, mixed_audio: AudioSegment, output_path: 
             cmd = [
                 "ffmpeg", "-y", "-i", video_path, "-i", mixed_temp_path,
                 "-filter_complex",
-                f"[0:v]tpad=start_duration={pad_seconds}:stop_mode=clone:"
-                f"stop_duration={pad_seconds}[v]",
+                f"[0:v]tpad=start_duration={pad_seconds}:start_mode=clone:"
+                f"stop_mode=clone:stop_duration={pad_seconds}[v]",
                 "-map", "[v]", "-map", "1:a:0",
                 "-c:v", "libx264", "-crf", "18", "-preset", "medium",
                 "-c:a", "aac", "-b:a", "192k",
@@ -633,7 +642,7 @@ def _remux_video_audio(video_path: str, mixed_audio: AudioSegment, output_path: 
                 "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
                 output_path,
             ]
-        r = subprocess.run(cmd, capture_output=True, timeout=600)
+        r = subprocess.run(cmd, capture_output=True, timeout=timeout)
         if r.returncode != 0:
             stderr = r.stderr or b""
             if isinstance(stderr, bytes):
@@ -666,6 +675,7 @@ def _ffmpeg_overlay_video(
     sc_release_ms: int = 400,
     narr_path: str | None = None,
     pad_seconds: int = 0,
+    timeout: int = 600,
 ) -> bool:
     """使用 ffmpeg 从磁盘叠加 BGM 到视频音轨。
 
@@ -724,9 +734,10 @@ def _ffmpeg_overlay_video(
         if has_pad:
             cmd += ["-i", narr_path]
             # 视频首尾冻结帧延展，与加静音的旁白对齐（需重编码）
+            # start_mode 必须显式 clone：默认 add 会补黑色帧（前 N 秒黑屏 bug）
             filter_complex = (
-                f"[0:v]tpad=start_duration={pad_seconds}:stop_mode=clone:"
-                f"stop_duration={pad_seconds}[v];" + filter_complex
+                f"[0:v]tpad=start_duration={pad_seconds}:start_mode=clone:"
+                f"stop_mode=clone:stop_duration={pad_seconds}[v];" + filter_complex
             )
             cmd += [
                 "-filter_complex", filter_complex,
@@ -747,7 +758,7 @@ def _ffmpeg_overlay_video(
         result = subprocess.run(
             cmd,
             capture_output=True,
-            timeout=600,
+            timeout=timeout,
         )
         if result.returncode != 0:
             stderr = result.stderr or b""

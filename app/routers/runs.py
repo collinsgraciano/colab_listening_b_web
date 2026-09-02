@@ -464,6 +464,16 @@ async def api_bgm_mix(name: str, mode: str = ""):
     return {"ok": True, "message": msg, "status": service.status}
 
 
+@router.post("/api/runs/{name}/bgm_mix_4k")
+async def api_bgm_mix_4k(name: str, mode: str = ""):
+    """为 4K 版本混入版权 BGM（输出 {标题}_4K_bgm.mp4 新文件，本地渲染零积分）。"""
+    service = get_service()
+    ok, msg = service.bgm_mix(name, mode=mode, target="4k")
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg, "status": service.status}
+
+
 @router.post("/api/runs/{name}/yt_meta_refresh")
 async def api_yt_meta_refresh(name: str, mode: str = ""):
     """重新生成 youtube_metadata.json（脚本编辑后刷新标题/简介/章节，零 AI 成本）。"""
