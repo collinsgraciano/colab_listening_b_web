@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% macro run_card(run) %}
 {% set gallery_url = '/runs/' ~ run.name ~ '/gallery' %}{% if run.structure %}{% set gallery_url = gallery_url ~ '?mode=' ~ run.structure %}{% endif %}
-<div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition run-card"
+<div class="relative bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition run-card"
      data-run="{{ run.name }}" data-uploaded="{% if run.uploaded %}1{% else %}0{% endif %}" data-structure="{{ run.structure }}">
+    <!-- 多选框（批量删除用；叠在缩略图左上角，点击不会触发下层的画廊链接） -->
+    <label class="absolute top-2 left-2 z-20 flex items-center justify-center w-7 h-7 bg-slate-900/70 hover:bg-slate-900/90 border border-slate-600 rounded-lg cursor-pointer"
+        title="勾选后可批量删除">
+        <input type="checkbox" class="run-select accent-indigo-500 w-4 h-4" onchange="onSelectChange()">
+    </label>
     <!-- Thumbnail（点击直接进画廊，不播放视频） -->
     {% if run.has_thumbnail %}
     <a href="{{ gallery_url }}" class="block aspect-video bg-slate-900 relative group" title="打开画廊">
@@ -115,6 +120,17 @@
                 class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">{{ mlabel }} <span data-mode-count="{{ mid }}"></span></button>
             {% endfor %}
         </div>
+    </div>
+
+    <!-- 批量操作：勾选卡片多选删除（全选只作用于当前筛选可见的运行） -->
+    <div class="flex flex-wrap items-center gap-3 mb-5">
+        <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input id="select-all" type="checkbox" onchange="toggleSelectAll(this.checked)"
+                class="accent-indigo-500 w-4 h-4"> 全选
+        </label>
+        <span id="sel-count" class="text-xs text-slate-400">已选 0 个</span>
+        <button onclick="deleteSelected()"
+            class="px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded-lg text-xs text-slate-300 hover:text-white">删除选中</button>
     </div>
 
     <!-- 运行卡片网格（受上面两组筛选共同过滤） -->
@@ -329,8 +345,8 @@ function paintModeChips() {
     });
 }
 
-function setUploadFilter(v) { uploadFilter = v; paintUploadChips(); applyFilters(); }
-function setModeFilter(v) { modeFilter = v; paintModeChips(); applyFilters(); }
+function setUploadFilter(v) { uploadFilter = v; paintUploadChips(); applyFilters(); _saveFilters(); }
+function setModeFilter(v) { modeFilter = v; paintModeChips(); applyFilters(); _saveFilters(); }
 
 function applyFilters() {
     let visible = 0;
@@ -340,9 +356,16 @@ function applyFilters() {
         const okM = modeFilter === 'all' || card.dataset.structure === modeFilter;
         const show = okU && okM;
         card.classList.toggle('hidden', !show);
-        if (show) visible++;
+        if (show) {
+            visible++;
+        } else {
+            // 被筛掉的卡片取消勾选：「已选」始终等于「可见且勾选」，避免误删看不到的运行
+            const cb = card.querySelector('.run-select');
+            if (cb) cb.checked = false;
+        }
     });
     document.getElementById('runs-empty').classList.toggle('hidden', visible > 0);
+    onSelectChange();
 }
 
 function refreshChipCounts() {
@@ -355,6 +378,82 @@ function refreshChipCounts() {
     document.querySelectorAll('[data-mode-count]').forEach(el => {
         el.textContent = cards.filter(c => c.dataset.structure === el.dataset.modeCount).length;
     });
+}
+
+// ---------------------------------------------------------------------------
+// 筛选状态记忆：localStorage 保存上次使用的筛选条件，下次进入页面自动恢复
+// ---------------------------------------------------------------------------
+const _FILTER_KEY = 'runs_page_filters';
+
+function _saveFilters() {
+    try {
+        localStorage.setItem(_FILTER_KEY, JSON.stringify({upload: uploadFilter, mode: modeFilter}));
+    } catch (e) { /* localStorage 不可用时静默跳过 */ }
+}
+
+function _loadSavedFilters() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(_FILTER_KEY) || '{}');
+        if (['all', 'pending', 'uploaded'].includes(saved.upload)) uploadFilter = saved.upload;
+        // 只恢复当前页面存在对应筛选按钮的模式，避免残留失效值
+        if (saved.mode && document.querySelector(`[data-mode-chip="${CSS.escape(saved.mode)}"]`)) {
+            modeFilter = saved.mode;
+        }
+    } catch (e) { /* 数据损坏时使用默认值 */ }
+}
+
+// ---------------------------------------------------------------------------
+// 多选删除：卡片勾选 → 全选/计数/批量移入回收站（只作用于当前筛选可见的运行）
+// ---------------------------------------------------------------------------
+function _visibleCards() {
+    return Array.from(document.querySelectorAll('#grid-runs .run-card'))
+        .filter(c => !c.classList.contains('hidden'));
+}
+
+function onSelectChange() {
+    const countEl = document.getElementById('sel-count');
+    if (!countEl) return;  // 无运行时批量条不渲染
+    const vis = _visibleCards();
+    const checked = vis.filter(c => {
+        const cb = c.querySelector('.run-select');
+        return cb && cb.checked;
+    }).length;
+    countEl.textContent = `已选 ${checked} 个`;
+    const sa = document.getElementById('select-all');
+    sa.checked = vis.length > 0 && checked === vis.length;
+    sa.indeterminate = checked > 0 && checked < vis.length;
+}
+
+function toggleSelectAll(checked) {
+    _visibleCards().forEach(card => {
+        const cb = card.querySelector('.run-select');
+        if (cb) cb.checked = checked;
+    });
+    onSelectChange();
+}
+
+function deleteSelected() {
+    const items = _visibleCards()
+        .filter(c => { const cb = c.querySelector('.run-select'); return cb && cb.checked; })
+        .map(c => ({name: c.dataset.run, mode: c.dataset.structure || ''}));
+    if (!items.length) { alert('请先勾选要删除的运行'); return; }
+    if (!confirm(`将选中的 ${items.length} 个运行移入回收站？（可在页面下方回收站中恢复）`)) return;
+    fetch('/api/runs/batch_delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({runs: items}),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.ok) { alert('批量删除失败: ' + (data.error || '未知错误')); return; }
+        const failed = (data.results || []).filter(x => !x.ok);
+        if (failed.length) {
+            alert(`${data.deleted} 个已移入回收站，${failed.length} 个失败：\n`
+                + failed.map(f => `${f.name} (${f.error})`).join('\n'));
+        }
+        location.reload();
+    })
+    .catch(() => alert('批量删除请求失败'));
 }
 
 function toggleUploaded(runName) {
@@ -933,7 +1032,8 @@ function pollTaskWidget() {
     }).catch(() => {});
 })();
 
-// 初始渲染筛选状态
+// 初始渲染筛选状态（先恢复上次使用的筛选条件）
+_loadSavedFilters();
 paintUploadChips();
 paintModeChips();
 refreshChipCounts();

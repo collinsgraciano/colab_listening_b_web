@@ -303,6 +303,43 @@ def _find_trash_item(output_dir: Path, name: str) -> Path | None:
     return None
 
 
+@router.post("/api/runs/batch_delete")
+async def api_batch_delete_runs(request: Request):
+    """批量删除运行（逐个移入回收站，防误删；返回逐项结果）。
+
+    body: {"runs": [{"name": 运行名, "mode": 模式文件夹名}, ...]}，
+    mode 用于跨模式重名消歧（与单删 DELETE /api/runs/{name}?mode= 一致）。
+    """
+    data = await request.json()
+    items = data.get("runs") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return JSONResponse({"ok": False, "error": "Invalid payload"}, status_code=400)
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    results = []
+    deleted = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        mode = str(item.get("mode", "")).strip()
+        run_dir = find_run_dir(output_dir, name, mode)
+        if not run_dir or not run_dir.is_dir():
+            results.append({"name": name, "ok": False, "error": "Not found"})
+            continue
+        # Safety: ensure it's within output_dir
+        if not str(run_dir.resolve()).startswith(str(output_dir.resolve())):
+            results.append({"name": name, "ok": False, "error": "Cannot delete"})
+            continue
+        try:
+            _move_run_to_recycle_bin(output_dir, run_dir)
+            results.append({"name": name, "ok": True})
+            deleted += 1
+        except OSError as e:
+            results.append({"name": name, "ok": False, "error": str(e)})
+    return {"ok": True, "deleted": deleted, "results": results}
+
+
 @router.delete("/api/runs/{name}")
 async def api_delete_run(name: str, mode: str = ""):
     """删除运行 → 移入回收站（防误删，可在页面恢复）。"""
