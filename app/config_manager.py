@@ -110,6 +110,20 @@ PARAM_SPEC = {
                         "label": "QA 轮数（全模式）",
                         "help": "最少审查-修复轮数；有 error 时一直修到 0 error 或 10 轮上限 (默认3, 0=关闭)"},
 
+    # --- 脚本质量增强（四开关独立，默认全关 = 原生成流程不变） ---
+    "script_style_boost": {"default": False, "type": "checkbox", "group": "llm",
+                           "label": "脚本风格强化 A",
+                           "help": "生成 prompt 注入手写示例台词、随机情节装置、张力要求与禁用套路开场白（默认关）"},
+    "script_outline_first": {"default": False, "type": "checkbox", "group": "llm",
+                             "label": "大纲先行 B",
+                             "help": "先生成带转折的故事大纲再写台词（每个脚本多 1 次调用）；quest 本就是大纲先行，此项对 quest 无效（默认关）"},
+    "script_engagement_qa": {"default": False, "type": "checkbox", "group": "llm",
+                             "label": "QA 张力评审 C",
+                             "help": "QA 循环增加「地道度/张力」评审，重写最平淡的台词段（每轮多 1 次调用，默认关）"},
+    "script_candidates": {"default": 1, "type": "number", "group": "llm",
+                          "label": "候选脚本数 D (1-3)",
+                          "help": "同主题生成 N 个候选，程序化门禁打分选优后再跑 QA；>1 时生成成本 ×N（quest 更高，默认 1）"},
+
     # --- TTS ---
     "tts_engine": {"default": "kokoro", "type": "select", "group": "tts",
                    "label": "TTS 引擎", "options": {
@@ -668,6 +682,20 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--num-lines", str(config["num_lines"])]
     if config.get("max_line_words"):
         args += ["--max-line-words", str(config["max_line_words"])]
+    # 脚本质量增强开关（默认全关）
+    if config.get("script_style_boost"):
+        args += ["--script-style-boost"]
+    if config.get("script_outline_first"):
+        args += ["--script-outline-first"]
+    if config.get("script_engagement_qa"):
+        args += ["--script-engagement-qa"]
+    if config.get("script_candidates"):
+        try:
+            _cand = int(config["script_candidates"])
+        except (TypeError, ValueError):
+            _cand = 1
+        if _cand > 1:
+            args += ["--script-candidates", str(min(3, max(1, _cand)))]
     args += ["--structure", str(config.get("structure", "original"))]
     args += ["--animation", str(config.get("animation", "landing"))]
     if config.get("host_character"):

@@ -137,6 +137,15 @@ Find ONLY story-level problems the machine checks above cannot detect:
 4. Scene drift in the STORY itself (actions imply a different location than the stated scene).
 5. Character role confusion: a speaker acts contrary to their role (e.g. the customer gives the waiter's lines).
 Report each problem as a line range [start, end] (0-indexed, inclusive)."""
+    elif kind == "engagement":
+        task = """You are an ENGAGEMENT judge for an ESL slow-listening video script (audience: overseas Chinese learners who want vivid, natural conversation).
+The script may be technically correct but DULL. Find the DULLEST stretches (2-6 consecutive lines) that feel like a flat transaction or textbook Q&A, and say how to make them vivid:
+- add a genuine human reaction (amusement, surprise, relief, mild annoyance)
+- add a light joke, a personal remark, or a back-channel ("oh really?", "that makes sense")
+- raise a small conflict or unexpected beat if the story has none
+- replace textbook phrasing with the way people actually talk (contractions, fragments)
+- vary line length (very short reactions vs fuller sentences)
+Rules: do NOT break story coherence, do NOT exceed the per-line word limit, do NOT change the scene or the facts. Report each dull stretch as a line range [start, end] (0-indexed, inclusive)."""
     else:
         task = """You are a LANGUAGE QUALITY judge for an ESL slow-listening video script (target: overseas Chinese beginners).
 Find ONLY language-level problems the machine checks above cannot detect:
@@ -186,10 +195,19 @@ def _parse_judge_issues(raw, n_lines: int) -> list[dict]:
     return issues[:10]
 
 
+def _engagement_qa_enabled() -> bool:
+    """C（张力评审）开关：SCRIPT_ENGAGEMENT_QA=1/true/yes/on（线程局部优先）。"""
+    return _env_get("SCRIPT_ENGAGEMENT_QA", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
 def _critique_listening(script: dict, report: dict) -> list[dict]:
-    """Run story judge + language judge, return combined validated issues."""
+    """Run story judge + language judge (+engagement judge if enabled)."""
+    kinds = ["story", "language"]
+    if _engagement_qa_enabled():
+        kinds.append("engagement")
     combined = []
-    for kind in ("story", "language"):
+    for kind in kinds:
         try:
             content = _chat(
                 [{"role": "system",
@@ -205,6 +223,8 @@ def _critique_listening(script: dict, report: dict) -> list[dict]:
         raw = (result.get("issues", []) if isinstance(result, dict)
                else (result if isinstance(result, list) else []))
         found = _parse_judge_issues(raw, len(script.get("dialogue", [])))
+        if kind == "engagement":
+            found = found[:3]  # 张力重写每轮最多 3 段，控制成本与重写抖动
         print(f"    {kind} judge: {len(found)} issues")
         combined.extend(found)
     return combined

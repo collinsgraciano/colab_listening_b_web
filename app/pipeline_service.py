@@ -259,6 +259,16 @@ class PipelineService:
             os.environ["LISTENING_MAX_LINE_WORDS"] = str(config["max_line_words"])
             os.environ["QUEST_MAX_LINE_WORDS"] = str(config["max_line_words"])
 
+        # 脚本质量增强开关（默认全关 = 原流程）
+        os.environ["SCRIPT_STYLE_BOOST"] = "1" if config.get("script_style_boost") else ""
+        os.environ["SCRIPT_OUTLINE_FIRST"] = "1" if config.get("script_outline_first") else ""
+        os.environ["SCRIPT_ENGAGEMENT_QA"] = "1" if config.get("script_engagement_qa") else ""
+        try:
+            _cand = int(config.get("script_candidates") or 1)
+        except (TypeError, ValueError):
+            _cand = 1
+        os.environ["SCRIPT_CANDIDATES"] = str(max(1, min(3, _cand)))
+
         # MOSS-TTS env vars (read by generate_tts -> MossTTSEngine)
         if config.get("moss_model_path"):
             os.environ["MOSS_MODEL_PATH"] = str(config["moss_model_path"])

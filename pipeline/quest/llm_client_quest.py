@@ -13,7 +13,8 @@
      (line-count preserving): run qa_rounds rounds minimum, keep repairing
      while gate errors remain (hard cap _QA_HARD_CAP).
 
-Env knobs: QUEST_BEAT_LINES (default 10), QUEST_QA_MAX_ROUNDS (default 3).
+Env knobs: QUEST_BEAT_LINES (default 10), QUEST_QA_MAX_ROUNDS (default 3),
+SCRIPT_STYLE_BOOST / SCRIPT_ENGAGEMENT_QA / SCRIPT_CANDIDATES (脚本质量增强，默认关).
 Reuses _chat, _extract_json from parent llm_client.
 """
 import json
@@ -35,6 +36,12 @@ from llm_client import (
     _get_character_overrides,
     resolve_max_line_words,
 )
+from script_style import (
+    build_cliche_block,
+    build_device_block,
+    build_fewshot_block,
+    pick_plot_devices,
+)
 
 try:
     from quest.quality_gate import run_quality_gate, format_report
@@ -53,18 +60,26 @@ def _env_int(name: str, default: int) -> int:
 # Public entry — orchestrates phases A-E
 # ---------------------------------------------------------------------------
 
-def generate_quest_script(topic: str, cefr: str = "A1",
-                          lessons_dir: str = None,
-                          num_lines: int = 48) -> dict:
-    """Generate a quest lesson script via multi-round LLM calls."""
+def _generate_quest_raw(topic: str, cefr: str, lessons_dir: str,
+                        num_lines: int) -> dict:
+    """Quest Phase A-D 单次生成（大纲→节拍→对话→元数据 + 程序化修复）。
+
+    供 generate_quest_script 调用：多候选（SCRIPT_CANDIDATES>1）时每个候选
+    各跑一遍本函数，quest 门禁打分选优后 winner 才进 Phase E。
+    """
     n_buildup, n_core, n_reveal, n_review = split_phase_lines(num_lines)
     used_summaries = _load_used_listening_summaries(lessons_dir)
     beat_lines = _env_int("QUEST_BEAT_LINES", 10)
-    qa_rounds = _env_int("QUEST_QA_MAX_ROUNDS", 3)
 
     # ── Phase A: outline + beat sheet ───────────────────────────────────
+    style_boost = _env_get("SCRIPT_STYLE_BOOST", "").strip().lower() in (
+        "1", "true", "yes", "on")
+    devices = pick_plot_devices(2) if style_boost else []
+    if style_boost:
+        print(f"  [LLM] Style boost ON, plot devices: {devices}")
     print("  [LLM] Phase A: story outline...")
-    outline_prompt = _build_outline_prompt(topic, cefr, used_summaries)
+    outline_prompt = _build_outline_prompt(topic, cefr, used_summaries,
+                                           devices=devices)
     outline = _chat_and_parse(
         outline_prompt, temperature=0.9, max_tokens=4096, reasoning_effort="medium",
         label="outline",
@@ -175,6 +190,48 @@ def generate_quest_script(topic: str, cefr: str = "A1",
             if gender:
                 script[f"{key}_gender"] = gender
                 print(f"  [LLM] Override {key}_gender = {gender}")
+
+    _apply_programmatic_fixes(script, num_lines)
+    return script
+
+
+def generate_quest_script(topic: str, cefr: str = "A1",
+                          lessons_dir: str = None,
+                          num_lines: int = 48) -> dict:
+    """Generate a quest lesson script via multi-round LLM calls (Phase A-E).
+
+    脚本质量增强开关（env，默认全关 = 原流程不变）：
+    - SCRIPT_STYLE_BOOST=1   → A：情节装置注入大纲 prompt；禁套路 + few-shot
+      示例注入对话首组 prompt
+    - SCRIPT_ENGAGEMENT_QA=1 → C：Phase E 增加「张力」第三评审
+    - SCRIPT_CANDIDATES>1    → D：N 个候选各跑 Phase A-D，quest 门禁打分
+      选优，winner 才进 Phase E
+    - SCRIPT_OUTLINE_FIRST   → 对 quest 无操作（Phase A 本就是大纲先行）
+    """
+    candidates = max(1, min(3, _env_int("SCRIPT_CANDIDATES", 1)))
+    qa_rounds = _env_int("QUEST_QA_MAX_ROUNDS", 3)
+
+    if candidates > 1:
+        # D（多候选择优）：每个候选跑 Phase A-D（含程序化修复），门禁打分选优
+        cap0 = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
+        best, best_key = None, None
+        for ci in range(candidates):
+            try:
+                cand = _generate_quest_raw(topic, cefr, lessons_dir, num_lines)
+            except RuntimeError as e:
+                print(f"  [LLM] Candidate {ci + 1}/{candidates} failed: {e}")
+                continue
+            report = run_quality_gate(cand, num_lines, max_line_words=cap0)
+            key = (report["n_errors"], report["n_warnings"])
+            print(f"  [LLM] Candidate {ci + 1}/{candidates}: "
+                  f"errors={report['n_errors']} warnings={report['n_warnings']}")
+            if best_key is None or key < best_key:
+                best, best_key = cand, key
+        if best is None:
+            raise RuntimeError("Quest script generation failed: all candidates failed")
+        script = best
+    else:
+        script = _generate_quest_raw(topic, cefr, lessons_dir, num_lines)
 
     # ── Phase D+E: quality gate + critique/repair loop ──────────────────
     _apply_programmatic_fixes(script, num_lines)
@@ -529,13 +586,22 @@ def _generate_dialogue_session(outline: dict, beats: dict, cefr: str) -> list[di
     for ph in ("buildup", "core", "reveal", "review"):
         groups.extend(_pack_groups(beats.get(ph, [])))
 
+    # A（风格强化）：禁套路 + few-shot 示例只在首个 group prompt 注入
+    style_section = ""
+    if _env_get("SCRIPT_STYLE_BOOST", "").strip().lower() in (
+            "1", "true", "yes", "on"):
+        mw = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
+        style_section = (build_cliche_block() + "\n\n"
+                         + build_fewshot_block(mw, cefr) + "\n")
+
     messages: list[dict] = [{"role": "system", "content": _WRITER_SYSTEM}]
     all_lines: list[dict] = []
     for gi, group in enumerate(groups):
         phases = sorted({b["phase"] for b in group})
         budget = sum(b["lines"] for b in group)
         prompt = _build_group_prompt(outline, group, cefr, all_lines,
-                                     first=(gi == 0))
+                                     first=(gi == 0),
+                                     style_section=style_section)
         messages.append({"role": "user", "content": prompt})
         lines = _session_turn(messages, budget,
                               temperature=_phase_temperature(phases[0]))
@@ -547,7 +613,8 @@ def _generate_dialogue_session(outline: dict, beats: dict, cefr: str) -> list[di
 
 
 def _build_group_prompt(outline: dict, group: list[dict], cefr: str,
-                        all_lines: list[dict], first: bool) -> str:
+                        all_lines: list[dict], first: bool,
+                        style_section: str = "") -> str:
     import json as _json
     phases = sorted({b["phase"] for b in group})
     question = outline.get("listening_question_en", "")
@@ -567,7 +634,7 @@ Characters:
 Key words: {key_words}
 
 {_DIALOGUE_QUALITY_RULES}
-"""
+{style_section}"""
     else:
         head = "Continue the same conversation.\n"
 
@@ -1098,6 +1165,14 @@ Find ONLY story-level problems the machine checks above cannot detect:
 4. Abrupt/unnatural transitions between sections; reveal phase doesn't clearly explain the answer; ending feels cut off.
 5. Facts contradict each other across the story (prices, names, times, places).
 Report each problem as a line range [start, end] (0-indexed, inclusive)."""
+    elif kind == "engagement":
+        task = """You are an ENGAGEMENT judge for an ESL slow-listening video script (audience: overseas Chinese learners who want vivid, natural conversation).
+The script may be technically correct but DULL. Find the DULLEST stretches (2-6 consecutive lines) that feel like a flat transaction or textbook Q&A, and say how to make them vivid:
+- add a genuine human reaction (amusement, surprise, relief, mild annoyance)
+- add a light joke, a personal remark, or a back-channel ("oh really?", "that makes sense")
+- replace textbook phrasing with the way people actually talk (contractions, fragments)
+- vary line length (very short reactions vs fuller sentences)
+Rules: do NOT break the story arc or the listening-question reveal, do NOT exceed the per-line word limit, do NOT change the scene or the facts. Report each dull stretch as a line range [start, end] (0-indexed, inclusive)."""
     else:
         task = """You are a LANGUAGE QUALITY judge for an ESL slow-listening video script (target: overseas Chinese beginners).
 Find ONLY language-level problems the machine checks above cannot detect:
@@ -1147,10 +1222,19 @@ def _parse_judge_issues(raw, n_lines: int) -> list[dict]:
     return issues[:10]
 
 
+def _engagement_qa_enabled() -> bool:
+    """C（张力评审）开关：SCRIPT_ENGAGEMENT_QA=1/true/yes/on（线程局部优先）。"""
+    return _env_get("SCRIPT_ENGAGEMENT_QA", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
 def _critique_script(script: dict, report: dict) -> list[dict]:
-    """Run story judge + language judge, return combined validated issues."""
+    """Run story judge + language judge (+engagement judge if enabled)."""
+    kinds = ["story", "language"]
+    if _engagement_qa_enabled():
+        kinds.append("engagement")
     combined = []
-    for kind in ("story", "language"):
+    for kind in kinds:
         system = ("You are a strict script quality judge for ESL videos. "
                   "Output valid JSON only.")
         try:
@@ -1164,6 +1248,8 @@ def _critique_script(script: dict, report: dict) -> list[dict]:
         raw = (result.get("issues", []) if isinstance(result, dict)
                else (result if isinstance(result, list) else []))
         found = _parse_judge_issues(raw, len(script.get("dialogue", [])))
+        if kind == "engagement":
+            found = found[:3]  # 张力重写每轮最多 3 段，控制成本与重写抖动
         print(f"    {kind} judge: {len(found)} issues")
         combined.extend(found)
     return combined
@@ -1332,7 +1418,9 @@ Output: JSON array of exactly {k} objects. JSON ONLY."""
 # Phase A: outline prompt (kept from v3)
 # ---------------------------------------------------------------------------
 
-def _build_outline_prompt(topic: str, cefr: str, used_dialogues: list[str] = None) -> str:
+def _build_outline_prompt(topic: str, cefr: str, used_dialogues: list[str] = None,
+                          devices: list[str] | None = None) -> str:
+    device_block = build_device_block(devices) if devices else ""
     used_hint = ""
     if used_dialogues:
         used_hint = f"""
@@ -1351,7 +1439,7 @@ CEFR Vocabulary Guide:
 
 Design a story where the LISTENING QUESTION has a non-obvious answer — a fun fact or common misconception revealed INSIDE the dialogue (e.g. "Why is it called bubble tea?" not "What flavor did he order?").
 
-CRITICAL — GENDER CONSISTENCY:
+{device_block}CRITICAL — GENDER CONSISTENCY:
 - Each character's gender (char_a_gender, char_b_gender, char_c_gender, host_gender) MUST be "male" or "female" (never "..." or empty).
 - The gender MUST match the physical description. If host_description says "a young man", host_gender MUST be "male".
 - This is essential for correct voice assignment in TTS.

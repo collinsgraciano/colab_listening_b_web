@@ -405,6 +405,18 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
     if cfg.get("max_line_words"):
         ov["LISTENING_MAX_LINE_WORDS"] = str(cfg["max_line_words"])
         ov["QUEST_MAX_LINE_WORDS"] = str(cfg["max_line_words"])
+    # 脚本质量增强开关（默认全关 = 原流程；经线程局部 override 隔离）
+    if cfg.get("script_style_boost"):
+        ov["SCRIPT_STYLE_BOOST"] = "1"
+    if cfg.get("script_outline_first"):
+        ov["SCRIPT_OUTLINE_FIRST"] = "1"
+    if cfg.get("script_engagement_qa"):
+        ov["SCRIPT_ENGAGEMENT_QA"] = "1"
+    try:
+        _cand = int(cfg.get("script_candidates") or 1)
+    except (TypeError, ValueError):
+        _cand = 1
+    ov["SCRIPT_CANDIDATES"] = str(max(1, min(3, _cand)))
     if structure == "quest":
         if cfg.get("quest_beat_lines"):
             ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])

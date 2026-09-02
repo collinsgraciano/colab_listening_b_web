@@ -13,6 +13,7 @@ import urllib.error
 from pathlib import Path
 
 from style_manager import get_active_style_prompt, get_active_thumbnail_hint
+from script_style import build_style_boost_section, build_device_block, pick_plot_devices
 
 # 线程局部 LLM 环境覆盖：Web 批量生成等后台线程自带 provider 配置，
 # 与运行中 pipeline 线程读的 os.environ 互不污染（并发运行互不干扰）。
@@ -50,6 +51,11 @@ def resolve_max_line_words(env_name: str = "LISTENING_MAX_LINE_WORDS",
                            default: int = 10) -> int:
     """对话/旁白每句最大词数（字幕最多两行约束）：env（线程局部优先）→ clamp [4,20]。"""
     return _env_int_clamped(env_name, default, 4, 20)
+
+
+def _env_flag(name: str) -> bool:
+    """布尔 env 解析（"1"/"true"/"yes"/"on"，大小写不敏感，线程局部优先）。"""
+    return _env_get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 # Rate limiting: enforce minimum interval between LLM API calls to avoid HTTP 429.
@@ -417,11 +423,17 @@ def _desc_consistency_hint(pf: str, speaker_num: int) -> str:
 
 def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = None,
                             num_lines: int = 18,
-                            structure: str = "original") -> str:
+                            structure: str = "original",
+                            style_boost: bool = False,
+                            outline: dict | None = None,
+                            devices: list[str] | None = None) -> str:
     """Build prompt for listening-practice lesson (num_lines + IPA + 繁中).
 
     structure 决定行级视觉 prompt 字段（其余模式不需要的字段不再要求生成）：
     original → video_prompt；original_static → image_prompt；original_cutout → 无。
+    style_boost（A）：注入 STYLE & STORY UPGRADE 块（few-shot/情节装置/禁套路/
+    张力要求）并把压制戏剧性的句子替换掉；默认 False 时 prompt 与原版逐字一致。
+    outline（B）：大纲先行生成的故事大纲，嵌入 MANDATORY 段。
     """
     pf = structure if structure in ("original", "original_static",
                                     "original_cutout") else "original"
@@ -430,6 +442,31 @@ def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = N
                      "original_cutout": ()}[pf]
     # 每句最大词数（字幕两行约束）：LISTENING_MAX_LINE_WORDS → clamp [4,20]
     mw = resolve_max_line_words()
+    # A（风格强化）：默认关闭 — story_line 保持原句，prompt 与旧版逐字一致
+    story_line = ("- The dialogue must tell a COMPLETE story with a clear "
+                  "beginning, problem/development, and resolution — but keep "
+                  "it grounded in reality, not exaggerated or melodramatic.")
+    style_boost_block = ""
+    outline_block = ""
+    if style_boost:
+        style_boost_block = build_style_boost_section(
+            topic, cefr, mw, devices=devices)
+        # 张力/意外节拍要求已由 STYLE & STORY UPGRADE 段承接，去掉压制性表述
+        story_line = ("- The dialogue must tell a COMPLETE story with a clear "
+                      "beginning, problem/development, and resolution.")
+    if outline:
+        outline_block = f"""
+STORY OUTLINE (MANDATORY — write the dialogue to follow this arc EXACTLY):
+- Premise: {outline.get('premise', '')}
+- Goal: {outline.get('goal', '')}
+- Obstacle: {outline.get('obstacle', '')}
+- Twist: {outline.get('twist', '')}
+- Resolution: {outline.get('resolution', '')}
+- Tone: {outline.get('tone', '')}
+- Scene: {outline.get('scene', '')}
+- char_a: {outline.get('char_a_role', '')} ({outline.get('char_a_gender', '')})
+- char_b: {outline.get('char_b_role', '')} ({outline.get('char_b_gender', '')})
+"""
     cefr_guide = (
         f"- A1: basic everyday words, present tense, short sentences (5-8 words)\n"
         f"- A2: common daily phrases, present/past tense, sentences 5-{min(12, mw)} words\n"
@@ -475,12 +512,12 @@ CEFR Vocabulary Guide:
 {cefr_guide}
 Output: a JSON object ONLY (no markdown, no explanation).
 
-{_build_character_override_prompt(quest=False)}CONTENT REQUIREMENTS — This is for a LISTENING PRACTICE video targeting overseas Chinese:
+{_build_character_override_prompt(quest=False)}{style_boost_block}{outline_block}CONTENT REQUIREMENTS — This is for a LISTENING PRACTICE video targeting overseas Chinese:
 - The dialogue must be about REAL-LIFE situations that overseas Chinese people actually face in English-speaking countries — practical, relatable, and immediately useful.
 - Topics should be things people encounter in daily life: ordering food, asking for directions, making small talk, dealing with a problem at a store, calling customer service, visiting a doctor, renting an apartment, banking, school registration, etc.
 - The conversation must feel 100% NATURAL and REALISTIC — like something you'd overhear in real life, NOT a textbook. Use filler words (like "um", "well", "so"), natural pauses, back-channeling ("oh really?", "that makes sense"), and conversational flow.
 - Characters should speak the way REAL Americans do in everyday life: contractions (don't, I'll, can't), casual phrasal verbs (pick up, figure out, run out of), common idioms and slang appropriate for the CEFR level, and natural sentence fragments.
-- The dialogue must tell a COMPLETE story with a clear beginning, problem/development, and resolution — but keep it grounded in reality, not exaggerated or melodramatic.
+{story_line}
 - Include realistic communication patterns: clarifying questions, polite hedging ("I was wondering if...", "Would it be possible to..."), thanking, apologizing, expressing mild frustration or satisfaction naturally.
 - Every line should teach something useful — a phrase, expression, or communication strategy that the viewer can immediately apply in their own life.
 {used_hint}
@@ -626,29 +663,77 @@ def _load_used_listening_summaries(lessons_dir: str = None,
     return summaries
 
 
-def generate_listening_script(topic: str, cefr: str = "A2",
-                              lessons_dir: str = None,
-                              num_lines: int = 18,
-                              structure: str = "original") -> dict:
-    """Generate a listening-practice lesson script via SenseNova DeepSeek V4 Flash.
+def _build_outline_prompt(topic: str, cefr: str, devices: list[str],
+                          num_lines: int) -> str:
+    """大纲先行（B）：故事大纲 prompt（目标→障碍→转折→收尾）。"""
+    mw = resolve_max_line_words()
+    device_block = build_device_block(devices)
+    override_block = _build_character_override_prompt(quest=False)
+    override_hint = ""
+    if override_block:
+        override_hint = ("Pre-defined characters (use EXACTLY these roles/genders "
+                         "in the outline):\n" + override_block)
+    return f"""You are a story architect designing a short real-life story for an English listening practice dialogue for overseas Chinese learners.
 
-    Args:
-        topic: e.g. "At the Pharmacy"
-        cefr: CEFR level (A1, A2, B1, B2, C1, C2)
-        lessons_dir: optional path to lessons/ directory for anti-duplicate check
-        num_lines: number of dialogue lines to generate (default 18)
-        structure: original / original_static / original_cutout — 决定行级
-            视觉 prompt 字段的裁剪（original→video_prompt, static→image_prompt,
-            cutout→无）；未知值回退 original。
+Topic: {topic}
+CEFR Level: {cefr}
+Dialogue length: exactly {num_lines} lines, exactly 2 speakers.
+Each line will be AT MOST {mw} words — design a story that fits short conversational lines.
+{device_block}
+{override_hint}Design rules:
+- Grounded everyday reality (a real-life scene in an English-speaking country), small but real stakes.
+- The story must have ONE clear arc: goal → obstacle → twist → resolution, with ONE unexpected moment (surprise / humor / small problem).
+- The story must be a scene TWO people can plausibly share (customer and staff, two friends, neighbors...).
+- Nothing that requires more than 2 speakers or a location change.
 
-    Returns:
-        Script dict with dialogue[], char descriptions, title, etc.
-    """
-    if structure not in ("original", "original_static", "original_cutout"):
-        structure = "original"
-    used_summaries = _load_used_listening_summaries(lessons_dir)
+Output a JSON object ONLY (no markdown):
+{{
+  "premise": "one-sentence premise",
+  "scene": "English scene name (e.g. 'pharmacy')",
+  "char_a_role": "role of speaker 1 (e.g. 'customer')",
+  "char_a_gender": "male or female",
+  "char_b_role": "role of speaker 2",
+  "char_b_gender": "male or female",
+  "goal": "what someone concretely wants in this scene",
+  "obstacle": "what gets in the way",
+  "twist": "the unexpected moment / surprise / humor beat",
+  "resolution": "how it ends and how a character reacts",
+  "tone": "overall tone (e.g. 'light and funny', 'warm', 'mildly chaotic but friendly')"
+}}
+
+Topic: {topic}"""
+
+
+def generate_story_outline(topic: str, cefr: str, devices: list[str],
+                           num_lines: int = 18) -> dict | None:
+    """大纲先行（B）：生成故事大纲；失败返回 None（回退单次生成，不中断）。"""
+    prompt = _build_outline_prompt(topic, cefr, devices, num_lines)
+    for attempt in range(2):
+        try:
+            content = _chat(
+                [{"role": "system",
+                  "content": "You are a story architect for ESL listening videos. Output valid JSON only."},
+                 {"role": "user", "content": prompt}],
+                temperature=0.9, max_tokens=2048, reasoning_effort="low")
+            outline = _extract_json(content)
+            if isinstance(outline, dict) and outline.get("premise"):
+                return outline
+            print("  [LLM] Outline missing 'premise', retrying...")
+        except (RuntimeError, json.JSONDecodeError) as e:
+            print(f"  [LLM] Outline attempt {attempt + 1}/2 failed: {e}")
+    print("  [LLM] Outline generation failed — falling back to single-pass generation")
+    return None
+
+
+def _generate_listening_raw(topic: str, cefr: str, used_summaries: list[str],
+                            num_lines: int, structure: str, style_boost: bool,
+                            devices: list[str], outline: dict | None,
+                            temp_start: float = 0.8) -> dict:
+    """单次生成 + 字段兜底（不含 QA 循环），供 generate_listening_script 调用。"""
     prompt = _build_listening_prompt(topic, cefr, used_dialogues=used_summaries,
-                                     num_lines=num_lines, structure=structure)
+                                     num_lines=num_lines, structure=structure,
+                                     style_boost=style_boost, outline=outline,
+                                     devices=devices)
 
     # Retry up to 3 times on JSON parse errors (LLM may truncate or produce invalid JSON)
     last_error = None
@@ -659,7 +744,7 @@ def generate_listening_script(topic: str, cefr: str = "A2",
                     {"role": "system", "content": "You are an expert ESL teacher creating English listening practice content for overseas Chinese learners. Output valid JSON only — no markdown, no explanations."},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.8 if attempt == 0 else 0.7,
+                temperature=round(temp_start if attempt == 0 else temp_start - 0.1, 2),
                 max_tokens=8192,
             )
             script = _extract_json(content)
@@ -726,6 +811,75 @@ def generate_listening_script(topic: str, cefr: str = "A2",
             line.setdefault("video_prompt", "")
         elif structure == "original_static":
             line.setdefault("image_prompt", "")
+
+    return script
+
+
+def generate_listening_script(topic: str, cefr: str = "A2",
+                              lessons_dir: str = None,
+                              num_lines: int = 18,
+                              structure: str = "original") -> dict:
+    """Generate a listening-practice lesson script via LLM (SenseNova / OpenAI-compatible).
+
+    脚本质量增强开关（全部经 env 读取，默认全关 = 原单次生成流程逐字节不变）：
+    - SCRIPT_STYLE_BOOST=1  → A：生成 prompt 注入风格强化块（few-shot 示例、
+      随机情节装置、禁用套路开场白、张力要求）
+    - SCRIPT_OUTLINE_FIRST=1 → B：先生成故事大纲再写台词（两阶段）
+    - SCRIPT_CANDIDATES=N    → D：生成 N 个候选，程序化门禁打分选优，
+      仅 winner 进完整 QA 循环
+
+    Args:
+        topic: e.g. "At the Pharmacy"
+        cefr: CEFR level (A1, A2, B1, B2, C1, C2)
+        lessons_dir: optional path to lessons/ directory for anti-duplicate check
+        num_lines: number of dialogue lines to generate (default 18)
+        structure: original / original_static / original_cutout — 决定行级
+            视觉 prompt 字段的裁剪（original→video_prompt, static→image_prompt,
+            cutout→无）；未知值回退 original。
+
+    Returns:
+        Script dict with dialogue[], char descriptions, title, etc.
+    """
+    if structure not in ("original", "original_static", "original_cutout"):
+        structure = "original"
+    used_summaries = _load_used_listening_summaries(lessons_dir)
+    style_boost = _env_flag("SCRIPT_STYLE_BOOST")
+    outline_first = _env_flag("SCRIPT_OUTLINE_FIRST")
+    candidates = _env_int_clamped("SCRIPT_CANDIDATES", 1, 1, 3)
+    devices = pick_plot_devices(2) if style_boost else []
+    if style_boost:
+        print(f"  [LLM] Style boost ON, plot devices: {devices}")
+    outline = None
+    if outline_first:
+        outline = generate_story_outline(topic, cefr, devices, num_lines)
+        if outline:
+            print(f"  [LLM] Outline ready: {str(outline.get('premise', ''))[:100]}")
+
+    if candidates > 1:
+        # D（多候选择优）：候选只跑程序化门禁打分，winner 才进完整 QA 循环
+        from quality_gate_listening import run_listening_quality_gate
+        best, best_key = None, None
+        for ci in range(candidates):
+            try:
+                cand = _generate_listening_raw(
+                    topic, cefr, used_summaries, num_lines, structure,
+                    style_boost, devices, outline, temp_start=0.8 + 0.05 * ci)
+            except (RuntimeError, json.JSONDecodeError) as e:
+                print(f"  [LLM] Candidate {ci + 1}/{candidates} failed: {e}")
+                continue
+            report = run_listening_quality_gate(cand, num_lines,
+                                                structure=structure)
+            key = (report["n_errors"], report["n_warnings"])
+            print(f"  [LLM] Candidate {ci + 1}/{candidates}: "
+                  f"errors={report['n_errors']} warnings={report['n_warnings']}")
+            if best_key is None or key < best_key:
+                best, best_key = cand, key
+        if best is None:
+            raise RuntimeError("LLM script generation failed: all candidates failed")
+        script = best
+    else:
+        script = _generate_listening_raw(topic, cefr, used_summaries, num_lines,
+                                         structure, style_boost, devices, outline)
 
     # QA: programmatic gate + LLM critique/repair loop (mirrors quest Phase D+E)
     from llm_review import run_listening_qa

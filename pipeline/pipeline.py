@@ -190,6 +190,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--used-topics-file", default=None, help="Path to used_topics.json (default: <output>/used_topics.json — persists on Drive across Colab sessions)")
     parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48)")
     parser.add_argument("--max-line-words", type=int, default=None, help="Max words per dialogue line / narration sentence (default 10) so on-screen subtitles never exceed 2 lines")
+    parser.add_argument("--script-style-boost", action="store_true",
+                        help="Script quality boost A: few-shot style examples + random plot devices + tension requirements + cliche ban list (default off)")
+    parser.add_argument("--script-outline-first", action="store_true",
+                        help="Script quality boost B: story outline first, then dialogue (default off; no-op in quest mode)")
+    parser.add_argument("--script-engagement-qa", action="store_true",
+                        help="Script quality boost C: engagement judge in QA loop rewrites the dullest stretches (default off)")
+    parser.add_argument("--script-candidates", type=int, default=1,
+                        help="Script quality boost D: generate N candidates and keep the best by programmatic gate score (1-3, default 1)")
     parser.add_argument("--mcp-tokens", default=None, help="TJGenerators MCP OAuth tokens, comma-separated for multi-token rotation")
     parser.add_argument("--mcp-token", default=None, help="(Deprecated) Single MCP token. Use --mcp-tokens instead.")
     parser.add_argument("--image-provider", default="mcp", choices=["mcp", "sensenova"],
@@ -1168,6 +1176,12 @@ def main():
     if args.max_line_words:
         os.environ["LISTENING_MAX_LINE_WORDS"] = str(args.max_line_words)
         os.environ["QUEST_MAX_LINE_WORDS"] = str(args.max_line_words)
+    # 脚本质量增强开关（默认全关 = 原流程）
+    os.environ["SCRIPT_STYLE_BOOST"] = "1" if args.script_style_boost else ""
+    os.environ["SCRIPT_OUTLINE_FIRST"] = "1" if args.script_outline_first else ""
+    os.environ["SCRIPT_ENGAGEMENT_QA"] = "1" if args.script_engagement_qa else ""
+    os.environ["SCRIPT_CANDIDATES"] = str(
+        max(1, min(3, int(args.script_candidates or 1))))
     # 画面风格：注入 env 供 llm_client / thumbnail_gen / 各 step 读取
     os.environ["VISUAL_STYLE_ID"] = str(getattr(args, "visual_style", "pixar3d"))
     os.environ["VISUAL_STYLE_PROMPT"] = _resolve_style_prompt(args.visual_style)
