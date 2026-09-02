@@ -254,6 +254,21 @@
         </div>
     </div>
 </div>
+
+<!-- 后台任务悬浮面板：4K/BGM/缩略图等本地渲染任务实时日志与状态 -->
+<div id="task-widget" class="hidden fixed bottom-4 right-4 z-50 w-96 max-w-[90vw] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
+    <div class="flex items-center justify-between px-3 py-2 bg-slate-800/80 border-b border-slate-700 gap-2">
+        <span class="flex items-center gap-2 text-xs font-semibold text-white min-w-0">
+            <span id="task-widget-dot" class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0"></span>
+            <span id="task-widget-title" class="truncate">后台任务</span>
+        </span>
+        <span class="flex items-center gap-2 shrink-0">
+            <span id="task-widget-elapsed" class="text-xs text-slate-400"></span>
+            <button onclick="taskWidgetHide()" title="收起" class="text-slate-400 hover:text-white text-sm leading-none px-1">✕</button>
+        </span>
+    </div>
+    <pre id="task-widget-log" class="px-3 py-2 text-[11px] leading-4 font-mono text-slate-300 max-h-56 overflow-y-auto whitespace-pre-wrap break-all"> </pre>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -539,6 +554,7 @@ function regenThumbnail(runName, mode) {
                 _resetThumbBtn(runName);
                 return;
             }
+            taskWidgetStart('thumb');
             pollThumbRegen();
         })
         .catch(() => { _resetThumbBtn(runName); });
@@ -705,6 +721,7 @@ function generate4k(runName, mode) {
                 _reset4kBtn(runName);
                 return;
             }
+            taskWidgetStart('pipeline');
             poll4kGen();
         })
         .catch(() => { _reset4kBtn(runName); });
@@ -774,6 +791,7 @@ function generateBgm(runName, mode, target = 'final') {
                 _resetBgmBtn(runName);
                 return;
             }
+            taskWidgetStart('pipeline');
             pollBgmGen();
         })
         .catch(() => { _resetBgmBtn(runName); });
@@ -808,6 +826,92 @@ function pollBgmGen() {
         })
         .catch(() => { _bgmTimer = setTimeout(pollBgmGen, 3000); });
 }
+
+// ---------------------------------------------------------------------------
+// 后台任务悬浮面板：实时显示本地渲染任务（4K/BGM/缩略图/主 pipeline）的日志与
+// 运行状态；按钮启动成功后调用 taskWidgetStart(source)，页面加载时自动探测
+// 已在运行的任务（含从控制台页启动的主 pipeline）。
+// ---------------------------------------------------------------------------
+const _taskWidget = { source: '', timer: null, idx: 0, hideTimer: null };
+
+function _taskWidgetFetch(source, since) {
+    return source === 'thumb'
+        ? fetch(`/api/thumbnail_regen/status?since=${since}`).then(r => r.json())
+        : fetch(`/api/run/logs/since/${since}`).then(r => r.json());
+}
+
+function taskWidgetStart(source) {
+    if (_taskWidget.hideTimer) { clearTimeout(_taskWidget.hideTimer); _taskWidget.hideTimer = null; }
+    if (_taskWidget.timer) { clearTimeout(_taskWidget.timer); _taskWidget.timer = null; }
+    _taskWidget.source = source;
+    _taskWidget.idx = 0;
+    document.getElementById('task-widget-log').textContent = '';
+    const dot = document.getElementById('task-widget-dot');
+    dot.className = 'w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0';
+    document.getElementById('task-widget-elapsed').textContent = '';
+    document.getElementById('task-widget-title').textContent = '后台任务';
+    document.getElementById('task-widget').classList.remove('hidden');
+    pollTaskWidget();
+}
+
+function taskWidgetHide() {
+    if (_taskWidget.timer) { clearTimeout(_taskWidget.timer); _taskWidget.timer = null; }
+    if (_taskWidget.hideTimer) { clearTimeout(_taskWidget.hideTimer); _taskWidget.hideTimer = null; }
+    _taskWidget.source = '';
+    document.getElementById('task-widget').classList.add('hidden');
+}
+
+function pollTaskWidget() {
+    const src = _taskWidget.source;
+    if (!src) return;
+    _taskWidgetFetch(src, _taskWidget.idx)
+        .then(data => {
+            if (_taskWidget.source !== src) return;  // 源已被切换/关闭
+            const st = data.status || {};
+            if (data.logs && data.logs.length) {
+                const logEl = document.getElementById('task-widget-log');
+                logEl.textContent += data.logs.join('\n') + '\n';
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+            _taskWidget.idx = data.total || 0;
+            const dot = document.getElementById('task-widget-dot');
+            const titleEl = document.getElementById('task-widget-title');
+            const elapsedEl = document.getElementById('task-widget-elapsed');
+            if (st.status === 'running') {
+                dot.className = 'w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0';
+                titleEl.textContent = st.current_step_label
+                    || (st.out_name ? '缩略图生成: ' + st.out_name : '后台任务');
+                elapsedEl.textContent = (typeof st.elapsed === 'number') ? st.elapsed + 's' : '';
+                _taskWidget.timer = setTimeout(pollTaskWidget, 2000);
+                return;
+            }
+            if (st.status === 'error') {
+                dot.className = 'w-2 h-2 rounded-full bg-red-500 shrink-0';
+                titleEl.textContent = '任务失败: ' + (st.error || '未知错误');
+                elapsedEl.textContent = '';
+            } else if (st.status === 'done') {
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
+                titleEl.textContent = (src === 'thumb' ? '缩略图已生成' : '任务完成');
+                elapsedEl.textContent = '';
+            } else {
+                // idle：任务记录不存在（服务重启等），静默收起
+                taskWidgetHide();
+                return;
+            }
+            _taskWidget.hideTimer = setTimeout(taskWidgetHide, 6000);
+        })
+        .catch(() => { if (_taskWidget.source === src) _taskWidget.timer = setTimeout(pollTaskWidget, 3000); });
+}
+
+// 页面加载探测：已有任务在跑则自动展开面板
+(function () {
+    fetch('/api/run/logs/since/0').then(r => r.json()).then(d => {
+        if ((d.status || {}).status === 'running') taskWidgetStart('pipeline');
+    }).catch(() => {});
+    fetch('/api/thumbnail_regen/status?since=0').then(r => r.json()).then(d => {
+        if ((d.status || {}).status === 'running' && _taskWidget.source !== 'pipeline') taskWidgetStart('thumb');
+    }).catch(() => {});
+})();
 
 // 初始渲染筛选状态
 paintUploadChips();
