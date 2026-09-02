@@ -220,6 +220,27 @@ async def api_topics_ai_generate(request: Request):
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
+@router.post("/api/topics/ai/suggest_categories")
+async def api_topics_ai_suggest_categories(request: Request):
+    """AI 推荐若干候选新分类（仅名称+理由），供「+ 新分类」表单选择。"""
+    data = await request.json()
+    try:
+        count = max(1, min(int(data.get("count", 5) or 5), 10))
+    except (TypeError, ValueError):
+        count = 5
+    config = load_config()
+    topics_data = _load_topics_data(config)
+    if not topics_data:
+        return JSONResponse({"error": "topics.json 不存在或为空"}, status_code=400)
+    try:
+        result = await asyncio.to_thread(topics_ai.suggest_categories, count, topics_data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, status_code=502)
+    if not result.get("categories"):
+        return JSONResponse({"error": "AI 未返回有效分类建议，请重试"}, status_code=502)
+    return {"ok": True, **result}
+
+
 @router.post("/api/topics/ai/review")
 async def api_topics_ai_review():
     """SSE: full-library audit — local duplicate check + AI batched review."""

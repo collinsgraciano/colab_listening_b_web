@@ -35,8 +35,13 @@
     <!-- Add category form -->
     <div id="add-cat-form" class="hidden bg-slate-800 rounded-xl p-5 mb-4 border border-slate-700">
         <h3 class="text-sm font-semibold text-white mb-3">新建分类</h3>
-        <input type="text" id="add-cat-name" placeholder="分类名称 (如: 餐厅 Restaurant)"
-            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-3">
+        <div class="flex gap-2 mb-3">
+            <input type="text" id="add-cat-name" placeholder="分类名称 (如: 餐厅 Restaurant)，或点右侧 AI 推荐"
+                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            <button onclick="aiSuggestCategories()" id="ai-cat-suggest-btn"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white whitespace-nowrap">🤖 AI 推荐</button>
+        </div>
+        <div id="ai-cat-suggestions" class="hidden flex-wrap gap-2 mb-3"></div>
         <div class="flex gap-2">
             <button onclick="addCategory()" class="px-4 py-2 bg-indigo-600 rounded-lg text-sm text-white">创建</button>
             <button onclick="hideAddCategory()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm text-slate-300">取消</button>
@@ -172,9 +177,57 @@ function hideAddTopic() { document.getElementById('add-topic-form').classList.ad
 function showAddCategory() {
     hideAllPanels();
     document.getElementById('add-cat-form').classList.remove('hidden');
+    document.getElementById('ai-cat-suggestions').classList.add('hidden');
+    document.getElementById('ai-cat-suggestions').innerHTML = '';
     document.getElementById('add-cat-name').focus();
 }
 function hideAddCategory() { document.getElementById('add-cat-form').classList.add('hidden'); }
+
+// ================= AI suggest new categories (+ 新分类) =================
+let aiCatCandidates = [];
+
+async function aiSuggestCategories() {
+    const btn = document.getElementById('ai-cat-suggest-btn');
+    const box = document.getElementById('ai-cat-suggestions');
+    btn.disabled = true; btn.textContent = '生成中...';
+    box.classList.remove('hidden');
+    box.innerHTML = '<p class="text-xs text-slate-400 w-full">AI 正在推荐候选分类，请稍候（约 10-30 秒）...</p>';
+    try {
+        const r = await fetch('/api/topics/ai/suggest_categories', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({count: 5})
+        }).then(r => r.json());
+        if (r.error) {
+            box.innerHTML = '<p class="text-xs text-red-400 w-full">❌ ' + esc(r.error) + '</p>';
+            return;
+        }
+        aiCatCandidates = r.categories || [];
+        if (!aiCatCandidates.length) {
+            box.innerHTML = '<p class="text-xs text-red-400 w-full">❌ AI 未返回有效建议，请重试</p>';
+            return;
+        }
+        box.innerHTML = aiCatCandidates.map((c, i) => `
+            <button type="button" class="cat-chip text-left bg-slate-900 border border-slate-600 hover:border-indigo-400 rounded-lg px-3 py-2 max-w-xs transition" data-index="${i}">
+                <span class="block text-sm text-white font-medium">${esc(c.category)}</span>
+                <span class="block text-xs text-slate-400 mt-0.5">${esc(c.reason)}</span>
+            </button>`).join('');
+    } catch (e) {
+        box.innerHTML = '<p class="text-xs text-red-400 w-full">❌ 请求失败，请重试</p>';
+    } finally {
+        btn.disabled = false; btn.textContent = '🤖 AI 推荐';
+    }
+}
+
+document.getElementById('ai-cat-suggestions').addEventListener('click', e => {
+    const chip = e.target.closest('.cat-chip');
+    if (!chip) return;
+    const c = aiCatCandidates[parseInt(chip.dataset.index, 10)];
+    if (!c) return;
+    document.getElementById('add-cat-name').value = c.category;
+    document.querySelectorAll('#ai-cat-suggestions .cat-chip').forEach(el =>
+        el.classList.remove('border-indigo-400', 'bg-indigo-900/40'));
+    chip.classList.add('border-indigo-400', 'bg-indigo-900/40');
+});
 
 function addTopic() {
     const category = document.getElementById('add-topic-category').value;

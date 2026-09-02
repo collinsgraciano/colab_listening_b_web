@@ -280,6 +280,56 @@ CATEGORY RULES:
     return {"category": category, "reason": str(data.get("reason", "")), "topics": topics}
 
 
+def suggest_categories(count: int, topics_data: dict[str, list[str]], hint: str = "") -> dict:
+    """Let the AI suggest MULTIPLE candidate new categories (name + reason only).
+
+    Used by the "+ 新分类" form: user picks one candidate to fill the input.
+    Returns {"categories": [{"category": "中文 English", "reason": "..."}]}.
+    """
+    cats = "\n".join(f"  - {c}" for c in topics_data.keys()) or "  (none)"
+    hint_block = (f"EXTRA REQUIREMENTS from the channel owner (follow strictly):\n{hint}\n"
+                  if hint.strip() else "")
+
+    prompt = f"""TASK: Suggest exactly {count} DIFFERENT candidate topic categories for an ESL listening-video topic library.
+
+EXISTING CATEGORIES (each candidate must be complementary, NOT overlapping or similar to any of them, and NOT similar to each other):
+{cats}
+
+AUDIENCE: {_AUDIENCE}
+
+CATEGORY RULES:
+- Category key format: "中文 English" matching the existing style (e.g. "旅行 Travel", "银行邮局 Bank & Post")
+- Each must be a coherent real-life domain that is genuinely useful for the audience and clearly missing above
+- Each candidate must target a clearly DIFFERENT life domain — no near-duplicates among the {count}
+
+{hint_block}OUTPUT JSON ONLY:
+{{"categories": [{{"category": "中文 English", "reason": "1-2 句中文理由"}}]}}"""
+
+    data = _chat_json(
+        [{"role": "system", "content": "You are an expert ESL content strategist for a YouTube "
+                                       "channel serving overseas Chinese learners. Output valid JSON only."},
+         {"role": "user", "content": prompt}],
+        temperature=0.9, max_tokens=2048)
+
+    raw = data.get("categories", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+    existing_keys = set(topics_data.keys())
+    existing_norm = {_norm(c) for c in existing_keys}
+    seen = set()
+    out = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        cat = str(item.get("category", "")).strip()
+        if not cat or len(cat) > 60:
+            continue
+        n = _norm(cat)
+        if cat in existing_keys or n in existing_norm or n in seen:
+            continue
+        seen.add(n)
+        out.append({"category": cat, "reason": str(item.get("reason", "")).strip()})
+    return {"categories": out}
+
+
 # ===========================================================================
 # AI review
 # ===========================================================================
