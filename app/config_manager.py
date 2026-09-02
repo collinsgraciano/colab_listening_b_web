@@ -490,6 +490,13 @@ def load_mode_config(mode: str) -> dict[str, Any]:
         saved = dict(base)
     merged = get_default_config()
     merged.update(saved)
+    # API Key 兜底：模式文件若 seed 于 default.json 尚无 key 的时期，
+    # 空字符串会永久遮蔽后续填入 default.json 的 key —— 空 key 回落 legacy 值
+    # （仅 allowlist 两个 key 字段；topic/used_topics_file 等空串是合法业务值不做回落）
+    legacy = _read_legacy_default() or {}
+    for _k in ("sensenova_api_key", "openai_api_key"):
+        if not merged.get(_k) and legacy.get(_k):
+            merged[_k] = legacy[_k]
     merged["structure"] = mode  # 结构由模式文件决定，恒等于文件名
     save_mode_config(mode, merged)
     return merged
@@ -501,8 +508,13 @@ def save_mode_config(mode: str, config: dict[str, Any]) -> None:
     CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
     config = dict(config)
     config["structure"] = mode  # 防止串模式
-    _mode_config_path(mode).write_text(
+    # 原子写：多进程（Web 服务/CLI/并行会话）并发 read-merge-write 下
+    # 防止读到半截 JSON 触发整体兜底链
+    path = _mode_config_path(mode)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(
         json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def load_all_mode_configs() -> dict[str, dict[str, Any]]:
