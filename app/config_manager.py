@@ -276,50 +276,56 @@ PARAM_SPEC = {
                                  "保留完整频率指纹供 YouTube Content ID 识别；"
                                  "adaptive=阈值随旁白 RMS 自适应（BGM/旁白比例恒定）；"
                                  "amix=固定增益叠加（用音量偏移/高通/动态音量/频谱塑形）"},
-    "bgm_base_gain_db": {"default": -15, "type": "number", "group": "bgm",
+    "bgm_start_chapter": {"default": 1, "type": "number", "group": "bgm",
+                          "label": "BGM 起始章节",
+                          "help": "从第几章开始混 BGM（按 YouTube 章节顺序，1=从头，"
+                                  "2=从第 2 章开头…实际章节以运行目录 youtube_metadata.json "
+                                  "为准，越界/缺失自动从头；起点前仅旁白无 BGM）"},
+    "bgm_base_gain_db": {"default": -15, "type": "number", "group": "bgm_sidechain",
                          "label": "BGM 基础增益 dB (sidechain)",
                          "help": "sidechain 模式下 BGM 的基础增益（仅 sidechain/adaptive 生效）"},
-    "bgm_volume_offset_db": {"default": -25, "type": "number", "group": "bgm",
+    "bgm_volume_offset_db": {"default": -25, "type": "number", "group": "bgm_amix",
                              "label": "BGM 音量偏移 dB (amix)",
                              "help": "amix 模式下 BGM 相对旁白 RMS 的音量偏移（仅 amix 生效）"},
     "bgm_fade_ms": {"default": 3000, "type": "number", "group": "bgm",
                     "label": "交叉淡入淡出 ms",
                     "help": "音乐片段间交叉淡化时长（毫秒）"},
-    "bgm_intro_outro_seconds": {"default": 5, "type": "number", "group": "bgm",
+    "bgm_intro_outro_seconds": {"default": 5, "type": "number", "group": "bgm_sidechain",
                                 "label": "首尾独立段秒数",
                                 "help": "旁白前后加静音段，给 Content ID 干净指纹参考"
-                                        "（仅 sidechain 模式生效）"},
-    "bgm_highpass_freq": {"default": 150, "type": "number", "group": "bgm",
+                                        "（仅 sidechain 模式生效；BGM 起始章节 >1 时"
+                                        "不加首部参考段，起点前天然干净）"},
+    "bgm_highpass_freq": {"default": 150, "type": "number", "group": "bgm_amix",
                           "label": "高通滤波 Hz (amix)",
                           "help": "BGM 高通滤波截止频率，切掉低频鼓点干扰旁白（仅 amix 生效）"},
     "bgm_min_volume_db": {"default": -40, "type": "number", "group": "bgm",
                           "label": "BGM 最低音量 dB",
                           "help": "BGM 音量下限，防止过度压低"},
-    "bgm_dynamic_volume": {"default": True, "type": "checkbox", "group": "bgm",
+    "bgm_dynamic_volume": {"default": True, "type": "checkbox", "group": "bgm_amix",
                            "label": "动态音量包络 (amix)",
                            "help": "BGM 音量跟随旁白包络动态调整：旁白响处 BGM 更低、"
                                    "停顿处更高（仅 amix 生效）"},
-    "bgm_spectral_shaping": {"default": True, "type": "checkbox", "group": "bgm",
+    "bgm_spectral_shaping": {"default": True, "type": "checkbox", "group": "bgm_amix",
                              "label": "频谱空隙塑形 (amix)",
                              "help": "分析旁白频谱空隙，BGM 在旁白能量集中的频段自动让位"
                                      "（仅 amix 生效）"},
     "bgm_stereo_offset": {"default": 0.0, "type": "number", "group": "bgm",
                           "label": "立体声偏移",
-                          "help": "BGM 声像偏移 -1..1（0=居中，仅 amix 生效）"},
-    "bgm_sc_threshold_db": {"default": -30, "type": "number", "group": "bgm",
+                          "help": "BGM 声像偏移 -1..1（0=居中，所有混音模式生效）"},
+    "bgm_sc_threshold_db": {"default": -30, "type": "number", "group": "bgm_sidechain",
                             "label": "侧链阈值 dB",
                             "help": "旁白超过该电平时压缩 BGM（仅 sidechain 生效）"},
-    "bgm_sc_threshold_offset_db": {"default": -5, "type": "number", "group": "bgm",
+    "bgm_sc_threshold_offset_db": {"default": -5, "type": "number", "group": "bgm_sidechain",
                                    "label": "自适应阈值偏移 dB",
                                    "help": "adaptive 模式阈值 = 旁白RMS + 该偏移"
                                            "（仅 sidechain_adaptive 生效）"},
-    "bgm_sc_ratio": {"default": 8, "type": "number", "group": "bgm",
+    "bgm_sc_ratio": {"default": 8, "type": "number", "group": "bgm_sidechain",
                      "label": "侧链压缩比",
                      "help": "旁白说话时 BGM 压缩比 N:1（仅 sidechain 生效）"},
-    "bgm_sc_attack_ms": {"default": 5, "type": "number", "group": "bgm",
+    "bgm_sc_attack_ms": {"default": 5, "type": "number", "group": "bgm_sidechain",
                          "label": "侧链起音 ms",
                          "help": "压缩器起音时间（毫秒，仅 sidechain 生效）"},
-    "bgm_sc_release_ms": {"default": 400, "type": "number", "group": "bgm",
+    "bgm_sc_release_ms": {"default": 400, "type": "number", "group": "bgm_sidechain",
                           "label": "侧链释放 ms",
                           "help": "压缩器释放时间（毫秒，仅 sidechain 生效）"},
 }
@@ -354,7 +360,9 @@ GROUP_META = {
     "tts": {"label": "TTS 语音", "icon": "🎙️", "order": 3},
     "mcp": {"label": "MCP / 图片", "icon": "🎨", "order": 4},
     "video": {"label": "视频合成", "icon": "🎬", "order": 5},
-    "bgm": {"label": "BGM 音乐", "icon": "🎵", "order": 6},
+    "bgm": {"label": "BGM 音乐（通用）", "icon": "🎵", "order": 6},
+    "bgm_amix": {"label": "BGM · amix 模式", "icon": "🎵", "order": 7},
+    "bgm_sidechain": {"label": "BGM · sidechain 模式", "icon": "🎵", "order": 8},
 }
 
 
@@ -783,6 +791,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args += ["--bgm-music-dir", str(config.get("bgm_music_dir", "")
                                         or (WEB_ROOT / "bgm_music"))]
     args += ["--bgm-ducking-mode", str(config.get("bgm_ducking_mode", "sidechain"))]
+    args += ["--bgm-start-chapter", str(config.get("bgm_start_chapter", 1))]
     args += ["--bgm-base-gain-db", str(config.get("bgm_base_gain_db", -15))]
     args += ["--bgm-volume-offset-db", str(config.get("bgm_volume_offset_db", -25))]
     args += ["--bgm-fade-ms", str(config.get("bgm_fade_ms", 3000))]

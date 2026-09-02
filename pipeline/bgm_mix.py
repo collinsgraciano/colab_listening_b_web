@@ -427,6 +427,45 @@ def prepare_copyright_music(
 
 
 # ============================================================================
+# 章节起始时间解析
+# ============================================================================
+def chapter_start_seconds(run_dir: str | os.PathLike, chapter: int) -> float:
+    """从运行目录的 youtube_metadata.json 解析第 N 章的起始秒数。
+
+    chapters 元素格式 "MM:SS Label" / "HH:MM:SS Label"，按数组顺序即 YouTube
+    章节顺序（1=第一章=00:00）。chapter<=1、文件缺失、解析失败或越界时
+    返回 0.0（BGM 是增强功能，回落从头混音不视为错误）。
+    """
+    try:
+        chapter = int(chapter or 1)
+    except (TypeError, ValueError):
+        return 0.0
+    if chapter <= 1:
+        return 0.0
+    meta_path = os.path.join(str(run_dir), "youtube_metadata.json")
+    try:
+        import json
+        with open(meta_path, encoding="utf-8") as fh:
+            chapters = json.load(fh).get("chapters") or []
+    except (OSError, ValueError) as e:
+        print(f"  [BGM] 起始章节解析失败（回退从头混音）: {meta_path} - {e}")
+        return 0.0
+    if not chapters or chapter > len(chapters):
+        print(f"  [BGM] 起始章节 {chapter} 超出实际章节数 {len(chapters)}（回退从头混音）")
+        return 0.0
+    ts = str(chapters[chapter - 1]).split()[0] if str(chapters[chapter - 1]).strip() else ""
+    parts = ts.split(":")
+    if not all(p.isdigit() for p in parts) or len(parts) > 3:
+        print(f"  [BGM] 起始章节 {chapter} 时间戳格式异常: {ts!r}（回退从头混音）")
+        return 0.0
+    seconds = 0.0
+    for p in parts:
+        seconds = seconds * 60 + int(p)
+    print(f"  [BGM] 起始章节: 第{chapter}章 @ {ts} ({seconds:.0f}s)")
+    return float(seconds)
+
+
+# ============================================================================
 # 顶层混音入口（视频版）
 # ============================================================================
 def mix_bgm_into_video(
@@ -450,11 +489,14 @@ def mix_bgm_into_video(
     sc_release_ms: int = 400,
     intro_outro_seconds: int = 5,
     ffmpeg_timeout: int = 600,
+    bgm_start_seconds: float = 0.0,
 ) -> bool:
     """把版权 BGM 混入视频音轨（视频流 copy，仅音频重编码）。失败返回 False 不抛异常。
 
     ffmpeg_timeout: 内部 ffmpeg 进程超时上限（秒）。4K 等高分辨率带 padding 时
     需整片重编码，调用方应传入更大的值（如 3600）。
+    bgm_start_seconds: BGM 起始秒数（通常来自运行目录章节时间戳），
+    该点之前 BGM 静音；此时不再加首部独立参考段（起点前天然干净）。
     """
     narr_temp_path: str | None = None
     bgm_temp_path: str | None = None
@@ -488,19 +530,30 @@ def mix_bgm_into_video(
         else:
             effective_vol_offset = volume_offset_db
 
+        # BGM 起始点防呆：起点贴近/超出片长时回退从头混音
+        if bgm_start_seconds > 0 and bgm_start_seconds >= len(orig_audio) / 1000 - 1:
+            print(f"  [BGM] 起始点 {bgm_start_seconds:.0f}s 贴近/超出片长，回退从头混音")
+            bgm_start_seconds = 0.0
+
         # BGM 首尾独立段（仅 sidechain 模式）：旁白前后加静音，给 Content ID 干净指纹参考。
-        # 视频版配套：音频加静音的同时视频用 tpad 冻结延展同秒数（否则音画错位）
-        pad_seconds = 0
+        # 视频版配套：音频加静音的同时视频用 tpad 冻结延展同秒数（否则音画错位）。
+        # BGM 不覆盖片头时（bgm_start_seconds>0）不加首部参考段——起点前天然干净，
+        # 且视频头部不延展可保持章节时间戳对齐。
+        pad_start = pad_end = 0
         if intro_outro_seconds > 0 and is_sidechain:
-            pad_seconds = int(intro_outro_seconds)
-            pad_ms = pad_seconds * 1000
-            silence = AudioSegment.silent(
-                duration=pad_ms, frame_rate=orig_audio.frame_rate,
-            )
-            orig_audio = silence + orig_audio + silence
+            pad_end = int(intro_outro_seconds)
+            pad_start = pad_end if bgm_start_seconds <= 0 else 0
+            if pad_start > 0:
+                orig_audio = AudioSegment.silent(
+                    duration=pad_start * 1000, frame_rate=orig_audio.frame_rate,
+                ) + orig_audio
+            if pad_end > 0:
+                orig_audio = orig_audio + AudioSegment.silent(
+                    duration=pad_end * 1000, frame_rate=orig_audio.frame_rate,
+                )
             print(
-                f"  [BGM] 首尾独立段: +{pad_seconds}s/+{pad_seconds}s (Content ID 参考，"
-                f"视频首尾冻结帧延展)"
+                f"  [BGM] 首尾独立段: +{pad_start}s/+{pad_end}s (Content ID 参考，"
+                f"视频对应端冻结帧延展)"
             )
             # 将 padded 旁白写入临时 WAV，供 ffmpeg 作为输入
             narr_temp = tempfile.NamedTemporaryFile(
@@ -531,6 +584,17 @@ def mix_bgm_into_video(
             bgm_music = bgm_music.set_frame_rate(orig_audio.frame_rate)
         if orig_audio.channels != bgm_music.channels:
             bgm_music = bgm_music.set_channels(orig_audio.channels)
+        # BGM 起始点：前置静音把音乐右移（下方截齐块自然裁掉尾部超长部分）。
+        # 注意只按 bgm_start_seconds 偏移：bgm_start>0 时 pad_start 恒为 0
+        # （无首部 pad），bgm_start=0 时 lead 必须为 0——首部参考段需 BGM 盖住
+        lead_ms = int(bgm_start_seconds * 1000)
+        if lead_ms > 0:
+            fd_in = min(fade_duration_ms, len(bgm_music) // 4)
+            if fd_in > 0:
+                bgm_music = bgm_music.fade_in(fd_in)
+            bgm_music = AudioSegment.silent(
+                duration=lead_ms, frame_rate=bgm_music.frame_rate,
+            ) + bgm_music
         if len(bgm_music) > len(orig_audio):
             bgm_music = bgm_music[: len(orig_audio)]
         elif len(bgm_music) < len(orig_audio):
@@ -538,6 +602,11 @@ def mix_bgm_into_video(
                 duration=len(orig_audio) - len(bgm_music),
                 frame_rate=orig_audio.frame_rate,
             )
+        if lead_ms > 0:
+            # prepend+截齐会裁掉 prepare 阶段的尾部淡出，在片尾补一次
+            fd_out = min(fade_duration_ms, len(bgm_music) // 10)
+            if fd_out > 100:
+                bgm_music = bgm_music.fade_out(fd_out)
 
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
@@ -556,7 +625,8 @@ def mix_bgm_into_video(
                 sc_attack_ms=sc_attack_ms,
                 sc_release_ms=sc_release_ms,
                 narr_path=narr_temp_path,
-                pad_seconds=pad_seconds,
+                pad_start=pad_start,
+                pad_end=pad_end,
                 timeout=ffmpeg_timeout,
             )
             if ok_mix:
@@ -584,7 +654,7 @@ def mix_bgm_into_video(
         load_music_segment_cached.cache_clear()
 
         ok_mix = _remux_video_audio(video_path, mixed, output_path,
-                                    pad_seconds=pad_seconds,
+                                    pad_start=pad_start, pad_end=pad_end,
                                     timeout=ffmpeg_timeout)
         del mixed
         gc.collect()
@@ -608,10 +678,11 @@ def _cleanup(path: str | None) -> None:
 
 
 def _remux_video_audio(video_path: str, mixed_audio: AudioSegment, output_path: str,
-                       pad_seconds: int = 0, timeout: int = 600) -> bool:
+                       pad_start: int = 0, pad_end: int = 0,
+                       timeout: int = 600) -> bool:
     """pydub 回退路径：把混音后的音频与原视频合成为新 mp4。
 
-    pad_seconds > 0 时音频已加首尾静音，视频同步 tpad 冻结延展（需重编码）。
+    pad_start/pad_end > 0 时音频已加首/尾静音，视频对应端 tpad 冻结延展（需重编码）。
     start_mode 必须显式 clone：默认 add 会补黑色帧（前 N 秒黑屏 bug）。
     """
     mixed_temp_path: str | None = None
@@ -624,12 +695,16 @@ def _remux_video_audio(video_path: str, mixed_audio: AudioSegment, output_path: 
         mixed_temp_path = mixed_temp.name
         mixed_temp.close()
         mixed_audio.export(mixed_temp_path, format="wav")
-        if pad_seconds > 0:
+        if pad_start > 0 or pad_end > 0:
+            pad_parts = []
+            if pad_start > 0:
+                pad_parts.append(f"start_duration={pad_start}:start_mode=clone")
+            if pad_end > 0:
+                pad_parts.append(f"stop_mode=clone:stop_duration={pad_end}")
             cmd = [
                 "ffmpeg", "-y", "-i", video_path, "-i", mixed_temp_path,
                 "-filter_complex",
-                f"[0:v]tpad=start_duration={pad_seconds}:start_mode=clone:"
-                f"stop_mode=clone:stop_duration={pad_seconds}[v]",
+                f"[0:v]tpad={':'.join(pad_parts)}[v]",
                 "-map", "[v]", "-map", "1:a:0",
                 "-c:v", "libx264", "-crf", "18", "-preset", "medium",
                 "-c:a", "aac", "-b:a", "192k",
@@ -674,7 +749,8 @@ def _ffmpeg_overlay_video(
     sc_attack_ms: int = 5,
     sc_release_ms: int = 400,
     narr_path: str | None = None,
-    pad_seconds: int = 0,
+    pad_start: int = 0,
+    pad_end: int = 0,
     timeout: int = 600,
 ) -> bool:
     """使用 ffmpeg 从磁盘叠加 BGM 到视频音轨。
@@ -684,7 +760,7 @@ def _ffmpeg_overlay_video(
       - "sidechain" / "sidechain_adaptive": 侧链压缩（旁白说话时BGM自动压低，静默时BGM升高）
 
     narr_path 为 padded 旁白 WAV（sidechain + intro_outro 时非 None）：
-      此时音频长度 = 视频 + 2*pad_seconds，视频流用 tpad 冻结延展后重编码，
+      此时音频长度 = 视频 + pad_start + pad_end，视频流用 tpad 冻结延展后重编码，
       保证音画同步；否则视频流 -c:v copy 零重编码。
     """
     bgm_temp_path: str | None = None
@@ -699,7 +775,7 @@ def _ffmpeg_overlay_video(
         bgm_temp.close()
         bgm_audio.export(bgm_temp_path, format="wav")
 
-        has_pad = narr_path is not None and pad_seconds > 0
+        has_pad = narr_path is not None and (pad_start > 0 or pad_end > 0)
         if ducking_mode in ("sidechain", "sidechain_adaptive"):
             # 侧链压缩：旁白作为 sidechain key，BGM 被压缩
             # 旁白 RMS 超过 threshold 时 → BGM 被压低 ratio:1
@@ -733,12 +809,15 @@ def _ffmpeg_overlay_video(
         cmd = ["ffmpeg", "-y", "-i", video_path, "-i", bgm_temp_path]
         if has_pad:
             cmd += ["-i", narr_path]
-            # 视频首尾冻结帧延展，与加静音的旁白对齐（需重编码）
+            # 视频对应端冻结帧延展，与加静音的旁白对齐（需重编码）
             # start_mode 必须显式 clone：默认 add 会补黑色帧（前 N 秒黑屏 bug）
-            filter_complex = (
-                f"[0:v]tpad=start_duration={pad_seconds}:start_mode=clone:"
-                f"stop_mode=clone:stop_duration={pad_seconds}[v];" + filter_complex
-            )
+            # narr WAV 仅在 pads 存在时由调用方写入，故 has_pad 蕴含 pad_start/pad_end>0
+            pad_parts = []
+            if pad_start > 0:
+                pad_parts.append(f"start_duration={pad_start}:start_mode=clone")
+            if pad_end > 0:
+                pad_parts.append(f"stop_mode=clone:stop_duration={pad_end}")
+            filter_complex = f"[0:v]tpad={':'.join(pad_parts)}[v];" + filter_complex
             cmd += [
                 "-filter_complex", filter_complex,
                 "-map", "[v]", "-map", "[a]",

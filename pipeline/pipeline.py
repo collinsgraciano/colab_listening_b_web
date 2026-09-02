@@ -269,6 +269,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Music library folder (mp3/wav/flac/ogg/m4a/aac/wma). Default: <project>/bgm_music/")
     parser.add_argument("--bgm-ducking-mode", default="sidechain", choices=["amix", "sidechain", "sidechain_adaptive"],
                         help="BGM mixing mode: amix (simple overlay) / sidechain (sidechain-compress, Content-ID friendly) / sidechain_adaptive (threshold from narration RMS)")
+    parser.add_argument("--bgm-start-chapter", type=int, default=1,
+                        help="Mix BGM starting from chapter N (YouTube chapter order, 1=from beginning; resolved via youtube_metadata.json, fallback to 1)")
     parser.add_argument("--bgm-base-gain-db", type=int, default=-15,
                         help="BGM base gain dB in sidechain mode (default -15)")
     parser.add_argument("--bgm-volume-offset-db", type=int, default=-25,
@@ -1037,11 +1039,14 @@ def _step55_bgm(args, checkpoint: dict, work_dir: Path, final_path: str) -> str:
     final_p = Path(final_path)
     bgm_output = str(work_dir / f"{final_p.stem}_bgm.mp4")
 
-    from bgm_mix import mix_bgm_into_video
+    from bgm_mix import mix_bgm_into_video, chapter_start_seconds
+    bgm_start_seconds = chapter_start_seconds(
+        work_dir, int(getattr(args, "bgm_start_chapter", 1) or 1))
     ok = mix_bgm_into_video(
         final_path,
         bgm_output,
         music_dir,
+        bgm_start_seconds=bgm_start_seconds,
         ducking_mode=str(getattr(args, "bgm_ducking_mode", "sidechain") or "sidechain"),
         bgm_base_gain_db=float(getattr(args, "bgm_base_gain_db", -15)),
         volume_offset_db=float(getattr(args, "bgm_volume_offset_db", -25)),

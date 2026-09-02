@@ -46,7 +46,7 @@
         <!-- 结构由当前 Tab 决定，隐藏域保证保存值正确 -->
         <input type="hidden" data-field="structure" value="{{ mode }}">
         {% for group_key, params in grouped %}
-        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div id="group-card-{{ group_key }}" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <button type="button" onclick="toggleSection(this)"
                 class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-750 transition">
                 <span class="flex items-center gap-2 text-sm font-semibold text-white">
@@ -77,6 +77,7 @@
                     <select data-field="{{ key }}"
                         {% if key == 'llm_provider' %}onchange="toggleLLMFields(this.value)"{% endif %}
                         {% if key == 'tts_engine' %}onchange="toggleTTSFields(this.value)"{% endif %}
+                        {% if key == 'bgm_ducking_mode' %}onchange="toggleBGMGroups(this.value)"{% endif %}
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
                         {% if spec.options is mapping %}
                             {% for opt_val, opt_label in spec.options.items() %}
@@ -213,6 +214,14 @@ function toggleTTSFields(engine) {
     });
 }
 
+// BGM 分组按混音模式显隐（隐藏卡片内字段仍参与保存）
+function toggleBGMGroups(mode) {
+    const amixCard = document.getElementById('group-card-bgm_amix');
+    const scCard = document.getElementById('group-card-bgm_sidechain');
+    if (amixCard) amixCard.style.display = (mode === 'amix') ? '' : 'none';
+    if (scCard) scCard.style.display = (mode === 'sidechain' || mode === 'sidechain_adaptive') ? '' : 'none';
+}
+
 function collectConfig() {
     const config = {};
     document.querySelectorAll('[data-field]').forEach(el => {
@@ -249,6 +258,7 @@ function fillForm(config) {
     // Trigger conditional displays
     toggleLLMFields(config.llm_provider || 'sensenova');
     toggleTTSFields(config.tts_engine || 'kokoro');
+    toggleBGMGroups(config.bgm_ducking_mode || 'sidechain');
 }
 
 function saveConfig() {
@@ -334,6 +344,7 @@ window.addEventListener('load', function() {
     forceStructureMode();
     toggleLLMFields(config.llm_provider || 'sensenova');
     toggleTTSFields(config.tts_engine || 'kokoro');
+    toggleBGMGroups(config.bgm_ducking_mode || 'sidechain');
 });
 
 // Auto-save on change (debounced)

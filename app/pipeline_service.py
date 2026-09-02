@@ -1033,6 +1033,7 @@ class PipelineService:
             bgm_mix=bool(config.get("bgm_mix", False)),
             bgm_music_dir=str(config.get("bgm_music_dir", "")
                               or Path(__file__).parent.parent / "bgm_music"),
+            bgm_start_chapter=int(config.get("bgm_start_chapter", 1) or 1),
             bgm_ducking_mode=str(config.get("bgm_ducking_mode", "sidechain")),
             bgm_base_gain_db=float(config.get("bgm_base_gain_db", -15)),
             bgm_volume_offset_db=float(config.get("bgm_volume_offset_db", -25)),
@@ -1669,18 +1670,19 @@ class PipelineService:
             # 4K 带 padding 时整片重编码，600s 默认值会超时
             ffmpeg_timeout=3600 if target == "4k" else 600,
         )
+        start_chapter = int(config.get("bgm_start_chapter", 1) or 1)
         out_path = run_dir / f"{final_path.stem}_bgm.mp4"
         self._thread = threading.Thread(
             target=self._bgm_mix_run,
-            args=(run_dir, final_path, out_path, music_dir, params),
+            args=(run_dir, final_path, out_path, music_dir, params, start_chapter),
             daemon=True)
         self._thread.start()
         return True, "BGM 混音已启动"
 
     def _bgm_mix_run(self, run_dir: Path, src_video: Path, out_path: Path,
-                     music_dir: str, params: dict):
+                     music_dir: str, params: dict, start_chapter: int = 1):
         """后台线程：mix_bgm_into_video 混音，成功原子替换旧 _bgm 产物。"""
-        from bgm_mix import mix_bgm_into_video
+        from bgm_mix import mix_bgm_into_video, chapter_start_seconds
         old_stdout = sys.stdout
         buf = _LineBuffer(self._on_log_line)
         sys.stdout = buf
@@ -1691,6 +1693,8 @@ class PipelineService:
             print(f"  源视频: {src_video.name}")
             print(f"  音乐库: {music_dir}")
             print(f"  混音模式: {params['ducking_mode']}")
+            params = dict(params)
+            params["bgm_start_seconds"] = chapter_start_seconds(run_dir, start_chapter)
             tmp_path.unlink(missing_ok=True)
             ok = mix_bgm_into_video(str(src_video), str(tmp_path), music_dir, **params)
             if ok and tmp_path.exists() and tmp_path.stat().st_size > 0:
