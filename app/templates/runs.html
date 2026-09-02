@@ -389,6 +389,19 @@ function openFolder(runName) {
         });
 }
 
+// 打开运行目录并高亮选中文件（file 为运行目录内的文件名）
+function openRunFile(runName, mode, fileName) {
+    const q = [];
+    if (mode) q.push(`mode=${encodeURIComponent(mode)}`);
+    if (fileName) q.push(`file=${encodeURIComponent(fileName)}`);
+    const qs = q.length ? `?${q.join('&')}` : '';
+    fetch(`/api/runs/${runName}/open_folder${qs}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) alert('打开目录失败: ' + (data.error || '未知错误'));
+        });
+}
+
 function deleteRun(runName, mode) {
     if (!confirm(`将 "${runName}" 移入回收站？（可在页面下方回收站中恢复）`)) return;
     fetch(`/api/runs/${runName}${mode ? `?mode=${mode}` : ''}`, {method: 'DELETE'})
@@ -762,6 +775,7 @@ function poll4kGen() {
 // ---------------------------------------------------------------------------
 let _bgmBusy = false;
 let _bgmRun = '';
+let _bgmMode = '';
 let _bgmTarget = 'final';
 let _bgmTimer = null;
 let _bgmLogIdx = 0;
@@ -777,6 +791,7 @@ function generateBgm(runName, mode, target = 'final') {
     if (!confirm(`为该运行混入版权 BGM？\n按当前配置的 BGM 参数混音，输出${outSuffix}新文件（原片保留，同名版本将被覆盖）；\n本地渲染不消耗积分，耗时取决于视频时长${slowHint}。`)) return;
     _bgmBusy = true;
     _bgmRun = runName;
+    _bgmMode = mode || '';
     _bgmTarget = target;
     _bgmLogIdx = 0;
     const btn = document.getElementById(_bgmBtnId(runName));
@@ -820,9 +835,14 @@ function pollBgmGen() {
                 alert('❌ BGM 混音失败: ' + (st.error || '未知错误'));
                 return;
             }
+            // 完成：不刷新页面（保留日志面板），直接在资源管理器中
+            // 打开运行目录并高亮选中新产出的 _bgm 文件
             _bgmBusy = false;
             if (_bgmTimer) { clearTimeout(_bgmTimer); _bgmTimer = null; }
-            location.reload();
+            _resetBgmBtn(runName);
+            const fp = st.final_path || '';
+            const fn = fp ? fp.split(/[\\/]/).pop() : '';
+            if (fn && fn.endsWith('.mp4')) openRunFile(runName, _bgmMode, fn);
         })
         .catch(() => { _bgmTimer = setTimeout(pollBgmGen, 3000); });
 }

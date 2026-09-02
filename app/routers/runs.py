@@ -540,8 +540,12 @@ def _raise_folder_window(folder_name: str, before: set[int], timeout: float = 3.
 
 
 @router.post("/api/runs/{name}/open_folder")
-async def api_open_folder(name: str, mode: str = ""):
-    """在系统文件管理器中打开运行目录（视频及所有素材所在目录）。"""
+async def api_open_folder(name: str, mode: str = "", file: str = ""):
+    """在系统文件管理器中打开运行目录；file 非空时打开目录并高亮选中该文件。"""
+    # 仅接受普通文件名（禁路径分隔符/点段，防目录穿越）
+    if file and (os.sep in file or "/" in file or "\\" in file or ".." in file
+                 or Path(file).name != file):
+        return JSONResponse({"ok": False, "error": "Invalid file"}, status_code=400)
     config = load_config()
     output_dir = Path(config.get("output_dir", "./output"))
     run_dir = find_run_dir(output_dir, name, mode)
@@ -550,19 +554,30 @@ async def api_open_folder(name: str, mode: str = ""):
     # Safety: ensure it's within output_dir
     if not str(run_dir.resolve()).startswith(str(output_dir.resolve())):
         return JSONResponse({"ok": False, "error": "Invalid path"}, status_code=400)
+    # file 存在且为运行目录内的普通文件 → 选中打开；否则回落打开目录
+    target = run_dir
+    if file:
+        candidate = run_dir / file
+        if candidate.is_file():
+            target = candidate
     try:
         if sys.platform == "win32":
+            import subprocess
             # 记录已有窗口，打开后把新资源管理器窗口强行带到前台（否则常被浏览器挡住）
             before = _list_explorer_windows()
-            os.startfile(str(run_dir))
+            if target != run_dir:
+                # explorer /select 打开所在目录并高亮选中文件（窗口标题=文件夹名）
+                subprocess.Popen(["explorer", "/select,", str(target)])
+            else:
+                os.startfile(str(run_dir))
             threading.Thread(
                 target=_raise_folder_window,
                 args=(run_dir.name, before), daemon=True).start()
         else:
             import subprocess
             opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.Popen([opener, str(run_dir)])
-        return {"ok": True, "path": str(run_dir)}
+            subprocess.Popen([opener, str(target)])
+        return {"ok": True, "path": str(target)}
     except OSError as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
