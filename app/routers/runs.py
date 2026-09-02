@@ -451,6 +451,19 @@ async def api_generate_4k(name: str, mode: str = ""):
     return {"ok": True, "message": msg, "status": service.status}
 
 
+@router.post("/api/runs/{name}/bgm_mix")
+async def api_bgm_mix(name: str, mode: str = ""):
+    """为成片混入版权 BGM（输出 {标题}_bgm.mp4 新文件，本地渲染零积分）。
+
+    BGM 参数读取运行所在模式的当前配置；与主 pipeline / 模式测试互斥。
+    """
+    service = get_service()
+    ok, msg = service.bgm_mix(name, mode=mode)
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg, "status": service.status}
+
+
 @router.post("/api/runs/{name}/yt_meta_refresh")
 async def api_yt_meta_refresh(name: str, mode: str = ""):
     """重新生成 youtube_metadata.json（脚本编辑后刷新标题/简介/章节，零 AI 成本）。"""

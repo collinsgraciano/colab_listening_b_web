@@ -29,6 +29,9 @@ configs/style_previews/
 # Pipeline run outputs
 output/
 
+# Copyright BGM music library (user-provided audio files)
+bgm_music/
+
 # OS
 Thumbs.db
 .DS_Store

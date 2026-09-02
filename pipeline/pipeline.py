@@ -262,6 +262,41 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--matting-engine", default="auto",
                         choices=["auto", "modnet", "white_threshold"],
                         help="Cutout matting engine: auto (MODNet if weights exist) / modnet / white_threshold (legacy)")
+    # --- BGM 版权音乐混合（Step 5.5，移植自 yt_aduio_book_one_to_all_v2）---
+    parser.add_argument("--bgm-mix", dest="bgm_mix", action="store_true",
+                        help="After compose, mix random copyright BGM into the final video audio ({name}_bgm.mp4)")
+    parser.add_argument("--bgm-music-dir", default="",
+                        help="Music library folder (mp3/wav/flac/ogg/m4a/aac/wma). Default: <project>/bgm_music/")
+    parser.add_argument("--bgm-ducking-mode", default="sidechain", choices=["amix", "sidechain", "sidechain_adaptive"],
+                        help="BGM mixing mode: amix (simple overlay) / sidechain (sidechain-compress, Content-ID friendly) / sidechain_adaptive (threshold from narration RMS)")
+    parser.add_argument("--bgm-base-gain-db", type=int, default=-15,
+                        help="BGM base gain dB in sidechain mode (default -15)")
+    parser.add_argument("--bgm-volume-offset-db", type=int, default=-25,
+                        help="BGM volume offset dB in amix mode (default -25)")
+    parser.add_argument("--bgm-fade-ms", type=int, default=3000,
+                        help="Crossfade duration ms between music segments (default 3000)")
+    parser.add_argument("--bgm-intro-outro-seconds", type=int, default=5,
+                        help="Silence padding seconds before/after narration for clean Content-ID fingerprint (sidechain only, default 5)")
+    parser.add_argument("--bgm-highpass-freq", type=int, default=150,
+                        help="Highpass filter Hz applied to BGM in amix mode (default 150)")
+    parser.add_argument("--bgm-min-volume-db", type=int, default=-40,
+                        help="Minimum BGM volume dB (default -40)")
+    parser.add_argument("--bgm-dynamic-volume", action=argparse.BooleanOptionalAction, default=True,
+                        help="Dynamic volume envelope tracking in amix mode (default on, --no-bgm-dynamic-volume to disable)")
+    parser.add_argument("--bgm-spectral-shaping", action=argparse.BooleanOptionalAction, default=True,
+                        help="Spectral gap shaping in amix mode (default on, --no-bgm-spectral-shaping to disable)")
+    parser.add_argument("--bgm-stereo-offset", type=float, default=0.0,
+                        help="BGM stereo offset -1..1 (default 0)")
+    parser.add_argument("--bgm-sc-threshold-db", type=int, default=-30,
+                        help="Sidechain threshold dB (default -30)")
+    parser.add_argument("--bgm-sc-threshold-offset-db", type=int, default=-5,
+                        help="sidechain_adaptive threshold offset from narration RMS dB (default -5)")
+    parser.add_argument("--bgm-sc-ratio", type=int, default=8,
+                        help="Sidechain compression ratio (default 8)")
+    parser.add_argument("--bgm-sc-attack-ms", type=int, default=5,
+                        help="Sidechain attack ms (default 5)")
+    parser.add_argument("--bgm-sc-release-ms", type=int, default=400,
+                        help="Sidechain release ms (default 400)")
     return parser.parse_args()
 
 
@@ -972,6 +1007,66 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
     return final_path, safe_vid_name
 
 
+def _step55_bgm(args, checkpoint: dict, work_dir: Path, final_path: str) -> str:
+    """Step 5.5: mix random copyright BGM into the final video audio.
+
+    输出新文件 {stem}_bgm.mp4（原片保留）；未启用 / 音乐库缺失 / 混音失败时
+    返回原片路径继续（BGM 是增强功能，失败不中止 run）。
+    4K 步骤以本函数返回的路径为源（BGM 音轨自动继承到 4K）。
+    """
+    if not getattr(args, "bgm_mix", False):
+        return final_path
+    if not final_path or not Path(final_path).exists():
+        return final_path
+
+    print("\n" + "=" * 60)
+    print("Step 5.5: BGM copyright music mix...")
+    music_dir = str(getattr(args, "bgm_music_dir", "") or "").strip()
+    if not music_dir:
+        music_dir = str(Path(__file__).resolve().parent.parent / "bgm_music")
+    if not os.path.isdir(music_dir):
+        print(f"  [BGM] 音乐库不存在: {music_dir} — 跳过混音（配置 bgm_music_dir 或放入音乐文件）")
+        return final_path
+
+    # Resume: checkpoint 记录的 _bgm 产物仍存在时直接复用
+    cached = str(checkpoint.get("bgm_output", "") or "")
+    if _step_done(checkpoint, "step55_bgm") and cached and Path(cached).exists():
+        print(f"  [Resume] BGM video already exists, skipping: {Path(cached).name}")
+        return cached
+
+    final_p = Path(final_path)
+    bgm_output = str(work_dir / f"{final_p.stem}_bgm.mp4")
+
+    from bgm_mix import mix_bgm_into_video
+    ok = mix_bgm_into_video(
+        final_path,
+        bgm_output,
+        music_dir,
+        ducking_mode=str(getattr(args, "bgm_ducking_mode", "sidechain") or "sidechain"),
+        bgm_base_gain_db=float(getattr(args, "bgm_base_gain_db", -15)),
+        volume_offset_db=float(getattr(args, "bgm_volume_offset_db", -25)),
+        highpass_freq=int(getattr(args, "bgm_highpass_freq", 150)),
+        fade_duration_ms=int(getattr(args, "bgm_fade_ms", 3000)),
+        min_volume_db=float(getattr(args, "bgm_min_volume_db", -40)),
+        dyn_vol=bool(getattr(args, "bgm_dynamic_volume", True)),
+        spec_shape=bool(getattr(args, "bgm_spectral_shaping", True)),
+        stereo_offset=float(getattr(args, "bgm_stereo_offset", 0.0)),
+        sc_threshold_db=float(getattr(args, "bgm_sc_threshold_db", -30)),
+        sc_threshold_offset_db=float(getattr(args, "bgm_sc_threshold_offset_db", -5)),
+        sc_ratio=int(getattr(args, "bgm_sc_ratio", 8)),
+        sc_attack_ms=int(getattr(args, "bgm_sc_attack_ms", 5)),
+        sc_release_ms=int(getattr(args, "bgm_sc_release_ms", 400)),
+        intro_outro_seconds=int(getattr(args, "bgm_intro_outro_seconds", 5)),
+    )
+    if ok and os.path.exists(bgm_output) and os.path.getsize(bgm_output) > 0:
+        size_mb = os.path.getsize(bgm_output) / (1024 * 1024)
+        print(f"  [BGM] 完成: {Path(bgm_output).name} ({size_mb:.1f}MB)")
+        _save_checkpoint(work_dir, "step55_bgm", bgm_output=bgm_output)
+        return bgm_output
+    print("  [BGM] 混音失败 — 继续使用原片音频（不中止流程）")
+    return final_path
+
+
 def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
               safe_vid_name: str) -> Path | None:
     """Step 6: upscale the final video to 4K. Returns the 4K path or None."""
@@ -1196,6 +1291,8 @@ def main():
     final_path, safe_vid_name = _step5_compose(
         args, checkpoint, script, work_dir, dirs, clip_paths, timeline,
         narration, normal_paths, zh_paths, ctx["tts_results"], group_info, line_to_group)
+    # Step 5.5: BGM 版权音乐混合（启用时输出 {stem}_bgm.mp4，4K 以其为源）
+    final_path = _step55_bgm(args, checkpoint, work_dir, final_path)
     final_4k_path = _step6_4k(args, checkpoint, work_dir, final_path, safe_vid_name)
 
     cp_path = work_dir / "checkpoint.json"

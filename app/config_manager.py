@@ -257,6 +257,71 @@ PARAM_SPEC = {
                                    "white_threshold": "白度阈值 (原方法)"},
                        "help": "MODNet 本地 ONNX 抠图（权重 H:\\models\\modnet\\modnet.onnx），"
                                "任意背景角色图可抠；原白度抠图始终保留可选"},
+    # --- BGM 版权音乐混合（Step 5.5，移植自 yt_aduio_book_one_to_all_v2/pipeline/bgm.py）---
+    "bgm_mix": {"default": False, "type": "checkbox", "group": "bgm",
+                "label": "运行时自动混入版权 BGM",
+                "help": "Step 5 完成后自动把音乐库随机连串拼接混入成片音轨，"
+                        "输出 {标题}_bgm.mp4 新文件（原片保留）；视频流零重编码。"
+                        "关闭时仍可用「运行历史」页按钮手动混音"},
+    "bgm_music_dir": {"default": str(WEB_ROOT / "bgm_music"), "type": "text", "group": "bgm",
+                      "label": "音乐库路径",
+                      "help": "版权 BGM 音乐文件夹（支持 mp3/wav/flac/ogg/m4a/aac/wma），"
+                              "混音时随机打乱循环拼接至全片时长"},
+    "bgm_ducking_mode": {"default": "sidechain", "type": "select", "group": "bgm",
+                         "label": "混音模式",
+                         "options": {"amix": "简单叠加 (amix)",
+                                     "sidechain": "侧链压缩 (sidechain)",
+                                     "sidechain_adaptive": "自适应侧链 (sidechain_adaptive)"},
+                         "help": "sidechain=旁白说话时 BGM 自动压低、静默时升高，"
+                                 "保留完整频率指纹供 YouTube Content ID 识别；"
+                                 "adaptive=阈值随旁白 RMS 自适应（BGM/旁白比例恒定）；"
+                                 "amix=固定增益叠加（用音量偏移/高通/动态音量/频谱塑形）"},
+    "bgm_base_gain_db": {"default": -15, "type": "number", "group": "bgm",
+                         "label": "BGM 基础增益 dB (sidechain)",
+                         "help": "sidechain 模式下 BGM 的基础增益（仅 sidechain/adaptive 生效）"},
+    "bgm_volume_offset_db": {"default": -25, "type": "number", "group": "bgm",
+                             "label": "BGM 音量偏移 dB (amix)",
+                             "help": "amix 模式下 BGM 相对旁白 RMS 的音量偏移（仅 amix 生效）"},
+    "bgm_fade_ms": {"default": 3000, "type": "number", "group": "bgm",
+                    "label": "交叉淡入淡出 ms",
+                    "help": "音乐片段间交叉淡化时长（毫秒）"},
+    "bgm_intro_outro_seconds": {"default": 5, "type": "number", "group": "bgm",
+                                "label": "首尾独立段秒数",
+                                "help": "旁白前后加静音段，给 Content ID 干净指纹参考"
+                                        "（仅 sidechain 模式生效）"},
+    "bgm_highpass_freq": {"default": 150, "type": "number", "group": "bgm",
+                          "label": "高通滤波 Hz (amix)",
+                          "help": "BGM 高通滤波截止频率，切掉低频鼓点干扰旁白（仅 amix 生效）"},
+    "bgm_min_volume_db": {"default": -40, "type": "number", "group": "bgm",
+                          "label": "BGM 最低音量 dB",
+                          "help": "BGM 音量下限，防止过度压低"},
+    "bgm_dynamic_volume": {"default": True, "type": "checkbox", "group": "bgm",
+                           "label": "动态音量包络 (amix)",
+                           "help": "BGM 音量跟随旁白包络动态调整：旁白响处 BGM 更低、"
+                                   "停顿处更高（仅 amix 生效）"},
+    "bgm_spectral_shaping": {"default": True, "type": "checkbox", "group": "bgm",
+                             "label": "频谱空隙塑形 (amix)",
+                             "help": "分析旁白频谱空隙，BGM 在旁白能量集中的频段自动让位"
+                                     "（仅 amix 生效）"},
+    "bgm_stereo_offset": {"default": 0.0, "type": "number", "group": "bgm",
+                          "label": "立体声偏移",
+                          "help": "BGM 声像偏移 -1..1（0=居中，仅 amix 生效）"},
+    "bgm_sc_threshold_db": {"default": -30, "type": "number", "group": "bgm",
+                            "label": "侧链阈值 dB",
+                            "help": "旁白超过该电平时压缩 BGM（仅 sidechain 生效）"},
+    "bgm_sc_threshold_offset_db": {"default": -5, "type": "number", "group": "bgm",
+                                   "label": "自适应阈值偏移 dB",
+                                   "help": "adaptive 模式阈值 = 旁白RMS + 该偏移"
+                                           "（仅 sidechain_adaptive 生效）"},
+    "bgm_sc_ratio": {"default": 8, "type": "number", "group": "bgm",
+                     "label": "侧链压缩比",
+                     "help": "旁白说话时 BGM 压缩比 N:1（仅 sidechain 生效）"},
+    "bgm_sc_attack_ms": {"default": 5, "type": "number", "group": "bgm",
+                         "label": "侧链起音 ms",
+                         "help": "压缩器起音时间（毫秒，仅 sidechain 生效）"},
+    "bgm_sc_release_ms": {"default": 400, "type": "number", "group": "bgm",
+                          "label": "侧链释放 ms",
+                          "help": "压缩器释放时间（毫秒，仅 sidechain 生效）"},
 }
 
 
@@ -289,6 +354,7 @@ GROUP_META = {
     "tts": {"label": "TTS 语音", "icon": "🎙️", "order": 3},
     "mcp": {"label": "MCP / 图片", "icon": "🎨", "order": 4},
     "video": {"label": "视频合成", "icon": "🎬", "order": 5},
+    "bgm": {"label": "BGM 音乐", "icon": "🎵", "order": 6},
 }
 
 
@@ -699,6 +765,28 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]
     args += ["--matting-engine", str(config.get("matting_engine", "auto"))]
     args += ["--upscale-engine", str(config.get("upscale_engine", "ffmpeg"))]
+    # BGM 版权音乐混合（Step 5.5；与 pipeline.py --bgm-* 一一对应）
+    if config.get("bgm_mix"):
+        args.append("--bgm-mix")
+        args += ["--bgm-music-dir", str(config.get("bgm_music_dir", "")
+                                        or (WEB_ROOT / "bgm_music"))]
+    args += ["--bgm-ducking-mode", str(config.get("bgm_ducking_mode", "sidechain"))]
+    args += ["--bgm-base-gain-db", str(config.get("bgm_base_gain_db", -15))]
+    args += ["--bgm-volume-offset-db", str(config.get("bgm_volume_offset_db", -25))]
+    args += ["--bgm-fade-ms", str(config.get("bgm_fade_ms", 3000))]
+    args += ["--bgm-intro-outro-seconds", str(config.get("bgm_intro_outro_seconds", 5))]
+    args += ["--bgm-highpass-freq", str(config.get("bgm_highpass_freq", 150))]
+    args += ["--bgm-min-volume-db", str(config.get("bgm_min_volume_db", -40))]
+    args += ["--bgm-dynamic-volume" if config.get("bgm_dynamic_volume", True)
+             else "--no-bgm-dynamic-volume"]
+    args += ["--bgm-spectral-shaping" if config.get("bgm_spectral_shaping", True)
+             else "--no-bgm-spectral-shaping"]
+    args += ["--bgm-stereo-offset", str(config.get("bgm_stereo_offset", 0.0))]
+    args += ["--bgm-sc-threshold-db", str(config.get("bgm_sc_threshold_db", -30))]
+    args += ["--bgm-sc-threshold-offset-db", str(config.get("bgm_sc_threshold_offset_db", -5))]
+    args += ["--bgm-sc-ratio", str(config.get("bgm_sc_ratio", 8))]
+    args += ["--bgm-sc-attack-ms", str(config.get("bgm_sc_attack_ms", 5))]
+    args += ["--bgm-sc-release-ms", str(config.get("bgm_sc_release_ms", 400))]
 
     if resume:
         args.append("--resume")

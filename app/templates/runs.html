@@ -59,6 +59,8 @@
             {% if run.videos %}
             <button id="fourk-btn-{{ run.name }}" onclick="generate4k('{{ run.name }}', '{{ run.structure }}')"
                 class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs text-white">生成4K</button>
+            <button id="bgm-btn-{{ run.name }}" onclick="generateBgm('{{ run.name }}', '{{ run.structure }}')"
+                class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 rounded-lg text-xs text-white">🎵 混BGM</button>
             {% endif %}
             <button onclick="openFolder('{{ run.name }}')"
                 class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">打开目录</button>
@@ -732,6 +734,66 @@ function poll4kGen() {
             location.reload();
         })
         .catch(() => { _fourKTimer = setTimeout(poll4kGen, 3000); });
+}
+
+// ---------------------------------------------------------------------------
+// BGM 版权音乐混合（输出 {标题}_bgm.mp4 新文件，原片保留；参数读当前模式配置）
+// ---------------------------------------------------------------------------
+let _bgmBusy = false;
+let _bgmRun = '';
+let _bgmTimer = null;
+let _bgmLogIdx = 0;
+
+function generateBgm(runName, mode) {
+    if (_bgmBusy) { alert('已有 BGM 混音任务进行中，请等待完成'); return; }
+    if (!confirm('为该运行混入版权 BGM？\n按当前配置的 BGM 参数混音，输出「_bgm.mp4」新文件（原片保留，已有 _bgm 版本将被覆盖）；\n本地渲染不消耗积分，耗时取决于视频时长。')) return;
+    _bgmBusy = true;
+    _bgmRun = runName;
+    _bgmLogIdx = 0;
+    const btn = document.getElementById(`bgm-btn-${runName}`);
+    if (btn) { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.textContent = '混音中...'; }
+    const q = mode ? `?mode=${mode}` : '';
+    fetch(`/api/runs/${runName}/bgm_mix${q}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                alert('启动失败: ' + (data.error || '未知错误'));
+                _resetBgmBtn(runName);
+                return;
+            }
+            pollBgmGen();
+        })
+        .catch(() => { _resetBgmBtn(runName); });
+}
+
+function _resetBgmBtn(runName) {
+    _bgmBusy = false;
+    if (_bgmTimer) { clearTimeout(_bgmTimer); _bgmTimer = null; }
+    const btn = document.getElementById(`bgm-btn-${runName}`);
+    if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.textContent = '🎵 混BGM'; }
+}
+
+function pollBgmGen() {
+    fetch(`/api/run/logs/since/${_bgmLogIdx}`)
+        .then(r => r.json())
+        .then(logData => {
+            _bgmLogIdx = logData.total || 0;
+            const st = logData.status || {};
+            if (st.status === 'running') {
+                _bgmTimer = setTimeout(pollBgmGen, 2000);
+                return;
+            }
+            const runName = _bgmRun;
+            if (st.status === 'error') {
+                _resetBgmBtn(runName);
+                alert('❌ BGM 混音失败: ' + (st.error || '未知错误'));
+                return;
+            }
+            _bgmBusy = false;
+            if (_bgmTimer) { clearTimeout(_bgmTimer); _bgmTimer = null; }
+            location.reload();
+        })
+        .catch(() => { _bgmTimer = setTimeout(pollBgmGen, 3000); });
 }
 
 // 初始渲染筛选状态

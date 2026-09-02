@@ -14,7 +14,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from .config_manager import MODES, resolve_provider, load_config, find_run_dir
+from .config_manager import (
+    MODES, resolve_provider, load_config, load_mode_config, find_run_dir,
+)
 from .paths import LIBRARY_DIR
 from . import run_mutex
 
@@ -41,6 +43,7 @@ STEP_PATTERNS = [
     (r"Step 3[:\s]", "step3_video", "视频片段生成"),
     (r"Step 4\.5[:\s]", "step45_thumbnail", "缩略图 + 元数据"),
     (r"Step 4[:\s]", "step4_timeline", "时间轴 + SRT"),
+    (r"Step 5\.5[:\s]", "step55_bgm", "BGM 音乐混合"),
     (r"Step 5[:\s]", "step5_compose", "视频合成"),
     (r"Step 6[:\s]", "step6_4k", "4K 超分辨率"),
 ]
@@ -48,7 +51,7 @@ STEP_PATTERNS = [
 STEP_ORDER = [
     "step0_script", "step1_mcp", "step2_images_tts",
     "step3_video", "step4_timeline", "step45_thumbnail",
-    "step5_compose", "step6_4k",
+    "step5_compose", "step55_bgm", "step6_4k",
 ]
 
 
@@ -1027,6 +1030,24 @@ class PipelineService:
             matting_engine=str(config.get("matting_engine", "auto")),
             host_character=str(config.get("host_character", "") or ""),
             host_bg_prompt=str(config.get("host_bg_prompt", "") or ""),
+            bgm_mix=bool(config.get("bgm_mix", False)),
+            bgm_music_dir=str(config.get("bgm_music_dir", "")
+                              or Path(__file__).parent.parent / "bgm_music"),
+            bgm_ducking_mode=str(config.get("bgm_ducking_mode", "sidechain")),
+            bgm_base_gain_db=float(config.get("bgm_base_gain_db", -15)),
+            bgm_volume_offset_db=float(config.get("bgm_volume_offset_db", -25)),
+            bgm_fade_ms=int(config.get("bgm_fade_ms", 3000)),
+            bgm_intro_outro_seconds=int(config.get("bgm_intro_outro_seconds", 5)),
+            bgm_highpass_freq=int(config.get("bgm_highpass_freq", 150)),
+            bgm_min_volume_db=float(config.get("bgm_min_volume_db", -40)),
+            bgm_dynamic_volume=bool(config.get("bgm_dynamic_volume", True)),
+            bgm_spectral_shaping=bool(config.get("bgm_spectral_shaping", True)),
+            bgm_stereo_offset=float(config.get("bgm_stereo_offset", 0.0)),
+            bgm_sc_threshold_db=float(config.get("bgm_sc_threshold_db", -30)),
+            bgm_sc_threshold_offset_db=float(config.get("bgm_sc_threshold_offset_db", -5)),
+            bgm_sc_ratio=int(config.get("bgm_sc_ratio", 8)),
+            bgm_sc_attack_ms=int(config.get("bgm_sc_attack_ms", 5)),
+            bgm_sc_release_ms=int(config.get("bgm_sc_release_ms", 400)),
             resume=False,
         )
 
@@ -1115,7 +1136,7 @@ class PipelineService:
         from pipeline import (
             _step0_script, _step1_mcp, _step2_images_tts,
             _step3_clips, _step4_timeline, _step45_thumbnail,
-            _step5_compose, _step6_4k,
+            _step5_compose, _step55_bgm, _step6_4k,
             _generate_script_with_retry, _resolve_topic, _resolve_run_dir,
         )
 
@@ -1288,6 +1309,18 @@ class PipelineService:
                 self._set_stopped()
                 return
             self._wait_for_step_approval("step5_compose")
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
+
+            # Step 5.5: BGM 版权音乐混合（启用时输出 {stem}_bgm.mp4，4K 以其为源）
+            final_path = _step55_bgm(args, checkpoint, work_dir, final_path)
+            self.final_path = final_path
+
+            if self._stop_flag.is_set():
+                self._set_stopped()
+                return
+            self._wait_for_step_approval("step55_bgm")
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
@@ -1536,6 +1569,139 @@ class PipelineService:
                     self.status = "done"
                 self.finished_at = time.time()
             run_mutex.release("4k_gen")
+
+    # ------------------------------------------------------------------
+    # BGM mix: mix copyright BGM into a finished run's audio
+    # ------------------------------------------------------------------
+
+    def bgm_mix(self, run_name: str, mode: str = "") -> tuple[bool, str]:
+        """为已完成运行混入版权 BGM（输出 {标题}_bgm.mp4 新文件，原片保留）。
+
+        参数读取运行所在模式的当前配置（配置页改完即可对旧运行重混）。
+        照 generate_4k 模式在后台线程执行；期间与主 pipeline / 模式测试互斥。
+        返回 (ok, message)。
+        """
+        if self.is_running:
+            return False, "Pipeline 正在运行中，请等待完成后再混音"
+
+        config = load_mode_config(mode) if mode in MODES else load_config()
+        output_dir = Path(config.get("output_dir", "./output"))
+        run_dir = find_run_dir(output_dir, run_name, mode)
+        if not run_dir:
+            return False, f"运行不存在: {run_name}"
+        if not (run_dir / "script.json").exists():
+            return False, "缺少 script.json"
+
+        # 成片定位：优先按脚本标题还原文件名，否则取根部最新的非中间产物 mp4
+        # （排除 _4K/_bgm 自身，避免拿 BGM 版再叠一层 BGM）
+        try:
+            script = json.loads((run_dir / "script.json").read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            return False, f"script.json 读取失败: {e}"
+        safe_vid_name = _safe_dirname(
+            script.get("youtube_title", script.get("title", run_name)), run_name)
+        final_path = run_dir / f"{safe_vid_name}.mp4"
+        if not final_path.exists():
+            candidates = [
+                v for v in run_dir.glob("*.mp4")
+                if not v.name.startswith(("final_no_sub", "final_video_norm"))
+                and not v.name.endswith(("_4K.mp4", "_bgm.mp4"))
+            ]
+            if not candidates:
+                return False, "未找到成片视频（运行目录根部无 final mp4）"
+            final_path = max(candidates, key=lambda v: v.stat().st_mtime)
+
+        music_dir = str(config.get("bgm_music_dir", "") or "").strip() \
+            or str(Path(__file__).parent.parent / "bgm_music")
+        if not Path(music_dir).is_dir() or not any(Path(music_dir).iterdir()):
+            return False, (f"音乐库为空或不存在: {music_dir}\n"
+                           f"请放入音乐文件（mp3/wav/flac 等）或在配置页修改「音乐库路径」")
+
+        if not run_mutex.try_acquire("bgm_mix"):
+            return False, (f"资源被占用：{run_mutex.current_owner()}"
+                           f"（主 pipeline / 模式测试 / 4K 生成中请等待完成）")
+
+        self._stop_flag.clear()
+        self._step_mode = False
+        self._paused_after_step = ""
+        with self._lock:
+            self.log_lines = []
+            self.status = "running"
+            self.current_step = ""
+            self.current_step_label = "BGM 音乐混合（本地渲染）"
+            self.started_at = time.time()
+            self.finished_at = 0
+            self.error = ""
+            self.work_dir = str(run_dir)
+            self.final_path = ""
+
+        params = dict(
+            ducking_mode=str(config.get("bgm_ducking_mode", "sidechain") or "sidechain"),
+            bgm_base_gain_db=float(config.get("bgm_base_gain_db", -15)),
+            volume_offset_db=float(config.get("bgm_volume_offset_db", -25)),
+            fade_duration_ms=int(config.get("bgm_fade_ms", 3000)),
+            highpass_freq=int(config.get("bgm_highpass_freq", 150)),
+            min_volume_db=float(config.get("bgm_min_volume_db", -40)),
+            dyn_vol=bool(config.get("bgm_dynamic_volume", True)),
+            spec_shape=bool(config.get("bgm_spectral_shaping", True)),
+            stereo_offset=float(config.get("bgm_stereo_offset", 0.0)),
+            sc_threshold_db=float(config.get("bgm_sc_threshold_db", -30)),
+            sc_threshold_offset_db=float(config.get("bgm_sc_threshold_offset_db", -5)),
+            sc_ratio=int(config.get("bgm_sc_ratio", 8)),
+            sc_attack_ms=int(config.get("bgm_sc_attack_ms", 5)),
+            sc_release_ms=int(config.get("bgm_sc_release_ms", 400)),
+            intro_outro_seconds=int(config.get("bgm_intro_outro_seconds", 5)),
+        )
+        out_path = run_dir / f"{final_path.stem}_bgm.mp4"
+        self._thread = threading.Thread(
+            target=self._bgm_mix_run,
+            args=(run_dir, final_path, out_path, music_dir, params),
+            daemon=True)
+        self._thread.start()
+        return True, "BGM 混音已启动"
+
+    def _bgm_mix_run(self, run_dir: Path, src_video: Path, out_path: Path,
+                     music_dir: str, params: dict):
+        """后台线程：mix_bgm_into_video 混音，成功原子替换旧 _bgm 产物。"""
+        from bgm_mix import mix_bgm_into_video
+        old_stdout = sys.stdout
+        buf = _LineBuffer(self._on_log_line)
+        sys.stdout = buf
+        tmp_path = out_path.with_name(out_path.stem + "_tmp.mp4")
+        try:
+            print("=" * 60)
+            print(f"BGM Mix: {run_dir.name}")
+            print(f"  源视频: {src_video.name}")
+            print(f"  音乐库: {music_dir}")
+            print(f"  混音模式: {params['ducking_mode']}")
+            tmp_path.unlink(missing_ok=True)
+            ok = mix_bgm_into_video(str(src_video), str(tmp_path), music_dir, **params)
+            if ok and tmp_path.exists() and tmp_path.stat().st_size > 0:
+                os.replace(str(tmp_path), str(out_path))
+                size_mb = out_path.stat().st_size / (1024 * 1024)
+                with self._lock:
+                    self.status = "done"
+                    self.finished_at = time.time()
+                    self.final_path = str(out_path)
+                print("=" * 60)
+                print(f"BGM Mix DONE! {out_path.name} ({size_mb:.1f}MB)")
+            else:
+                tmp_path.unlink(missing_ok=True)
+                self._fail("BGM 混音失败（原片未改动）")
+        except Exception as e:
+            tmp_path.unlink(missing_ok=True)
+            self._fail(f"BGM Mix {type(e).__name__}: {e}")
+            import traceback
+            for line in traceback.format_exc().split("\n"):
+                self._on_log_line(line)
+        finally:
+            sys.stdout = old_stdout
+            buf.flush()
+            with self._lock:
+                if self.status == "running":
+                    self.status = "done"
+                self.finished_at = time.time()
+            run_mutex.release("bgm_mix")
 
     def recompose(self, run_name: str, subtitle_style: str = "", font_size: int = 60,
                   show_zh: bool = True, regen_4k: bool = False,
