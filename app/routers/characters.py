@@ -434,7 +434,10 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
                 f"thinking with hand on chin, surprised with raised eyebrows, "
                 f"bottom row left to right: nodding in agreement, waving right hand, "
                 f"pointing forward, laughing with eyes closed, "
-                f"half-body close-up, waist up, all eight poses same character same outfit, "
+                f"medium waist-up shot, every pose fully inside its own cell with generous "
+                f"empty margin on all sides, both shoulders fully visible, all arms and hands "
+                f"completely within the cell borders, no body part cropped or cut off at the "
+                f"cell edges, all eight poses same character same outfit, "
                 f"plain white background, {_STYLE}, "
                 f"no props, no objects, no scene, no text"
             )
@@ -448,7 +451,9 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
         else:
             # Original structure: single character scene image
             atlas_prompt = (
-                f"{description}, standing pose, half-body close-up, waist up, "
+                f"{description}, standing pose, medium waist-up shot, "
+                f"both shoulders fully visible, all arms and hands completely within "
+                f"the frame, no body part cropped or cut off at the image edges, "
                 f"plain white background, {_STYLE}, "
                 f"no props, no objects, no scene, no text"
             )

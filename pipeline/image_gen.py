@@ -367,7 +367,10 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
             f"thinking with hand on chin, surprised with raised eyebrows, "
             f"bottom row left to right: nodding in agreement, waving right hand, "
             f"pointing forward, laughing with eyes closed, "
-            f"half-body close-up, waist up, all eight poses same character same outfit, "
+            f"medium waist-up shot, every pose fully inside its own cell with generous "
+            f"empty margin on all sides, both shoulders fully visible, all arms and hands "
+            f"completely within the cell borders, no body part cropped or cut off at the "
+            f"cell edges, all eight poses same character same outfit, "
             f"plain white background, {_STYLE}, "
             f"no props, no objects, no scene, no text"
         )
