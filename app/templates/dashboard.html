@@ -180,10 +180,12 @@
                     </div>
                     <div data-qc-group="hostbg">
                         <label class="block text-xs text-slate-400 mb-1">主持人演播室背景</label>
-                        <select id="qc-host_bg_source" onchange="onQuickInput('host_bg_source', this.value)"
+                        <select id="qc-host_bg_source" onchange="onQuickInput('host_bg_source', this.value); updateHostBgPreview()"
                             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
                             <option value="">每期自动生成（按主题）</option>
                         </select>
+                        <img id="qc-host_bg_preview" alt="主持人演播室背景预览"
+                            class="hidden mt-2 w-full max-h-40 object-contain rounded-lg border border-slate-700 bg-slate-900 cursor-zoom-in">
                     </div>
                 </div>
             </div>
@@ -692,6 +694,32 @@ function refreshHostBgOptions() {
     if (runGroup.children.length) sel.appendChild(runGroup);
     const values = [...sel.querySelectorAll('option')].map(o => o.value);
     sel.value = values.includes(saved) ? saved : '';
+    updateHostBgPreview();
+}
+
+// 主持人演播室背景预览：选中 lib:/run: 绑定时内联显示对应 host_bg.png（点击看原图）
+function updateHostBgPreview() {
+    const sel = document.getElementById('qc-host_bg_source');
+    const img = document.getElementById('qc-host_bg_preview');
+    if (!sel || !img) return;
+    const v = sel.value || '';
+    let url = '';
+    if (v.startsWith('lib:')) {
+        url = '/api/character_library/' + encodeURIComponent(v.slice(4)) + '/host_bg';
+    } else if (v.startsWith('run:')) {
+        url = '/api/runs/' + encodeURIComponent(v.slice(4)) + '/images/host_bg.png';
+    }
+    if (!url) {
+        img.classList.add('hidden');
+        img.removeAttribute('src');
+        return;
+    }
+    // 绑定图可能被重新保存覆盖 → 时间戳破缓存（图片端点 no-cache 约定）
+    url += (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
+    img.onerror = function() { img.classList.add('hidden'); };
+    img.onclick = function() { window.open(url, '_blank'); };
+    img.src = url;
+    img.classList.remove('hidden');
 }
 
 function loadCharSources() {

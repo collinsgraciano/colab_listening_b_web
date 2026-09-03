@@ -295,6 +295,20 @@ async def api_library_image(lib_id: str):
     return FileResponse(str(thumb), media_type="image/png")
 
 
+@router.get("/api/character_library/{lib_id}/host_bg")
+async def api_library_host_bg(lib_id: str):
+    """Serve the library entry's host studio background (主持人演播室背景预览)."""
+    lib_dir = LIBRARY_DIR / lib_id
+    if (not lib_dir.exists() or not lib_dir.is_dir()
+            or not str(lib_dir.resolve()).startswith(str(LIBRARY_DIR.resolve()))):
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    bg = lib_dir / "host_bg.png"
+    if not bg.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(bg), media_type="image/png",
+                        headers={"Cache-Control": "no-cache"})
+
+
 @router.get("/api/character_library/{lib_id}/atlas")
 async def api_library_atlas(lib_id: str):
     """Serve the character's full-size image for the atlas viewer modal.
