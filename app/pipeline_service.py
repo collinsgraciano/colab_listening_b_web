@@ -565,13 +565,6 @@ class PipelineService:
                                 if not dst.exists():
                                     shutil.copy2(str(atlas), str(dst))
                                     copied.append(atlas.name)
-                            if key == "host":
-                                hb = src_img_dir / "host_bg.png"
-                                if hb.exists():
-                                    dst = dst_img_dir / "host_bg.png"
-                                    if not dst.exists():
-                                        shutil.copy2(str(hb), str(dst))
-                                        copied.append("host_bg.png")
                         else:
                             if "char_a" in image_keys and "char_b" in image_keys:
                                 for fname in self._CHAR_FILES_ORIGINAL:
@@ -675,13 +668,6 @@ class PipelineService:
                         if not dst.exists():
                             shutil.copy2(str(atlas), str(dst))
                             copied.append(dst_name)
-                    if key == "host":
-                        hb = lib_char_dir / "host_bg.png"
-                        if hb.exists():
-                            dst = dst_img_dir / "host_bg.png"
-                            if not dst.exists():
-                                shutil.copy2(str(hb), str(dst))
-                                copied.append("host_bg.png")
                 else:
                     cs = lib_char_dir / "char_scene.png"
                     if cs.exists():
@@ -913,6 +899,8 @@ class PipelineService:
 
         host_bg_source 取值：lib:<素材库ID> / run:<运行名>；空=不绑定（每期自动生成）。
         已存在时不覆盖（与角色复用语义一致，改绑定需删除运行目录中的 host_bg.png）。
+        本函数是 host_bg.png 进入运行目录的唯一途径——主持人形象绑定（素材库/角色
+        复用）不夹带背景（2026-09-03 解绑），背景只由本绑定或每期自动生成。
         """
         import shutil
 
