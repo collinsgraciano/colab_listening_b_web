@@ -376,6 +376,17 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
         if description_en:
             description_en = description_en.rstrip() + "\n" + hashtags
 
+    # SEO 词池：并入高频搜索短语（脚本 LLM tags 优先 → 主题命中 → core），
+    # 只丰富 metadata 的 tags 字段；上面的 hashtag 追加保持仅用脚本原 tags
+    try:
+        from seo_pool import merge_tags
+        tags = merge_tags(
+            tags,
+            f"{script.get('title', '')} {script.get('scene', '')} "
+            f"{script.get('youtube_title', '')} {script.get('topic', '')}")
+    except Exception as e:
+        print(f"  [YouTube] WARNING: SEO 词池合并失败: {e}")
+
     title = script.get("youtube_title", script.get("title", ""))
     title_en = script.get("youtube_title_en", "")
     # YouTube 标题硬上限 100 字符，超长会被截断 —— 最后防线

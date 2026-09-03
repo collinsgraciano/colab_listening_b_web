@@ -421,6 +421,22 @@ def _desc_consistency_hint(pf: str, speaker_num: int) -> str:
     return ""
 
 
+def _seo_hint_line(topic: str) -> str:
+    """SEO 词池提示行：按主题命中的高流量搜索短语，供 tags/标题/简介自然融入。
+
+    词池缺失或无命中 → 空串，prompt 与无词池时逐字节一致。
+    """
+    try:
+        from seo_pool import keyword_hint
+        hint = keyword_hint(topic)
+    except Exception:
+        return ""
+    if not hint:
+        return ""
+    return (f" High-traffic YouTube search phrases to weave in naturally "
+            f"where relevant: {hint}.")
+
+
 def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = None,
                             num_lines: int = 18,
                             structure: str = "original",
@@ -540,7 +556,7 @@ TECHNICAL REQUIREMENTS:
 - "youtube_title_en": a high-CTR YouTube title in PURE ENGLISH (no Chinese). STRONGLY PREFER the "quote hook" pattern: open with title_quote in quotes, then the scene context. Example: '"Pump Number 3, Please" — Paying Inside at an American Gas Station'. Second-best pattern: a curiosity question, e.g. "Can You Order Coffee in English? ☕ Real Conversation at a Coffee Shop". Include the topic, keep it under 100 chars, and make viewers want to click.
 - "youtube_description": a full YouTube video description (max 3000 chars). First line must be a hook with the main keyword. Do NOT write chapter timestamps — they are injected automatically after rendering. End with a call-to-action asking viewers to LIKE the video, SUBSCRIBE to the channel, and leave a COMMENT (e.g. which scenario they want to learn next), then finish with the 3 hashtags (#EnglishListening #ESL #LearnEnglish). ALL Chinese text in Traditional Chinese (繁體中文).
 - "youtube_description_en": a full YouTube video description in PURE ENGLISH (no Chinese). Max 3000 chars. First line = hook with main keyword. Do NOT write chapter timestamps — they are injected automatically after rendering. End with a call-to-action asking viewers to LIKE the video, SUBSCRIBE to the channel, and leave a COMMENT (e.g. which scenario they want to learn next), then finish with the hashtags.
-- "youtube_tags": an array of 15-20 SEO tags (mix of short and long-tail keywords, include both English and Traditional Chinese tags)
+- "youtube_tags": an array of 15-20 SEO tags (mix of short and long-tail keywords, include both English and Traditional Chinese tags).{_seo_hint_line(topic)}
 - "youtube_title_ref": a SECOND YouTube title option in the reference channel's "沉浸式英文動畫" style. Exact format: 【🎬沉浸式英文動畫】+ emoji + 主題+"英文" ｜ 內容點1・內容點2・內容點3 ｜ 吸引句 ｜ 🌱{cefr} 初級英文 ｜ 💡不用背，多聽就會用 ｜ 🎧聽力口說練習 ｜ 後段逐句跟讀 — segments joined by ｜. The 3 content points name specifically what viewers learn from THIS dialogue, joined by "・" (e.g. "形容味道與口感・問口味・和陌生人聊美食"). ALL Traditional Chinese. Length 55-95 chars (NEVER exceed 95). Example: "【🎬沉浸式英文動畫】✈️聽懂美食英文｜🍢形容味道與口感・問口味・和陌生人聊美食｜🍽️出國盡情嚐美食｜🌱A1–A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀"
 - "youtube_description_ref": a SECOND YouTube description option in the same reference style (max 3000 chars). ALL Traditional Chinese (繁體中文). Structure: start with "📌 影片簡介：" + a relatable hook question (2-3 short lines); then a paragraph "這一集帶大家走進…" (narrate the scene/location); then "你會聽到：" with 2-4 emoji bullet sections, each = a Traditional Chinese heading + 1-2 lines explaining what you'll learn, quoting REAL English phrases from THIS dialogue; then a paragraph about the 逐句聽力＋跟讀練習 🎧 in the second half; then "🌱 適合 {cefr} 初級英文學習者" paragraph (不用背，跟著情境反覆聽就會自然); then a short warm CTA paragraph asking viewers to 點讚、訂閱頻道，並留言告訴我們下一集想學的場景 (natural, warm, fits the reference channel's tone); end with a short warm closing line. Do NOT write timestamps or 時間軸 (auto-injected). Do NOT include playlist/video links or hashtags (auto-appended).
 - "scene": the English name of the scene/location (e.g. "pharmacy", "coffee shop", "hotel lobby"). Used for thumbnail and prompts.

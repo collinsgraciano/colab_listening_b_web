@@ -34,6 +34,7 @@ from llm_client import (
     _load_used_listening_summaries,
     _build_character_override_prompt,
     _get_character_overrides,
+    _seo_hint_line,
     resolve_max_line_words,
 )
 from script_style import (
@@ -820,7 +821,7 @@ Generate JSON with these fields:
   "youtube_title_en": "high-CTR PURE ENGLISH title (no Chinese). STRONGLY PREFER opening with title_quote in quotes, then the scene context (e.g. \"Can You Guess Why It's Called Bubble Tea?\" — bubble tea shop mystery). Otherwise use a curiosity question. Max 100 chars.",
   "youtube_description": "full 繁中 description with key_words. Do NOT write chapter timestamps — they are injected automatically after rendering.",
   "youtube_description_en": "full PURE ENGLISH description. Include key_words, hashtags, and subscribe CTA. Do NOT write chapter timestamps — they are injected automatically after rendering.",
-  "youtube_tags": ["tag1","tag2",... 15-20 tags],
+  "youtube_tags": ["tag1","tag2",... 15-20 tags]{_seo_hint_line(topic)},
   "thumbnail_expression": "main character expression",
   "thumbnail_action": "main character action",
   "thumbnail_subtitle": "繁中 short subtitle",

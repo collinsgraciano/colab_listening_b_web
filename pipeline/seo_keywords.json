@@ -1,0 +1,85 @@
+{
+  "_comment": "SEO 词池（来源：12 个竞品种子词 + LLM 长尾扩展 + 人工精选 2026-09-03）。core=每支影片都会并入 tags；by_topic=match 子串命中主题文本（title/scene/youtube_title）时并入。合并逻辑在 pipeline/seo_pool.py：脚本 LLM tags 优先 → by_topic → core，大小写去重，tags 字段总长截 500 字符（YouTube 硬限）。hashtag 追加逻辑不受本文件影响。扩充词池直接编辑本文件，无常驻挖掘脚本。",
+  "core": [
+    "english speaking practice",
+    "english listening practice",
+    "english conversation practice",
+    "learn english through story",
+    "immersive english learning",
+    "english shadowing practice",
+    "slow english listening",
+    "english listening with subtitles",
+    "英文聽力練習",
+    "英文對話練習",
+    "英文跟讀練習",
+    "沉浸式英文",
+    "英文口說練習",
+    "初級英文聽力"
+  ],
+  "by_topic": [
+    {
+      "match": ["work", "office", "job", "coworker", "boss", "meeting", "職場", "辦公室", "工作", "面試"],
+      "tags": ["workplace english conversation", "office english dialogue", "english for work practice", "job interview english practice", "business english listening", "speaking english at work", "職場英文對話", "辦公室英文聽力", "工作英文對話練習", "求職面試英文"]
+    },
+    {
+      "match": ["class", "school", "teacher", "student", "homework", "課堂", "學校", "老師", "作業", "同學"],
+      "tags": ["classroom instructions in english", "classroom english conversation", "teacher student english dialogue", "english class listening practice", "school dialogue english practice", "課堂英文用語", "學校英文對話", "上課英文練習"]
+    },
+    {
+      "match": ["present", "pitch", "speech", "demo", "q&a", "簡報", "演講", "報告"],
+      "tags": ["presentation practice in english", "english presentation phrases", "how to present in english", "business presentation english practice", "english speech practice", "presentation english listening", "英文簡報練習", "商務簡報英文", "英文演講練習", "英文報告用語"]
+    },
+    {
+      "match": ["polite", "request", "complaint", "apolog", "invitat", "favor", "permission", "compliment", "interrupt", "declin", "thank", "禮貌", "請求", "客氣", "道歉", "拒絕", "感謝"],
+      "tags": ["polite requests in english", "polite english conversation", "how to ask politely in english", "polite spoken english phrases", "making complaints politely in english", "polite english shadowing practice", "禮貌英文對談", "客氣英文請求", "英文委婉表達", "禮貌英文句型"]
+    },
+    {
+      "match": ["story", "narrative", "tale", "故事", "繪本", "情節"],
+      "tags": ["learn english through story", "english listening story slow", "story based english learning", "english short story dialogue", "看故事學英文", "英文故事對話"]
+    },
+    {
+      "match": ["pronunc", "accent", "intonat", "syllable", "發音", "連音", "語調"],
+      "tags": ["english pronunciation in use", "english pronunciation practice", "american accent listening practice", "english connected speech listening", "english intonation shadowing", "英文發音練習", "美語連音技巧", "英文語調練習", "英文發音跟讀"]
+    },
+    {
+      "match": ["gramm", "syntax", "tense", "文法", "時態", "句型"],
+      "tags": ["english with chinese grammar", "english sentence patterns listening", "learn english grammar conversation", "english tenses in dialogue", "practical english grammar listening", "中式英文糾正", "生活英文句型", "對話學英文文法"]
+    },
+    {
+      "match": ["writ", "email", "letter", "mail", "寫作", "信件", "郵件"],
+      "tags": ["letter writing in english", "english writing skills improvement", "business email english writing", "email writing english phrases", "formal english writing practice", "英文書信寫作", "英文信件用語", "實用英文寫作"]
+    },
+    {
+      "match": ["travel", "airport", "hotel", "flight", "tourist", "旅遊", "機場", "飯店", "海關"],
+      "tags": ["travel english conversation", "airport english dialogue practice", "hotel check in english", "asking directions english practice", "english for vacation listening", "旅遊英文對話", "機場英文聽力", "飯店入住英文", "問路英文練習"]
+    },
+    {
+      "match": ["restaurant", "food", "order", "menu", "cafe", "coffee", "餐廳", "點餐", "食物", "咖啡"],
+      "tags": ["restaurant english conversation", "ordering food english practice", "english for dining out", "coffee shop english conversation", "fast food english order", "餐廳點餐英文", "國外點餐對話", "咖啡廳英文用語", "用餐英文練習"]
+    },
+    {
+      "match": ["shop", "store", "buy", "price", "mall", "supermarket", "購物", "買東西", "商店", "超市"],
+      "tags": ["shopping english conversation", "buying clothes english dialogue", "supermarket english dialogue", "asking price english practice", "bargaining in english practice", "購物英文對話", "買東西英文練習", "超市購物英文", "服飾店英文對話"]
+    },
+    {
+      "match": ["customer service", "complaint", "refund", "warranty", "客服", "客訴", "退貨", "退款"],
+      "tags": ["customer service english conversation", "calling customer service english", "making a complaint in english", "complaint english dialogue", "客服英文對話", "客訴英文練習"]
+    },
+    {
+      "match": ["doctor", "hospital", "health", "pharmacy", "sick", "medicine", "看病", "醫院", "診所", "藥局"],
+      "tags": ["at the doctor english conversation", "describing symptoms in english", "pharmacy english conversation", "seeing a doctor in english", "medical english conversation beginner", "看病英文對話", "診所英文聽力", "描述症狀英文", "藥局英文用語"]
+    },
+    {
+      "match": ["daily", "home", "routine", "family", "hobby", "weather", "chores", "日常", "生活", "家務", "家人"],
+      "tags": ["daily english conversation practice", "daily routine english dialogue", "talking about hobbies in english", "family english conversation listening", "everyday spoken english practice", "日常英文對話", "生活英文聽力", "家庭日常英文"]
+    },
+    {
+      "match": ["phone", "tech", "app", "computer", "wifi", "手機", "科技", "電腦", "網路"],
+      "tags": ["phone call english conversation", "technology english dialogue", "technical support english practice", "computer english conversation", "calling customer service english", "電話英文對話", "手機科技英文", "接電話英文練習", "電腦常用英文"]
+    },
+    {
+      "match": ["bank", "money", "card", "account", "exchange", "tax", "銀行", "開戶", "金錢", "換匯", "報稅"],
+      "tags": ["at the bank english conversation", "opening bank account english", "credit card english conversation", "currency exchange english dialogue", "banking english listening practice", "銀行開戶英文", "換匯英文對話", "信用卡英文用語", "銀行辦理英文"]
+    }
+  ]
+}
