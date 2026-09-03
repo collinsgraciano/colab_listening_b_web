@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -180,10 +181,10 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
 
     def _gen_one(prompt, filename):
         print(f"  [Image] Generating: {filename}...")
-        try:
-            if sensenova_image.get_image_provider() == "sensenova":
-                # U1.5 Lite：生成 → 下载落盘 → 重传 TOS 换永久 URL
-                # （U1.5 返回的 URL 仅 24h 有效，不能直接进 image_urls 给 Seedance/resume 用）
+        if sensenova_image.get_image_provider() == "sensenova":
+            # U1.5 Lite：生成 → 下载落盘 → 重传 TOS 换永久 URL
+            # （U1.5 返回的 URL 仅 24h 有效，不能直接进 image_urls 给 Seedance/resume 用）
+            try:
                 size = sensenova_image.SIZE_MAP.get(image_size, "2720x1536")
                 url = sensenova_image.text_to_image(prompt, size=size, output_format="png")
                 dest = str(img_dir / filename)
@@ -194,29 +195,43 @@ def generate_images(image_prompts, img_dir, tts_thread, max_workers=4,
                 if not tos_url:
                     return filename, "", "tos_reupload_failed"
                 return filename, tos_url, None
-            result = call_tool("generate_image", {
-                "prompt": prompt,
-                "provider": "seedream",
-                "image_size": image_size,
-                "output_format": "png",
-            })
-            task_id = parse_task_id(result)
-            data = poll_task(task_id, interval=10, max_wait=600)
-            url = data.get("url", "")
-            if url:
-                dest = str(img_dir / filename)
-                download_file(url, dest)
-                print(f"    [Image] Downloaded: {dest}")
-                return filename, url, None
-            else:
-                print(f"    [Image] FATAL: No URL for {filename}")
-                return filename, "", "no_url"
-        except RuntimeError as e:
-            if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
-                return filename, "", "tokens_exhausted"
-            return filename, "", str(e)
-        except Exception as e:
-            return filename, "", str(e)
+            except RuntimeError as e:
+                if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
+                    return filename, "", "tokens_exhausted"
+                return filename, "", str(e)
+            except Exception as e:
+                return filename, "", str(e)
+        # MCP 路径：create+poll 包一层重试。token 轮换的瞬间旧会话可能失效、
+        # 旧 token 已创建的任务可能查不到（跨账号失联）——这些属瞬时错误，
+        # 与 clip_gen 的 retry_clip 对齐加每图重试，避免一张失败就 ABORTING。
+        last_err = ""
+        for attempt in range(1, 3):
+            try:
+                result = call_tool("generate_image", {
+                    "prompt": prompt,
+                    "provider": "seedream",
+                    "image_size": image_size,
+                    "output_format": "png",
+                })
+                task_id = parse_task_id(result)
+                data = poll_task(task_id, interval=10, max_wait=600)
+                url = data.get("url", "")
+                if url:
+                    dest = str(img_dir / filename)
+                    download_file(url, dest)
+                    print(f"    [Image] Downloaded: {dest}")
+                    return filename, url, None
+                print(f"    [Image] WARNING: No URL for {filename} (attempt {attempt}/2)")
+                last_err = "no_url"
+            except RuntimeError as e:
+                if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
+                    return filename, "", "tokens_exhausted"
+                last_err = str(e)
+            except Exception as e:
+                last_err = str(e)
+            if attempt < 2:
+                time.sleep(5)
+        return filename, "", last_err or "no_url"
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futs = {pool.submit(_gen_one, prompt, filename): filename

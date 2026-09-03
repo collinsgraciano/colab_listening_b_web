@@ -32,6 +32,12 @@ _token_idx = 0
 TOKEN = ""
 _session_id = None
 _msg_id = 0
+# 并发保护：_INIT_LOCK 只保护 ensure_initialized。轮换与会话切换必须走
+# _ROTATE_LOCK（RLock——轮换内部的 initialize 若再触发积分轮换需可重入），
+# 否则多线程同时收到"积分不足"会把 _token_idx 连加多次，越过可用 token
+# 误抛 ALL_MCP_TOKENS_EXHAUSTED（运行中断的主因）。
+_ROTATE_LOCK = threading.RLock()
+_MSG_ID_LOCK = threading.Lock()
 
 # Windows local: auto-detect token from ~/.codely-cli/mcp-oauth-tokens.json
 _TOKEN_FILE = os.path.join(os.environ.get("USERPROFILE", ""), ".codely-cli", "mcp-oauth-tokens.json")
@@ -47,8 +53,9 @@ except Exception:
 
 def _next_id():
     global _msg_id
-    _msg_id += 1
-    return _msg_id
+    with _MSG_ID_LOCK:
+        _msg_id += 1
+        return _msg_id
 
 
 def _is_credit_error(text: str) -> bool:
@@ -63,53 +70,90 @@ def _is_credit_error(text: str) -> bool:
     return (is_error and has_credit) or explicit
 
 
-def _rotate_token():
-    """Switch to the next available token. Raises if all tokens exhausted."""
+def _rotate_token(failed_token=None):
+    """Switch to the next available token. Raises if all tokens exhausted.
+
+    failed_token: the token that hit the error. Double-check under the lock —
+    if another thread already rotated past it, do nothing and let the caller
+    retry with the current token. Without this check, N concurrent credit
+    errors each bump _token_idx and falsely raise ALL_MCP_TOKENS_EXHAUSTED
+    while later tokens were never tried.
+    """
     global _token_idx, TOKEN, _session_id
-    _token_idx += 1
-    if _token_idx >= len(_TOKENS):
-        raise RuntimeError("ALL_MCP_TOKENS_EXHAUSTED: All tokens have insufficient credits.")
-    TOKEN = _TOKENS[_token_idx]
-    _session_id = None  # force re-initialize with new token
-    print(f"  [MCP] 积分不足, switching to token #{_token_idx+1}/{len(_TOKENS)}...")
-    # Re-initialize MCP session with new token
-    mcp_call("initialize", {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {"name": "codely-cli", "version": "1.0"},
-    })
-    mcp_notify("notifications/initialized")
+    with _ROTATE_LOCK:
+        if failed_token is not None and TOKEN != failed_token:
+            return  # someone else already rotated past the failed token
+        while True:
+            _token_idx += 1
+            if _token_idx >= len(_TOKENS):
+                raise RuntimeError("ALL_MCP_TOKENS_EXHAUSTED: All tokens have insufficient credits.")
+            TOKEN = _TOKENS[_token_idx]
+            _session_id = None  # force re-initialize with new token
+            print(f"  [MCP] 积分不足, switching to token #{_token_idx+1}/{len(_TOKENS)}...")
+            # Re-initialize MCP session with new token. If this token is itself
+            # unusable (expired/invalid → 401/403), skip to the next one
+            # instead of crashing the whole run.
+            try:
+                mcp_call("initialize", {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "codely-cli", "version": "1.0"},
+                })
+                mcp_notify("notifications/initialized")
+                return
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    print(f"  [MCP] token #{_token_idx+1} 无效 (HTTP {e.code}), trying next...")
+                    continue
+                raise
 
 
-def mcp_call(method, params=None):
-    """Call MCP method. Auto-rotates token on credit errors."""
+def _is_session_error(code: int, body: str) -> bool:
+    """Stale/unknown MCP session (e.g. a concurrent token rotation reset it)."""
+    if code not in (400, 404):
+        return False
+    return "session" in body.lower()
+
+
+def mcp_call(method, params=None, _allow_session_retry=True, _drop_session=False):
+    """Call MCP method. Auto-rotates token on credit errors.
+
+    TOKEN/_session_id are snapshotted per call: rotation may switch the
+    globals mid-flight from another thread, so each request must pin the
+    auth it was built with.
+    """
     global _session_id
+    used_token = TOKEN
+    sid = None if _drop_session else _session_id
     msg_id = _next_id()
     payload = {"jsonrpc": "2.0", "method": method, "id": msg_id}
     if params is not None:
         payload["params"] = params
     data = json.dumps(payload).encode("utf-8")
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {TOKEN}"}
-    if _session_id:
-        headers["Mcp-Session-Id"] = _session_id
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {used_token}"}
+    if sid:
+        headers["Mcp-Session-Id"] = sid
     req = urllib.request.Request(MCP_URL, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            sid = resp.headers.get("Mcp-Session-Id") or resp.headers.get("mcp-session-id")
-            if sid:
-                _session_id = sid
+            new_sid = resp.headers.get("Mcp-Session-Id") or resp.headers.get("mcp-session-id")
+            # Only adopt a returned session id while the token is unchanged —
+            # a session minted for the old token must not clobber the new one.
+            if new_sid and TOKEN == used_token:
+                _session_id = new_sid
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        sid = e.headers.get("Mcp-Session-Id") or e.headers.get("mcp-session-id")
-        if sid:
-            _session_id = sid
         body = e.read().decode("utf-8", errors="replace")
+        # Stale session: drop the session id and retry once with a fresh one.
+        if _allow_session_retry and _is_session_error(e.code, body):
+            print(f"  [MCP] HTTP {e.code} session invalid, retrying without session id...")
+            return mcp_call(method, params, _allow_session_retry=False, _drop_session=True)
         # Check for credit errors and rotate token
         # (_rotate_token raises ALL_MCP_TOKENS_EXHAUSTED when no tokens left —
         #  even for single-token setups, so credits errors never pass silently)
         if _is_credit_error(body):
             print(f"  [MCP] 积分不足! HTTP {e.code} 响应: {body[:500]}")
-            _rotate_token()
+            _rotate_token(used_token)
             return mcp_call(method, params)  # retry with new token
         print(f"HTTP {e.code}: {body[:500]}")
         raise
@@ -198,6 +242,7 @@ def ensure_initialized(tokens=None):
 
 def call_tool(name, arguments):
     """Call an MCP tool. Auto-rotates token on credit errors in response."""
+    used_token = TOKEN  # snapshot — mcp_call may rotate before returning
     result = mcp_call("tools/call", {"name": name, "arguments": arguments})
     # Check response content for credit errors
     if "result" in result:
@@ -207,7 +252,7 @@ def call_tool(name, arguments):
                 text = item.get("text", "")
                 if _is_credit_error(text):
                     print(f"  [MCP] 积分不足! 工具响应: {text[:500]}")
-                    _rotate_token()  # raises ALL_MCP_TOKENS_EXHAUSTED if no tokens left
+                    _rotate_token(used_token)  # raises ALL_MCP_TOKENS_EXHAUSTED if no tokens left
                     return call_tool(name, arguments)  # retry with new token
     return result
 
