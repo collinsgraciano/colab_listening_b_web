@@ -26,6 +26,9 @@ configs/moss_voices/
 configs/script_library/
 configs/style_previews/
 
+# Batch queue runtime state (console batch video generation)
+configs/batch_queue.json
+
 # Pipeline run outputs
 output/
 

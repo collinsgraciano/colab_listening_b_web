@@ -17,6 +17,7 @@ from .config_manager import load_all_mode_configs
 from .paths import STATIC_DIR, WEB_ROOT
 from .routers import (
     ai_test as ai_test_routes,
+    batch_queue as batch_queue_routes,
     characters as characters_routes,
     config as config_routes,
     health as health_routes,
@@ -54,6 +55,8 @@ app.mount("/static", _NoCacheStaticFiles(directory=str(STATIC_DIR)), name="stati
 app.include_router(pages_routes.router)
 app.include_router(config_routes.router)
 app.include_router(run_routes.router)
+# 批量队列紧跟 run 路由注册（领域分组；批量队列与主 pipeline 互斥，见 run.py 保护）
+app.include_router(batch_queue_routes.router)
 app.include_router(mode_test_routes.router)
 app.include_router(topics_routes.router)
 app.include_router(styles_routes.router)

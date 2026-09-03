@@ -3,8 +3,9 @@ import asyncio
 import json
 
 from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
+from ..batch_queue_service import get_batch_queue
 from ..config_manager import load_config
 from ..pipeline_service import get_service
 
@@ -13,6 +14,12 @@ router = APIRouter()
 
 @router.post("/api/run/start")
 async def api_run_start(request: Request):
+    # 批量队列运行中拒绝手动单次启动：队列 worker 在任务间隙会短暂释放互斥锁，
+    # 放行手动启动会与队列下一个任务争抢 run_mutex（与批量队列的约定互斥）
+    if get_batch_queue().is_blocking_manual_start():
+        return JSONResponse(
+            {"ok": False, "error": "批量队列运行中，请先暂停队列或等待完成后再手动启动"},
+            status_code=409)
     service = get_service()
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     config = data.get("config") or load_config()

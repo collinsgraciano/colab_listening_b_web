@@ -285,6 +285,106 @@
         </div>
     </div>
 
+    <!-- Batch queue (批量生成队列) -->
+    <div class="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="text-lg font-semibold text-white">📦 批量生成队列</h3>
+            <div class="flex items-center gap-2">
+                <span id="bq-summary" class="text-xs text-slate-500"></span>
+                <span id="bq-state-badge" class="px-3 py-1 rounded-lg text-xs font-medium bg-slate-700 text-slate-300">空闲</span>
+            </div>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">串行自动生成：一次跑一个视频（可混合脚本库脚本与主题、跨模式），完成后自动开始下一个；失败自动跳过继续。队列在服务端运行，关闭页面不中断。</p>
+
+        <!-- Add sources -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">主题任务 <span class="text-slate-600">（每行一个；跟随当前模式的 CEFR 与配置）</span></label>
+                <textarea id="bq-topics-input" rows="2"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                    placeholder="At the Pharmacy&#10;Ordering Coffee"></textarea>
+                <div class="flex gap-2 mt-2 items-center">
+                    <button type="button" onclick="bqAddTopicsFromInput()"
+                        class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs font-medium">＋ 添加主题</button>
+                    <input type="number" id="bq-random-count" value="5" min="1" max="30"
+                        class="w-16 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white text-center" title="随机抽取数量">
+                    <button type="button" onclick="bqAddRandomTopics()"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs">🎲 随机抽取加入</button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">脚本任务 <span class="text-slate-600">（脚本库未用脚本，模式随脚本自身结构）</span></label>
+                <button type="button" onclick="openBqScriptModal()"
+                    class="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 text-left">📋 从脚本库选择加入队列…</button>
+                <p class="text-xs text-slate-600 mt-2">队列项固定内容（主题/脚本），开始时读取该模式最新配置（TTS/角色绑定等在配置页调整）。</p>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-wrap gap-2 mb-3">
+            <button id="bq-btn-start" onclick="bqAction('start')" style="display:none"
+                class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-xs font-medium">▶ 启动队列</button>
+            <button id="bq-btn-pause" onclick="bqAction('pause')" style="display:none"
+                class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-white text-xs font-medium">⏸ 暂停（当前完成后生效）</button>
+            <button id="bq-btn-resume" onclick="bqAction('resume')" style="display:none"
+                class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-xs font-medium">⏵ 恢复队列</button>
+            <button id="bq-btn-stop" onclick="bqStopCurrent()" style="display:none"
+                class="px-4 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-white text-xs font-medium">⏹ 停止当前</button>
+            <button id="bq-btn-clear-finished" onclick="bqClear('finished')" style="display:none"
+                class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs">🧹 清理已完成</button>
+            <button id="bq-btn-clear-all" onclick="bqClear('all')"
+                class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs">🗑 清空队列</button>
+        </div>
+
+        <!-- Queue table -->
+        <div class="border border-slate-700 rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-900/60 text-xs text-slate-400">
+                    <tr>
+                        <th class="px-3 py-2 text-left w-12">#</th>
+                        <th class="px-3 py-2 text-left w-20">状态</th>
+                        <th class="px-3 py-2 text-left w-20">类型</th>
+                        <th class="px-3 py-2 text-left">内容</th>
+                        <th class="px-3 py-2 text-left w-28">模式</th>
+                        <th class="px-3 py-2 text-left w-24">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="bq-tbody" class="divide-y divide-slate-700/60">
+                    <tr><td colspan="6" class="px-3 py-4 text-xs text-slate-500 text-center">队列为空 — 从上方添加主题或脚本任务</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Queue-level log -->
+        <div id="bq-log" class="mt-3 font-mono text-[11px] text-slate-500 bg-slate-950 rounded-lg p-2 h-24 overflow-y-auto whitespace-pre-wrap" style="display:none"></div>
+    </div>
+
+    <!-- Batch script picker modal -->
+    <div id="bq-script-modal" class="hidden fixed inset-0 z-50 bg-black/70 items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                <h4 class="text-sm font-semibold text-white">选择脚本加入批量队列
+                    <span class="text-xs text-slate-400 font-normal">（<span id="bq-modal-mode"></span>）</span></h4>
+                <button onclick="closeBqScriptModal()" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <div class="px-4 py-2 border-b border-slate-700 flex gap-3 items-center">
+                <input type="text" id="bq-script-search" oninput="renderBqScriptList()"
+                    class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white" placeholder="搜索主题 / 标题 / 首行...">
+                <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                    <input type="checkbox" id="bq-script-checkall" onchange="bqToggleCheckAll(this.checked)" class="accent-indigo-500"> 全选
+                </label>
+            </div>
+            <div id="bq-script-list" class="overflow-y-auto p-2 space-y-1 flex-1"></div>
+            <div class="px-4 py-3 border-t border-slate-700 flex items-center justify-between">
+                <span id="bq-script-count" class="text-xs text-slate-400">已选 0 个脚本</span>
+                <div class="flex gap-2">
+                    <button onclick="closeBqScriptModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs">取消</button>
+                    <button onclick="bqAddCheckedScripts()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs font-medium">加入队列</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Progress bar -->
     <div id="progress-section" class="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700" style="display:none">
         <div class="flex items-center justify-between mb-3">
@@ -1532,6 +1632,9 @@ window.addEventListener('load', function() {
     loadLibrary();
     loadCharSets();
     loadScriptLibrary();
+    // 批量队列：立即拉取一次并常驻轮询（队列运行中自动接上日志流）
+    bqFetchStatus();
+    setInterval(bqFetchStatus, 2000);
     // ?script_id= 预选（脚本页「到控制台」带入）：自动切模式并选中该脚本
     const preselectId = new URLSearchParams(location.search).get('script_id');
     if (preselectId) {
@@ -1703,26 +1806,33 @@ function connectSSE() {
                 document.getElementById('btn-stop').style.display = 'none';
                 document.getElementById('btn-continue').style.display = 'none';
                 if (data.status === 'done') {
-                    let msg = '✅ 视频生成完成!';
-                    if (data.final_path) msg += '\n视频: ' + data.final_path;
-                    if (data.work_dir) msg += '\n\n查看图片画廊和脚本?';
-                    setTimeout(() => {
-                        if (confirm(msg)) {
-                            // work_dir 形如 output/{mode}/{run_name}/（旧布局无 mode 段）
-                            const parts = data.work_dir ? data.work_dir.split(/[\\/]/).filter(Boolean) : [];
-                            const runName = parts[parts.length - 1] || '';
-                            const parentSeg = parts.length >= 2 ? parts[parts.length - 2] : '';
-                            const isMode = ['original', 'original_static', 'original_cutout', 'quest'].includes(parentSeg);
-                            const modeQ = isMode ? `?mode=${parentSeg}` : '';
-                            if (runName) location.href = `/runs/${runName}/gallery${modeQ}`;
-                            else location.href = '/runs';
-                        }
-                    }, 500);
+                    // 批量队列驱动时由队列面板统一汇报，不逐条弹确认窗
+                    if (!bqIsActive()) {
+                        let msg = '✅ 视频生成完成!';
+                        if (data.final_path) msg += '\n视频: ' + data.final_path;
+                        if (data.work_dir) msg += '\n\n查看图片画廊和脚本?';
+                        setTimeout(() => {
+                            if (confirm(msg)) {
+                                // work_dir 形如 output/{mode}/{run_name}/（旧布局无 mode 段）
+                                const parts = data.work_dir ? data.work_dir.split(/[\\/]/).filter(Boolean) : [];
+                                const runName = parts[parts.length - 1] || '';
+                                const parentSeg = parts.length >= 2 ? parts[parts.length - 2] : '';
+                                const isMode = ['original', 'original_static', 'original_cutout', 'quest'].includes(parentSeg);
+                                const modeQ = isMode ? `?mode=${parentSeg}` : '';
+                                if (runName) location.href = `/runs/${runName}/gallery${modeQ}`;
+                                else location.href = '/runs';
+                            }
+                        }, 500);
+                    }
                 }
-                if (data.status === 'error' && data.error) {
+                if (data.status === 'error' && data.error && !bqIsActive()) {
                     alert('❌ 错误: ' + data.error);
                 }
-                if (data.type === 'done') evtSource.close();
+                if (data.type === 'done') {
+                    evtSource.close();
+                    evtSource = null;
+                    // 批量队列运行中：队列轮询会在下一个任务启动后自动重连日志流
+                }
             }
             // Handle paused state (step mode)
             if (data.status === 'paused') {
@@ -1735,6 +1845,7 @@ function connectSSE() {
 
     evtSource.onerror = function() {
         evtSource.close();
+        evtSource = null;
     };
 }
 
@@ -2190,5 +2301,294 @@ function loadVideoPreview(runName) {
         });
 }
 
+// =========================================================================
+// 批量生成队列（串行自动生成；服务端驻留，关页面不中断）
+// =========================================================================
+let _bqData = null;
+let _bqScriptCandidates = [];
+let _bqBlockedManual = false;  // 队列运行中由本模块禁用的手动启动按钮标记
+
+const BQ_STATUS_BADGE = {
+    pending:     ['bg-slate-700 text-slate-300', '待处理'],
+    running:     ['bg-green-600 text-white', '生成中'],
+    done:        ['bg-blue-600 text-white', '已完成'],
+    error:       ['bg-red-600 text-white', '失败'],
+    stopped:     ['bg-amber-600 text-white', '已停止'],
+    interrupted: ['bg-amber-600 text-white', '已中断'],
+};
+const BQ_FINISHED = ['done', 'error', 'stopped', 'interrupted'];
+
+function bqIsActive() {
+    return !!(_bqData && _bqData.state === 'running');
+}
+
+function bqPost(path, body) {
+    return fetch('/api/batch_queue/' + path, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body || {}),
+    })
+    .then(r => r.json().then(d => ({ok: r.ok, data: d})))
+    .catch(() => ({ok: false, data: {error: '请求失败'}}));
+}
+
+function bqFetchStatus() {
+    return fetch('/api/batch_queue/status', {cache: 'no-store'})
+        .then(r => r.json())
+        .then(data => { _bqData = data; renderBqQueue(); })
+        .catch(() => {});
+}
+
+function renderBqQueue() {
+    if (!_bqData) return;
+    const state = _bqData.state || 'idle';
+    const items = _bqData.items || [];
+    const counts = _bqData.counts || {};
+    const pendingN = counts.pending || 0;
+    const finishedN = BQ_FINISHED.reduce((n, s) => n + (counts[s] || 0), 0);
+
+    const badge = document.getElementById('bq-state-badge');
+    const stateMap = {
+        idle:    ['bg-slate-700 text-slate-300', '空闲'],
+        running: ['bg-green-600 text-white', '运行中'],
+        paused:  ['bg-amber-600 text-white', '已暂停'],
+    };
+    const [sCls, sTxt] = stateMap[state] || stateMap.idle;
+    badge.className = `px-3 py-1 rounded-lg text-xs font-medium ${sCls}`;
+    badge.textContent = sTxt;
+
+    document.getElementById('bq-summary').textContent = items.length
+        ? `共 ${items.length} 项 · 待处理 ${pendingN} · 已完成 ${finishedN}` : '';
+
+    const show = (id, visible) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = visible ? '' : 'none';
+    };
+    show('bq-btn-start', state === 'idle' && pendingN > 0);
+    show('bq-btn-pause', state === 'running');
+    show('bq-btn-resume', state === 'paused' && pendingN > 0);
+    show('bq-btn-stop', state === 'running');
+    show('bq-btn-clear-finished', finishedN > 0);
+    show('bq-btn-clear-all', items.length > 0 && state !== 'running');
+
+    // 队列运行中禁用手动单次启动（服务端同样拒绝）；只负责自己禁用的恢复
+    if (state === 'running') {
+        document.getElementById('btn-start').disabled = true;
+        document.getElementById('btn-resume').disabled = true;
+        _bqBlockedManual = true;
+    } else if (_bqBlockedManual) {
+        document.getElementById('btn-start').disabled = false;
+        document.getElementById('btn-resume').disabled = false;
+        _bqBlockedManual = false;
+    }
+
+    // 队列运行且 pipeline 在跑但日志流未连接 → 自动接上（页面加载时队列已在跑）
+    if (state === 'running' && !evtSource) {
+        fetch('/api/run/status')
+            .then(r => r.json())
+            .then(st => { if (st.is_running && !evtSource) connectSSE(); })
+            .catch(() => {});
+    }
+
+    const tbody = document.getElementById('bq-tbody');
+    if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-xs text-slate-500 text-center">队列为空 — 从上方添加主题或脚本任务</td></tr>';
+    } else {
+        tbody.innerHTML = items.map((it, i) => {
+            const [bCls, bTxt] = BQ_STATUS_BADGE[it.status] || BQ_STATUS_BADGE.pending;
+            const typeTxt = it.type === 'script' ? '📝 脚本' : '💬 主题';
+            const modeLabel = MODE_LABELS[it.mode] || it.mode || '?';
+            let extra = '';
+            if (it.status === 'done' && it.run_name) {
+                extra = `<div class="text-[11px] text-slate-500 truncate max-w-[420px]">→ ${escapeHtml(it.run_name)}</div>`;
+            } else if ((it.status === 'error' || it.status === 'interrupted') && it.error) {
+                extra = `<div class="text-[11px] text-red-400/80 truncate max-w-[420px]" title="${escapeHtml(it.error)}">${escapeHtml(it.error)}</div>`;
+            }
+            const removeBtn = it.status === 'pending'
+                ? `<button onclick="bqRemove('${escapeHtml(it.id)}')" class="text-red-400 hover:text-red-300 text-xs" title="移除该任务">✕ 移除</button>`
+                : '';
+            return `<tr class="${it.status === 'running' ? 'bg-emerald-900/20' : ''}">
+                <td class="px-3 py-2 text-xs text-slate-500">${i + 1}</td>
+                <td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-[11px] font-medium ${bCls}">${bTxt}</span></td>
+                <td class="px-3 py-2 text-xs text-slate-400">${typeTxt}</td>
+                <td class="px-3 py-2 text-xs text-slate-200">${escapeHtml(it.label || '')}${extra}</td>
+                <td class="px-3 py-2 text-xs text-slate-400">${escapeHtml(modeLabel)}</td>
+                <td class="px-3 py-2">${removeBtn}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    const logs = _bqData.logs || [];
+    const logEl = document.getElementById('bq-log');
+    if (logs.length) {
+        logEl.style.display = '';
+        logEl.textContent = logs.join('\n');
+        logEl.scrollTop = logEl.scrollHeight;
+    } else {
+        logEl.style.display = 'none';
+    }
+}
+
+function bqAction(action) {
+    bqPost(action).then(({ok, data}) => {
+        if (!ok) alert(data.error || '操作失败');
+        bqFetchStatus();
+    });
+}
+
+function bqStopCurrent() {
+    bqPost('stop_current').then(({ok, data}) => {
+        if (!ok) alert(data.error || '停止失败');
+        bqFetchStatus();
+    });
+}
+
+function bqClear(scope) {
+    if (scope === 'all' && !confirm('清空整个批量队列？（待处理任务与已完成记录全部移除）')) return;
+    bqPost('clear', {scope}).then(({ok, data}) => {
+        if (!ok) alert(data.error || '清理失败');
+        bqFetchStatus();
+    });
+}
+
+function bqRemove(itemId) {
+    bqPost('remove', {item_id: itemId}).then(({ok, data}) => {
+        if (!ok) alert(data.error || '移除失败');
+        bqFetchStatus();
+    });
+}
+
+// --- 主题任务：多行输入 + 随机抽取 ---
+function bqAddTopicsFromInput() {
+    const ta = document.getElementById('bq-topics-input');
+    const topics = [...new Set(ta.value.split('\n').map(s => s.trim()).filter(Boolean))];
+    if (!topics.length) { alert('请先输入主题（每行一个）'); return; }
+    bqPost('add', {items: topics.map(t => ({type: 'topic', mode: ACTIVE_MODE, topic: t}))})
+        .then(({data}) => {
+            const added = (data.added || []).length;
+            const rej = data.rejected || [];
+            let msg = `已加入 ${added} 个主题`;
+            if (rej.length) msg += `\n拒绝 ${rej.length} 个：\n` + rej.map(x => `· ${x.reason}`).join('\n');
+            alert(msg);
+            if (added) ta.value = '';
+            bqFetchStatus();
+        });
+}
+
+function bqAddRandomTopics() {
+    const n = Math.max(1, Math.min(30, parseInt(document.getElementById('bq-random-count').value || '5', 10) || 5));
+    const queueTopics = new Set(((_bqData && _bqData.items) || [])
+        .filter(it => it.type === 'topic' && !BQ_FINISHED.includes(it.status))
+        .map(it => it.topic));
+    const picked = [];
+    let exhausted = false;
+    let chain = Promise.resolve();
+    for (let i = 0; i < n; i++) {
+        chain = chain.then(() => fetch('/api/topics/random')
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok) { exhausted = true; return; }  // 主题库已无可用主题
+                if (!queueTopics.has(d.topic) && !picked.includes(d.topic)) picked.push(d.topic);
+            })
+            .catch(() => {}));
+    }
+    chain.then(() => {
+        if (!picked.length) {
+            alert(exhausted ? '没有抽到新主题（主题库可用主题已用完或都已在队列中）' : '没有抽到新主题（可用主题不足）');
+            return;
+        }
+        return bqPost('add', {items: picked.map(t => ({type: 'topic', mode: ACTIVE_MODE, topic: t}))})
+            .then(({data}) => {
+                const added = (data.added || []).length;
+                const rej = (data.rejected || []).length;
+                alert(`已随机加入 ${added} 个主题` + (rej ? `，拒绝 ${rej} 个（重复）` : ''));
+                bqFetchStatus();
+            });
+    });
+}
+
+// --- 脚本任务：多选弹窗 ---
+function openBqScriptModal() {
+    fetch('/api/scripts?status=unused&structure=' + ACTIVE_MODE)
+        .then(r => r.json())
+        .then(data => {
+            _bqScriptCandidates = data.scripts || [];
+            if (!_bqScriptCandidates.length) {
+                alert(`当前模式（${MODE_LABELS[ACTIVE_MODE] || ACTIVE_MODE}）脚本库没有未使用的脚本 — 可先到「批量脚本」页生成`);
+                return;
+            }
+            document.getElementById('bq-modal-mode').textContent = MODE_LABELS[ACTIVE_MODE] || ACTIVE_MODE;
+            document.getElementById('bq-script-search').value = '';
+            document.getElementById('bq-script-checkall').checked = false;
+            renderBqScriptList();
+            const modal = document.getElementById('bq-script-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        });
+}
+
+function closeBqScriptModal() {
+    const modal = document.getElementById('bq-script-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function renderBqScriptList() {
+    const q = (document.getElementById('bq-script-search').value || '').toLowerCase();
+    const rows = _bqScriptCandidates.filter(s =>
+        !q || `${s.topic} ${s.title} ${s.preview}`.toLowerCase().includes(q));
+    const list = document.getElementById('bq-script-list');
+    if (!rows.length) {
+        list.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">无匹配脚本</p>';
+    } else {
+        list.innerHTML = rows.map(s => {
+            const score = (s.score !== null && s.score !== undefined) ? ` · ★${s.score}` : '';
+            const g = s.genders || {};
+            const gA = genderSymbol(g.char_a), gB = genderSymbol(g.char_b);
+            const gTxt = (gA || gB) ? ` · ${gA || '?'}${gB || '?'}` : '';
+            return `<label class="flex items-center gap-3 bg-slate-900/50 hover:bg-slate-900 rounded-lg px-3 py-2 cursor-pointer">
+                <input type="checkbox" class="bq-script-check accent-indigo-500 w-4 h-4" value="${escapeHtml(s.id)}">
+                <div class="min-w-0">
+                    <div class="text-xs text-slate-200 truncate">${escapeHtml(s.topic)}${score} · ${s.lines}行 · ${escapeHtml(s.cefr || '')}${gTxt}</div>
+                    <div class="text-[11px] text-slate-500 truncate">${escapeHtml(s.title || '')}</div>
+                </div>
+            </label>`;
+        }).join('');
+    }
+    list.querySelectorAll('.bq-script-check').forEach(cb => cb.addEventListener('change', bqSyncCount));
+    bqSyncCount();
+}
+
+function bqCheckedScripts() {
+    return [...document.querySelectorAll('.bq-script-check:checked')].map(cb => cb.value);
+}
+
+function bqSyncCount() {
+    document.getElementById('bq-script-count').textContent = `已选 ${bqCheckedScripts().length} 个脚本`;
+}
+
+function bqToggleCheckAll(checked) {
+    document.querySelectorAll('#bq-script-list .bq-script-check').forEach(cb => { cb.checked = checked; });
+    bqSyncCount();
+}
+
+function bqAddCheckedScripts() {
+    const ids = bqCheckedScripts();
+    if (!ids.length) { alert('请先勾选脚本'); return; }
+    bqPost('add', {items: ids.map(id => ({type: 'script', script_id: id}))})
+        .then(({data}) => {
+            const added = (data.added || []).length;
+            const rej = data.rejected || [];
+            let msg = `已加入 ${added} 个脚本`;
+            if (rej.length) msg += `\n拒绝 ${rej.length} 个：\n` + rej.map(x => `· ${x.reason}`).join('\n');
+            alert(msg);
+            closeBqScriptModal();
+            bqFetchStatus();
+        });
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeBqScriptModal();
+});
 </script>
 {% endblock %}
