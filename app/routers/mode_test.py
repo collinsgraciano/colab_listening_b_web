@@ -83,7 +83,8 @@ async def api_mode_test_logs():
 async def api_mode_test_video(mode: str, video_name: str):
     """播放测试视频（仅限 active 素材集目录内，防路径穿越）。"""
     service = get_mode_test_service()
-    if mode not in ("original", "original_static", "original_cutout", "quest"):
+    if mode not in ("original", "original_static", "original_cutout", "quest",
+                    "original_cutout_sprite", "quest_sprite"):
         return JSONResponse({"error": "未知模式"}, status_code=400)
     # 路径穿越防护：只允许纯文件名
     if "/" in video_name or "\\" in video_name or ".." in video_name:

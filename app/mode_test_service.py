@@ -37,7 +37,8 @@ from .pipeline_service import PipelineService, STEP_PATTERNS, _LineBuffer
 from . import run_mutex
 
 TEST_DIRNAME = ".mode_test"
-MINI_LINES = {"original": 4, "original_static": 4, "original_cutout": 4, "quest": 8}
+MINI_LINES = {"original": 4, "original_static": 4, "original_cutout": 4, "quest": 8,
+              "original_cutout_sprite": 4, "quest_sprite": 8}
 MODES = list(MINI_LINES)
 
 
@@ -274,7 +275,9 @@ class ModeTestService:
                 os.environ.pop("CHARACTER_OVERRIDES", None)
 
             args = self._svc._build_args(config)
-            args.structure = mode
+            # 保留 _build_args 的族归一（args.structure=族名）；身份存 mode_name
+            # （旧写法 args.structure = mode 会破坏序列帧新模式的族分支命中）
+            args.mode_name = mode
             args.num_lines = MINI_LINES[mode]
             t_root = test_root()
             used_topics_file = t_root / "used_topics.json"
