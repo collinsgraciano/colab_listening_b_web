@@ -87,15 +87,24 @@ def _resolve_seg_audio(seg_type: str, audio_idx: int, narration: dict,
 def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | None,
                          host_bg: str, audio_file: str | None, out_path: str,
                          duration: float, sm_root: Path, render_fps: int,
-                         fade_af: str, stop_check=None) -> bool:
+                         fade_af: str, host_clips: dict | None = None,
+                         clip_fps: int = 12, stop_check=None) -> bool:
     """Quest 式主持人段：姿势图集抠像定格动画（welcome/hook_intro/outro 出镜）。
+
+    host_clips：主持人动作序列帧 {action: [帧路径]}（sprite_sequence 模式），
+    存在时优先序列帧播放，缺图集时也可仅凭 clips 渲染。
 
     Returns True if rendered successfully.
     """
     h_poses = host_poses or []
-    if not h_poses:
+    host_clip_map = host_clips or {}
+    if not h_poses and not host_clip_map:
         return False
-    char_layers = [{"poses": h_poses, "is_speaker": True}]
+    layer: dict = {"poses": h_poses, "is_speaker": True}
+    if host_clip_map:
+        layer["clips"] = host_clip_map
+        layer["clip_fps"] = clip_fps
+    char_layers = [layer]
     frames_dir = sm_root / f"{seg_type}_{seg_idx}"
     direction = 1 if seg_idx % 2 == 0 else -1
 
@@ -140,6 +149,8 @@ def _prepare_segment(
     static_dir: Path,
     host_poses: list[str] | None = None,
     host_bg: str = "",
+    char_clip_map: dict | None = None,
+    sprite_clip_fps: int = 12,
     stop_check=None,
 ) -> tuple[str | None, str]:
     """Prepare params and render a single segment.
@@ -165,9 +176,13 @@ def _prepare_segment(
     # --- Quest-style host segments (Ch1 welcome / Ch2 hook) ---
     if seg_type in ("welcome", "hook_intro"):
         bg_for_host = host_bg or scene_img
+        host_clips = (char_clip_map or {}).get("host")
         if not _render_host_segment(seg_type, seg_idx, host_poses, bg_for_host,
                                     audio_file, out_path, duration, sm_root,
-                                    render_fps, fade_af, stop_check=stop_check):
+                                    render_fps, fade_af,
+                                    host_clips=host_clips,
+                                    clip_fps=sprite_clip_fps,
+                                    stop_check=stop_check):
             # 无图集或渲染失败 → 静态演播室底图回退
             if audio_file and os.path.exists(audio_file):
                 cmd = ["ffmpeg", "-y", "-loop", "1", "-i", bg_for_host,
@@ -195,11 +210,27 @@ def _prepare_segment(
 
         other = "char_b" if speaker == "char_a" else "char_a"
 
+        # sprite_sequence 模式：角色动作序列帧（缺 clips 的角色自动回退姿势图集）
+        clip_map = char_clip_map or {}
+
+        def _sm_layer(char_key: str, is_speaker: bool) -> dict | None:
+            poses = char_pose_map.get(char_key) or []
+            clips = clip_map.get(char_key) or {}
+            if not poses and not clips:
+                return None
+            layer: dict = {"poses": poses, "is_speaker": is_speaker}
+            if clips:
+                layer["clips"] = clips
+                layer["clip_fps"] = sprite_clip_fps
+            return layer
+
         char_layers = []
-        if speaker in char_pose_map and char_pose_map[speaker]:
-            char_layers.append({"poses": char_pose_map[speaker], "is_speaker": True})
-        if other in char_pose_map and char_pose_map[other]:
-            char_layers.append({"poses": char_pose_map[other], "is_speaker": False})
+        layer_speaker = _sm_layer(speaker, True)
+        if layer_speaker:
+            char_layers.append(layer_speaker)
+        layer_other = _sm_layer(other, False)
+        if layer_other:
+            char_layers.append(layer_other)
 
         if not char_layers:
             # 无姿势图 — 回退静态场景（保留有效音频）
@@ -374,9 +405,13 @@ def _prepare_segment(
     # --- Outro ---
     elif seg_type == "outro":
         bg_for_host = host_bg or scene_img
+        host_clips = (char_clip_map or {}).get("host")
         if not _render_host_segment("outro", seg_idx, host_poses, bg_for_host,
                                     audio_file, out_path, duration, sm_root,
-                                    render_fps, fade_af, stop_check=stop_check):
+                                    render_fps, fade_af,
+                                    host_clips=host_clips,
+                                    clip_fps=sprite_clip_fps,
+                                    stop_check=stop_check):
             # 回退：静态场景图 + 文字叠加
             outro_en = seg.get("subtitle_en", "")
             outro_zh = seg.get("subtitle_zh", "")
@@ -436,6 +471,8 @@ def compose_original_cutout(
     scene_bg_list: list[str] | None = None,
     host_poses: list[str] | None = None,
     host_bg: str = "",
+    char_clip_map: dict | None = None,
+    sprite_clip_fps: int = 12,
     timeline: list[dict] = None,
     script: dict = None,
     narration: dict = None,
@@ -462,6 +499,9 @@ def compose_original_cutout(
         host_poses: Host pose atlas for welcome/hook_intro/outro segments
                     (quest-style). Bound character poses or separate host atlas.
         host_bg: TV-studio background for host segments. Falls back to scene_img.
+        char_clip_map: 序列帧动作素材 {char: {action: [帧路径]}}（sprite_sequence
+                    模式）；缺 clips 的角色自动回退姿势图集，None=完全旧行为。
+        sprite_clip_fps: 序列帧播放帧率（manifest fps，默认 12）。
         timeline: Timeline segments from build_listening_timeline.
         script: Lesson script dict.
         narration: {"welcome"/"hook"/"outro"/"practice_intro" paths} (host form)
@@ -545,6 +585,7 @@ def compose_original_cutout(
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses=host_poses, host_bg=host_bg or scene_img,
+                char_clip_map=char_clip_map, sprite_clip_fps=sprite_clip_fps,
                 stop_check=stop_check,
             )
             if out_path:
@@ -565,6 +606,7 @@ def compose_original_cutout(
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses, host_bg or scene_img,
+                char_clip_map, sprite_clip_fps,
                 stop_check,
             ): seg_idx
             for seg_idx, seg in enumerate(timeline)

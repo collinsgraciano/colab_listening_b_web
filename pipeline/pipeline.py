@@ -219,8 +219,11 @@ def _parse_args() -> argparse.Namespace:
                         help="Quest/Cutout: fixed TV-studio background prompt for host segments. Empty = per-topic LLM-generated (script.host_bg_prompt)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
-    parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion"],
-                        help="Dialogue animation: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow). Default: landing")
+    parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion", "sprite_sequence"],
+                        help="Dialogue animation: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow), 'sprite_sequence' (game-style action clips). Default: landing")
+    parser.add_argument("--sprite-seq-source", default="atlas_grid",
+                        choices=["atlas_grid", "video_frames", "sprite_sheet"],
+                        help="sprite_sequence 素材路线: atlas_grid (4x4 动作图集, 成本最低), video_frames (AI 视频抽帧, 一致性最好), sprite_sheet (MCP sprite 工具). Default: atlas_grid")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint in output dir")
     parser.add_argument("--no-4k", dest="no_4k", action="store_true", help="Skip the final 4K upscaling step")
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
@@ -436,6 +439,22 @@ def _step1_mcp(args):
     print("  MCP connected.")
 
 
+def _generate_sprite_clips_for(args, script, img_dir, tts_thread, style_prompt,
+                               char_keys, stop_check=None) -> None:
+    """sprite_sequence 模式：生成 4 动作序列帧素材（三路线可选，见 sprite_seq）。"""
+    from sprite_seq import generate_sprite_clips
+    source = getattr(args, "sprite_seq_source", "") or "atlas_grid"
+    try:
+        generate_sprite_clips(script, img_dir, source=source,
+                              tts_thread=tts_thread, max_workers=2,
+                              style_prompt=style_prompt,
+                              char_keys=char_keys, stop_check=stop_check)
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"  [SpriteSeq] 生成失败（{e}），本 run 回退姿势图集动画")
+
+
 def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs: dict,
                       stop_check=None) -> dict:
     """Step 2: concurrent image generation + TTS audio, then launch clip_0."""
@@ -536,6 +555,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             _generate_quest_atlases(script, img_dir, tts_thread,
                                     max_workers=args.image_concurrency,
                                     style_prompt=style_prompt)
+            if getattr(args, "animation", "") == "sprite_sequence":
+                _generate_sprite_clips_for(args, script, img_dir, tts_thread,
+                                           style_prompt, char_keys=None,
+                                           stop_check=stop_check)
             _scene_images = script.get("scene_images", [])
             _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
                                    style_prompt=style_prompt)
@@ -549,6 +572,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                                     max_workers=args.image_concurrency,
                                     style_prompt=style_prompt,
                                     char_keys=_cutout_keys)
+            if getattr(args, "animation", "") == "sprite_sequence":
+                _generate_sprite_clips_for(args, script, img_dir, tts_thread,
+                                           style_prompt, char_keys=_cutout_keys,
+                                           stop_check=stop_check)
             # Ch2 对话多场景背景（quest 同款 2×2 atlas）；scene.png 主背景照旧生成
             _scene_images = script.get("scene_images", [])
             _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
@@ -889,6 +916,14 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             else:
                 scene_bg_list.append(scene_img)
 
+        # sprite_sequence：读取序列帧 manifest（缺失/不完整角色自动回退姿势图集）
+        char_clip_map, sprite_clip_fps = {}, 12
+        if getattr(args, "animation", "") == "sprite_sequence":
+            from sprite_seq import load_clip_map
+            char_clip_map, sprite_clip_fps = load_clip_map(dirs["images"])
+            if char_clip_map:
+                print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
+
         final_path = compose_quest(
             work_dir=str(work_dir),
             pose_images=pose_images,
@@ -896,6 +931,8 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             host_poses=host_poses,
             host_bg=host_bg,
             scene_bg_list=scene_bg_list,
+            char_clip_map=char_clip_map or None,
+            sprite_clip_fps=sprite_clip_fps,
             render_fps=getattr(args, "render_fps", 12),
             workers=getattr(args, "workers", 1),
             timeline=timeline,
@@ -967,12 +1004,23 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
                 scene_bg_list.append(p)
             else:
                 scene_bg_list.append(scene_img)
+        # sprite_sequence：读取序列帧 manifest；绑定主持人时复用其角色的 clips
+        char_clip_map, sprite_clip_fps = {}, 12
+        if getattr(args, "animation", "") == "sprite_sequence":
+            from sprite_seq import load_clip_map
+            char_clip_map, sprite_clip_fps = load_clip_map(dirs["images"])
+            if _host_bound and _host_bound in char_clip_map:
+                char_clip_map["host"] = char_clip_map[_host_bound]
+            if char_clip_map:
+                print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
         final_path = compose_original_cutout(
             work_dir=str(work_dir),
             char_pose_map=char_pose_map,
             scene_bg_list=scene_bg_list,
             host_poses=host_poses,
             host_bg=host_bg,
+            char_clip_map=char_clip_map or None,
+            sprite_clip_fps=sprite_clip_fps,
             timeline=timeline,
             script=script,
             narration=narration,

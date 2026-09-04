@@ -267,6 +267,72 @@ def _build_pose_schedule(n_poses: int, total_frames: int, fps: float,
     return schedule
 
 
+_CLIP_BASE = "talking"
+_CLIP_IDLE = "idle"
+_CLIP_INSERTS = ("gesture", "wave")
+
+
+def _build_clip_schedule(clips: dict, total_frames: int, fps: float,
+                         audio_file: str | None, seed: int,
+                         is_speaker: bool = True) -> list:
+    """构建序列帧动作调度：[(action, start_frame)]。
+
+    说话者：talking 基础循环贯穿全段，在音频低能量停顿点（与 _build_pose_schedule
+    同源检测）轮转插入 gesture/wave 各一个循环后回到 talking；无音频时按 3-5s
+    随机间隔轮转。倾听者：整段 idle 循环（clip 自带微动作，替代呼吸正弦）。
+    """
+    if not clips:
+        return []
+    available = [a for a in (_CLIP_BASE, *_CLIP_INSERTS, _CLIP_IDLE) if a in clips]
+    if not available:
+        # 未知名动作键：按字典序取第一个当基础循环
+        return [(sorted(clips)[0], 0)]
+    base = _CLIP_BASE if _CLIP_BASE in clips else available[0]
+    if not is_speaker:
+        idle = _CLIP_IDLE if _CLIP_IDLE in clips else base
+        return [(idle, 0)]
+
+    inserts = [a for a in _CLIP_INSERTS if a in clips]
+    schedule = [(base, 0)]
+    if not inserts:
+        return schedule
+    rng = random.Random(seed)
+    loop_frames = 16  # 与 FRAMES_PER_CLIP 对齐的插入循环长度
+    tail_guard = round(1.2 * fps)
+    switch_frames = []
+    if audio_file and os.path.exists(audio_file):
+        rms = _compute_audio_rms_segments(
+            audio_file, n_segments=max(20, total_frames // max(1, round(fps))))
+        min_hold_frames = round(2.0 * fps)
+        last = 0
+        for i, val in enumerate(rms):
+            frame = round(i * total_frames / len(rms))
+            if frame - last < min_hold_frames or frame >= total_frames - tail_guard:
+                continue
+            if val < 0.4:
+                switch_frames.append(frame)
+                last = frame
+    else:
+        frame = 0
+        while True:
+            frame += round(rng.uniform(3.0, 5.0) * fps)
+            if frame >= total_frames - tail_guard:
+                break
+            switch_frames.append(frame)
+
+    k = 0
+    for sf in switch_frames:
+        if sf - schedule[-1][1] < round(1.6 * fps):
+            continue
+        schedule.append((inserts[k % len(inserts)], sf))
+        k += 1
+        # 插入一个完整循环（loop_frames @ 12fps）后回到基础动作
+        back = sf + max(round(1.5 * fps), round(loop_frames * fps / 12.0))
+        if back < total_frames - tail_guard:
+            schedule.append((base, back))
+    return schedule
+
+
 def _atomic_save(img, target: Path) -> None:
     """原子写 PNG 缓存：先写进程/线程唯一的 .tmp 再 os.replace。
 
@@ -380,8 +446,25 @@ def _render_sm_segment_inner(
             processed.append(norm)
         if not processed:
             processed = [PILImage.new("RGBA", (1280, 720), (0, 0, 0, 0))]
+        # 序列帧 clips（sprite_sequence 模式）：生成期已统一 remove_bg+归一化，
+        # 此处直接加载，无需 pose 的 cutout 缓存链
+        clips_in = layer.get("clips") or {}
+        processed_clips: dict[str, list] = {}
+        for act, frame_paths in clips_in.items():
+            cframes = []
+            for fp in frame_paths or []:
+                if not os.path.exists(fp):
+                    continue
+                try:
+                    cframes.append(PILImage.open(fp).convert("RGBA"))
+                except Exception as e:
+                    print(f"  [Quest] clip frame error {fp}: {e}")
+            if cframes:
+                processed_clips[act] = cframes
         processed_layers.append({
             "poses": processed,
+            "clips": processed_clips,
+            "clip_fps": int(layer.get("clip_fps", 12)),
             "is_speaker": is_speaker,
         })
 
@@ -429,6 +512,18 @@ def _render_sm_segment_inner(
             audio_file=af)
         schedules.append(s)
 
+    # Build clip schedules（sprite_sequence 模式专用；无 clips 的层为空表）
+    clip_schedules = []
+    for i, layer in enumerate(processed_layers):
+        clips = layer.get("clips") or {}
+        if not clips:
+            clip_schedules.append([])
+            continue
+        clip_schedules.append(_build_clip_schedule(
+            clips, total_frames, render_fps,
+            audio_file if layer["is_speaker"] else None,
+            seed + i * 100, is_speaker=layer["is_speaker"]))
+
     # Pre-generate optical flow morph frames for speaker pose transitions
     morph_cache: dict[int, list] = {}  # layer_idx -> {transition_idx: [frames]}
     try:
@@ -438,7 +533,7 @@ def _render_sm_segment_inner(
         _HAS_MORPH = False
 
     for li, layer in enumerate(processed_layers):
-        if not layer["is_speaker"] or not _HAS_MORPH:
+        if (not layer["is_speaker"]) or (not _HAS_MORPH) or layer.get("clips"):
             continue
         poses = layer["poses"]
         sched = schedules[li]
@@ -474,6 +569,35 @@ def _render_sm_segment_inner(
             poses = layer["poses"]
             schedule = schedules[li]
             x = positions[li] if li < len(positions) else 1280 * 0.5
+
+            # --- 序列帧播放分支（sprite_sequence；clips 加载成功才走此路）---
+            layer_clips = layer.get("clips") or {}
+            cschedule = clip_schedules[li] if li < len(clip_schedules) else []
+            if layer_clips and cschedule:
+                from stop_motion import transform_pose, paste_with_shadow
+                act_idx = 0
+                for si, (act, start_f) in enumerate(cschedule):
+                    if fidx >= start_f:
+                        act_idx = si
+                    else:
+                        break
+                act, start_f = cschedule[act_idx]
+                cframes = layer_clips.get(act) or []
+                if cframes:
+                    local_t = (fidx - start_f) / render_fps
+                    # 游戏式采样：播放帧率(clip_fps)与输出帧率(render_fps)解耦
+                    cidx = int(local_t * layer.get("clip_fps", 12)) % len(cframes)
+                    sprite = cframes[cidx]
+                    if layer["is_speaker"]:
+                        landing = compute_landing(local_t, direction=direction)
+                        sprite = transform_pose(sprite, scale=1.0 + landing["scale"],
+                                                rotation=landing["rotation"])
+                        paste_with_shadow(canvas, sprite, x + landing["x"],
+                                          cy + landing["y"], centered=True)
+                    else:
+                        paste_with_shadow(canvas, sprite, x, cy, centered=True)
+                    continue
+            # --- 以下为原姿势切换路径（无 clips 时行为逐字节不变）---
 
             # Find which pose stage we're in
             stage_idx = 0
@@ -611,7 +735,7 @@ def _run_fallback(cmd, out_path, scene_img, duration, render_fps):
 def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
                      normal_paths, host_poses, host_bg_path, scene_bgs,
                      char_pose_map, pose_images, scene_img, pad, render_fps,
-                     tmp_dir, sm_root):
+                     tmp_dir, sm_root, char_clip_map=None, sprite_clip_fps=12):
     """Prepare params and render a single segment. Returns (out_path or None, seg_type)."""
     seg_type = seg["type"]
     duration = seg["duration"]
@@ -639,7 +763,12 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
 
     if seg_type in ("welcome", "hook_intro", "outro"):
         h_poses = host_poses or [scene_img]
-        char_layers = [{"poses": h_poses, "is_speaker": True}]
+        host_layer: dict = {"poses": h_poses, "is_speaker": True}
+        _host_clips = (char_clip_map or {}).get("host")
+        if _host_clips:
+            host_layer["clips"] = _host_clips
+            host_layer["clip_fps"] = sprite_clip_fps
+        char_layers = [host_layer]
         frames_dir = sm_root / f"{seg_type}_{seg_idx}"
         direction = 1 if seg_idx % 2 == 0 else -1
         success = _render_sm_segment(
@@ -676,15 +805,21 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
         on_screen = line_data.get("on_screen") or [speaker]
 
         if char_pose_map:
+            _clip_map = char_clip_map or {}
             char_layers = []
             for char_key in on_screen:
                 poses = char_pose_map.get(char_key, [])
                 if not poses:
                     poses = char_pose_map.get("char_a", [line_bg])
-                char_layers.append({
+                layer: dict = {
                     "poses": poses,
                     "is_speaker": (char_key == speaker),
-                })
+                }
+                # sprite_sequence：该角色有序列帧时附加（渲染层自动优先播放）
+                if _clip_map.get(char_key):
+                    layer["clips"] = _clip_map[char_key]
+                    layer["clip_fps"] = sprite_clip_fps
+                char_layers.append(layer)
         else:
             idx = min(audio_idx, len(pose_images) - 1) if pose_images else 0
             line_poses = pose_images[idx] if pose_images and idx < len(pose_images) else [line_bg]
@@ -738,6 +873,8 @@ def compose_quest(
     char_pose_map: dict[str, list[str]] | None = None,
     host_bg: str | None = None,
     scene_bg_list: list[str] | None = None,
+    char_clip_map: dict | None = None,
+    sprite_clip_fps: int = 12,
     render_fps: int = 12,
     show_zh: bool = True,
     workers: int = 1,
@@ -795,7 +932,7 @@ def compose_quest(
                 seg_idx, seg, timeline, dialogue, narration,
                 normal_paths, host_poses, host_bg_path, scene_bgs,
                 char_pose_map, pose_images, scene_img, pad, render_fps,
-                tmp_dir, sm_root,
+                tmp_dir, sm_root, char_clip_map, sprite_clip_fps,
             )
             if out_path:
                 segments[seg_idx] = out_path
@@ -813,7 +950,7 @@ def compose_quest(
                     seg_idx, seg, timeline, dialogue, narration,
                     normal_paths, host_poses, host_bg_path, scene_bgs,
                     char_pose_map, pose_images, scene_img, pad, render_fps,
-                    tmp_dir, sm_root,
+                    tmp_dir, sm_root, char_clip_map, sprite_clip_fps,
                 ): seg_idx
                 for seg_idx, seg in enumerate(timeline)
             }
