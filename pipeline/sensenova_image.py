@@ -27,6 +27,7 @@ SIZE_MAP = {
     "portrait_16_9": "1536x2720",   # 9:16 2K（竖版）
     "atlas_pose": "4096x2720",      # 4x2 姿势图集，3:2 4K（每格 ~1024x1360）
     "atlas_scene": "4096x2304",     # 2x2 场景图集，16:9 4K（每格 2048x1152）
+    "atlas_seq": "4096x4096",       # 4x4 序列帧图集，方形 4K（每格 1024x1024）
 }
 
 _MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
