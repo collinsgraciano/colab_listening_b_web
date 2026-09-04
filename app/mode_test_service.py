@@ -32,7 +32,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from .config_manager import load_config, load_mode_config
+from .config_manager import load_config, load_mode_config, normalize_animation
 from .pipeline_service import PipelineService, STEP_PATTERNS, _LineBuffer
 from . import run_mutex
 
@@ -488,8 +488,9 @@ class ModeTestService:
         args.workers = int(manifest.get("workers", 1))
         args.host_character = str(manifest.get("host_character", "") or "")
         args.num_lines = int(manifest.get("num_lines", MINI_LINES[mode]))
-        # animation 同样按素材快照回放（无值时保持当前配置）
-        args.animation = str(manifest.get("animation", getattr(args, "animation", "stop_motion")))
+        # animation 同样按素材快照回放（无值时保持当前配置）；legacy none/landing 归一
+        args.animation = normalize_animation(
+            str(manifest.get("animation", getattr(args, "animation", "stop_motion"))))
 
         dirs = {
             "images": set_dir / "images",

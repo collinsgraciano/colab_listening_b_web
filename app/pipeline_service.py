@@ -16,6 +16,7 @@ from typing import Any
 
 from .config_manager import (
     MODES, resolve_provider, load_config, load_mode_config, find_run_dir,
+    normalize_animation,
 )
 from .paths import LIBRARY_DIR
 from . import run_mutex
@@ -953,7 +954,8 @@ class PipelineService:
             pad = 0.4
 
         # original_static: always use static images (no landing/stop_motion)
-        animation = config.get("animation", "landing")
+        animation = normalize_animation(
+            str(config.get("animation", "") or "stop_motion"))
         if structure == "original_static":
             animation = "none"
 

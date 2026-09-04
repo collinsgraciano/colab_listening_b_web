@@ -165,6 +165,16 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
 # CLI + orchestration helpers
 # ---------------------------------------------------------------------------
 
+def _norm_animation(value: str) -> str:
+    """legacy none/landing → stop_motion。
+
+    cutout/quest 渲染器不读 animation 值（三值渲染完全等效，素材结构同为姿势图集）；
+    sprite_sequence 是唯一有真实分支的值（序列帧素材）。归一化保证旧 CLI 参数、
+    旧配置与旧 checkpoint（存有 landing/none）在 resume 对比时不会被误判为参数变更。
+    """
+    return "stop_motion" if value in ("none", "landing") else value
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate English listening practice video")
     parser.add_argument("--topic", default=None, help="Topic (e.g. 'At the Pharmacy'). If not specified, picks randomly from topics.json")
@@ -219,8 +229,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Quest/Cutout: fixed TV-studio background prompt for host segments. Empty = per-topic LLM-generated (script.host_bg_prompt)")
     parser.add_argument("--visual-style", default="pixar3d",
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
-    parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion", "sprite_sequence"],
-                        help="Dialogue animation: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow), 'sprite_sequence' (game-style action clips). Default: landing")
+    parser.add_argument("--animation", default="stop_motion", choices=["none", "landing", "stop_motion", "sprite_sequence"],
+                        help="Dialogue animation: 'stop_motion' (multi-pose, default) or 'sprite_sequence' (game-style action clips). Legacy 'none'/'landing' are accepted and auto-mapped to 'stop_motion' (cutout/quest renderers ignore the value — all three render identically)")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint in output dir")
     parser.add_argument("--no-4k", dest="no_4k", action="store_true", help="Skip the final 4K upscaling step")
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
@@ -381,6 +391,10 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
                               ("host_character", "host_character")):
             cp_val = checkpoint.get(cp_key)
             cur_val = getattr(args, param, "")
+            if param == "animation" and cp_val is not None:
+                # legacy none/landing 与 stop_motion 渲染等效，归一后对比避免旧 run 刷 warning
+                cp_val = _norm_animation(str(cp_val))
+                cur_val = _norm_animation(str(cur_val))
             if cp_val is not None and str(cp_val) != str(cur_val):
                 print(f"  [Resume] WARNING: {param} changed "
                       f"({cp_val or '(empty)'} → {cur_val or '(empty)'}) — "
@@ -1209,6 +1223,8 @@ def main():
     args.ch3_en_repeats = max(0, min(10, int(args.ch3_en_repeats)))
     args.ch3_zh_repeats = max(0, min(10, int(args.ch3_zh_repeats)))
 
+    # legacy none/landing → stop_motion（渲染等效归一，见 _norm_animation）
+    args.animation = _norm_animation(args.animation)
     # original_static: always use static images (no landing/stop_motion animation)
     if args.structure == "original_static":
         args.animation = "none"
@@ -1319,7 +1335,7 @@ def main():
         checkpoint = _load_checkpoint(mode_dir)
         if checkpoint:
             cp_struct = checkpoint.get("structure")
-            cp_anim = checkpoint.get("animation", args.animation)
+            cp_anim = _norm_animation(str(checkpoint.get("animation", args.animation)))
             struct_changed = (cp_struct != args.structure)
             anim_changed = (cp_struct == "original_cutout" and cp_anim != args.animation)
             if cp_struct and struct_changed:

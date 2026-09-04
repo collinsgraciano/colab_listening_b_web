@@ -20,6 +20,18 @@ from .paths import ensure_pipeline_on_path
 
 ensure_pipeline_on_path()
 
+
+def normalize_animation(value: str) -> str:
+    """legacy none/landing → stop_motion。
+
+    cutout/quest 渲染器不读 animation 值（三值渲染完全等效）；sprite_sequence 是
+    唯一有真实分支的值。与 pipeline.pipeline._norm_animation 语义一致（pipeline
+    自包含不 import app，故此处独立实现）。用于 Web 启动链路：build_cli_args /
+    _build_args / mode_test manifest 回放，保证旧配置与旧 checkpoint resume 兼容。
+    """
+    return "stop_motion" if value in ("none", "landing") else value
+
+
 # All configurable parameters with defaults, types, and metadata
 #
 # 模式生效性标注（"modes" 键）：
@@ -45,17 +57,15 @@ PARAM_SPEC = {
                       "original_static": "Original Static (4章静态图片)",
                       "original_cutout": "Original Cutout (4章+人物抠图)",
                       "quest": "Quest (任务听力)"}},
-    "animation": {"default": "landing", "type": "select", "group": "content",
+    "animation": {"default": "stop_motion", "type": "select", "group": "content",
                   "modes": ["original_cutout", "quest"],
                   "label": "动画类型", "options": {
-                      "none": "None (静态，等效定格)",
-                      "landing": "Landing (静态，等效定格)",
                       "stop_motion": "Stop Motion (定格动画，默认)",
                       "sprite_sequence": "Sprite Sequence (游戏式序列帧动画)"},
-                  "help": "cutout 模式下 none/landing/stop_motion 渲染结果相同"
-                          "（都走双人定格动画）。sprite_sequence=游戏角色式"
-                          "动作序列帧（talking/idle/gesture/wave 4 动作循环，"
-                          "AI 视频抽帧路线生成）。"
+                  "help": "cutout/quest 渲染器固定走双人定格动画。sprite_sequence="
+                          "游戏角色式动作序列帧（talking/idle/gesture/wave 4 动作循环，"
+                          "AI 视频抽帧路线生成）。旧配置/旧运行里的 none/landing "
+                          "自动按 stop_motion 处理（三值渲染等效）。"
                           "original_static 模式动画被强制为 none（不显示此项）"},
     "visual_style": {"default": "pixar3d", "type": "select", "group": "content",
                      "label": "画面风格",
@@ -700,7 +710,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         if _cand > 1:
             args += ["--script-candidates", str(min(3, max(1, _cand)))]
     args += ["--structure", str(config.get("structure", "original"))]
-    args += ["--animation", str(config.get("animation", "landing"))]
+    args += ["--animation",
+             normalize_animation(str(config.get("animation", "") or "stop_motion"))]
     if config.get("host_character"):
         args += ["--host-character", str(config["host_character"])]
     if config.get("host_bg_prompt"):
