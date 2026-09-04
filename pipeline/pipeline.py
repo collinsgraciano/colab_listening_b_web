@@ -933,6 +933,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             char_clip_map, sprite_clip_fps = load_clip_map(dirs["images"])
             if char_clip_map:
                 print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
+        sprite_take_mode = getattr(args, "mode_name", "") == "quest_sprite"
 
         final_path = compose_quest(
             work_dir=str(work_dir),
@@ -943,6 +944,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             scene_bg_list=scene_bg_list,
             char_clip_map=char_clip_map or None,
             sprite_clip_fps=sprite_clip_fps,
+            sprite_take_mode=sprite_take_mode,
             render_fps=getattr(args, "render_fps", 12),
             workers=getattr(args, "workers", 1),
             timeline=timeline,
@@ -1023,6 +1025,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
                 char_clip_map["host"] = char_clip_map[_host_bound]
             if char_clip_map:
                 print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
+        sprite_take_mode = getattr(args, "mode_name", "") == "original_cutout_sprite"
         final_path = compose_original_cutout(
             work_dir=str(work_dir),
             char_pose_map=char_pose_map,
@@ -1031,6 +1034,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             host_bg=host_bg,
             char_clip_map=char_clip_map or None,
             sprite_clip_fps=sprite_clip_fps,
+            sprite_take_mode=sprite_take_mode,
             timeline=timeline,
             script=script,
             narration=narration,

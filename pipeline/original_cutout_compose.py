@@ -88,11 +88,13 @@ def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | No
                          host_bg: str, audio_file: str | None, out_path: str,
                          duration: float, sm_root: Path, render_fps: int,
                          fade_af: str, host_clips: dict | None = None,
-                         clip_fps: int = 12, stop_check=None) -> bool:
+                         clip_fps: int = 12, take_mode: bool = False,
+                         take_action: str = "", stop_check=None) -> bool:
     """Quest 式主持人段：姿势图集抠像定格动画（welcome/hook_intro/outro 出镜）。
 
     host_clips：主持人动作序列帧 {action: [帧路径]}（sprite_sequence 模式），
     存在时优先序列帧播放，缺图集时也可仅凭 clips 渲染。
+    take_mode：序列帧新模式整句单 take（take_action="wave" 用于 outro 送别）。
 
     Returns True if rendered successfully.
     """
@@ -104,6 +106,10 @@ def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | No
     if host_clip_map:
         layer["clips"] = host_clip_map
         layer["clip_fps"] = clip_fps
+        if take_mode:
+            layer["take_mode"] = True
+            if take_action:
+                layer["take_action"] = take_action
     char_layers = [layer]
     frames_dir = sm_root / f"{seg_type}_{seg_idx}"
     direction = 1 if seg_idx % 2 == 0 else -1
@@ -151,6 +157,7 @@ def _prepare_segment(
     host_bg: str = "",
     char_clip_map: dict | None = None,
     sprite_clip_fps: int = 12,
+    sprite_take_mode: bool = False,
     stop_check=None,
 ) -> tuple[str | None, str]:
     """Prepare params and render a single segment.
@@ -182,6 +189,7 @@ def _prepare_segment(
                                     render_fps, fade_af,
                                     host_clips=host_clips,
                                     clip_fps=sprite_clip_fps,
+                                    take_mode=sprite_take_mode,
                                     stop_check=stop_check):
             # 无图集或渲染失败 → 静态演播室底图回退
             if audio_file and os.path.exists(audio_file):
@@ -222,6 +230,14 @@ def _prepare_segment(
             if clips:
                 layer["clips"] = clips
                 layer["clip_fps"] = sprite_clip_fps
+                if sprite_take_mode:
+                    layer["take_mode"] = True
+                    if is_speaker:
+                        # 跨行轮换 talking 变体（相邻行不重样；缺变体自动回退）
+                        tkeys = sorted(k for k in clips
+                                       if k == "talking"
+                                       or k.startswith("talking_"))
+                        layer["take_action"] = tkeys[audio_idx % len(tkeys)]
             return layer
 
         char_layers = []
@@ -411,6 +427,8 @@ def _prepare_segment(
                                     render_fps, fade_af,
                                     host_clips=host_clips,
                                     clip_fps=sprite_clip_fps,
+                                    take_mode=sprite_take_mode,
+                                    take_action="wave",
                                     stop_check=stop_check):
             # 回退：静态场景图 + 文字叠加
             outro_en = seg.get("subtitle_en", "")
@@ -473,6 +491,7 @@ def compose_original_cutout(
     host_bg: str = "",
     char_clip_map: dict | None = None,
     sprite_clip_fps: int = 12,
+    sprite_take_mode: bool = False,
     timeline: list[dict] = None,
     script: dict = None,
     narration: dict = None,
@@ -586,6 +605,7 @@ def compose_original_cutout(
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses=host_poses, host_bg=host_bg or scene_img,
                 char_clip_map=char_clip_map, sprite_clip_fps=sprite_clip_fps,
+                sprite_take_mode=sprite_take_mode,
                 stop_check=stop_check,
             )
             if out_path:
@@ -606,7 +626,7 @@ def compose_original_cutout(
                 normal_paths, zh_paths, char_pose_map, scene_bgs,
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses, host_bg or scene_img,
-                char_clip_map, sprite_clip_fps,
+                char_clip_map, sprite_clip_fps, sprite_take_mode,
                 stop_check,
             ): seg_idx
             for seg_idx, seg in enumerate(timeline)

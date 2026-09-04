@@ -774,7 +774,8 @@ def _run_fallback(cmd, out_path, scene_img, duration, render_fps):
 def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
                      normal_paths, host_poses, host_bg_path, scene_bgs,
                      char_pose_map, pose_images, scene_img, pad, render_fps,
-                     tmp_dir, sm_root, char_clip_map=None, sprite_clip_fps=12):
+                     tmp_dir, sm_root, char_clip_map=None, sprite_clip_fps=12,
+                     sprite_take_mode=False):
     """Prepare params and render a single segment. Returns (out_path or None, seg_type)."""
     seg_type = seg["type"]
     duration = seg["duration"]
@@ -807,6 +808,10 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
         if _host_clips:
             host_layer["clips"] = _host_clips
             host_layer["clip_fps"] = sprite_clip_fps
+            if sprite_take_mode:
+                host_layer["take_mode"] = True
+                if seg_type == "outro":
+                    host_layer["take_action"] = "wave"  # 送别挥手
         char_layers = [host_layer]
         frames_dir = sm_root / f"{seg_type}_{seg_idx}"
         direction = 1 if seg_idx % 2 == 0 else -1
@@ -855,9 +860,17 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
                     "is_speaker": (char_key == speaker),
                 }
                 # sprite_sequence：该角色有序列帧时附加（渲染层自动优先播放）
-                if _clip_map.get(char_key):
-                    layer["clips"] = _clip_map[char_key]
+                char_clips = _clip_map.get(char_key)
+                if char_clips:
+                    layer["clips"] = char_clips
                     layer["clip_fps"] = sprite_clip_fps
+                    if sprite_take_mode and char_key == speaker:
+                        # 整句单 take：talking 变体按行轮换（相邻行不重样）
+                        tkeys = sorted(k for k in char_clips
+                                       if k == "talking"
+                                       or k.startswith("talking_"))
+                        layer["take_mode"] = True
+                        layer["take_action"] = tkeys[audio_idx % len(tkeys)]
                 char_layers.append(layer)
         else:
             idx = min(audio_idx, len(pose_images) - 1) if pose_images else 0
@@ -914,6 +927,7 @@ def compose_quest(
     scene_bg_list: list[str] | None = None,
     char_clip_map: dict | None = None,
     sprite_clip_fps: int = 12,
+    sprite_take_mode: bool = False,
     render_fps: int = 12,
     show_zh: bool = True,
     workers: int = 1,
@@ -972,6 +986,7 @@ def compose_quest(
                 normal_paths, host_poses, host_bg_path, scene_bgs,
                 char_pose_map, pose_images, scene_img, pad, render_fps,
                 tmp_dir, sm_root, char_clip_map, sprite_clip_fps,
+                sprite_take_mode,
             )
             if out_path:
                 segments[seg_idx] = out_path
@@ -990,6 +1005,7 @@ def compose_quest(
                     normal_paths, host_poses, host_bg_path, scene_bgs,
                     char_pose_map, pose_images, scene_img, pad, render_fps,
                     tmp_dir, sm_root, char_clip_map, sprite_clip_fps,
+                    sprite_take_mode,
                 ): seg_idx
                 for seg_idx, seg in enumerate(timeline)
             }
