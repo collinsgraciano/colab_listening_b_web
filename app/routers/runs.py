@@ -17,6 +17,7 @@ from ..config_manager import (
 from ..paths import TRASH_META_FILENAME
 from ..pipeline_service import get_service
 from ..thumbnail_regen_service import get_thumb_regen_service
+from ..local_batch_service import get_local_batch
 import subtitle_style_manager as subtitle_style_lib
 
 router = APIRouter()
@@ -168,6 +169,39 @@ async def api_regen_thumbnail(name: str, mode: str = ""):
 async def api_thumb_regen_status(since: int = 0):
     """缩略图重生成子进程任务状态 + 增量日志（形状对齐 /api/run/logs/since）。"""
     return get_thumb_regen_service().get_status(since=since)
+
+
+# ---------------------------------------------------------------------------
+# 本地批量队列（生成4K / 混BGM / 混BGM 4K）：后端驻留串行执行，浏览器页面后台/
+# 刷新/关闭均不影响批量；用独立顶层域 /api/local_batch/*，勿挪进 /api/runs/{name}
+# 通配路径组（路由遮蔽陷阱，见 CODELY.md）
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/local_batch/start")
+async def api_local_batch_start(request: Request):
+    """提交本地批量清单（body: {kind: "4k"|"bgm"|"bgm4k", items: [{name, mode}]}）。"""
+    data = await request.json()
+    ok, msg = get_local_batch().start(
+        str(data.get("kind", "")).strip(), data.get("items"))
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg}
+
+
+@router.get("/api/local_batch/status")
+async def api_local_batch_status():
+    """本地批量队列状态（前端轮询渲染批量条进度与结果汇总）。"""
+    return get_local_batch().status()
+
+
+@router.post("/api/local_batch/stop")
+async def api_local_batch_stop():
+    """请求停止批量：当前任务完成后停止，剩余项标记跳过。"""
+    ok, msg = get_local_batch().stop()
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return {"ok": True, "message": msg}
 
 
 @router.post("/api/runs/{name}/thumbnail_set_main")

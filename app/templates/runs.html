@@ -139,6 +139,8 @@
                 class="batch-btn px-3 py-1.5 bg-rose-600 hover:bg-rose-500 rounded-lg text-xs text-white">🎵 混BGM</button>
             <button onclick="batchAction('bgm4k')"
                 class="batch-btn px-3 py-1.5 bg-rose-700 hover:bg-rose-600 rounded-lg text-xs text-white">🎵 混BGM 4K</button>
+            <button id="batch-stop-btn" onclick="stopLocalBatch()"
+                class="hidden px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs text-white">⏹ 停止批量</button>
             <button onclick="deleteSelected()"
                 class="batch-btn px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded-lg text-xs text-slate-300 hover:text-white">🗑 删除选中</button>
         </div>
@@ -501,8 +503,10 @@ function deleteSelected() {
 }
 
 // ---------------------------------------------------------------------------
-// 批量 4K / BGM（含 4K 混音）/ 标记已上传：4K 与 BGM 共用 PipelineService
-// 互斥锁，逐个排队串行执行；标记已上传无互斥直接并发；完成后汇总结果并刷新。
+// 批量 4K / BGM（含 4K 混音）：后端驻留队列（/api/local_batch/*）——排队调度在
+// 服务器线程执行，页面后台/刷新/关闭都不影响批量（浏览器会节流后台标签页定时器，
+// 前端逐项排队在后台会停摆）；前端只提交清单+轮询进度。标记已上传为瞬时操作仍
+// 前端直发；完成后汇总结果并刷新。
 // ---------------------------------------------------------------------------
 const _BATCH_LABELS = {upload: '标记已上传', '4k': '生成4K', bgm: '混BGM', bgm4k: '混BGM 4K'};
 const _BATCH_CONFIRMS = {
@@ -511,6 +515,78 @@ const _BATCH_CONFIRMS = {
     bgm: n => `为选中的 ${n} 个运行批量混入版权 BGM？\n按当前 BGM 配置逐个混音（输出 _bgm.mp4 新文件，原片保留）；逐个排队执行，总耗时可能较长。`,
     bgm4k: n => `为选中的 ${n} 个运行批量对 4K 版本混入版权 BGM？\n按当前 BGM 配置逐个混音（输出 _4K_bgm.mp4 新文件）；4K 需整片重编码、耗时较长，逐个排队执行。`,
 };
+
+let _localBatchTimer = null;
+let _localBatchLastCurrent = '';
+let _localBatchFinishGuard = false;
+
+function _refreshBatchStopBtn(show) {
+    const b = document.getElementById('batch-stop-btn');
+    if (b) b.classList.toggle('hidden', !show);
+}
+
+function _batchBarText(d) {
+    const el = document.getElementById('batch-status');
+    if (!el) return;
+    const stopping = d.state === 'stopping' ? '（停止中，当前任务完成后停止）' : '';
+    el.textContent = `批量${_BATCH_LABELS[d.kind] || d.kind}中 ${d.done || 0}/${d.total || 0}`
+        + (d.current ? `：${d.current}` : '') + stopping;
+}
+
+function _startBatchWatch(d) {
+    _batchBusy = true;
+    _localBatchFinishGuard = false;
+    _localBatchLastCurrent = d.current || '';
+    _refreshBatchButtons();
+    const el = document.getElementById('batch-status');
+    if (el) el.classList.remove('hidden');
+    _batchBarText(d);
+    _refreshBatchStopBtn(true);
+    if (_localBatchTimer) { clearTimeout(_localBatchTimer); _localBatchTimer = null; }
+    if (_localBatchLastCurrent && _taskWidget.source !== 'pipeline') taskWidgetStart('pipeline');
+    pollLocalBatch();
+}
+
+function pollLocalBatch() {
+    fetch('/api/local_batch/status').then(r => r.json()).then(d => {
+        if (!d.running) {
+            _localBatchTimer = null;
+            if (_localBatchFinishGuard || !(d.total > 0)) return;
+            _localBatchFinishGuard = true;
+            _batchBusy = false;
+            _refreshBatchButtons();
+            _refreshBatchStopBtn(false);
+            const el = document.getElementById('batch-status');
+            if (el) { el.classList.add('hidden'); el.textContent = ''; }
+            const results = d.results || [];
+            const okN = results.filter(x => x.status === 'done').length;
+            const fails = results.filter(x => x.status === 'error');
+            const skipped = results.filter(x => x.status === 'skipped').length;
+            let msg = `批量${_BATCH_LABELS[d.kind] || d.kind}${d.state === 'stopped' ? '已停止' : '完成'}：成功 ${okN} 个`;
+            if (skipped) msg += `，跳过 ${skipped} 个`;
+            if (fails.length) msg += `，失败 ${fails.length} 个：\n${fails.map(x => `${x.name}：${x.error || '失败'}`).join('\n')}`;
+            alert(msg);
+            location.reload();
+            return;
+        }
+        _batchBarText(d);
+        if (d.current && d.current !== _localBatchLastCurrent) {
+            _localBatchLastCurrent = d.current;
+            taskWidgetStart('pipeline');  // 新任务开始：重置面板（seq 纪律防 stale done）
+        }
+        _localBatchTimer = setTimeout(pollLocalBatch, 2000);
+    }).catch(() => {
+        if (!_localBatchFinishGuard) _localBatchTimer = setTimeout(pollLocalBatch, 3000);
+    });
+}
+
+function stopLocalBatch() {
+    if (!confirm('停止批量队列？当前任务完成后将不再处理剩余项。')) return;
+    fetch('/api/local_batch/stop', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => { if (!data.ok) alert('停止失败: ' + (data.error || '未知错误')); })
+        .catch(() => alert('停止请求失败'));
+}
 
 async function batchAction(kind) {
     if (_batchBusy) { alert('已有批量任务进行中，请等待完成'); return; }
@@ -528,64 +604,43 @@ async function batchAction(kind) {
         items = with4k;
     }
     if (!confirm(_BATCH_CONFIRMS[kind](items.length))) return;
-    _batchBusy = true;
-    _refreshBatchButtons();
-    const statusEl = document.getElementById('batch-status');
-    if (statusEl) statusEl.classList.remove('hidden');
-    const okNames = [];
-    const failList = [];
-    for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        if (statusEl) statusEl.textContent = `批量${_BATCH_LABELS[kind]}中 ${i + 1}/${items.length}：${it.name}`;
-        try {
-            const qs = it.mode ? `?mode=${encodeURIComponent(it.mode)}` : '';
-            let url;
-            if (kind === '4k') url = `/api/runs/${it.name}/generate_4k${qs}`;
-            else if (kind === 'bgm') url = `/api/runs/${it.name}/bgm_mix${qs}`;
-            else if (kind === 'bgm4k') url = `/api/runs/${it.name}/bgm_mix_4k${qs}`;
-            else url = `/api/runs/${it.name}/mark_uploaded${qs ? `${qs}&` : '?'}state=uploaded`;
-            // 上个任务状态已置 done 但互斥锁/线程尚在收尾的瞬时竞争：占用时重试
-            let data = null;
-            for (let attempt = 0; attempt < 3; attempt++) {
-                const r = await fetch(url, {method: 'POST'});
-                data = await r.json();
-                const err = data.error || '';
-                if (data.ok || !(err.includes('资源被占用') || err.includes('正在运行中'))) break;
-                await new Promise(res => setTimeout(res, 3000));
-            }
-            if (!data.ok) { failList.push(`${it.name}：${data.error || '启动失败'}`); continue; }
-            if (kind === 'upload') { okNames.push(it.name); continue; }
-            // 任务确认启动后再重置悬浮面板：首次轮询必然读到 running，
-            // 避免读到上一任务的 stale done 后挂起 6s 自动收起（面板中途消失的根因）
-            taskWidgetStart('pipeline');
-            const st = await _batchWaitIdle();
-            if (st === 'error') failList.push(`${it.name}：任务执行失败（详见悬浮面板日志）`);
-            else okNames.push(it.name);
-        } catch (e) {
-            failList.push(`${it.name}：请求失败`);
-        }
-    }
-    _batchBusy = false;
-    if (statusEl) { statusEl.classList.add('hidden'); statusEl.textContent = ''; }
-    _refreshBatchButtons();
-    let msg = `批量${_BATCH_LABELS[kind]}完成：成功 ${okNames.length} 个`;
-    if (failList.length) msg += `，失败 ${failList.length} 个：\n${failList.join('\n')}`;
-    alert(msg);
-    location.reload();
-}
 
-async function _batchWaitIdle() {
-    // 轮询主服务状态直到非 running（4K/BGM 任务共用 PipelineService 单例的状态）
-    let idx = 0;
-    for (;;) {
-        await new Promise(res => setTimeout(res, 2000));
-        try {
-            const d = await fetch(`/api/run/logs/since/${idx}`).then(r => r.json());
-            idx = d.total || 0;
-            const st = (d.status || {}).status;
-            if (st && st !== 'running') return st;
-        } catch (e) { /* 瞬时网络失败继续等待 */ }
+    if (kind === 'upload') {
+        // 瞬时操作：前端直发（无等待循环，浏览器后台节流不影响）
+        _batchBusy = true;
+        _refreshBatchButtons();
+        const okNames = [];
+        const failList = [];
+        for (const it of items) {
+            const qs = it.mode ? `?mode=${encodeURIComponent(it.mode)}` : '';
+            try {
+                const r = await fetch(`/api/runs/${it.name}/mark_uploaded${qs ? `${qs}&` : '?'}state=uploaded`, {method: 'POST'});
+                const data = await r.json();
+                if (data.ok) okNames.push(it.name);
+                else failList.push(`${it.name}：${data.error || '失败'}`);
+            } catch (e) { failList.push(`${it.name}：请求失败`); }
+        }
+        _batchBusy = false;
+        _refreshBatchButtons();
+        let msg = `批量标记已上传完成：成功 ${okNames.length} 个`;
+        if (failList.length) msg += `，失败 ${failList.length} 个：\n${failList.join('\n')}`;
+        alert(msg);
+        location.reload();
+        return;
     }
+
+    // 生成4K / 混BGM / 混BGM 4K → 后端驻留队列
+    let data;
+    try {
+        const r = await fetch('/api/local_batch/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({kind, items: items.map(it => ({name: it.name, mode: it.mode}))}),
+        });
+        data = await r.json();
+    } catch (e) { alert('批量启动请求失败'); return; }
+    if (!data.ok) { alert('批量启动失败: ' + (data.error || '未知错误')); return; }
+    _startBatchWatch({kind, total: items.length, done: 0, current: ''});
 }
 
 function toggleUploaded(runName) {
@@ -1169,6 +1224,9 @@ function pollTaskWidget() {
 
 // 页面加载探测：已有任务在跑则自动展开面板
 (function () {
+    fetch('/api/local_batch/status').then(r => r.json()).then(d => {
+        if (d.running) _startBatchWatch(d);  // 恢复进行中的后端批量（刷新/重开页面继续显示进度）
+    }).catch(() => {});
     fetch('/api/run/logs/since/0').then(r => r.json()).then(d => {
         if ((d.status || {}).status === 'running') taskWidgetStart('pipeline');
     }).catch(() => {});
