@@ -179,8 +179,13 @@ async def gallery_page(request: Request, name: str, mode: str = ""):
             if v.name not in videos and not v.name.startswith("final_no_sub") and not v.name.startswith("final_video_norm"):
                 videos.append(v.name)
 
+    # 画廊页操作按钮所需状态：已上传标记 + 主缩略图绝对路径（无缩略图传空串）
+    thumb = _resolve_main_thumbnail(run_dir)
+
     return templates.TemplateResponse(request, "gallery.html", {
         "run_name": name,
+        "uploaded": (run_dir / "uploaded.flag").exists(),
+        "thumb_path": str(thumb) if thumb.exists() else "",
         "script": script,
         "images": images,
         "clips": clips,

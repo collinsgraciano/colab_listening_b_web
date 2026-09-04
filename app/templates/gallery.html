@@ -13,6 +13,14 @@
             <a href="/api/runs/{{ run_name }}/script/edit" target="_blank"
                 class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white">查看脚本</a>
             {% endif %}
+            <button id="upload-btn" onclick="toggleUploaded()"
+                class="px-4 py-2 rounded-lg text-sm text-white {% if uploaded %}bg-emerald-600 hover:bg-emerald-500{% else %}bg-amber-600/80 hover:bg-amber-500{% endif %}">
+                {% if uploaded %}已上传 ✓{% else %}标记已上传{% endif %}
+            </button>
+            <button onclick="openFolder()"
+                class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">📂 打开目录</button>
+            <button id="thumb-path-btn" onclick="copyThumbPath(this)" {% if not thumb_path %}disabled title="该运行没有缩略图"{% endif %}
+                class="px-4 py-2 rounded-lg text-sm {% if thumb_path %}bg-slate-700 hover:bg-slate-600 text-slate-300{% else %}bg-slate-800 text-slate-500 cursor-not-allowed{% endif %}">📋 缩略图路径</button>
         </div>
     </div>
 
@@ -222,6 +230,47 @@ function switchTab(tab) {
 
 // 运行可能位于模式子文件夹（output/{mode}/{name}/），API 调用带上 ?mode= 消歧
 const _runMode = new URLSearchParams(location.search).get('mode') || '';
+const _runName = {{ run_name | tojson }};
+const _thumbPath = {{ thumb_path | tojson }};
+
+// 标记/取消「已上传」（切换 uploaded.flag，与运行历史页一致）
+function toggleUploaded() {
+    fetch(`/api/runs/${_runName}/mark_uploaded${_runMode ? `?mode=${_runMode}` : ''}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) { alert('操作失败: ' + (data.error || '未知错误')); return; }
+            const btn = document.getElementById('upload-btn');
+            if (!btn) return;
+            if (data.uploaded) {
+                btn.textContent = '已上传 ✓';
+                btn.className = 'px-4 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-500';
+            } else {
+                btn.textContent = '标记已上传';
+                btn.className = 'px-4 py-2 rounded-lg text-sm text-white bg-amber-600/80 hover:bg-amber-500';
+            }
+        });
+}
+
+function openFolder() {
+    fetch(`/api/runs/${_runName}/open_folder${_runMode ? `?mode=${_runMode}` : ''}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) alert('打开目录失败: ' + (data.error || '未知错误'));
+        });
+}
+
+function copyThumbPath(btn) {
+    if (!_thumbPath) { alert('该运行没有缩略图'); return; }
+    const done = () => {
+        btn.textContent = '✓ 已复制';
+        setTimeout(() => { btn.textContent = '📋 缩略图路径'; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(_thumbPath).then(done).catch(() => fallbackCopy(_thumbPath, done));
+    } else {
+        fallbackCopy(_thumbPath, done);
+    }
+}
 
 // 进入画廊默认优先显示 📺 YouTube 标签页
 switchTab('youtube');
