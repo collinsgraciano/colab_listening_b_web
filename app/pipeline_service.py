@@ -367,7 +367,8 @@ class PipelineService:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        structure = config.get("structure", "original")
+        from .config_manager import structure_family
+        structure = structure_family(config.get("structure", "original"))
         if structure == "quest":
             all_keys = ["char_a", "char_b", "char_c", "host"]
         elif structure == "original_cutout":
@@ -496,7 +497,8 @@ class PipelineService:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        structure = self.config.get("structure", "original")
+        from .config_manager import structure_family
+        structure = structure_family(self.config.get("structure", "original"))
         if structure == "quest":
             all_char_keys = ["char_a", "char_b", "char_c", "host"]
         elif structure == "original_cutout":
@@ -801,7 +803,8 @@ class PipelineService:
         script.json（character_reuse 的 image/desc/voice 模式）。
         交换仅写运行副本 script.json，脚本库原稿不动；resume 不触发。
         """
-        structure = self.config.get("structure", "original")
+        from .config_manager import structure_family
+        structure = structure_family(self.config.get("structure", "original"))
         if structure == "quest":
             keys = ["char_a", "char_b", "char_c"]
         elif structure == "original_cutout":
@@ -947,7 +950,10 @@ class PipelineService:
         except (ValueError, TypeError):
             pad = None
 
-        structure = config.get("structure", "original")
+        # 序列帧新模式：身份保留在 mode_name（输出目录/配置），行为族归一给 structure
+        from .config_manager import structure_family
+        mode_name = config.get("structure", "original")
+        structure = structure_family(mode_name)
         if num_lines is None:
             num_lines = 48 if structure == "quest" else 18
         if pad is None:
@@ -958,6 +964,8 @@ class PipelineService:
             str(config.get("animation", "") or "stop_motion"))
         if structure == "original_static":
             animation = "none"
+        if mode_name in ("original_cutout_sprite", "quest_sprite"):
+            animation = "sprite_sequence"
 
         # tts_rate 为旧全局覆盖（兼容）；分项参数优先（tts_pipeline.resolve_tts_rate）
         tts_rate = config.get("tts_rate", "") or None
@@ -973,6 +981,7 @@ class PipelineService:
             num_lines=num_lines,
             max_line_words=_cfg_int(config, "max_line_words", 10),
             structure=structure,
+            mode_name=mode_name,
             animation=animation,
             visual_style=str(config.get("visual_style", "pixar3d")),
             llm_provider=config.get("llm_provider", "sensenova"),
@@ -1083,7 +1092,7 @@ class PipelineService:
         self._on_log_line("Step 0: 使用脚本库脚本（跳过 LLM 生成）...")
         yt_title = script.get("youtube_title", script.get("title", topic))
         safe_title = _safe_dirname(yt_title, topic)
-        work_dir = parent_dir / args.structure / safe_title
+        work_dir = parent_dir / getattr(args, "mode_name", args.structure) / safe_title
         work_dir.mkdir(parents=True, exist_ok=True)
         dirs = {k: work_dir / k for k in ("images", "clips", "audio", "subtitles", "videos")}
         for d in dirs.values():
@@ -1166,7 +1175,8 @@ class PipelineService:
             parent_dir = Path(args.output).resolve()
             parent_dir.mkdir(parents=True, exist_ok=True)
             # 新布局：每种模式一个独立文件夹 output/{mode}/{run_name}/
-            mode_dir = parent_dir / args.structure
+            # （序列帧新模式按 mode_name 分文件夹，族行为归一后 structure 已是族名）
+            mode_dir = parent_dir / getattr(args, "mode_name", args.structure)
             mode_dir.mkdir(parents=True, exist_ok=True)
             # Full raw LLM responses are dumped here when _chat hits errors
             os.environ["LLM_DEBUG_DIR"] = str(parent_dir / "llm_debug")

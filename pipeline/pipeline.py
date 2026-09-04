@@ -1228,6 +1228,13 @@ def main():
     # original_static: always use static images (no landing/stop_motion animation)
     if args.structure == "original_static":
         args.animation = "none"
+    # 序列帧新模式：行为族归一（107 处结构分支零改动），模式身份保留在 args.mode_name
+    # （输出目录 / 配置按新模式名分文件夹；checkpoint structure 存族名）
+    args.mode_name = args.structure
+    if args.structure in ("original_cutout_sprite", "quest_sprite"):
+        args.animation = "sprite_sequence"
+        args.structure = ("original_cutout" if args.structure == "original_cutout_sprite"
+                          else "quest")
 
     os.environ["LLM_RETRIES"] = str(args.llm_retries)
     # 抠图引擎（stop_motion.remove_bg 读取）：auto/modnet/white_threshold
@@ -1326,7 +1333,8 @@ def main():
     parent_dir = Path(args.output).resolve()
     parent_dir.mkdir(parents=True, exist_ok=True)
     # 新布局：每种模式一个独立文件夹 output/{mode}/{run_name}/
-    mode_dir = parent_dir / args.structure
+    # （序列帧新模式按 args.mode_name 分文件夹，族行为归一后 structure 已是族名）
+    mode_dir = parent_dir / getattr(args, "mode_name", args.structure)
     mode_dir.mkdir(parents=True, exist_ok=True)
 
     used_topics_file = args.used_topics_file or str(parent_dir / "used_topics.json")
