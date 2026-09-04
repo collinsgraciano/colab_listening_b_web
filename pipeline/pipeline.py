@@ -221,9 +221,6 @@ def _parse_args() -> argparse.Namespace:
                         help="Visual art style id from style_manager.py (default pixar3d = 3D cartoon Pixar-like). Affects all image/video/thumbnail prompts + LLM script prompts")
     parser.add_argument("--animation", default="landing", choices=["none", "landing", "stop_motion", "sprite_sequence"],
                         help="Dialogue animation: 'none' (static), 'landing' (landing transform), 'stop_motion' (multi-pose + optical flow), 'sprite_sequence' (game-style action clips). Default: landing")
-    parser.add_argument("--sprite-seq-source", default="atlas_grid",
-                        choices=["atlas_grid", "video_frames", "sprite_sheet"],
-                        help="sprite_sequence 素材路线: atlas_grid (4x4 动作图集, 成本最低), video_frames (AI 视频抽帧, 一致性最好), sprite_sheet (MCP sprite 工具). Default: atlas_grid")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint in output dir")
     parser.add_argument("--no-4k", dest="no_4k", action="store_true", help="Skip the final 4K upscaling step")
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
@@ -441,11 +438,10 @@ def _step1_mcp(args):
 
 def _generate_sprite_clips_for(args, script, img_dir, tts_thread, style_prompt,
                                char_keys, stop_check=None) -> None:
-    """sprite_sequence 模式：生成 4 动作序列帧素材（三路线可选，见 sprite_seq）。"""
+    """sprite_sequence 模式：生成 4 动作序列帧素材（AI 视频抽帧路线，见 sprite_seq）。"""
     from sprite_seq import generate_sprite_clips
-    source = getattr(args, "sprite_seq_source", "") or "atlas_grid"
     try:
-        generate_sprite_clips(script, img_dir, source=source,
+        generate_sprite_clips(script, img_dir,
                               tts_thread=tts_thread, max_workers=2,
                               style_prompt=style_prompt,
                               char_keys=char_keys, stop_check=stop_check)

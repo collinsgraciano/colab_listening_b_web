@@ -972,7 +972,6 @@ class PipelineService:
             max_line_words=_cfg_int(config, "max_line_words", 10),
             structure=structure,
             animation=animation,
-            sprite_seq_source=str(config.get("sprite_seq_source", "atlas_grid") or "atlas_grid"),
             visual_style=str(config.get("visual_style", "pixar3d")),
             llm_provider=config.get("llm_provider", "sensenova"),
             sensenova_api_key=p_api_key if p_type == "sensenova" else "",

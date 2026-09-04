@@ -1,11 +1,7 @@
 """游戏角色式序列帧素材生成（sprite_sequence 动画模式）。
 
-三条 AI 素材生产路线（--sprite-seq-source 配置选择）：
-  A. atlas_grid   — 4×4 网格动作图集 → split_atlas_sequence 切 16 帧
-                    （与现有姿势图集管线同构，成本最低）
-  B. video_frames — Seedance2 参考图生成白底动作视频 → ffmpeg 抽帧 → 抠图 → 取样 16 帧
-                    （帧间一致性最好，积分消耗较高）
-  C. sprite_sheet — MCP generate_sprite_animation（4×4=16 帧 sprite sheet，支持参考图）
+素材生产路线（唯一）：Seedance2 参考图生成白底动作视频 → ffmpeg 抽帧 →
+抠图 → 取样 16 帧（帧间一致性最好）。
 
 产出规格：每角色 4 个动作循环（talking/idle/gesture/wave）× 16 帧，
 文件 clip_{char}_{action}_{j:02d}.png —— 已统一 remove_bg + 整组 union bbox
@@ -23,10 +19,8 @@ import numpy as np
 from PIL import Image
 
 from mcp_client import call_tool, parse_task_id, poll_task, download_file
-from atlas_split import split_atlas_sequence
 from stop_motion import remove_bg, POSE_CANVAS_W, POSE_CANVAS_H, POSE_TARGET_H
 from style_manager import DEFAULT_STYLE_PROMPT
-import sensenova_image
 from image_gen import reupload_for_cdn
 
 SPRITE_ACTIONS = ("talking", "idle", "gesture", "wave")
@@ -34,8 +28,9 @@ FIRST_ACTION = "talking"
 FRAMES_PER_CLIP = 16
 CLIP_FPS = 12           # 播放帧率（与成片 25fps 解耦，游戏式采样）
 MANIFEST_NAME = "sprite_clips.json"
+SOURCE = "video_frames"
 
-# 动作提示词：强调"同一人物连续微动作"（flip book 式），供三条路线共用
+# 动作提示词：强调"同一人物连续微动作"（flip book 式）
 _ACTION_PHRASES = {
     "talking": ("talking and conversing, mouth moving with expressive friendly "
                 "expressions, natural small hand gestures while speaking"),
@@ -45,27 +40,6 @@ _ACTION_PHRASES = {
                 "presenting, confident friendly expression"),
     "wave": ("waving hello in a friendly greeting, right hand raised waving"),
 }
-
-# 带参考图时的一致性前缀（编辑模式保持外观一致）
-_REF_PREFIX = ("Keep the character's face, hairstyle, outfit, proportions and "
-               "colors EXACTLY consistent with the reference image. ")
-
-
-def _grid_prompt(action: str, char_desc: str, style_prompt: str) -> str:
-    return (
-        f"4x4 grid sprite sheet, 16 consecutive animation frames of ONE continuous "
-        f"looping motion cycle, the exact same character performing the same action "
-        f"in every frame, only small smooth movement differences between adjacent "
-        f"frames like a flip book animation, "
-        f"{char_desc}, {_ACTION_PHRASES[action]}, "
-        f"medium waist-up shot, every frame fully inside its own cell with generous "
-        f"empty margin on all sides, both shoulders fully visible, all arms and hands "
-        f"completely within the cell borders, no body part cropped or cut off at the "
-        f"cell edges, "
-        f"all 16 frames same character same outfit same camera framing same character "
-        f"size, plain white background, {style_prompt}, "
-        f"no props, no objects, no scene, no text, no grid lines, no numbers"
-    )
 
 
 def _video_prompt(action: str, char_desc: str, style_prompt: str) -> str:
@@ -77,63 +51,6 @@ def _video_prompt(action: str, char_desc: str, style_prompt: str) -> str:
         f"no text, no watermark, no other people"
     )
 
-
-# ---------------------------------------------------------------------------
-# 路线 A：4×4 网格动作图集
-# ---------------------------------------------------------------------------
-
-def _gen_grid_atlas(prompt: str, atlas_path: str, ref_local: str = "",
-                    stop_check=None) -> str:
-    """生成 4×4 动作网格图，返回本地路径（空串=失败）。
-
-    ref_local：参考图本地路径（一致性链）。sensenova 走 /v1/images/edits
-    （本地路径内部转 Data-URL）；MCP 无参考时 is_segmentation=True 透明图集，
-    带参考走编辑模式（输出可能为白底，统一在 _unify_clip_frames 抠图）。
-    """
-    try:
-        if sensenova_image.get_image_provider() == "sensenova":
-            size = sensenova_image.SIZE_MAP.get("atlas_seq", "4096x4096")
-            if ref_local:
-                url = sensenova_image.edit_image(ref_local, prompt, size=size,
-                                                 prompt_extend=False)
-            else:
-                url = sensenova_image.text_to_image(prompt, size=size,
-                                                    prompt_extend=False)
-            return atlas_path if sensenova_image.download_image(url, atlas_path) else ""
-        gen_params = {"prompt": prompt, "provider": "seedream",
-                      "image_size": "4096x4096", "output_format": "png"}
-        if ref_local:
-            ref_url = reupload_for_cdn(ref_local, Path(ref_local).name)
-            if ref_url:
-                gen_params["image_urls"] = ref_url
-            else:
-                # 参考图上传失败 → 退回纯文本（is_segmentation 透明路径）
-                gen_params["is_segmentation"] = True
-        else:
-            gen_params["is_segmentation"] = True
-        result = call_tool("generate_image", gen_params)
-        task_id = parse_task_id(result)
-        if not task_id:
-            if result and "result" in result:
-                print(f"    [SpriteSeq] WARNING: no task_id, response: "
-                      f"{json.dumps(result['result'].get('content', []), ensure_ascii=False)[:500]}")
-            return ""
-        data = poll_task(task_id, interval=10, max_wait=600, stop_check=stop_check)
-        url = data.get("url", "")
-        if not url:
-            print(f"    [SpriteSeq] WARNING: no URL, status={data.get('status')}")
-            return ""
-        return atlas_path if download_file(url, atlas_path) else ""
-    except RuntimeError:
-        raise
-    except Exception as e:
-        print(f"    [SpriteSeq] grid atlas ERROR: {e}")
-        return ""
-
-
-# ---------------------------------------------------------------------------
-# 路线 B：AI 视频抽帧
-# ---------------------------------------------------------------------------
 
 def _gen_action_video(prompt: str, video_path: str, ref_url: str = "",
                       stop_check=None) -> str:
@@ -198,37 +115,6 @@ def _sample_frames(frame_paths: list, n: int = FRAMES_PER_CLIP) -> list:
         if not idxs or k != idxs[-1]:
             idxs.append(k)
     return [frame_paths[k] for k in idxs]
-
-
-# ---------------------------------------------------------------------------
-# 路线 C：MCP generate_sprite_animation（4×4=16 帧 sprite sheet）
-# ---------------------------------------------------------------------------
-
-def _gen_sprite_sheet(prompt: str, sheet_path: str, ref_url: str = "",
-                      stop_check=None) -> str:
-    """生成 4×4 sprite sheet，返回本地路径（空串=失败）。"""
-    try:
-        params = {"prompt": prompt, "output_format": "png"}
-        if ref_url:
-            params["image_urls"] = ref_url
-        result = call_tool("generate_sprite_animation", params)
-        task_id = parse_task_id(result)
-        if not task_id:
-            if result and "result" in result:
-                print(f"    [SpriteSeq] WARNING: no task_id, response: "
-                      f"{json.dumps(result['result'].get('content', []), ensure_ascii=False)[:500]}")
-            return ""
-        data = poll_task(task_id, interval=10, max_wait=900, stop_check=stop_check)
-        url = data.get("url", "")
-        if not url:
-            print(f"    [SpriteSeq] WARNING: no sheet URL, status={data.get('status')}")
-            return ""
-        return sheet_path if download_file(url, sheet_path) else ""
-    except RuntimeError:
-        raise
-    except Exception as e:
-        print(f"    [SpriteSeq] sprite sheet ERROR: {e}")
-        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -305,66 +191,29 @@ def _clip_complete(img_dir, char_key: str, action: str) -> bool:
     return all(os.path.exists(p) for p in clip_frame_paths(img_dir, char_key, action))
 
 
-def _split_grid_frames(atlas_path: str, work_dir: Path, cols: int = 4,
-                       rows: int = 4) -> list:
-    """切分网格图集为原始帧路径（split_atlas_sequence，统一 union 对齐）。"""
-    out_paths = [str(work_dir / f"cell_{k:02d}.png") for k in range(cols * rows)]
-    sizes = split_atlas_sequence(atlas_path, cols, rows, out_paths)
-    return [p for p, s in zip(out_paths, sizes) if s[0] > 4 and s[1] > 4]
-
-
 def _produce_clip(char_key: str, action: str, char_desc: str,
-                  img_dir: Path, source: str, style_prompt: str,
+                  img_dir: Path, style_prompt: str,
                   ref_frame: str | None, stop_check=None) -> list:
     """产出单个动作 clip，返回 16 帧最终路径（空列表=失败）。
 
-    返回前完成：切分/抽帧 → _unify_clip_frames 统一几何 → 覆盖保存目标帧。
+    返回前完成：抽帧 → _unify_clip_frames 统一几何 → 覆盖保存目标帧。
     """
-    work_dir = Path(tempfile.gettempdir()) / f"sprite_work_{source}_{char_key}_{action}"
+    work_dir = Path(tempfile.gettempdir()) / f"sprite_work_{char_key}_{action}"
     work_dir.mkdir(parents=True, exist_ok=True)
     final_paths = clip_frame_paths(img_dir, char_key, action)
     if all(os.path.exists(p) for p in final_paths):
         return final_paths
 
-    if source == "atlas_grid":
-        prompt = _grid_prompt(action, char_desc, style_prompt)
-        atlas = str(work_dir / "atlas.png")
-        got = _gen_grid_atlas(prompt, atlas, ref_local=ref_frame or "",
-                              stop_check=stop_check)
-        if not got and ref_frame:
-            # 带参考失败 → 纯文本重试
-            print(f"    [SpriteSeq] {char_key}/{action} ref-guided grid failed, retry text-only")
-            got = _gen_grid_atlas(prompt, atlas, ref_local="", stop_check=stop_check)
-        if not got:
-            return []
-        raw_paths = _split_grid_frames(atlas, work_dir)
-    elif source == "video_frames":
-        prompt = _video_prompt(action, char_desc, style_prompt)
-        video = str(work_dir / "action.mp4")
-        ref_url = ""
-        if ref_frame and os.path.exists(ref_frame):
-            ref_url = reupload_for_cdn(ref_frame, Path(ref_frame).name)
-        got = _gen_action_video(prompt, video, ref_url=ref_url, stop_check=stop_check)
-        if not got:
-            return []
-        all_frames = _extract_video_frames(video, work_dir / "frames", fps=8)
-        raw_paths = [str(p) for p in _sample_frames(all_frames)]
-    elif source == "sprite_sheet":
-        prompt = _grid_prompt(action, char_desc, style_prompt)
-        sheet = str(work_dir / "sheet.png")
-        ref_url = ""
-        if ref_frame and os.path.exists(ref_frame):
-            ref_url = reupload_for_cdn(ref_frame, Path(ref_frame).name)
-        got = _gen_sprite_sheet(prompt, sheet, ref_url=ref_url, stop_check=stop_check)
-        if not got and ref_url:
-            print(f"    [SpriteSeq] {char_key}/{action} ref-guided sheet failed, retry text-only")
-            got = _gen_sprite_sheet(prompt, sheet, ref_url="", stop_check=stop_check)
-        if not got:
-            return []
-        raw_paths = _split_grid_frames(sheet, work_dir)
-    else:
-        print(f"    [SpriteSeq] Unknown source '{source}'")
+    prompt = _video_prompt(action, char_desc, style_prompt)
+    video = str(work_dir / "action.mp4")
+    ref_url = ""
+    if ref_frame and os.path.exists(ref_frame):
+        ref_url = reupload_for_cdn(ref_frame, Path(ref_frame).name)
+    got = _gen_action_video(prompt, video, ref_url=ref_url, stop_check=stop_check)
+    if not got:
         return []
+    all_frames = _extract_video_frames(video, work_dir / "frames", fps=8)
+    raw_paths = [str(p) for p in _sample_frames(all_frames)]
 
     if len(raw_paths) < 4:
         print(f"    [SpriteSeq] {char_key}/{action} too few frames ({len(raw_paths)})")
@@ -388,8 +237,7 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
 
     for j, frame in enumerate(unified):
         frame.save(final_paths[j], compress_level=2)
-    print(f"    [SpriteSeq] {char_key}/{action}: {FRAMES_PER_CLIP} frames saved "
-          f"(source={source})")
+    print(f"    [SpriteSeq] {char_key}/{action}: {FRAMES_PER_CLIP} frames saved")
     return final_paths
 
 
@@ -410,7 +258,7 @@ def _pick_ref_frame(frame_paths: list) -> str | None:
     return best
 
 
-def generate_sprite_clips(script, img_dir, source: str = "atlas_grid",
+def generate_sprite_clips(script, img_dir,
                           tts_thread=None, max_workers: int = 2,
                           style_prompt: str = DEFAULT_STYLE_PROMPT,
                           char_keys=None, stop_check=None) -> dict | None:
@@ -419,10 +267,6 @@ def generate_sprite_clips(script, img_dir, source: str = "atlas_grid",
     resume：目标帧文件齐 16 张的动作直接登记跳过；单动作失败记日志继续。
     """
     img_dir = Path(img_dir)
-    if source not in ("atlas_grid", "video_frames", "sprite_sheet"):
-        print(f"  [SpriteSeq] Unknown source '{source}', fallback to atlas_grid")
-        source = "atlas_grid"
-
     all_chars = [
         ("char_a", script.get("char_a_description", "friendly young man")),
         ("char_b", script.get("char_b_description", "friendly young woman")),
@@ -435,7 +279,7 @@ def generate_sprite_clips(script, img_dir, source: str = "atlas_grid",
     if not chars:
         return None
 
-    manifest = {"version": 1, "fps": CLIP_FPS, "source": source, "chars": {}}
+    manifest = {"version": 1, "fps": CLIP_FPS, "source": SOURCE, "chars": {}}
     todo: dict[str, list] = {}
     for char_key, _desc in chars:
         entry = {}
@@ -456,7 +300,7 @@ def generate_sprite_clips(script, img_dir, source: str = "atlas_grid",
         _write_manifest(img_dir, manifest)
         return manifest
     print(f"  [SpriteSeq] Generating {n_total - n_done}/{n_total} clips "
-          f"(source={source}, actions={list(SPRITE_ACTIONS)})...")
+          f"(actions={list(SPRITE_ACTIONS)})...")
 
     def _gen_char(char_key: str, char_desc: str, actions: list) -> dict:
         produced: dict[str, list] = {}
@@ -474,7 +318,7 @@ def generate_sprite_clips(script, img_dir, source: str = "atlas_grid",
                 ref = _pick_ref_frame(talking_frames)
             try:
                 frames = _produce_clip(char_key, action, char_desc, img_dir,
-                                       source, style_prompt, ref,
+                                       style_prompt, ref,
                                        stop_check=stop_check)
             except RuntimeError as e:
                 if "ALL_MCP_TOKENS_EXHAUSTED" in str(e):
@@ -544,4 +388,3 @@ def load_clip_map(img_dir) -> tuple:
             clip_map[char_key] = valid
     fps = int(manifest.get("fps") or CLIP_FPS)
     return clip_map, fps
-
