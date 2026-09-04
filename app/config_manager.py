@@ -46,14 +46,26 @@ PARAM_SPEC = {
                       "original_cutout": "Original Cutout (4章+人物抠图)",
                       "quest": "Quest (任务听力)"}},
     "animation": {"default": "landing", "type": "select", "group": "content",
-                  "modes": ["original_cutout"],
+                  "modes": ["original_cutout", "quest"],
                   "label": "动画类型", "options": {
                       "none": "None (静态，等效定格)",
                       "landing": "Landing (静态，等效定格)",
-                      "stop_motion": "Stop Motion (定格动画，默认)"},
+                      "stop_motion": "Stop Motion (定格动画，默认)",
+                      "sprite_sequence": "Sprite Sequence (游戏式序列帧动画)"},
                   "help": "cutout 模式下 none/landing/stop_motion 渲染结果相同"
-                          "（都走双人定格动画）。"
+                          "（都走双人定格动画）。sprite_sequence=游戏角色式"
+                          "动作序列帧（talking/idle/gesture/wave 4 动作循环，"
+                          "素材路线见下方「序列帧素材路线」）。"
                           "original_static 模式动画被强制为 none（不显示此项）"},
+    "sprite_seq_source": {"default": "atlas_grid", "type": "select", "group": "content",
+                          "modes": ["original_cutout", "quest"],
+                          "label": "序列帧素材路线",
+                          "options": {
+                              "atlas_grid": "A 动作图集（4×4 网格，成本最低）",
+                              "video_frames": "B AI 视频抽帧（一致性最好，积分较高）",
+                              "sprite_sheet": "C Sprite Sheet 工具（16 帧）"},
+                          "help": "animation=sprite_sequence 时生效：序列帧素材的"
+                                  "AI 生产路线（一次生成全 run 复用，断点续传按文件）"},
     "visual_style": {"default": "pixar3d", "type": "select", "group": "content",
                      "label": "画面风格",
                      "options": {"pixar3d": "3D 卡通（皮克斯）"},
@@ -698,6 +710,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
             args += ["--script-candidates", str(min(3, max(1, _cand)))]
     args += ["--structure", str(config.get("structure", "original"))]
     args += ["--animation", str(config.get("animation", "landing"))]
+    args += ["--sprite-seq-source", str(config.get("sprite_seq_source", "atlas_grid"))]
     if config.get("host_character"):
         args += ["--host-character", str(config["host_character"])]
     if config.get("host_bg_prompt"):
