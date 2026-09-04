@@ -101,7 +101,7 @@ def _gen_grid_atlas(prompt: str, atlas_path: str, ref_local: str = "",
                                                     prompt_extend=False)
             return atlas_path if sensenova_image.download_image(url, atlas_path) else ""
         gen_params = {"prompt": prompt, "provider": "seedream",
-                      "image_size": "4992x4992", "output_format": "png"}
+                      "image_size": "4096x4096", "output_format": "png"}
         if ref_local:
             ref_url = reupload_for_cdn(ref_local, Path(ref_local).name)
             if ref_url:
