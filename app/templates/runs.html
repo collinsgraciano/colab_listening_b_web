@@ -537,8 +537,6 @@ async function batchAction(kind) {
     for (let i = 0; i < items.length; i++) {
         const it = items[i];
         if (statusEl) statusEl.textContent = `批量${_BATCH_LABELS[kind]}中 ${i + 1}/${items.length}：${it.name}`;
-        // 每个任务前重置悬浮面板（否则上个任务的 6s 自动收起会中断显示）
-        if (kind !== 'upload') taskWidgetStart('pipeline');
         try {
             const qs = it.mode ? `?mode=${encodeURIComponent(it.mode)}` : '';
             let url;
@@ -557,6 +555,9 @@ async function batchAction(kind) {
             }
             if (!data.ok) { failList.push(`${it.name}：${data.error || '启动失败'}`); continue; }
             if (kind === 'upload') { okNames.push(it.name); continue; }
+            // 任务确认启动后再重置悬浮面板：首次轮询必然读到 running，
+            // 避免读到上一任务的 stale done 后挂起 6s 自动收起（面板中途消失的根因）
+            taskWidgetStart('pipeline');
             const st = await _batchWaitIdle();
             if (st === 'error') failList.push(`${it.name}：任务执行失败（详见悬浮面板日志）`);
             else okNames.push(it.name);
@@ -1087,7 +1088,7 @@ function pollBgmGen() {
 // 运行状态；按钮启动成功后调用 taskWidgetStart(source)，页面加载时自动探测
 // 已在运行的任务（含从控制台页启动的主 pipeline）。
 // ---------------------------------------------------------------------------
-const _taskWidget = { source: '', timer: null, idx: 0, hideTimer: null };
+const _taskWidget = { source: '', timer: null, idx: 0, hideTimer: null, seq: 0 };
 
 function _taskWidgetFetch(source, since) {
     return source === 'thumb'
@@ -1095,9 +1096,14 @@ function _taskWidgetFetch(source, since) {
         : fetch(`/api/run/logs/since/${since}`).then(r => r.json());
 }
 
-function taskWidgetStart(source) {
-    if (_taskWidget.hideTimer) { clearTimeout(_taskWidget.hideTimer); _taskWidget.hideTimer = null; }
+function _clearWidgetTimers() {
     if (_taskWidget.timer) { clearTimeout(_taskWidget.timer); _taskWidget.timer = null; }
+    if (_taskWidget.hideTimer) { clearTimeout(_taskWidget.hideTimer); _taskWidget.hideTimer = null; }
+}
+
+function taskWidgetStart(source) {
+    _taskWidget.seq++;  // 作废 in-flight 旧轮询响应，防止重复轮询链
+    _clearWidgetTimers();
     _taskWidget.source = source;
     _taskWidget.idx = 0;
     document.getElementById('task-widget-log').textContent = '';
@@ -1110,18 +1116,19 @@ function taskWidgetStart(source) {
 }
 
 function taskWidgetHide() {
-    if (_taskWidget.timer) { clearTimeout(_taskWidget.timer); _taskWidget.timer = null; }
-    if (_taskWidget.hideTimer) { clearTimeout(_taskWidget.hideTimer); _taskWidget.hideTimer = null; }
+    _taskWidget.seq++;
+    _clearWidgetTimers();
     _taskWidget.source = '';
     document.getElementById('task-widget').classList.add('hidden');
 }
 
 function pollTaskWidget() {
     const src = _taskWidget.source;
+    const seq = _taskWidget.seq;
     if (!src) return;
     _taskWidgetFetch(src, _taskWidget.idx)
         .then(data => {
-            if (_taskWidget.source !== src) return;  // 源已被切换/关闭
+            if (_taskWidget.source !== src || _taskWidget.seq !== seq) return;  // 源已被切换/关闭/重启
             const st = data.status || {};
             if (data.logs && data.logs.length) {
                 const logEl = document.getElementById('task-widget-log');
@@ -1133,6 +1140,7 @@ function pollTaskWidget() {
             const titleEl = document.getElementById('task-widget-title');
             const elapsedEl = document.getElementById('task-widget-elapsed');
             if (st.status === 'running') {
+                if (_taskWidget.hideTimer) { clearTimeout(_taskWidget.hideTimer); _taskWidget.hideTimer = null; }  // 取消挂起的自动收起（stale done 修正）
                 dot.className = 'w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0';
                 titleEl.textContent = st.current_step_label
                     || (st.out_name ? '缩略图生成: ' + st.out_name : '后台任务');
@@ -1153,9 +1161,10 @@ function pollTaskWidget() {
                 taskWidgetHide();
                 return;
             }
-            _taskWidget.hideTimer = setTimeout(taskWidgetHide, 6000);
+            if (!_taskWidget.hideTimer) _taskWidget.hideTimer = setTimeout(taskWidgetHide, 6000);
+            _taskWidget.timer = setTimeout(pollTaskWidget, 2000);  // 继续轮询：stale done 下一拍可见 running 并取消收起
         })
-        .catch(() => { if (_taskWidget.source === src) _taskWidget.timer = setTimeout(pollTaskWidget, 3000); });
+        .catch(() => { if (_taskWidget.source === src && _taskWidget.seq === seq) _taskWidget.timer = setTimeout(pollTaskWidget, 3000); });
 }
 
 // 页面加载探测：已有任务在跑则自动展开面板
