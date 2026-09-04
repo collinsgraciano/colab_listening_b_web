@@ -23,21 +23,35 @@ from stop_motion import remove_bg, POSE_CANVAS_W, POSE_CANVAS_H, POSE_TARGET_H
 from style_manager import DEFAULT_STYLE_PROMPT
 from image_gen import reupload_for_cdn
 
-SPRITE_ACTIONS = ("talking", "idle", "gesture", "wave")
-FIRST_ACTION = "talking"
+SPRITE_ACTIONS = ("talking_01", "idle_01", "wave",
+                  "talking_02", "talking_03", "idle_02")
+FIRST_ACTION = "talking_01"
 FRAMES_PER_CLIP = 16
-CLIP_FPS = 12           # 播放帧率（与成片 25fps 解耦，游戏式采样）
+TALKING_FRAMES = 48     # talking take：6s 源视频 @8fps 全帧（整句单 take 铺放）
+CLIP_FPS = 12           # 循环型动作播放帧率（与成片 25fps 解耦，游戏式采样）
 MANIFEST_NAME = "sprite_clips.json"
 SOURCE = "video_frames"
 
-# 动作提示词：强调"同一人物连续微动作"（flip book 式）
+
+def frames_for_action(action: str) -> int:
+    """talking 变体整句单 take 需要全帧（6s@8fps=48）；循环型动作 16 帧足够。"""
+    return TALKING_FRAMES if action.startswith("talking") else FRAMES_PER_CLIP
+
+# 动作提示词：强调"同一人物连续微动作"（flip book 式）。
+# talking ×3 / idle ×2 为变体：新模式（take_mode）说话者整句播一个 take、
+# 倾听者按行轮换 idle，跨行不重样；变体差异用 prompt 手势/体态侧别区分
+# （Seedance2 无 seed 暴露）。wave 仅供主持人 outro 送别。
 _ACTION_PHRASES = {
-    "talking": ("talking and conversing, mouth moving with expressive friendly "
-                "expressions, natural small hand gestures while speaking"),
-    "idle": ("standing relaxed, calm breathing idle loop, subtle body sway, "
-             "gentle listening expression"),
-    "gesture": ("making an emphatic explanatory gesture, one hand raised "
-                "presenting, confident friendly expression"),
+    "talking_01": ("talking and conversing, mouth moving with expressive friendly "
+                   "expressions, natural small hand gestures while speaking"),
+    "talking_02": ("explaining with both hands gesturing in front of the chest, "
+                   "slightly more animated friendly expressions, mouth moving"),
+    "talking_03": ("leaning slightly forward, one hand raised in a soft presenting "
+                   "gesture, warm engaged expression, mouth moving"),
+    "idle_01": ("standing relaxed, calm breathing idle loop, subtle body sway, "
+                "gentle listening expression"),
+    "idle_02": ("standing relaxed with a warm smile, gently shifting weight from "
+                "one side to the other, subtle head tilts while listening"),
     "wave": ("waving hello in a friendly greeting, right hand raised waving"),
 }
 
@@ -56,7 +70,7 @@ def _gen_action_video(prompt: str, video_path: str, ref_url: str = "",
                       stop_check=None) -> str:
     """生成白底动作视频（Seedance2），返回本地路径（空串=失败）。"""
     try:
-        params = {"prompt": prompt, "duration": 5, "ratio": "16:9",
+        params = {"prompt": prompt, "duration": 6, "ratio": "16:9",
                   "resolution": "720p", "generate_audio": False}
         if ref_url:
             params.update({"mode": "reference_image", "image_urls": ref_url})
@@ -181,26 +195,32 @@ def _unify_clip_frames(raw_frames: list, label: str = "") -> list:
 # 单动作产出与编排
 # ---------------------------------------------------------------------------
 
-def clip_frame_paths(img_dir, char_key: str, action: str) -> list:
-    """该角色该动作的 16 帧目标路径。"""
+def clip_frame_paths(img_dir, char_key: str, action: str,
+                     count: int | None = None) -> list:
+    """该角色该动作的目标帧路径（count 缺省按动作类型取 48/16）。"""
+    n = count if count is not None else frames_for_action(action)
     return [str(Path(img_dir) / f"clip_{char_key}_{action}_{j:02d}.png")
-            for j in range(FRAMES_PER_CLIP)]
+            for j in range(n)]
 
 
-def _clip_complete(img_dir, char_key: str, action: str) -> bool:
-    return all(os.path.exists(p) for p in clip_frame_paths(img_dir, char_key, action))
+def _clip_complete(img_dir, char_key: str, action: str,
+                   count: int | None = None) -> bool:
+    return all(os.path.exists(p)
+               for p in clip_frame_paths(img_dir, char_key, action, count))
 
 
 def _produce_clip(char_key: str, action: str, char_desc: str,
                   img_dir: Path, style_prompt: str,
                   ref_frame: str | None, stop_check=None) -> list:
-    """产出单个动作 clip，返回 16 帧最终路径（空列表=失败）。
+    """产出单个动作 clip，返回帧路径列表（空列表=失败）。
 
+    talking 变体存全帧（48）供整句单 take 铺放；循环型动作取样 16 帧。
     返回前完成：抽帧 → _unify_clip_frames 统一几何 → 覆盖保存目标帧。
     """
+    n_frames = frames_for_action(action)
     work_dir = Path(tempfile.gettempdir()) / f"sprite_work_{char_key}_{action}"
     work_dir.mkdir(parents=True, exist_ok=True)
-    final_paths = clip_frame_paths(img_dir, char_key, action)
+    final_paths = clip_frame_paths(img_dir, char_key, action, n_frames)
     if all(os.path.exists(p) for p in final_paths):
         return final_paths
 
@@ -213,7 +233,10 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
     if not got:
         return []
     all_frames = _extract_video_frames(video, work_dir / "frames", fps=8)
-    raw_paths = [str(p) for p in _sample_frames(all_frames)]
+    if len(all_frames) <= n_frames:
+        raw_paths = [str(p) for p in all_frames]
+    else:
+        raw_paths = [str(p) for p in _sample_frames(all_frames, n_frames)]
 
     if len(raw_paths) < 4:
         print(f"    [SpriteSeq] {char_key}/{action} too few frames ({len(raw_paths)})")
@@ -229,15 +252,15 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
     if len(unified) < 4:
         return []
 
-    # 帧数对齐 FRAMES_PER_CLIP：不足时循环补齐，超出时均匀取样
-    if len(unified) != FRAMES_PER_CLIP:
-        idxs = [round(i * (len(unified) - 1) / (FRAMES_PER_CLIP - 1))
-                for i in range(FRAMES_PER_CLIP)]
+    # 帧数对齐 n_frames：不足时循环补齐，超出时均匀取样
+    if len(unified) != n_frames:
+        idxs = [round(i * (len(unified) - 1) / (n_frames - 1))
+                for i in range(n_frames)]
         unified = [unified[k] for k in idxs]
 
     for j, frame in enumerate(unified):
         frame.save(final_paths[j], compress_level=2)
-    print(f"    [SpriteSeq] {char_key}/{action}: {FRAMES_PER_CLIP} frames saved")
+    print(f"    [SpriteSeq] {char_key}/{action}: {n_frames} frames saved")
     return final_paths
 
 
@@ -262,9 +285,10 @@ def generate_sprite_clips(script, img_dir,
                           tts_thread=None, max_workers: int = 2,
                           style_prompt: str = DEFAULT_STYLE_PROMPT,
                           char_keys=None, stop_check=None) -> dict | None:
-    """生成全部角色的 4 动作序列帧素材，返回 manifest dict（完全失败返回 None）。
+    """生成全部角色的动作变体序列帧素材，返回 manifest dict（完全失败返回 None）。
 
-    resume：目标帧文件齐 16 张的动作直接登记跳过；单动作失败记日志继续。
+    resume：目标帧文件齐该动作应有帧数（talking 48 / 其余 16）直接登记跳过；
+    单动作失败记日志继续。
     """
     img_dir = Path(img_dir)
     all_chars = [
