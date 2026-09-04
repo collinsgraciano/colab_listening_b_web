@@ -272,28 +272,37 @@ _CLIP_IDLE = "idle"
 _CLIP_INSERTS = ("gesture", "wave")
 
 
+def _clip_variants(clips: dict, base: str) -> list:
+    """动作变体键列表（base 与 base_NN 前缀，如 talking_01/02/03），按名排序稳定。
+
+    兼容旧单键 manifest（键名恰为 base）。无匹配返回空列表。
+    """
+    return sorted(k for k in clips if k == base or k.startswith(base + "_"))
+
+
 def _build_clip_schedule(clips: dict, total_frames: int, fps: float,
                          audio_file: str | None, seed: int,
                          is_speaker: bool = True) -> list:
     """构建序列帧动作调度：[(action, start_frame)]。
 
-    说话者：talking 基础循环贯穿全段，在音频低能量停顿点（与 _build_pose_schedule
-    同源检测）轮转插入 gesture/wave 各一个循环后回到 talking；无音频时按 3-5s
-    随机间隔轮转。倾听者：整段 idle 循环（clip 自带微动作，替代呼吸正弦）。
+    说话者：talking 变体组按行轮换（seed 含行号），在音频低能量停顿点插入
+    gesture/wave 一个循环后回到组内下一个变体；无音频时按 3-5s 随机间隔。
+    倾听者：整段 idle 变体循环（clip 自带微动作，替代呼吸正弦）。
+    旧单键 manifest（talking/idle）退化为原行为。
     """
     if not clips:
         return []
-    available = [a for a in (_CLIP_BASE, *_CLIP_INSERTS, _CLIP_IDLE) if a in clips]
-    if not available:
+    talking_group = _clip_variants(clips, _CLIP_BASE)
+    idle_group = _clip_variants(clips, _CLIP_IDLE)
+    inserts = [a for a in _CLIP_INSERTS if a in clips]
+    if not is_speaker:
+        pool = idle_group or talking_group or [sorted(clips)[0]]
+        return [(pool[seed % len(pool)], 0)]
+    if not talking_group:
         # 未知名动作键：按字典序取第一个当基础循环
         return [(sorted(clips)[0], 0)]
-    base = _CLIP_BASE if _CLIP_BASE in clips else available[0]
-    if not is_speaker:
-        idle = _CLIP_IDLE if _CLIP_IDLE in clips else base
-        return [(idle, 0)]
-
-    inserts = [a for a in _CLIP_INSERTS if a in clips]
-    schedule = [(base, 0)]
+    base_idx = seed % len(talking_group)
+    schedule = [(talking_group[base_idx], 0)]
     if not inserts:
         return schedule
     rng = random.Random(seed)
@@ -321,15 +330,18 @@ def _build_clip_schedule(clips: dict, total_frames: int, fps: float,
             switch_frames.append(frame)
 
     k = 0
+    cycle = 0
     for sf in switch_frames:
         if sf - schedule[-1][1] < round(1.6 * fps):
             continue
         schedule.append((inserts[k % len(inserts)], sf))
         k += 1
-        # 插入一个完整循环（loop_frames @ 12fps）后回到基础动作
+        cycle += 1
+        # 插入一个完整循环（loop_frames @ 12fps）后回到组内下一个 talking 变体
         back = sf + max(round(1.5 * fps), round(loop_frames * fps / 12.0))
         if back < total_frames - tail_guard:
-            schedule.append((base, back))
+            schedule.append((talking_group[(base_idx + cycle) % len(talking_group)],
+                             back))
     return schedule
 
 
@@ -512,11 +524,11 @@ def _render_sm_segment_inner(
             audio_file=af)
         schedules.append(s)
 
-    # Build clip schedules（sprite_sequence 模式专用；无 clips 的层为空表）
+    # Build clip schedules（sprite_sequence 模式专用；无 clips/take_mode 层为空表）
     clip_schedules = []
     for i, layer in enumerate(processed_layers):
         clips = layer.get("clips") or {}
-        if not clips:
+        if not clips or layer.get("take_mode"):
             clip_schedules.append([])
             continue
         clip_schedules.append(_build_clip_schedule(
@@ -572,6 +584,33 @@ def _render_sm_segment_inner(
 
             # --- 序列帧播放分支（sprite_sequence；clips 加载成功才走此路）---
             layer_clips = layer.get("clips") or {}
+
+            # --- 整句单 take 分支（take_mode：序列帧新模式）---
+            if layer.get("take_mode") and layer_clips:
+                from stop_motion import transform_pose, paste_with_shadow
+                if layer["is_speaker"]:
+                    # 说话者：一个 talking take 铺满整句（无循环/无插入/无 landing），
+                    # 帧随时间均匀取样 → 动作速度 ≈ 源视频速度（台词 4-8s 带 0.75-1.5x）
+                    group = (layer_clips.get(layer.get("take_action") or "")
+                             or layer_clips.get(_CLIP_BASE))
+                    if not group:
+                        gkeys = _clip_variants(layer_clips, _CLIP_BASE) \
+                            or sorted(layer_clips)
+                        group = layer_clips[gkeys[0]]
+                    idx = min(int(fidx / max(1, total_frames) * len(group)),
+                              len(group) - 1)
+                    sprite = transform_pose(group[idx])
+                    paste_with_shadow(canvas, sprite, x, cy, centered=True)
+                else:
+                    # 倾听者：idle 变体按 seed 选其一，循环播放
+                    gkeys = _clip_variants(layer_clips, _CLIP_IDLE) \
+                        or sorted(layer_clips)
+                    frames = layer_clips[gkeys[(seed + li * 100) % len(gkeys)]]
+                    idx = int((fidx / render_fps) * layer.get("clip_fps", 12)) \
+                        % len(frames)
+                    paste_with_shadow(canvas, frames[idx], x, cy, centered=True)
+                continue
+
             cschedule = clip_schedules[li] if li < len(clip_schedules) else []
             if layer_clips and cschedule:
                 from stop_motion import transform_pose, paste_with_shadow
