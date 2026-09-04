@@ -90,6 +90,25 @@ def _cfg_int(config: dict, key: str, default: int) -> int:
         return default
 
 
+def _merge_run_clip_manifest(dst_img_dir: Path, char_key: str,
+                             actions: dict, fps: int = 12) -> None:
+    """把复制的序列帧 clips 合并写入运行 manifest。
+
+    generate_sprite_clips 按目标帧文件存在性续传，此合并非必需，
+    但写入后 load_clip_map/缩略图参考等消费方可直接读到。
+    """
+    mp = dst_img_dir / "sprite_clips.json"
+    manifest = {"version": 1, "fps": fps, "source": "video_frames", "chars": {}}
+    if mp.exists():
+        try:
+            manifest = json.loads(mp.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    manifest.setdefault("chars", {}).setdefault(char_key, {}).update(actions)
+    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2),
+                  encoding="utf-8")
+
+
 class PipelineService:
     """Manages pipeline execution in a background thread with direct imports."""
 
@@ -568,6 +587,30 @@ class PipelineService:
                                 if not dst.exists():
                                     shutil.copy2(str(atlas), str(dst))
                                     copied.append(atlas.name)
+                            # 序列帧 clips（源运行含 manifest 时按角色复制，续传据此跳过生成）
+                            src_clips_mp = src_img_dir / "sprite_clips.json"
+                            if src_clips_mp.exists():
+                                try:
+                                    scm = json.loads(src_clips_mp.read_text(encoding="utf-8"))
+                                except (json.JSONDecodeError, OSError):
+                                    scm = {}
+                                char_clips = (scm.get("chars") or {}).get(key) or {}
+                                clip_entries = {}
+                                for action, frames in char_clips.items():
+                                    paths = []
+                                    for fp in frames:
+                                        dst = dst_img_dir / Path(fp).name
+                                        if Path(fp).exists() and not dst.exists():
+                                            shutil.copy2(str(fp), str(dst))
+                                        if dst.exists():
+                                            paths.append(str(dst))
+                                    if len(paths) >= 4:
+                                        clip_entries[action] = paths
+                                if clip_entries:
+                                    _merge_run_clip_manifest(
+                                        dst_img_dir, key, clip_entries,
+                                        int(scm.get("fps", 12)))
+                                    copied.append(f"{key} clips×{len(clip_entries)}")
                         else:
                             if "char_a" in image_keys and "char_b" in image_keys:
                                 for fname in self._CHAR_FILES_ORIGINAL:
@@ -644,7 +687,8 @@ class PipelineService:
                 # Copy images: library stores files as pose_{source_key}_*.png
                 # Need to rename to target key (e.g. char_a_0.png → pose_char_a_0.png)
                 src_key = lib_meta.get("source_key", key)
-                lib_structure = lib_meta.get("structure", structure)
+                lib_structure = structure_family(
+                    lib_meta.get("structure", structure))
                 dst_img_dir = dirs["images"]
                 if lib_structure in ("quest", "original_cutout"):
                     for j in range(8):
@@ -678,6 +722,34 @@ class PipelineService:
                         if not dst.exists():
                             shutil.copy2(str(cs), str(dst))
                             copied.append("char_scene.png")
+                # 序列帧 clips（与 structure 无关；素材库存有即复制改名，续传据此跳过生成）
+                lib_clips_mp = lib_char_dir / "sprite_clips.json"
+                if lib_clips_mp.exists():
+                    try:
+                        lcm = json.loads(lib_clips_mp.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        lcm = {}
+                    clip_entries = {}
+                    for action, names in (lcm.get("actions") or {}).items():
+                        paths = []
+                        for j, name in enumerate(names):
+                            dst = dst_img_dir / f"clip_{key}_{action}_{j:02d}.png"
+                            src_f = lib_char_dir / name
+                            if src_f.exists() and not dst.exists():
+                                shutil.copy2(str(src_f), str(dst))
+                            if dst.exists():
+                                paths.append(str(dst))
+                        if len(paths) >= 4:
+                            clip_entries[action] = paths
+                    if clip_entries:
+                        _merge_run_clip_manifest(dst_img_dir, key, clip_entries,
+                                                 int(lcm.get("fps", 12)))
+                        copied.append(f"{key} clips×{len(clip_entries)}")
+                        snap = lcm.get("desc_snapshot", "")
+                        if snap and snap != script.get(f"{key}_description", ""):
+                            self._on_log_line(
+                                f"  [Library] WARNING: {key} 序列帧外观快照与当前角色描述"
+                                "不一致（描述已改，画面素材未重新生成）")
                 self._on_log_line(f"  [Library] {key} ← {lib_id} ({lib_meta.get('name', '')})")
 
         # --- character_fixes: custom description (no source needed) ---

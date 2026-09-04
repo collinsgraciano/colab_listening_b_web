@@ -443,6 +443,7 @@ function createCharCard(char) {
         ${char.kokoro_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-900/50 text-fuchsia-300">🎵 ${char.kokoro_voice}</span>` : ''}
         ${(char.scenarios || []).map(s => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-300">📍 ${s}</span>`).join('')}
         ${!voiceOnly && char.pose_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">📷 ${char.pose_count}图</span>` : ''}
+        ${!voiceOnly && char.clip_count ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-teal-900/50 text-teal-300">🎬 ${char.clip_count}段动作</span>` : ''}
     `;
 
     const desc = document.createElement('div');

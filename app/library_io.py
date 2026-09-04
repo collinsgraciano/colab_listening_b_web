@@ -28,6 +28,16 @@ def list_library_chars(include_pose_count: bool = False) -> list[dict]:
                                          if "_c" not in p.stem)
             else:
                 meta["pose_count"] = 1 if (d / "char_scene.png").exists() else 0
+        # 序列帧动作段数（sprite_clips.json 缺失/损坏 = 0）
+        meta["clip_count"] = 0
+        clip_mp = d / "sprite_clips.json"
+        if clip_mp.exists():
+            try:
+                cm = json.loads(clip_mp.read_text(encoding="utf-8"))
+                meta["clip_count"] = sum(len(v)
+                                         for v in (cm.get("actions") or {}).values())
+            except (json.JSONDecodeError, OSError):
+                pass
         chars.append(meta)
     return chars
 

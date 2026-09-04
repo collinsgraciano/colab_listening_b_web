@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from ..config_manager import (
     MODES, find_run_dir, get_active_mode, iter_run_dirs, load_config,
-    resolve_provider,
+    resolve_provider, structure_family,
 )
 from ..library_io import list_library_chars, write_library_meta
 from ..page_mcp import (
@@ -203,7 +203,7 @@ async def api_library_save(request: Request):
     run_name = data.get("run_name", "")
     char_key = data.get("char_key", "")
     custom_name = data.get("name", "").strip()
-    structure = data.get("structure", "quest")
+    structure = structure_family(data.get("structure", "quest"))
 
     if not run_name or not char_key:
         return JSONResponse({"ok": False, "error": "缺少参数"}, status_code=400)
@@ -254,7 +254,39 @@ async def api_library_save(request: Request):
     # Copy thumbnail (pose_0 or char_scene)
     thumb_src = src_img_dir / f"pose_{char_key}_0.png" if structure == "quest" else src_img_dir / "char_scene.png"
     if thumb_src.exists():
-        shutil.copy2(str(thumb_src), str(lib_dir / "thumb.png"))
+        shutil.copy2(str(thumb_src), str(lib_dir / thumb_src.name))
+
+    # 序列帧 clips（sprite_sequence 运行产出；与 structure 无关，cutout/quest 通用）
+    clips_saved = 0
+    run_clips_mp = src_img_dir / "sprite_clips.json"
+    if run_clips_mp.exists():
+        try:
+            run_clips = json.loads(run_clips_mp.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            run_clips = {}
+        char_clips = (run_clips.get("chars") or {}).get(char_key) or {}
+        lib_actions = {}
+        for action, frames in char_clips.items():
+            names = []
+            for j, fp in enumerate(frames):
+                src = Path(fp)
+                if not src.exists():
+                    continue
+                dst = lib_dir / f"clip_{action}_{j:02d}.png"
+                shutil.copy2(str(src), str(dst))
+                names.append(dst.name)
+            if len(names) >= 4:
+                lib_actions[action] = names
+                clips_saved += 1
+        if lib_actions:
+            (lib_dir / "sprite_clips.json").write_text(
+                json.dumps({"version": 1,
+                            "fps": int(run_clips.get("fps", 12)),
+                            "source": run_clips.get("source", "video_frames"),
+                            "desc_snapshot": desc,
+                            "actions": lib_actions},
+                           ensure_ascii=False, indent=2),
+                encoding="utf-8")
 
     # Save metadata
     meta = {
@@ -268,6 +300,7 @@ async def api_library_save(request: Request):
         "kokoro_voice": kokoro_voice,
         "source_run": run_name,
         "source_key": char_key,
+        "sprite_clips": clips_saved,
         "created": time.time(),
     }
     (lib_dir / "meta.json").write_text(
