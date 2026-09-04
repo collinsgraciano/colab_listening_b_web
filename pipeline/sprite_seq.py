@@ -320,7 +320,7 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
 
     返回前完成：切分/抽帧 → _unify_clip_frames 统一几何 → 覆盖保存目标帧。
     """
-    work_dir = Path(tempfile.gettempdir()) / f"sprite_work_{char_key}_{action}"
+    work_dir = Path(tempfile.gettempdir()) / f"sprite_work_{source}_{char_key}_{action}"
     work_dir.mkdir(parents=True, exist_ok=True)
     final_paths = clip_frame_paths(img_dir, char_key, action)
     if all(os.path.exists(p) for p in final_paths):
