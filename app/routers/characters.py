@@ -1092,7 +1092,8 @@ def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
                 ok += 1
                 continue
             params = {"prompt": _with_ref_consistency(
-                          _video_prompt(action, description, DEFAULT_STYLE_PROMPT),
+                          _video_prompt(action, "" if ref_url else description,
+                                        DEFAULT_STYLE_PROMPT),
                           bool(ref_url)),
                       "duration": 6, "ratio": "16:9", "resolution": "720p",
                       "generate_audio": False}
@@ -1206,7 +1207,7 @@ async def api_library_gen_prompts(lib_id: str):
         clips.append({
             "action": action,
             "prompt": (_with_ref_consistency(
-                _video_prompt(action, description, DEFAULT_STYLE_PROMPT),
+                _video_prompt(action, "" if has_ref else description, DEFAULT_STYLE_PROMPT),
                 has_ref) if description else ""),
             "exists": description != "" and n_have == len(paths),
             "frames": n_have,

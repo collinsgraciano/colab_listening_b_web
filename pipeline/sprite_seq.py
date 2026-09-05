@@ -57,8 +57,11 @@ _ACTION_PHRASES = {
 
 
 def _video_prompt(action: str, char_desc: str, style_prompt: str) -> str:
+    """char_desc 传空串时省略外观描述段（有参考图场景以图为准，文字描述反干扰一致性）；
+    管线内各调用方恒传非空描述，输出逐字节不变。"""
+    desc = f"{char_desc}, " if char_desc else ""
     return (
-        f"{char_desc}, {_ACTION_PHRASES[action]}, plain pure white background, "
+        f"{desc}{_ACTION_PHRASES[action]}, plain pure white background, "
         f"static camera, medium waist-up shot, character stays centered and fully "
         f"in frame at all times, consistent appearance throughout the whole video, "
         f"smooth continuous looping motion, {style_prompt}, "
