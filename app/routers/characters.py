@@ -948,46 +948,55 @@ def _lib_is_host(meta: dict) -> bool:
     return bool(meta.get("is_host")) or meta.get("source_key") == "host"
 
 
-def _lib_clip_paths(lib_dir: Path, action: str) -> list[str]:
-    """库内命名目标帧路径（clip_{action}_{j:02d}.png，talking 48 帧/其余 16 帧）。"""
-    n = 48 if action.startswith("talking") else 16
-    return [str(lib_dir / f"clip_{action}_{j:02d}.png") for j in range(n)]
+def _list_action_frames(lib_dir: Path, action: str) -> list[str]:
+    """该动作已入库的帧文件（clip_{action}_*.png，按帧号数值排序）。
+
+    帧数由上传视频实际时长决定（8fps 全程抽帧），不固定 48/16；
+    帧号两位/三位混排（j≥100 时自然进位），必须按数值排序。
+    """
+    import re
+
+    def _key(p: Path) -> int:
+        m = re.search(r"_(\d+)\.png$", p.name)
+        return int(m.group(1)) if m else 0
+
+    return [str(p) for p in sorted(lib_dir.glob(f"clip_{action}_*.png"), key=_key)]
+
+
+# 单动作帧数上限（15s @ 8fps）：防超长视频抽帧过多撑爆渲染内存
+MAX_CLIP_FRAMES = 120
 
 
 def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
                               label: str = "") -> bool:
-    """本地处理：视频 → ffmpeg 抽帧(8fps) → 取样(48/16) → 抠图统一几何 → 存库内帧。
+    """本地处理：视频 → ffmpeg 全程抽帧(8fps) → 抠图统一几何 → 存库内帧。
 
-    复用 pipeline/sprite_seq.py 纯函数（与管线内序列帧产出规格逐字节一致），
-    MCP 自动生成与外部视频回传两条路线共用。
+    帧数 = 上传视频实际时长 × 8fps（上限 MAX_CLIP_FRAMES，超出截断告警），
+    不固定 6s/48 帧；复用 pipeline/sprite_seq.py 纯函数（抠图与几何统一规格
+    与管线内序列帧产出一致），MCP 自动生成与外部视频回传两条路线共用。
+    重新上传为替换语义：统一几何成功后先清该动作旧帧再写新帧。
     """
-    import os
     import shutil
     import tempfile
 
     from PIL import Image
-    from sprite_seq import (_extract_video_frames, _sample_frames,
-                            _unify_clip_frames, frames_for_action)
+    from sprite_seq import _extract_video_frames, _unify_clip_frames
 
-    n_frames = frames_for_action(action)
-    final_paths = _lib_clip_paths(lib_dir, action)
-    # 不做「帧已齐早退」——重新上传必须替换旧素材；
-    # MCP 自动路线的续传跳过由调用方 _generate_char_clips 自行判断。
     frames_dir = Path(tempfile.gettempdir()) / f"libclip_{lib_dir.name}_{action}"
     shutil.rmtree(str(frames_dir), ignore_errors=True)
     try:
         all_frames = _extract_video_frames(video_path, frames_dir, fps=8)
         if not all_frames:
             return False
-        if len(all_frames) > n_frames:
-            raw = [str(p) for p in _sample_frames(all_frames, n_frames)]
-        else:
-            raw = [str(p) for p in all_frames]
-        if len(raw) < 4:
-            print(f"    [LibClips] {label or action} too few frames ({len(raw)})")
+        if len(all_frames) > MAX_CLIP_FRAMES:
+            print(f"    [LibClips] {label or action} {len(all_frames)} 帧 "
+                  f"超过上限 {MAX_CLIP_FRAMES}，截断保留前 {MAX_CLIP_FRAMES} 帧")
+            all_frames = all_frames[:MAX_CLIP_FRAMES]
+        if len(all_frames) < 4:
+            print(f"    [LibClips] {label or action} too few frames ({len(all_frames)})")
             return False
         raw_imgs = []
-        for p in raw:
+        for p in all_frames:
             try:
                 raw_imgs.append(Image.open(p))
             except Exception as e:
@@ -995,30 +1004,30 @@ def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
         unified = _unify_clip_frames(raw_imgs, label=label or action)
         if len(unified) < 4:
             return False
-        if len(unified) != n_frames:
-            idxs = [round(i * (len(unified) - 1) / (n_frames - 1))
-                    for i in range(n_frames)]
-            unified = [unified[k] for k in idxs]
+        for old in lib_dir.glob(f"clip_{action}_*.png"):
+            try:
+                old.unlink()
+            except OSError:
+                pass
         for j, frame in enumerate(unified):
-            frame.save(final_paths[j], compress_level=2)
-        print(f"    [LibClips] {label or action}: {n_frames} frames saved")
+            frame.save(str(lib_dir / f"clip_{action}_{j:02d}.png"), compress_level=2)
+        print(f"    [LibClips] {label or action}: {len(unified)} frames saved")
         return True
     finally:
         shutil.rmtree(str(frames_dir), ignore_errors=True)
 
 
 def _refresh_clip_manifest(lib_dir: Path, description: str) -> int:
-    """扫描库内已齐帧的 clip 文件重建 sprite_clips.json 并更新 meta.sprite_clips。
+    """扫描库内已有帧的动作重建 sprite_clips.json 并更新 meta.sprite_clips。
 
-    返回登记的动作数；无任何完整动作时不写 manifest（与运行导入语义一致）。
+    帧数按实际上传时长（≥4 帧即登记，不要求固定 48/16 全齐）；
+    无任何动作时不写 manifest（与运行导入语义一致）。
     """
-    import os
-
     actions: dict[str, list[str]] = {}
     for action in _CLIP_ACTIONS_HOST:  # host 是超集（含 wave）
-        paths = _lib_clip_paths(lib_dir, action)
-        if all(os.path.exists(p) for p in paths):
-            actions[action] = [Path(p).name for p in paths]
+        frames = _list_action_frames(lib_dir, action)
+        if len(frames) >= 4:
+            actions[action] = [Path(p).name for p in frames]
     if actions:
         (lib_dir / "sprite_clips.json").write_text(
             json.dumps({"version": 1, "fps": 12, "source": "video_frames",
@@ -1086,8 +1095,7 @@ def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
         ok, failed = 0, []
         for i, action in enumerate(actions):
             _clip_gen_status[lib_id].update({"current_action": action, "done": i})
-            final_paths = _lib_clip_paths(lib_dir, action)
-            if all(os.path.exists(p) for p in final_paths):
+            if _list_action_frames(lib_dir, action):
                 print(f"  [LibClips] {lib_id}/{action} 已存在，跳过")
                 ok += 1
                 continue
@@ -1129,7 +1137,7 @@ def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
             ok += 1
             # 无参考图时用 talking_01 的帧做其后动作的一致性参考
             if not ref_url and action == _CLIP_ACTIONS_BASE[0]:
-                ref = _pick_ref_frame(final_paths)
+                ref = _pick_ref_frame(_list_action_frames(lib_dir, action))
                 if ref:
                     ref_url = reupload_for_cdn(ref, Path(ref).name,
                                                call_tool_fn=mcp.call_tool) or ""
@@ -1183,8 +1191,6 @@ async def api_library_clip_status(lib_id: str):
 @router.get("/api/character_library/{lib_id}/gen_prompts")
 async def api_library_gen_prompts(lib_id: str):
     """输出参考图 + 各动作视频的完整提示词（复制到外部工具用，与 MCP 路线逐字一致）。"""
-    import os
-
     from sprite_seq import _video_prompt
     from style_manager import DEFAULT_STYLE_PROMPT
 
@@ -1202,16 +1208,17 @@ async def api_library_gen_prompts(lib_id: str):
     has_ref = bool(ref_file)
     clips = []
     for action in (_CLIP_ACTIONS_HOST if is_host else _CLIP_ACTIONS_BASE):
-        paths = _lib_clip_paths(lib_dir, action)
-        n_have = sum(1 for p in paths if os.path.exists(p))
+        frames = _list_action_frames(lib_dir, action)
         clips.append({
             "action": action,
             "prompt": (_with_ref_consistency(
                 _video_prompt(action, "" if has_ref else description, DEFAULT_STYLE_PROMPT),
                 has_ref) if description else ""),
-            "exists": description != "" and n_have == len(paths),
-            "frames": n_have,
-            "sample_file": (Path(paths[0]).name if os.path.exists(paths[0]) else ""),
+            # 最少集语义：talking_01/idle_01（主持人另加 wave）必需，其余变体可选
+            "required": action in ("talking_01", "idle_01", "wave"),
+            "exists": bool(frames) and len(frames) >= 4,
+            "frames": len(frames),
+            "sample_file": (Path(frames[0]).name if frames else ""),
         })
     return {
         "description": description,
@@ -1225,7 +1232,8 @@ async def api_library_gen_prompts(lib_id: str):
                           else "16:9 横版单人半身"),
             "sample_file": ref_file,
         },
-        "video_suggested": "16:9、720p 及以上、6 秒以上、纯白背景、无文字水印、人物始终完整在画面中央",
+        "video_suggested": ("16:9、720p 及以上、纯白背景、无文字水印、人物始终完整在画面中央；"
+                            "时长不限，全程按 8fps 抽帧入库（几秒就抽几秒）"),
     }
 
 
@@ -1282,7 +1290,7 @@ async def api_library_import_pose_image(lib_id: str, image: UploadFile = File(..
 @router.post("/api/character_library/{lib_id}/import_clip")
 async def api_library_import_clip(lib_id: str, action: str = Form(""),
                                   video: UploadFile = File(...)):
-    """上传外部生成的动作视频回库：本地抽帧→取样→抠图统一→入库（零积分）。"""
+    """上传外部生成的动作视频回库：全程抽帧(8fps)→抠图统一→入库（零积分）。"""
     lib_dir = LIBRARY_DIR / lib_id
     if not lib_dir.exists():
         return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
@@ -1313,9 +1321,11 @@ async def api_library_import_clip(lib_id: str, action: str = Form(""),
     if not ok:
         return JSONResponse({"ok": False, "error": "视频处理失败（抽帧失败或有效内容过少）"}, status_code=500)
     n_actions = _refresh_clip_manifest(lib_dir, meta.get("description", ""))
-    print(f"  [LibImport] {lib_id}/{action}: clip imported (manifest {n_actions} actions)")
+    n_frames = len(_list_action_frames(lib_dir, action))
+    print(f"  [LibImport] {lib_id}/{action}: clip imported "
+          f"({n_frames} frames, manifest {n_actions} actions)")
     return {"ok": True, "action": action,
-            "frames": 48 if action.startswith("talking") else 16,
+            "frames": n_frames,
             "manifest_actions": n_actions}
 
 

@@ -296,8 +296,11 @@ def _build_clip_schedule(clips: dict, total_frames: int, fps: float,
     idle_group = _clip_variants(clips, _CLIP_IDLE)
     inserts = [a for a in _CLIP_INSERTS if a in clips]
     if not is_speaker:
-        pool = idle_group or talking_group or [sorted(clips)[0]]
-        return [(pool[seed % len(pool)], 0)]
+        # 倾听者只用 idle 变体；无 idle 返回空表 → 渲染层回退姿势图集路径
+        # （不循环 talking —— 静默角色嘴动属视觉 bug）
+        if not idle_group:
+            return []
+        return [(idle_group[seed % len(idle_group)], 0)]
     if not talking_group:
         # 未知名动作键：按字典序取第一个当基础循环
         return [(sorted(clips)[0], 0)]
@@ -601,15 +604,16 @@ def _render_sm_segment_inner(
                               len(group) - 1)
                     sprite = transform_pose(group[idx])
                     paste_with_shadow(canvas, sprite, x, cy, centered=True)
-                else:
-                    # 倾听者：idle 变体按 seed 选其一，循环播放
-                    gkeys = _clip_variants(layer_clips, _CLIP_IDLE) \
-                        or sorted(layer_clips)
+                    continue
+                # 倾听者：idle 变体按 seed 选其一，循环播放；无 idle 变体时
+                # 落入下方姿势图集路径（不循环 talking —— 静默角色嘴动属视觉 bug）
+                gkeys = _clip_variants(layer_clips, _CLIP_IDLE)
+                if gkeys:
                     frames = layer_clips[gkeys[(seed + li * 100) % len(gkeys)]]
                     idx = int((fidx / render_fps) * layer.get("clip_fps", 12)) \
                         % len(frames)
                     paste_with_shadow(canvas, frames[idx], x, cy, centered=True)
-                continue
+                    continue
 
             cschedule = clip_schedules[li] if li < len(clip_schedules) else []
             if layer_clips and cschedule:
@@ -865,12 +869,13 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
                     layer["clips"] = char_clips
                     layer["clip_fps"] = sprite_clip_fps
                     if sprite_take_mode and char_key == speaker:
-                        # 整句单 take：talking 变体按行轮换（相邻行不重样）
+                        # 整句单 take：talking 变体按行随机（不与上一行重复）
+                        from stop_motion import pick_take_variant
                         tkeys = sorted(k for k in char_clips
                                        if k == "talking"
                                        or k.startswith("talking_"))
                         layer["take_mode"] = True
-                        layer["take_action"] = tkeys[audio_idx % len(tkeys)]
+                        layer["take_action"] = pick_take_variant(tkeys, audio_idx)
                 char_layers.append(layer)
         else:
             idx = min(audio_idx, len(pose_images) - 1) if pose_images else 0

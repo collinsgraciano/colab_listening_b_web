@@ -284,6 +284,23 @@ def _pick_ref_frame(frame_paths: list) -> str | None:
     return best
 
 
+def _load_prior_manifest(img_dir) -> tuple[dict, set]:
+    """读运行目录已有 manifest（存在时），返回 (chars dict, from_library 集合)。
+
+    from_library 由 app/pipeline_service._merge_run_clip_manifest 写入：
+    这些角色的序列帧素材以素材库为权威来源。
+    """
+    path = Path(img_dir) / MANIFEST_NAME
+    if not path.exists():
+        return {}, set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            m = json.load(f)
+        return (m.get("chars") or {}), set(m.get("from_library") or [])
+    except (json.JSONDecodeError, OSError):
+        return {}, set()
+
+
 def generate_sprite_clips(script, img_dir,
                           tts_thread=None, max_workers: int = 2,
                           style_prompt: str = DEFAULT_STYLE_PROMPT,
@@ -292,8 +309,12 @@ def generate_sprite_clips(script, img_dir,
 
     resume：目标帧文件齐该动作应有帧数（talking 48 / 其余 16）直接登记跳过；
     单动作失败记日志继续。
+    from_library 角色（绑定素材库序列帧角色）：缺失动作不自动补齐（用户决策
+    「缺什么用什么」，零积分），已有动作沿用原 manifest 帧清单——帧数随上传
+    视频时长可变，固定 48/16 判定会截断长视频素材。
     """
     img_dir = Path(img_dir)
+    prior_chars, library_chars = _load_prior_manifest(img_dir)
     all_chars = [
         ("char_a", script.get("char_a_description", "friendly young man")),
         ("char_b", script.get("char_b_description", "friendly young woman")),
@@ -307,17 +328,27 @@ def generate_sprite_clips(script, img_dir,
         return None
 
     manifest = {"version": 1, "fps": CLIP_FPS, "source": SOURCE, "chars": {}}
+    if library_chars:
+        manifest["from_library"] = sorted(library_chars)
     todo: dict[str, list] = {}
     for char_key, _desc in chars:
+        prior = prior_chars.get(char_key) or {}
         entry = {}
         missing = []
         for action in SPRITE_ACTIONS:
-            if _clip_complete(img_dir, char_key, action):
+            prior_frames = [p for p in (prior.get(action) or [])
+                            if os.path.exists(p)]
+            if len(prior_frames) >= 4:
+                entry[action] = prior_frames
+            elif _clip_complete(img_dir, char_key, action):
                 entry[action] = clip_frame_paths(img_dir, char_key, action)
             else:
                 missing.append(action)
         manifest["chars"][char_key] = entry
-        if missing:
+        if missing and char_key in library_chars:
+            print(f"  [SpriteSeq] {char_key}: 素材库角色，缺失动作不自动补齐 "
+                  f"({', '.join(missing)})")
+        elif missing:
             todo[char_key] = missing
 
     n_done = sum(len(v) for v in manifest["chars"].values())

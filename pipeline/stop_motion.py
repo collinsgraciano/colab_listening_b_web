@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import os
+import random
 import subprocess
 from pathlib import Path
 
@@ -58,6 +59,26 @@ SHADOW_OPACITY = 0.40
 SHADOW_BLUR = 1.2
 SHADOW_OFFSET_X = 8
 SHADOW_OFFSET_Y = 10
+
+
+def pick_take_variant(keys: list, line_idx: int, salt: str = "take"):
+    """按行号无状态随机挑一个动作变体，且不与上一行的最终结果重复。
+
+    用户决策：多段 talking 变体「随机轮换，但避免相邻重复」。
+    结果只由 (keys, line_idx, salt) 决定：从行 0 起逐行模拟
+    （raw 随机 → 与上一行最终结果相同则 +1 错开），并行分段渲染与
+    断点续传都安全。实际行数为几十级，重算成本可忽略。
+    """
+    if not keys:
+        return None
+    if len(keys) == 1:
+        return keys[0]
+    n = len(keys)
+    final = random.Random(f"{salt}:0").randrange(n)
+    for i in range(1, max(0, line_idx) + 1):
+        raw = random.Random(f"{salt}:{i}").randrange(n)
+        final = raw if raw != final else (raw + 1) % n
+    return keys[final]
 
 
 # ---------------------------------------------------------------------------

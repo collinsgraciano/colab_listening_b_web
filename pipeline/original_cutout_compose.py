@@ -110,6 +110,14 @@ def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | No
             layer["take_mode"] = True
             if take_action:
                 layer["take_action"] = take_action
+            else:
+                # welcome/hook 说话段未显式指定动作：talking 变体按段随机（不与上一段重复）
+                from stop_motion import pick_take_variant
+                tkeys = sorted(k for k in host_clip_map
+                               if k == "talking" or k.startswith("talking_"))
+                picked = pick_take_variant(tkeys, seg_idx)
+                if picked:
+                    layer["take_action"] = picked
     char_layers = [layer]
     frames_dir = sm_root / f"{seg_type}_{seg_idx}"
     direction = 1 if seg_idx % 2 == 0 else -1
@@ -233,11 +241,12 @@ def _prepare_segment(
                 if sprite_take_mode:
                     layer["take_mode"] = True
                     if is_speaker:
-                        # 跨行轮换 talking 变体（相邻行不重样；缺变体自动回退）
+                        # 跨行随机轮换 talking 变体（不与上一行重复；缺变体自动回退）
+                        from stop_motion import pick_take_variant
                         tkeys = sorted(k for k in clips
                                        if k == "talking"
                                        or k.startswith("talking_"))
-                        layer["take_action"] = tkeys[audio_idx % len(tkeys)]
+                        layer["take_action"] = pick_take_variant(tkeys, audio_idx)
             return layer
 
         char_layers = []

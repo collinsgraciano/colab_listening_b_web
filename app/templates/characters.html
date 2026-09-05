@@ -1139,11 +1139,12 @@ function renderPromptsModal(libId, data) {
         </div>
         <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
             <div class="text-xs font-semibold text-indigo-300 mb-1">② 动作视频提示词（${data.clips.length} 段${data.is_host ? ' · 主持人含 wave' : ''}）</div>
+            <p class="text-[10px] text-emerald-300/90 mb-1">最少上传：talking ×1 + idle ×1${data.is_host ? ' + wave ×1（主持人）' : ''} 即可使用；talking 最多 3 段、idle 最多 2 段，多段自动随机轮换（不与上一行重复），缺的变体不补齐也不回退。</p>
             <p class="text-[10px] text-slate-500 mb-2">建议参数：${_esc(data.video_suggested)}。每段视频生成后用「📥 上传视频」回库，本地自动抽帧抠图入库（零积分），重新上传会替换旧素材。${data.has_ref ? '<span class="text-emerald-400">已附加一致性约束：视频人物与上传的参考图保持一致（外部工具请同步上传同一张参考图），prompt 已省略外观描述以参考图为准。</span>' : ''}</p>
             ${data.clips.map(c => `
             <div class="border-t border-slate-800 pt-2 mt-2">
                 <div class="flex items-center justify-between gap-2 mb-1">
-                    <div class="text-[11px] text-slate-200">🎬 ${c.action} ${c.exists ? '<span class="text-[10px] text-emerald-300">✅ 已入库</span>' : (c.frames ? `<span class="text-[10px] text-amber-300">部分 ${c.frames} 帧</span>` : '')}</div>
+                    <div class="text-[11px] text-slate-200">🎬 ${c.action} ${c.required === false ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400">可选</span>' : ''} ${c.exists ? '<span class="text-[10px] text-emerald-300">✅ 已入库</span>' : (c.frames ? `<span class="text-[10px] text-amber-300">部分 ${c.frames} 帧</span>` : '')}</div>
                     <div class="flex items-center gap-2">
                         <input type="file" id="prompt-clip-file-${c.action}" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" class="hidden" onchange="importClipSelected('${libId}', '${c.action}', this)">
                         <button onclick="document.getElementById('prompt-clip-file-${c.action}').click()" class="px-2 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-[11px] text-white">📥 上传视频</button>

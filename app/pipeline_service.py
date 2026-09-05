@@ -91,11 +91,15 @@ def _cfg_int(config: dict, key: str, default: int) -> int:
 
 
 def _merge_run_clip_manifest(dst_img_dir: Path, char_key: str,
-                             actions: dict, fps: int = 12) -> None:
+                             actions: dict, fps: int = 12,
+                             from_library: bool = False) -> None:
     """把复制的序列帧 clips 合并写入运行 manifest。
 
     generate_sprite_clips 按目标帧文件存在性续传，此合并非必需，
     但写入后 load_clip_map/缩略图参考等消费方可直接读到。
+    from_library=True 时把角色记入 manifest["from_library"]：素材库是序列帧
+    素材的权威来源，generate_sprite_clips 对这些角色跳过缺失动作的自动补齐
+    （避免绑定最少集角色跑片时意外消耗 MCP 积分）。
     """
     mp = dst_img_dir / "sprite_clips.json"
     manifest = {"version": 1, "fps": fps, "source": "video_frames", "chars": {}}
@@ -105,6 +109,10 @@ def _merge_run_clip_manifest(dst_img_dir: Path, char_key: str,
         except (json.JSONDecodeError, OSError):
             pass
     manifest.setdefault("chars", {}).setdefault(char_key, {}).update(actions)
+    if from_library:
+        flags = manifest.setdefault("from_library", [])
+        if char_key not in flags:
+            flags.append(char_key)
     mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2),
                   encoding="utf-8")
 
@@ -743,13 +751,20 @@ class PipelineService:
                             clip_entries[action] = paths
                     if clip_entries:
                         _merge_run_clip_manifest(dst_img_dir, key, clip_entries,
-                                                 int(lcm.get("fps", 12)))
+                                                 int(lcm.get("fps", 12)),
+                                                 from_library=True)
                         copied.append(f"{key} clips×{len(clip_entries)}")
                         snap = lcm.get("desc_snapshot", "")
                         if snap and snap != script.get(f"{key}_description", ""):
                             self._on_log_line(
                                 f"  [Library] WARNING: {key} 序列帧外观快照与当前角色描述"
                                 "不一致（描述已改，画面素材未重新生成）")
+                    elif lcm.get("actions") is not None:
+                        # 库有 clips 清单但本次无可复制动作（源文件缺失）：
+                        # 仍标记 from_library，防止运行中意外 MCP 补齐
+                        _merge_run_clip_manifest(dst_img_dir, key, {},
+                                                 int(lcm.get("fps", 12)),
+                                                 from_library=True)
                 self._on_log_line(f"  [Library] {key} ← {lib_id} ({lib_meta.get('name', '')})")
 
         # --- character_fixes: custom description (no source needed) ---
