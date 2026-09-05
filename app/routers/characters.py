@@ -921,6 +921,27 @@ _CLIP_ACTIONS_HOST = _CLIP_ACTIONS_BASE + ("wave",)
 
 _clip_gen_status: dict[str, dict] = {}  # lib_id → {status, done, total, current_action, error}
 
+# 有参考图时附加到视频 prompt 的一致性强约束（外部工具与 MCP 自动路线共用；
+# 仅素材库路线附加，管线 sprite_seq._video_prompt 保持零改动）
+_REF_CONSISTENCY = (
+    "the character must be exactly the same person as the reference image, "
+    "identical face, identical hairstyle, identical outfit and colors, "
+    "strictly follow the reference image appearance, no design changes"
+)
+
+
+def _with_ref_consistency(prompt: str, has_ref: bool) -> str:
+    """有参考图时在视频 prompt 末尾附加人物一致性约束。"""
+    return f"{prompt}, {_REF_CONSISTENCY}" if has_ref and prompt else prompt
+
+
+def _lib_ref_file(lib_dir: Path) -> str:
+    """该角色当前参考图文件名（姿势图 → 场景图 → 空），供提示词与打开目录用。"""
+    for name in ("pose_char_a_0.png", "char_scene.png"):
+        if (lib_dir / name).exists():
+            return name
+    return ""
+
 
 def _lib_is_host(meta: dict) -> bool:
     """该库角色是否按主持人处理（决定是否生成 wave 动作段）。"""
@@ -950,8 +971,8 @@ def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
 
     n_frames = frames_for_action(action)
     final_paths = _lib_clip_paths(lib_dir, action)
-    if all(os.path.exists(p) for p in final_paths):
-        return True
+    # 不做「帧已齐早退」——重新上传必须替换旧素材；
+    # MCP 自动路线的续传跳过由调用方 _generate_char_clips 自行判断。
     frames_dir = Path(tempfile.gettempdir()) / f"libclip_{lib_dir.name}_{action}"
     shutil.rmtree(str(frames_dir), ignore_errors=True)
     try:
@@ -1070,7 +1091,9 @@ def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
                 print(f"  [LibClips] {lib_id}/{action} 已存在，跳过")
                 ok += 1
                 continue
-            params = {"prompt": _video_prompt(action, description, DEFAULT_STYLE_PROMPT),
+            params = {"prompt": _with_ref_consistency(
+                          _video_prompt(action, description, DEFAULT_STYLE_PROMPT),
+                          bool(ref_url)),
                       "duration": 6, "ratio": "16:9", "resolution": "720p",
                       "generate_audio": False}
             if ref_url:
@@ -1174,25 +1197,32 @@ async def api_library_gen_prompts(lib_id: str):
     description = meta.get("description", "")
     structure = meta.get("structure", "quest")
     is_host = _lib_is_host(meta)
+    ref_file = _lib_ref_file(lib_dir)
+    has_ref = bool(ref_file)
     clips = []
     for action in (_CLIP_ACTIONS_HOST if is_host else _CLIP_ACTIONS_BASE):
         paths = _lib_clip_paths(lib_dir, action)
         n_have = sum(1 for p in paths if os.path.exists(p))
         clips.append({
             "action": action,
-            "prompt": _video_prompt(action, description, DEFAULT_STYLE_PROMPT) if description else "",
+            "prompt": (_with_ref_consistency(
+                _video_prompt(action, description, DEFAULT_STYLE_PROMPT),
+                has_ref) if description else ""),
             "exists": description != "" and n_have == len(paths),
             "frames": n_have,
+            "sample_file": (Path(paths[0]).name if os.path.exists(paths[0]) else ""),
         })
     return {
         "description": description,
         "structure": structure,
         "is_host": is_host,
+        "has_ref": has_ref,
         "clips": clips,
         "image": {
             "prompt": _build_image_prompt(structure, description) if description else "",
             "suggested": ("4992x3328 横版图集（4×2 八姿势）" if structure == "quest"
                           else "16:9 横版单人半身"),
+            "sample_file": ref_file,
         },
         "video_suggested": "16:9、720p 及以上、6 秒以上、纯白背景、无文字水印、人物始终完整在画面中央",
     }
@@ -1286,5 +1316,47 @@ async def api_library_import_clip(lib_id: str, action: str = Form(""),
     return {"ok": True, "action": action,
             "frames": 48 if action.startswith("talking") else 16,
             "manifest_actions": n_actions}
+
+
+@router.post("/api/character_library/{lib_id}/open_folder")
+async def api_library_open_folder(lib_id: str, file: str = ""):
+    """在系统文件管理器中打开角色素材目录；file 非空时高亮选中该文件。
+
+    仿 runs.py open_folder：仅接受目录内普通文件名（禁路径分隔符/点段）。
+    """
+    import os
+    import subprocess
+    import sys
+    import threading
+
+    lib_dir = (LIBRARY_DIR / lib_id).resolve()
+    if (not str(lib_dir).startswith(str(LIBRARY_DIR.resolve()))
+            or not lib_dir.is_dir()):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    if file and (os.sep in file or "/" in file or "\\" in file or ".." in file
+                 or Path(file).name != file):
+        return JSONResponse({"ok": False, "error": "Invalid file"}, status_code=400)
+    target = lib_dir
+    if file:
+        candidate = lib_dir / file
+        if candidate.is_file():
+            target = candidate
+    try:
+        if sys.platform == "win32":
+            from .runs import _list_explorer_windows, _raise_folder_window
+            before = _list_explorer_windows()
+            if target != lib_dir:
+                subprocess.Popen(["explorer", "/select,", str(target)])
+            else:
+                os.startfile(str(lib_dir))  # noqa: S606
+            threading.Thread(
+                target=_raise_folder_window,
+                args=(lib_dir.name, before), daemon=True).start()
+        else:
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.Popen([opener, str(target)])
+        return {"ok": True, "path": str(target)}
+    except OSError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
