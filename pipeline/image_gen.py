@@ -99,16 +99,21 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
     return tts_results, image_urls
 
 
-def reupload_for_cdn(filepath, filename):
+def reupload_for_cdn(filepath, filename, call_tool_fn=None):
     """Re-upload an existing local image to TOS and return the CDN URL.
 
     file_upload MCP tool only returns presigned URLs — the actual PUT upload
     must be done by the caller. Without this, Seedance2 gets a URL pointing to
     nothing → 'resource download failed'.
+
+    call_tool_fn: 可选注入的 MCP call_tool 函数（页面级独立会话用，避免动
+    pipeline 全局会话）；缺省 None 时用模块全局 call_tool（管线行为不变）。
     """
+    if call_tool_fn is None:
+        call_tool_fn = call_tool
     print(f"  [Image] {filename} already exists, re-uploading for CDN URL...")
     try:
-        upload_result = call_tool("file_upload", {"file_path": filepath})
+        upload_result = call_tool_fn("file_upload", {"file_path": filepath})
         if "result" not in upload_result:
             print(f"    [Image] file_upload returned no result")
             return ""

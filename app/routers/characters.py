@@ -430,6 +430,40 @@ async def api_library_set_moss_voice(lib_id: str, request: Request):
 _gen_status: dict[str, dict] = {}  # lib_id → {status, poses, error, started_at}
 
 
+# 参考图风格串（MCP 生成与外部工具提示词输出共用，保证逐字一致）
+_CHAR_IMG_STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
+                   "cel-shaded with thin clean black outline, "
+                   "vibrant saturated colors, smooth surfaces")
+
+
+def _build_image_prompt(structure: str, description: str) -> str:
+    """参考图生成 prompt（MCP 自动生成与 /gen_prompts 提示词输出共用）。"""
+    if structure == "quest":
+        # 4×2 grid atlas (8 poses)
+        return (
+            f"4x2 grid character pose sheet, eight poses of the same character, "
+            f"{description}, "
+            f"top row left to right: speaking with mouth open, listening with slight smile, "
+            f"thinking with hand on chin, surprised with raised eyebrows, "
+            f"bottom row left to right: nodding in agreement, waving right hand, "
+            f"pointing forward, laughing with eyes closed, "
+            f"medium waist-up shot, every pose fully inside its own cell with generous "
+            f"empty margin on all sides, both shoulders fully visible, all arms and hands "
+            f"completely within the cell borders, no body part cropped or cut off at the "
+            f"cell edges, all eight poses same character same outfit, "
+            f"plain white background, {_CHAR_IMG_STYLE}, "
+            f"no props, no objects, no scene, no text"
+        )
+    # Original structure: single character scene image
+    return (
+        f"{description}, standing pose, medium waist-up shot, "
+        f"both shoulders fully visible, all arms and hands completely within "
+        f"the frame, no body part cropped or cut off at the image edges, "
+        f"plain white background, {_CHAR_IMG_STYLE}, "
+        f"no props, no objects, no scene, no text"
+    )
+
+
 def _generate_char_images(lib_id: str, description: str, structure: str):
     """Background thread: generate pose atlas via MCP, download, split into poses.
 
@@ -458,10 +492,6 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
               f"×{len(resolved['tokens'])} ({mask_token(resolved['tokens'][0])})")
         mcp = PageMcpSession(resolved["tokens"]).initialize()
 
-        _STYLE = ("3D cartoon style, Pixar-like, warm soft lighting, "
-                  "cel-shaded with thin clean black outline, "
-                  "vibrant saturated colors, smooth surfaces")
-
         # Use "char_a" as source_key for all manually created characters
         src_key = "char_a"
 
@@ -473,21 +503,7 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
             old_atlas.unlink()
 
         if structure == "quest":
-            # 4×2 grid atlas (8 poses)
-            atlas_prompt = (
-                f"4x2 grid character pose sheet, eight poses of the same character, "
-                f"{description}, "
-                f"top row left to right: speaking with mouth open, listening with slight smile, "
-                f"thinking with hand on chin, surprised with raised eyebrows, "
-                f"bottom row left to right: nodding in agreement, waving right hand, "
-                f"pointing forward, laughing with eyes closed, "
-                f"medium waist-up shot, every pose fully inside its own cell with generous "
-                f"empty margin on all sides, both shoulders fully visible, all arms and hands "
-                f"completely within the cell borders, no body part cropped or cut off at the "
-                f"cell edges, all eight poses same character same outfit, "
-                f"plain white background, {_STYLE}, "
-                f"no props, no objects, no scene, no text"
-            )
+            atlas_prompt = _build_image_prompt("quest", description)
             gen_params = {
                 "prompt": atlas_prompt,
                 "provider": "seedream",
@@ -496,14 +512,8 @@ def _generate_char_images(lib_id: str, description: str, structure: str):
                 "is_segmentation": True,
             }
         else:
-            # Original structure: single character scene image
-            atlas_prompt = (
-                f"{description}, standing pose, medium waist-up shot, "
-                f"both shoulders fully visible, all arms and hands completely within "
-                f"the frame, no body part cropped or cut off at the image edges, "
-                f"plain white background, {_STYLE}, "
-                f"no props, no objects, no scene, no text"
-            )
+            # Original: save as char_scene.png
+            atlas_prompt = _build_image_prompt("original", description)
             gen_params = {
                 "prompt": atlas_prompt,
                 "provider": "seedream",
@@ -804,7 +814,8 @@ async def api_library_update(lib_id: str, request: Request):
         return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
 
     data = await request.json()
-    for key in ("name", "description", "gender", "structure", "qwen_speaker", "moss_voice", "kokoro_voice"):
+    for key in ("name", "description", "gender", "structure", "qwen_speaker",
+                "moss_voice", "kokoro_voice", "is_host"):
         if key in data:
             meta[key] = data[key]
     write_library_meta(lib_id, meta)
@@ -899,5 +910,381 @@ async def api_library_pose_file(lib_id: str, filename: str):
     if not pose_path.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
     return FileResponse(str(pose_path), media_type="image/png")
+
+
+# ===========================================================================
+# Sprite clip generation（序列帧素材：MCP 自动生成 / 外部工具提示词+回传）
+# ===========================================================================
+
+_CLIP_ACTIONS_BASE = ("talking_01", "talking_02", "talking_03", "idle_01", "idle_02")
+_CLIP_ACTIONS_HOST = _CLIP_ACTIONS_BASE + ("wave",)
+
+_clip_gen_status: dict[str, dict] = {}  # lib_id → {status, done, total, current_action, error}
+
+
+def _lib_is_host(meta: dict) -> bool:
+    """该库角色是否按主持人处理（决定是否生成 wave 动作段）。"""
+    return bool(meta.get("is_host")) or meta.get("source_key") == "host"
+
+
+def _lib_clip_paths(lib_dir: Path, action: str) -> list[str]:
+    """库内命名目标帧路径（clip_{action}_{j:02d}.png，talking 48 帧/其余 16 帧）。"""
+    n = 48 if action.startswith("talking") else 16
+    return [str(lib_dir / f"clip_{action}_{j:02d}.png") for j in range(n)]
+
+
+def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
+                              label: str = "") -> bool:
+    """本地处理：视频 → ffmpeg 抽帧(8fps) → 取样(48/16) → 抠图统一几何 → 存库内帧。
+
+    复用 pipeline/sprite_seq.py 纯函数（与管线内序列帧产出规格逐字节一致），
+    MCP 自动生成与外部视频回传两条路线共用。
+    """
+    import os
+    import shutil
+    import tempfile
+
+    from PIL import Image
+    from sprite_seq import (_extract_video_frames, _sample_frames,
+                            _unify_clip_frames, frames_for_action)
+
+    n_frames = frames_for_action(action)
+    final_paths = _lib_clip_paths(lib_dir, action)
+    if all(os.path.exists(p) for p in final_paths):
+        return True
+    frames_dir = Path(tempfile.gettempdir()) / f"libclip_{lib_dir.name}_{action}"
+    shutil.rmtree(str(frames_dir), ignore_errors=True)
+    try:
+        all_frames = _extract_video_frames(video_path, frames_dir, fps=8)
+        if not all_frames:
+            return False
+        if len(all_frames) > n_frames:
+            raw = [str(p) for p in _sample_frames(all_frames, n_frames)]
+        else:
+            raw = [str(p) for p in all_frames]
+        if len(raw) < 4:
+            print(f"    [LibClips] {label or action} too few frames ({len(raw)})")
+            return False
+        raw_imgs = []
+        for p in raw:
+            try:
+                raw_imgs.append(Image.open(p))
+            except Exception as e:
+                print(f"    [LibClips] open frame error: {e}")
+        unified = _unify_clip_frames(raw_imgs, label=label or action)
+        if len(unified) < 4:
+            return False
+        if len(unified) != n_frames:
+            idxs = [round(i * (len(unified) - 1) / (n_frames - 1))
+                    for i in range(n_frames)]
+            unified = [unified[k] for k in idxs]
+        for j, frame in enumerate(unified):
+            frame.save(final_paths[j], compress_level=2)
+        print(f"    [LibClips] {label or action}: {n_frames} frames saved")
+        return True
+    finally:
+        shutil.rmtree(str(frames_dir), ignore_errors=True)
+
+
+def _refresh_clip_manifest(lib_dir: Path, description: str) -> int:
+    """扫描库内已齐帧的 clip 文件重建 sprite_clips.json 并更新 meta.sprite_clips。
+
+    返回登记的动作数；无任何完整动作时不写 manifest（与运行导入语义一致）。
+    """
+    import os
+
+    actions: dict[str, list[str]] = {}
+    for action in _CLIP_ACTIONS_HOST:  # host 是超集（含 wave）
+        paths = _lib_clip_paths(lib_dir, action)
+        if all(os.path.exists(p) for p in paths):
+            actions[action] = [Path(p).name for p in paths]
+    if actions:
+        (lib_dir / "sprite_clips.json").write_text(
+            json.dumps({"version": 1, "fps": 12, "source": "video_frames",
+                        "desc_snapshot": description, "actions": actions},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8")
+    meta_path = lib_dir / "meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return len(actions)
+        meta["sprite_clips"] = len(actions)
+        write_library_meta(lib_dir.name, meta)
+    return len(actions)
+
+
+def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
+    """后台线程：MCP Seedance2 生成各动作白底视频 → 本地抽帧抠图入库。
+
+    页面级独立 MCP 会话（与 pipeline 全局会话隔离）；单动作失败记日志继续；
+    文件级续传（帧已齐的动作跳过）；无参考图时 talking_01 先行、其后动作
+    用它的帧做一致性参考（与管线 sprite_seq._gen_char 语义一致）。
+    """
+    import os
+
+    from image_gen import reupload_for_cdn
+    from sprite_seq import _pick_ref_frame, _video_prompt
+    from style_manager import DEFAULT_STYLE_PROMPT
+
+    lib_dir = LIBRARY_DIR / lib_id
+    actions = list(_CLIP_ACTIONS_HOST if is_host else _CLIP_ACTIONS_BASE)
+    total = len(actions)
+    if not lib_dir.exists():
+        _clip_gen_status[lib_id] = {"status": "error", "error": "角色目录不存在",
+                                    "done": 0, "total": total, "current_action": ""}
+        return
+    _clip_gen_status[lib_id] = {"status": "generating", "error": "", "done": 0,
+                                "total": total, "current_action": "",
+                                "started_at": time.time()}
+    try:
+        resolved = resolve_page_tokens("characters")
+        if not resolved["tokens"]:
+            _clip_gen_status[lib_id] = {
+                "status": "error",
+                "error": "未配置 MCP Token（本页专属 / 模式配置 / 本地检测均为空）",
+                "done": 0, "total": total, "current_action": ""}
+            return
+        print(f"  [LibClips] MCP token: {MCP_SOURCE_LABELS[resolved['source']]} "
+              f"×{len(resolved['tokens'])} ({mask_token(resolved['tokens'][0])})")
+        mcp = PageMcpSession(resolved["tokens"]).initialize()
+
+        # 参考图：姿势图 → 场景图 → 无（无图允许直接生成）
+        ref_url = ""
+        for name in ("pose_char_a_0.png", "char_scene.png"):
+            p = lib_dir / name
+            if p.exists():
+                ref_url = reupload_for_cdn(str(p), name, call_tool_fn=mcp.call_tool)
+                if ref_url:
+                    print(f"  [LibClips] {lib_id} ref: {name}")
+                else:
+                    print(f"  [LibClips] WARNING: 参考图上传失败，回退 text_to_video")
+                break
+
+        ok, failed = 0, []
+        for i, action in enumerate(actions):
+            _clip_gen_status[lib_id].update({"current_action": action, "done": i})
+            final_paths = _lib_clip_paths(lib_dir, action)
+            if all(os.path.exists(p) for p in final_paths):
+                print(f"  [LibClips] {lib_id}/{action} 已存在，跳过")
+                ok += 1
+                continue
+            params = {"prompt": _video_prompt(action, description, DEFAULT_STYLE_PROMPT),
+                      "duration": 6, "ratio": "16:9", "resolution": "720p",
+                      "generate_audio": False}
+            if ref_url:
+                params.update({"mode": "reference_image", "image_urls": ref_url})
+            else:
+                params.update({"mode": "text_to_video"})
+            result = mcp.call_tool("generate_video", params)
+            task_id = mcp.parse_task_id(result)
+            video_path = ""
+            if task_id:
+                data = mcp.poll_task(task_id, interval=40, max_wait=900)
+                url = data.get("url", "")
+                tmp_video = lib_dir / f"_tmp_{action}.mp4"
+                if (url and mcp.download_file(url, str(tmp_video))
+                        and tmp_video.stat().st_size >= 500000):
+                    video_path = str(tmp_video)
+            if not video_path:
+                print(f"  [LibClips] WARNING: {lib_id}/{action} 视频生成失败")
+                failed.append(action)
+                continue
+            try:
+                produced = _produce_clips_from_video(video_path, lib_dir, action,
+                                                     label=f"{lib_id}/{action}")
+            finally:
+                try:
+                    os.remove(video_path)
+                except OSError:
+                    pass
+            if not produced:
+                failed.append(action)
+                continue
+            ok += 1
+            # 无参考图时用 talking_01 的帧做其后动作的一致性参考
+            if not ref_url and action == _CLIP_ACTIONS_BASE[0]:
+                ref = _pick_ref_frame(final_paths)
+                if ref:
+                    ref_url = reupload_for_cdn(ref, Path(ref).name,
+                                               call_tool_fn=mcp.call_tool) or ""
+
+        _refresh_clip_manifest(lib_dir, description)
+        _clip_gen_status[lib_id] = {
+            "status": "done" if ok else "error",
+            "error": "" if ok else "全部动作生成失败" + (f"：{', '.join(failed)}" if failed else ""),
+            "done": ok, "total": total, "current_action": ""}
+        print(f"  [LibClips] Done {lib_id}: {ok}/{total} clips")
+    except RuntimeError as e:
+        msg = ("MCP Token 积分全部耗尽" if "ALL_MCP_TOKENS_EXHAUSTED" in str(e)
+               else str(e)[:200])
+        _clip_gen_status[lib_id] = {"status": "error", "error": msg,
+                                    "done": 0, "total": total, "current_action": ""}
+    except Exception as e:  # noqa: BLE001 — 错误信息原样落状态供前端展示
+        print(f"  [LibClips] ERROR {lib_id}: {e}")
+        _clip_gen_status[lib_id] = {"status": "error", "error": str(e)[:200],
+                                    "done": 0, "total": total, "current_action": ""}
+
+
+@router.post("/api/character_library/{lib_id}/generate_clips")
+async def api_library_generate_clips(lib_id: str):
+    """Start MCP sprite clip generation in background thread (页面级独立会话)."""
+    import threading
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    try:
+        meta = json.loads((lib_dir / "meta.json").read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+    description = meta.get("description", "")
+    if not description:
+        return JSONResponse({"ok": False, "error": "角色描述为空，无法生成序列帧"}, status_code=400)
+    if _clip_gen_status.get(lib_id, {}).get("status") == "generating":
+        return JSONResponse({"ok": False, "error": "该角色已有序列帧生成任务进行中"}, status_code=409)
+    is_host = _lib_is_host(meta)
+    threading.Thread(target=_generate_char_clips,
+                     args=(lib_id, description, is_host), daemon=True).start()
+    return {"ok": True, "message": "序列帧生成中...", "is_host": is_host}
+
+
+@router.get("/api/character_library/{lib_id}/clip_status")
+async def api_library_clip_status(lib_id: str):
+    """Poll sprite clip generation status."""
+    return _clip_gen_status.get(lib_id, {"status": "idle", "done": 0, "total": 0,
+                                         "current_action": "", "error": ""})
+
+
+@router.get("/api/character_library/{lib_id}/gen_prompts")
+async def api_library_gen_prompts(lib_id: str):
+    """输出参考图 + 各动作视频的完整提示词（复制到外部工具用，与 MCP 路线逐字一致）。"""
+    import os
+
+    from sprite_seq import _video_prompt
+    from style_manager import DEFAULT_STYLE_PROMPT
+
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    try:
+        meta = json.loads((lib_dir / "meta.json").read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"error": "meta.json 读取失败"}, status_code=500)
+    description = meta.get("description", "")
+    structure = meta.get("structure", "quest")
+    is_host = _lib_is_host(meta)
+    clips = []
+    for action in (_CLIP_ACTIONS_HOST if is_host else _CLIP_ACTIONS_BASE):
+        paths = _lib_clip_paths(lib_dir, action)
+        n_have = sum(1 for p in paths if os.path.exists(p))
+        clips.append({
+            "action": action,
+            "prompt": _video_prompt(action, description, DEFAULT_STYLE_PROMPT) if description else "",
+            "exists": description != "" and n_have == len(paths),
+            "frames": n_have,
+        })
+    return {
+        "description": description,
+        "structure": structure,
+        "is_host": is_host,
+        "clips": clips,
+        "image": {
+            "prompt": _build_image_prompt(structure, description) if description else "",
+            "suggested": ("4992x3328 横版图集（4×2 八姿势）" if structure == "quest"
+                          else "16:9 横版单人半身"),
+        },
+        "video_suggested": "16:9、720p 及以上、6 秒以上、纯白背景、无文字水印、人物始终完整在画面中央",
+    }
+
+
+@router.post("/api/character_library/{lib_id}/import_pose_image")
+async def api_library_import_pose_image(lib_id: str, image: UploadFile = File(...)):
+    """上传外部生成的参考图回库：quest 图集自动切分 8 姿势图 / original 单图直存。"""
+    import shutil
+
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    try:
+        meta = json.loads((lib_dir / "meta.json").read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+    filename = (image.filename or "").lower()
+    if not filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+        return JSONResponse({"ok": False, "error": "仅支持 png/jpg/webp 图片"}, status_code=400)
+    content = await image.read()
+    if len(content) < 10240:
+        return JSONResponse({"ok": False, "error": "文件过小，可能不是有效图片"}, status_code=400)
+
+    structure = meta.get("structure", "quest")
+    tmp_path = lib_dir / "_tmp_upload.png"
+    tmp_path.write_bytes(content)
+    try:
+        if structure == "quest":
+            from atlas_split import split_atlas
+            atlas_path = lib_dir / "pose_atlas_char_a.png"
+            tmp_path.replace(atlas_path)
+            pose_files = [str(lib_dir / f"pose_char_a_{i}.png") for i in range(8)]
+            split_atlas(str(atlas_path), 4, 2, pose_files, log_prefix="[LibImport]")
+            thumb_src = lib_dir / "pose_char_a_0.png"
+        else:
+            scene_path = lib_dir / "char_scene.png"
+            tmp_path.replace(scene_path)
+            thumb_src = scene_path
+        if thumb_src.exists():
+            shutil.copy2(str(thumb_src), str(lib_dir / "thumb.png"))
+        print(f"  [LibImport] {lib_id}: pose image imported ({structure})")
+        return {"ok": True, "structure": structure,
+                "thumb_url": f"/api/character_library/{lib_id}/image"}
+    except Exception as e:  # noqa: BLE001
+        print(f"  [LibImport] ERROR {lib_id}: {e}")
+        return JSONResponse({"ok": False, "error": f"处理失败: {str(e)[:150]}"}, status_code=500)
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+
+
+@router.post("/api/character_library/{lib_id}/import_clip")
+async def api_library_import_clip(lib_id: str, action: str = Form(""),
+                                  video: UploadFile = File(...)):
+    """上传外部生成的动作视频回库：本地抽帧→取样→抠图统一→入库（零积分）。"""
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    try:
+        meta = json.loads((lib_dir / "meta.json").read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+    allowed = _CLIP_ACTIONS_HOST if _lib_is_host(meta) else _CLIP_ACTIONS_BASE
+    if action not in allowed:
+        return JSONResponse({"ok": False, "error": f"未知动作: {action}"}, status_code=400)
+    filename = (video.filename or "").lower()
+    if not filename.endswith((".mp4", ".mov", ".webm", ".mkv")):
+        return JSONResponse({"ok": False, "error": "仅支持 mp4/mov/webm/mkv 视频"}, status_code=400)
+    content = await video.read()
+    if len(content) < 102400:
+        return JSONResponse({"ok": False, "error": "视频文件过小"}, status_code=400)
+
+    tmp_video = lib_dir / f"_tmp_{action}_upload.mp4"
+    tmp_video.write_bytes(content)
+    try:
+        ok = _produce_clips_from_video(str(tmp_video), lib_dir, action,
+                                       label=f"{lib_id}/{action}")
+    finally:
+        try:
+            tmp_video.unlink()
+        except OSError:
+            pass
+    if not ok:
+        return JSONResponse({"ok": False, "error": "视频处理失败（抽帧失败或有效内容过少）"}, status_code=500)
+    n_actions = _refresh_clip_manifest(lib_dir, meta.get("description", ""))
+    print(f"  [LibImport] {lib_id}/{action}: clip imported (manifest {n_actions} actions)")
+    return {"ok": True, "action": action,
+            "frames": 48 if action.startswith("talking") else 16,
+            "manifest_actions": n_actions}
 
 

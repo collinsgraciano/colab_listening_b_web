@@ -221,6 +221,19 @@
         <div class="text-[10px] text-slate-500 text-center">滚轮/拖动滚动查看 · ESC 关闭</div>
     </div>
 </div>
+
+<!-- 提示词输出 / 外部素材导入弹窗（参考图 + 动作视频） -->
+<div id="prompts-modal" class="hidden fixed inset-0 z-50 bg-black/80 items-center justify-center p-4"
+    onclick="if(event.target===this) closePromptsModal()">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-slate-700 shrink-0">
+            <div id="prompts-modal-name" class="text-sm font-medium text-white truncate">提示词 / 导入</div>
+            <button onclick="closePromptsModal()"
+                class="px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded text-xs text-white shrink-0">✕ 关闭</button>
+        </div>
+        <div id="prompts-modal-body" class="p-4 overflow-y-auto space-y-3 text-xs"></div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -368,6 +381,9 @@ function loadLibrary() {
                 if (c.id && _genPolling.has(c.id) === false) {
                     checkGenStatus(c.id, false);
                 }
+                if (c.id && _clipPolling.has(c.id) === false) {
+                    checkClipStatus(c.id, false);
+                }
             });
         });
 }
@@ -438,6 +454,7 @@ function createCharCard(char) {
         ${voiceOnly
             ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">仅音色+性别</span>`
             : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">${char.structure || '?'}</span>`}
+        ${(char.is_host || char.source_key === 'host') ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-900/50 text-purple-300">🎙️ 主持人</span>` : ''}
         ${char.qwen_speaker ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/50 text-indigo-300">🎤 ${char.qwen_speaker}</span>` : ''}
         ${char.moss_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300">🔊 ${char.moss_voice}</span>` : ''}
         ${char.kokoro_voice ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-900/50 text-fuchsia-300">🎵 ${char.kokoro_voice}</span>` : ''}
@@ -475,6 +492,12 @@ function createCharCard(char) {
     genArea.className = 'hidden';
     div.appendChild(genArea);
 
+    // Clip gen status area (序列帧生成进度)
+    const clipArea = document.createElement('div');
+    clipArea.id = `clipgen-${char.id}`;
+    clipArea.className = 'hidden';
+    div.appendChild(clipArea);
+
     // Edit form (hidden by default)
     const editForm = document.createElement('div');
     editForm.id = `edit-${char.id}`;
@@ -493,6 +516,10 @@ function createCharCard(char) {
                 <option value="original" ${char.structure === 'original' ? 'selected' : ''}>Original</option>
             </select>
         </div>
+        <label class="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" id="edit-ishost-${char.id}" class="rounded bg-slate-900 border-slate-600" ${char.is_host || char.source_key === 'host' ? 'checked' : ''}>
+            🎙️ 主持人（生成 wave 送别动作）
+        </label>
         <textarea id="edit-desc-${char.id}" rows="3" placeholder="英文外观描述（清空 = 转为仅音色+性别角色）"
             class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white resize-y">${char.description || ''}</textarea>
         <select id="edit-voice-${char.id}" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white">
@@ -519,7 +546,9 @@ function createCharCard(char) {
     actions.innerHTML = `
         <button onclick="toggleEdit('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">✏️ 编辑</button>
         ${char.qwen_speaker ? `<button onclick="previewBoundVoice('${char.id}', this)" class="px-2 py-1 bg-slate-700 hover:bg-indigo-600 rounded text-[11px] text-white">▶ 试听音色</button>` : ''}
-        ${voiceOnly ? '' : `<button onclick="generateImages('${char.id}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">🎨 生成图片</button>`}
+        ${voiceOnly ? '' : `<button onclick="generateImages('${char.id}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">🎨 生成图片</button>
+        <button id="btn-clips-${char.id}" onclick="generateClips('${char.id}')" class="px-2 py-1 bg-teal-700 hover:bg-teal-600 rounded text-[11px] text-white">🎬 生成序列帧</button>
+        <button onclick="openPromptsModal('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">📋 提示词</button>`}
         <button onclick="deleteCharacter('${char.id}')" class="px-2 py-1 bg-slate-700 hover:bg-red-600 rounded text-[11px] text-red-300">🗑 删除</button>
     `;
 
@@ -601,6 +630,7 @@ function saveEdit(libId) {
         qwen_speaker: document.getElementById(`edit-voice-${libId}`).value,
         moss_voice: document.getElementById(`edit-moss-voice-${libId}`).value,
         kokoro_voice: document.getElementById(`edit-kokoro-voice-${libId}`).value,
+        is_host: document.getElementById(`edit-ishost-${libId}`).checked,
     };
     fetch(`/api/character_library/${libId}`, {
         method: 'PUT',
@@ -934,6 +964,235 @@ function checkGenStatus(libId, startPoll) {
             }
         })
         .catch(() => {});
+}
+
+// --- Sprite clips (序列帧) generation ---
+const _clipPolling = new Set();
+let _promptsLibId = null;
+let _promptsData = null;
+
+function generateClips(libId) {
+    const char = _libraryChars.find(c => c.id === libId);
+    const n = (char && (char.is_host || char.source_key === 'host')) ? 6 : 5;
+    if (!confirm(`生成序列帧将通过 MCP 生成 ${n} 段 Seedance2 动作视频（每段 6 秒），消耗较多积分。确定继续？\n\n（不想花积分可点「📋 提示词」复制到外部工具生成后再上传回库）`)) return;
+    fetch(`/api/character_library/${libId}/generate_clips`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                showClipProgress(libId, 'generating', '', 0, n, '');
+                if (!_clipPolling.has(libId)) { _clipPolling.add(libId); pollClipStatus(libId); }
+            } else {
+                alert('启动失败: ' + (data.error || ''));
+            }
+        });
+}
+
+function showClipProgress(libId, status, error, done, total, current) {
+    const area = document.getElementById(`clipgen-${libId}`);
+    if (!area) return;
+    if (status === 'generating') {
+        area.classList.remove('hidden');
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-teal-700 rounded-lg p-3 flex items-center gap-3">
+                <div class="animate-spin text-xl">🎬</div>
+                <div class="text-xs text-teal-300">正在生成序列帧 ${done}/${total}${current ? ' · ' + current : ''}（视频生成较慢，请耐心等待）</div>
+            </div>`;
+    } else if (status === 'done') {
+        area.classList.remove('hidden');
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-emerald-700 rounded-lg p-3 flex items-center justify-between gap-3">
+                <div class="text-xs text-emerald-300">✅ 序列帧完成 (${done}/${total})</div>
+                <button onclick="openPromptsModal('${libId}')" class="text-[11px] text-teal-400 hover:text-teal-300">📋 提示词/补齐</button>
+            </div>`;
+    } else if (status === 'error') {
+        area.classList.remove('hidden');
+        area.innerHTML = `
+            <div class="bg-slate-900/50 border border-red-700 rounded-lg p-3 flex items-center justify-between gap-3">
+                <div class="text-xs text-red-300">❌ 序列帧生成失败: ${error || '未知错误'}</div>
+                <button onclick="generateClips('${libId}')" class="text-[11px] text-indigo-400 hover:text-indigo-300">🔄 重试</button>
+            </div>`;
+    }
+}
+
+function pollClipStatus(libId) {
+    if (!_clipPolling.has(libId)) return;
+    fetch(`/api/character_library/${libId}/clip_status`)
+        .then(r => r.json())
+        .then(data => {
+            if (!_clipPolling.has(libId)) return;
+            if (data.status === 'generating') {
+                showClipProgress(libId, 'generating', '', data.done || 0, data.total || 0, data.current_action || '');
+                setTimeout(() => pollClipStatus(libId), 3000);
+            } else if (data.status === 'done') {
+                _clipPolling.delete(libId);
+                showClipProgress(libId, 'done', '', data.done || 0, data.total || 0, '');
+                loadLibrary();
+                if (_promptsLibId === libId) loadGenPrompts(libId);
+            } else if (data.status === 'error') {
+                _clipPolling.delete(libId);
+                showClipProgress(libId, 'error', data.error, data.done || 0, data.total || 0, '');
+            } else {
+                // idle（服务重启等）——停止轮询
+                _clipPolling.delete(libId);
+            }
+        })
+        .catch(() => setTimeout(() => pollClipStatus(libId), 5000));
+}
+
+function checkClipStatus(libId, startPoll) {
+    fetch(`/api/character_library/${libId}/clip_status`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'generating') {
+                showClipProgress(libId, 'generating', '', data.done || 0, data.total || 0, data.current_action || '');
+                if (!_clipPolling.has(libId)) { _clipPolling.add(libId); pollClipStatus(libId); }
+            }
+        })
+        .catch(() => {});
+}
+
+// --- Prompts modal (提示词输出 / 外部素材导入) ---
+function _esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function openPromptsModal(libId) {
+    _promptsLibId = libId;
+    const m = document.getElementById('prompts-modal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    loadGenPrompts(libId);
+}
+
+function closePromptsModal() {
+    const m = document.getElementById('prompts-modal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    _promptsLibId = null;
+    _promptsData = null;
+}
+
+function copyText(text, btn) {
+    const done = () => {
+        if (!btn) return;
+        const old = btn.textContent;
+        btn.textContent = '✅ 已复制';
+        setTimeout(() => { btn.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => _copyFallback(text, done));
+    } else {
+        _copyFallback(text, done);
+    }
+}
+
+function _copyFallback(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选择文本复制'); }
+    document.body.removeChild(ta);
+}
+
+function loadGenPrompts(libId) {
+    const body = document.getElementById('prompts-modal-body');
+    body.innerHTML = '<p class="text-slate-400 text-xs">加载中...</p>';
+    fetch(`/api/character_library/${libId}/gen_prompts`)
+        .then(r => r.json())
+        .then(data => {
+            if (_promptsLibId !== libId) return;
+            _promptsData = data;
+            renderPromptsModal(libId, data);
+        })
+        .catch(() => { body.innerHTML = '<p class="text-red-300 text-xs">加载失败</p>'; });
+}
+
+function renderPromptsModal(libId, data) {
+    const body = document.getElementById('prompts-modal-body');
+    const char = _libraryChars.find(c => c.id === libId);
+    const name = char ? (char.name || libId) : libId;
+    document.getElementById('prompts-modal-name').textContent = `提示词 / 导入 — ${name}`;
+
+    if (!data.description) {
+        body.innerHTML = '<p class="text-amber-300 text-xs">该角色没有外观描述，请先在卡片「✏️ 编辑」里填写英文外观描述再生成提示词。</p>';
+        return;
+    }
+
+    const hasPoses = (char && char.pose_count) ? char.pose_count : 0;
+    body.innerHTML = `
+        <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <div class="text-xs font-semibold text-indigo-300">① 人物参考图${data.structure === 'quest' ? '（4×2 姿势图集）' : '（单张场景图）'}</div>
+                <div class="flex items-center gap-2">
+                    ${hasPoses ? `<span class="text-[10px] text-emerald-300">📷 已有 ${hasPoses} 图</span>` : '<span class="text-[10px] text-slate-500">未生成</span>'}
+                    <input type="file" id="prompt-pose-file" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="importPoseImageSelected('${libId}', this)">
+                    <button onclick="document.getElementById('prompt-pose-file').click()" class="px-2 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-[11px] text-white">📥 上传图片回库</button>
+                    <button onclick="copyText(_promptsData.image.prompt, this)" class="px-2 py-1 bg-teal-700 hover:bg-teal-600 rounded text-[11px] text-white">📋 复制</button>
+                </div>
+            </div>
+            <p class="text-[10px] text-slate-500 mb-1">建议参数：${_esc(data.image.suggested)} · 纯白背景、无文字水印。外部生成后上传回库${data.structure === 'quest' ? '（自动切成 8 张姿势图）' : ''}，作为动作视频的一致性参考。</p>
+            <pre class="bg-slate-950/70 border border-slate-800 rounded p-2 text-[10px] text-slate-300 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">${_esc(data.image.prompt)}</pre>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
+            <div class="text-xs font-semibold text-indigo-300 mb-1">② 动作视频提示词（${data.clips.length} 段${data.is_host ? ' · 主持人含 wave' : ''}）</div>
+            <p class="text-[10px] text-slate-500 mb-2">建议参数：${_esc(data.video_suggested)}。每段视频生成后用「📥 上传视频」回库，本地自动抽帧抠图入库（零积分）。</p>
+            ${data.clips.map(c => `
+            <div class="border-t border-slate-800 pt-2 mt-2">
+                <div class="flex items-center justify-between gap-2 mb-1">
+                    <div class="text-[11px] text-slate-200">🎬 ${c.action} ${c.exists ? '<span class="text-[10px] text-emerald-300">✅ 已入库</span>' : (c.frames ? `<span class="text-[10px] text-amber-300">部分 ${c.frames} 帧</span>` : '')}</div>
+                    <div class="flex items-center gap-2">
+                        <input type="file" id="prompt-clip-file-${c.action}" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" class="hidden" onchange="importClipSelected('${libId}', '${c.action}', this)">
+                        <button onclick="document.getElementById('prompt-clip-file-${c.action}').click()" class="px-2 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-[11px] text-white">📥 上传视频</button>
+                        <button onclick="copyText(_promptsData.clips.find(x=>x.action==='${c.action}').prompt, this)" class="px-2 py-1 bg-teal-700 hover:bg-teal-600 rounded text-[11px] text-white">📋 复制</button>
+                    </div>
+                </div>
+                <pre class="bg-slate-950/70 border border-slate-800 rounded p-2 text-[10px] text-slate-300 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">${_esc(c.prompt)}</pre>
+            </div>`).join('')}
+        </div>`;
+}
+
+function importPoseImageSelected(libId, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    fetch(`/api/character_library/${libId}/import_pose_image`, {method: 'POST', body: fd})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert('参考图导入成功' + (data.structure === 'quest' ? '（已切成 8 张姿势图）' : ''));
+                loadLibrary();
+                loadGenPrompts(libId);
+            } else {
+                alert('导入失败: ' + (data.error || ''));
+            }
+        })
+        .catch(e => alert('导入失败: ' + e));
+    input.value = '';
+}
+
+function importClipSelected(libId, action, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('action', action);
+    fd.append('video', file);
+    fetch(`/api/character_library/${libId}/import_clip`, {method: 'POST', body: fd})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert(`${action} 导入成功（${data.frames} 帧）`);
+                loadLibrary();
+                loadGenPrompts(libId);
+            } else {
+                alert('导入失败: ' + (data.error || ''));
+            }
+        })
+        .catch(e => alert('导入失败: ' + e));
+    input.value = '';
 }
 
 // --- Load poses ---
