@@ -24,8 +24,7 @@ def list_library_chars(include_pose_count: bool = False) -> list[dict]:
         meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
         if include_pose_count:
             if meta.get("structure") == "quest":
-                meta["pose_count"] = sum(1 for p in d.glob("pose_char_a_*.png")
-                                         if "_c" not in p.stem)
+                meta["pose_count"] = sum(1 for _ in d.glob("pose_char_a_*.png"))
             else:
                 meta["pose_count"] = 1 if (d / "char_scene.png").exists() else 0
         # 序列帧动作段数（sprite_clips.json 缺失/损坏 = 0）
