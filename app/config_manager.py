@@ -214,6 +214,11 @@ PARAM_SPEC = {
     "no_thumbnail": {"default": False, "type": "checkbox", "group": "mcp",
                      "label": "跳过缩略图",
                      "help": "勾选后 Step 4.5 只生成 YouTube 元数据，不生成缩略图图片（不消耗生图 API）"},
+    "quick_test": {"default": False, "type": "checkbox", "group": "mcp",
+                   "label": "⚡ 快速测试（零积分）",
+                   "help": "勾选后：脚本直接复用同模式最近一次运行（无则回退同结构族）；"
+                           "图片/音频/序列帧优先复制该运行现成产物，缺失处用黑色占位代替；"
+                           "跳过 LLM/MCP/缩略图图/视频片段生成。主题词仅兜底命名，实际沿用上次标题"},
     "clip_duration": {"default": 15, "type": "number", "group": "mcp",
                       "modes": ["original"],
                       "label": "视频片段时长(秒)", "help": "4-15"},
@@ -825,6 +830,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args.append("--no-zh-subtitle")
     if config.get("no_thumbnail"):
         args.append("--no-thumbnail")
+    if config.get("quick_test"):
+        args.append("--quick-test")
     if config.get("no_4k"):
         args.append("--no-4k")
     args += ["--upscale-timeout", str(config.get("upscale_timeout", 3600))]

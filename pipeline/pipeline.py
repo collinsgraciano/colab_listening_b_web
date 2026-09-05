@@ -236,6 +236,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-zh-subtitle", dest="no_zh_subtitle", action="store_true", help="Hide Chinese subtitles (default: show ZH subtitles)")
     parser.add_argument("--no-thumbnail", dest="no_thumbnail", action="store_true",
                         help="Skip thumbnail image generation (step 4.5 still saves YouTube metadata)")
+    parser.add_argument("--quick-test", dest="quick_test", action="store_true",
+                        help="Quick test: reuse last run's script/materials (missing = black placeholders); "
+                             "no LLM/MCP/thumbnail-image/clip generation (zero credits)")
     parser.add_argument("--subtitle-font-size", type=int, default=60, help="English subtitle font size in pixels (default 60). ZH subtitle is auto-scaled to 85%% of EN size.")
     parser.add_argument("--subtitle-style", default="", help="Subtitle style id from subtitle_style_manager (web 字幕样式页). Empty = legacy behavior driven by --subtitle-font-size.")
     parser.add_argument("--tts-rate", default=None, help="Legacy: override ALL TTS rates (dialogue EN/ZH/narration). Per-type flags take precedence. Default: mode-dependent")
@@ -348,6 +351,182 @@ def _resolve_run_dir(parent_dir: Path, checkpoint: dict) -> Path:
 
 
 # ---------------------------------------------------------------------------
+# Quick test（快速测试）：复用上次脚本与素材，缺失处黑色占位，零积分
+# ---------------------------------------------------------------------------
+
+def _find_quick_test_source(args, exclude_dir=None):
+    """快速测试素材来源：同模式最近一次含 script.json 的运行；无则回退全部
+    模式目录中结构族（script.structure == args.structure）相同的最近运行。
+    排除回收站/隐藏目录/当前运行。找不到返回 None。"""
+
+    def _collect(base: Path, want_structure):
+        runs = []
+        if not base.is_dir():
+            return runs
+        for d in base.iterdir():
+            if not d.is_dir() or d.name.startswith((".", "_")):
+                continue
+            if exclude_dir is not None and d.resolve() == Path(exclude_dir).resolve():
+                continue
+            sp = d / "script.json"
+            if not sp.exists():
+                continue
+            if want_structure is not None:
+                try:
+                    st = json.loads(sp.read_text(encoding="utf-8")).get("structure", "")
+                except (json.JSONDecodeError, OSError):
+                    continue
+                if st != want_structure:
+                    continue
+            runs.append(d)
+        return runs
+
+    root = Path(getattr(args, "output_dir", None)
+                or getattr(args, "output", "./output"))
+    mode_name = getattr(args, "mode_name", "") or ""
+    cands = _collect(root / mode_name, None) if mode_name else []
+    if not cands:
+        if root.is_dir():
+            for md in root.iterdir():
+                if md.is_dir() and not md.name.startswith((".", "_")):
+                    cands += _collect(md, args.structure)
+    if not cands:
+        return None
+    cands.sort(key=lambda d: (d / "script.json").stat().st_mtime, reverse=True)
+    return cands[0]
+
+
+def _quick_test_copy_materials(src: Path, work_dir: Path, args) -> list:
+    """复制源运行现成素材：images/ audio/ 必复制，original 另加 clips/。"""
+    import shutil
+    copied = []
+    subdirs = ["images", "audio"] + (["clips"] if args.structure == "original" else [])
+    for name in subdirs:
+        src_dir = src / name
+        if not src_dir.is_dir():
+            continue
+        dst_dir = work_dir / name
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for f in src_dir.iterdir():
+            if f.is_file():
+                shutil.copy2(str(f), str(dst_dir / f.name))
+        copied.append(f"{name}×{sum(1 for _ in dst_dir.iterdir())}")
+    return copied
+
+
+def _quick_test_fill_placeholders(args, script, img_dir: Path) -> int:
+    """按模式为缺失的期望图片生成深灰黑占位（已存在不覆盖）。返回补建数量。"""
+    from PIL import Image
+
+    structure = args.structure
+    names = []
+    if structure in ("quest", "original_cutout"):
+        pose_chars = (["char_a", "char_b", "char_c", "host"]
+                      if structure == "quest"
+                      else ["char_a", "char_b"]
+                      + ([] if getattr(args, "host_character", "") else ["host"]))
+        for ck in pose_chars:
+            names += [f"pose_{ck}_{i}.png" for i in range(8)]
+        names += ["scene.png"] if structure == "original_cutout" else ["scene_0.png"]
+        names += [f"scene_{i}.png" for i in range(12)]
+        names += ["host_bg.png"]
+    elif structure == "original_static":
+        names += ["char_scene.png", "scene.png"]
+        names += [f"dialogue_img_{i}.png" for i in range(len(script.get("dialogue", [])))]
+    else:  # original
+        names += ["char_scene.png", "scene.png"]
+
+    created = 0
+    for name in names:
+        p = img_dir / name
+        if p.exists():
+            continue
+        p.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (1280, 720), (18, 18, 18)).save(str(p))
+        created += 1
+    if created:
+        print(f"  [QuickTest] 黑色占位图 ×{created}")
+    return created
+
+
+def _quick_test_prepare_manifest(img_dir: Path) -> None:
+    """快速测试：sprite manifest 帧路径重映射到新运行目录（文件名与运行无关），
+    并把全部角色标记 from_library —— 复用既有跳过机制杜绝任何 MCP 补齐。"""
+    mp = img_dir / "sprite_clips.json"
+    manifest = {}
+    if mp.exists():
+        try:
+            manifest = json.loads(mp.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            manifest = {}
+    for actions in (manifest.get("chars") or {}).values():
+        for action, frames in (actions or {}).items():
+            actions[action] = [str(img_dir / Path(p).name) for p in (frames or [])]
+    flags = set(manifest.get("from_library") or [])
+    flags.update({"char_a", "char_b", "char_c", "host"})
+    manifest["from_library"] = sorted(flags)
+    manifest.setdefault("version", 1)
+    manifest.setdefault("fps", 12)
+    manifest.setdefault("source", "video_frames")
+    manifest.setdefault("chars", {})
+    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _load_tts_results_from_files(audio_dir: Path, n: int, is_quest: bool,
+                                 include_zh: bool, structure: str):
+    """从 audio 目录重建 tts_results（快速测试复用上次音频）；缺失返回 None。"""
+    normal_paths = [str(audio_dir / f"dialogue_{i}.mp3") for i in range(n)]
+    if not all(os.path.exists(p) for p in normal_paths):
+        return None
+    if is_quest or not include_zh:
+        zh_paths = [""] * n
+    else:
+        zh_paths = [str(audio_dir / f"zh_{i}.mp3") for i in range(n)]
+        if not all(os.path.exists(p) for p in zh_paths):
+            return None
+    if structure == "original_cutout":
+        narration_names = ["welcome", "hook", "outro", "practice_intro"]
+    elif is_quest:
+        narration_names = ["welcome", "hook", "outro"]
+    else:
+        narration_names = ["outro", "practice_intro"]
+    narration = {}
+    for name in narration_names:
+        p = audio_dir / f"{name}.mp3"
+        if not p.exists():
+            return None
+        narration[name] = str(p)
+    return {
+        "narration": narration,
+        "normal_paths": normal_paths,
+        "dialogue_durations": [_get_audio_duration(p) for p in normal_paths],
+        "zh_paths": zh_paths,
+        "vocab_paths": [],
+        "slow_paths": [],
+        "slow_durations": [],
+        "quiz_paths": [],
+    }
+
+
+def _quick_test_placeholder_clip(path, duration: float) -> bool:
+    """生成黑底静音占位视频（快速测试，original 模式缺失 clip 用）。"""
+    cmd = ["ffmpeg", "-y",
+           "-f", "lavfi", "-i", "color=c=0x181818:s=1280x720:r=25",
+           "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+           "-t", f"{max(1.0, float(duration)):.3f}",
+           "-c:v", "libx264", "-pix_fmt", "yuv420p",
+           "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+           str(path)]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=300)
+    except Exception as e:
+        print(f"  [QuickTest] placeholder clip ERROR: {e}")
+        return False
+    return os.path.exists(str(path)) and os.path.getsize(str(path)) > 1000
+
+
+# ---------------------------------------------------------------------------
 # Step functions
 # ---------------------------------------------------------------------------
 
@@ -402,30 +581,56 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
         script = json.loads(script_path.read_text(encoding="utf-8"))
         mark_topic_used(used_topics_file, topic)
     else:
-        script = _generate_script_with_retry(
-            topic, args.cefr, args.lessons_dir, args.num_lines,
-            quest=(args.structure == "quest"),
-            structure=(args.structure if args.structure != "quest" else "original"))
-        yt_title = script.get("youtube_title", script.get("title", topic))
-        safe_title = _safe_dirname(yt_title, topic)
-        work_dir = parent_dir / safe_title
-        work_dir.mkdir(parents=True, exist_ok=True)
-        dirs = _dirs(work_dir)
-        script_path = work_dir / "script.json"
-        for d in dirs.values():
-            d.mkdir(parents=True, exist_ok=True)
-        qa_report = script.pop("_qa", None)
-        script["structure"] = args.structure
-        script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
-        if qa_report:
-            qa_path = work_dir / "qa_report.json"
-            qa_path.write_text(json.dumps(qa_report, indent=2, ensure_ascii=False), encoding="utf-8")
-            print(f"  QA report saved: {qa_path}")
-        _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
-                         structure=args.structure, animation=args.animation,
-                         visual_style=getattr(args, "visual_style", ""),
-                         host_character=getattr(args, "host_character", ""))
-        mark_topic_used(used_topics_file, topic)
+        qt_src = (_find_quick_test_source(args)
+                  if getattr(args, "quick_test", False) else None)
+        if qt_src is not None:
+            # 快速测试：脚本复用源运行，运行目录沿用其标题（冲突加 _qt 后缀）
+            script = json.loads((qt_src / "script.json").read_text(encoding="utf-8"))
+            script["structure"] = args.structure
+            yt_title = script.get("youtube_title", script.get("title", topic))
+            safe_title = _safe_dirname(yt_title, topic)
+            work_dir = parent_dir / safe_title
+            if work_dir.exists():
+                work_dir = parent_dir / f"{safe_title}_qt{time.strftime('%H%M%S')}"
+            work_dir.mkdir(parents=True, exist_ok=True)
+            dirs = _dirs(work_dir)
+            script_path = work_dir / "script.json"
+            for d in dirs.values():
+                d.mkdir(parents=True, exist_ok=True)
+            script["structure"] = args.structure
+            script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
+                             structure=args.structure, animation=args.animation,
+                             visual_style=getattr(args, "visual_style", ""),
+                             host_character=getattr(args, "host_character", ""))
+            print(f"  [QuickTest] 脚本复用自上次运行: {qt_src.name}")
+        else:
+            if getattr(args, "quick_test", False):
+                print("  [QuickTest] 找不到可复用脚本的运行 —— 本次正常生成脚本")
+            script = _generate_script_with_retry(
+                topic, args.cefr, args.lessons_dir, args.num_lines,
+                quest=(args.structure == "quest"),
+                structure=(args.structure if args.structure != "quest" else "original"))
+            yt_title = script.get("youtube_title", script.get("title", topic))
+            safe_title = _safe_dirname(yt_title, topic)
+            work_dir = parent_dir / safe_title
+            work_dir.mkdir(parents=True, exist_ok=True)
+            dirs = _dirs(work_dir)
+            script_path = work_dir / "script.json"
+            for d in dirs.values():
+                d.mkdir(parents=True, exist_ok=True)
+            qa_report = script.pop("_qa", None)
+            script["structure"] = args.structure
+            script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            if qa_report:
+                qa_path = work_dir / "qa_report.json"
+                qa_path.write_text(json.dumps(qa_report, indent=2), encoding="utf-8")
+                print(f"  QA report saved: {qa_path}")
+            _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
+                             structure=args.structure, animation=args.animation,
+                             visual_style=getattr(args, "visual_style", ""),
+                             host_character=getattr(args, "host_character", ""))
+            mark_topic_used(used_topics_file, topic)
     print(f"  Script saved: {script_path}")
     print(f"  Title: {script.get('title', '')}")
     print(f"  Dialogue lines: {len(script.get('dialogue', []))}")
@@ -440,6 +645,10 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
 def _step1_mcp(args):
     """Step 1: initialize the TJGenerators MCP session."""
     print("\n" + "=" * 60)
+    if getattr(args, "quick_test", False):
+        # 快速测试：素材全部复用/占位，无任何 MCP 消费点，跳过初始化
+        print("Step 1: 快速测试 —— 跳过 MCP 初始化")
+        return
     print("Step 1: Initializing TJGenerators MCP...")
     raw_tokens = args.mcp_tokens or args.mcp_token or ""
     tokens = [t.strip() for t in raw_tokens.split(",") if t.strip()]
@@ -517,12 +726,33 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                                         "a bright modern TV studio set with a large screen behind, warm lighting"))
         image_prompts.append((f"{host_bg_prompt}, {style_prompt}, no people, 16:9", "host_bg.png"))
 
+    # --- Quick test：复用上次素材 / 黑色占位（零积分）---
+    quick_test = getattr(args, "quick_test", False)
+    qt_tts = None
+    if quick_test:
+        qt_src = _find_quick_test_source(args, exclude_dir=work_dir)
+        if qt_src is not None:
+            copied = _quick_test_copy_materials(qt_src, work_dir, args)
+            print(f"  [QuickTest] 复用素材 ← {qt_src.name} ({', '.join(copied) or '无现成文件'})")
+        else:
+            print("  [QuickTest] 未找到源运行 —— 全部画面用黑色占位")
+        _quick_test_fill_placeholders(args, script, img_dir)
+        _quick_test_prepare_manifest(img_dir)
+        qt_tts = _load_tts_results_from_files(audio_dir, n, is_quest,
+                                              include_zh, args.structure)
+        if qt_tts is not None:
+            print(f"  [QuickTest] 复用上次音频（{n} 句 + 旁白）")
+        else:
+            print("  [QuickTest] 上次音频不全 —— TTS 按当前引擎正常生成（画面仍零生成）")
+
     # --- Resume check ---
     resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest,
                                         include_zh=include_zh)
     tts_thread = None
     if resume_result is not None:
         tts_results, image_urls = resume_result
+    elif qt_tts is not None:
+        tts_results, image_urls = qt_tts, {}
     else:
         tts_results = {}
 
@@ -550,55 +780,60 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             print("  [TTS] ch3_zh_repeats=0 → 跳过中文音频生成")
         print("  [TTS] Started TTS generation in background thread.")
 
-        image_urls = _generate_images(image_prompts, img_dir, tts_thread,
-                                      max_workers=args.image_concurrency,
-                                      image_size="landscape_16_9")
+        if quick_test:
+            # 占位图已覆盖全部期望文件 —— 画面零生成
+            image_urls = {}
+            print("  [QuickTest] 画面素材已就绪（复用/占位），跳过图片生成")
+        else:
+            image_urls = _generate_images(image_prompts, img_dir, tts_thread,
+                                          max_workers=args.image_concurrency,
+                                          image_size="landscape_16_9")
 
-        if is_original_static:
-            char_scene_cdn = image_urls.get("char_scene.png", "")
-            _generate_dialogue_images(
-                dialogue, img_dir, char_a_desc, char_b_desc, scene,
-                is_quest, char_scene_cdn, "", tts_thread,
-                max_workers=args.image_concurrency,
-                style_prompt=style_prompt)
-        elif is_quest:
-            _generate_quest_atlases(script, img_dir, tts_thread,
-                                    max_workers=args.image_concurrency,
-                                    style_prompt=style_prompt)
-            if getattr(args, "animation", "") == "sprite_sequence":
-                _generate_sprite_clips_for(args, script, img_dir, tts_thread,
-                                           style_prompt, char_keys=None,
-                                           stop_check=stop_check)
-            _scene_images = script.get("scene_images", [])
-            _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
-                                   style_prompt=style_prompt)
-        elif is_original_cutout:
-            # original_cutout: per-character pose atlas (char_a + char_b, 8 poses each)
-            # 主持人未绑定角色时额外生成独立主持人图集
-            _cutout_keys = ["char_a", "char_b"]
-            if not getattr(args, "host_character", ""):
-                _cutout_keys.append("host")
-            _generate_quest_atlases(script, img_dir, tts_thread,
-                                    max_workers=args.image_concurrency,
-                                    style_prompt=style_prompt,
-                                    char_keys=_cutout_keys)
-            if getattr(args, "animation", "") == "sprite_sequence":
-                _generate_sprite_clips_for(args, script, img_dir, tts_thread,
-                                           style_prompt, char_keys=_cutout_keys,
-                                           stop_check=stop_check)
-            # Ch2 对话多场景背景（quest 同款 2×2 atlas）；scene.png 主背景照旧生成
-            _scene_images = script.get("scene_images", [])
-            _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
-                                   style_prompt=style_prompt)
+            if is_original_static:
+                char_scene_cdn = image_urls.get("char_scene.png", "")
+                _generate_dialogue_images(
+                    dialogue, img_dir, char_a_desc, char_b_desc, scene,
+                    is_quest, char_scene_cdn, "", tts_thread,
+                    max_workers=args.image_concurrency,
+                    style_prompt=style_prompt)
+            elif is_quest:
+                _generate_quest_atlases(script, img_dir, tts_thread,
+                                        max_workers=args.image_concurrency,
+                                        style_prompt=style_prompt)
+                if getattr(args, "animation", "") == "sprite_sequence":
+                    _generate_sprite_clips_for(args, script, img_dir, tts_thread,
+                                               style_prompt, char_keys=None,
+                                               stop_check=stop_check)
+                _scene_images = script.get("scene_images", [])
+                _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
+                                       style_prompt=style_prompt)
+            elif is_original_cutout:
+                # original_cutout: per-character pose atlas (char_a + char_b, 8 poses each)
+                # 主持人未绑定角色时额外生成独立主持人图集
+                _cutout_keys = ["char_a", "char_b"]
+                if not getattr(args, "host_character", ""):
+                    _cutout_keys.append("host")
+                _generate_quest_atlases(script, img_dir, tts_thread,
+                                        max_workers=args.image_concurrency,
+                                        style_prompt=style_prompt,
+                                        char_keys=_cutout_keys)
+                if getattr(args, "animation", "") == "sprite_sequence":
+                    _generate_sprite_clips_for(args, script, img_dir, tts_thread,
+                                               style_prompt, char_keys=_cutout_keys,
+                                               stop_check=stop_check)
+                # Ch2 对话多场景背景（quest 同款 2×2 atlas）；scene.png 主背景照旧生成
+                _scene_images = script.get("scene_images", [])
+                _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
+                                       style_prompt=style_prompt)
 
-        if is_quest or is_original_cutout:
-            # 全新生成路径：姿势图集只落本地。此处把 char_a 参考图补传 CDN 写入
-            # image_urls，供 Step 4.5 缩略图做角色参考（与 --resume 路径行为一致）。
-            _ref_path = img_dir / "pose_char_a_0.png"
-            if _ref_path.exists():
-                _ref_url = _reupload_for_cdn(str(_ref_path), _ref_path.name)
-                if _ref_url:
-                    image_urls[_ref_path.name] = _ref_url
+            if is_quest or is_original_cutout:
+                # 全新生成路径：姿势图集只落本地。此处把 char_a 参考图补传 CDN 写入
+                # image_urls，供 Step 4.5 缩略图做角色参考（与 --resume 路径行为一致）。
+                _ref_path = img_dir / "pose_char_a_0.png"
+                if _ref_path.exists():
+                    _ref_url = _reupload_for_cdn(str(_ref_path), _ref_path.name)
+                    if _ref_url:
+                        image_urls[_ref_path.name] = _ref_url
 
         print("  [Image] All images done. Waiting for TTS...")
 
@@ -617,14 +852,17 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         clip0_path = str(clips_dir / "clip_0.mp4")
         clip_paths = [clip0_path if _file_ok(clip0_path, 500000) else None]
         if clip_paths[0] is None:
-            scene_clip_thread = threading.Thread(
-                target=_generate_video_clips,
-                args=([scene_clip_task], clips_dir, clip_paths),
-                kwargs={"stop_check": stop_check, "max_concurrency": 1},
-                daemon=True,
-            )
-            scene_clip_thread.start()
-            print("  [Video] Scene clip (clip_0) generation started in parallel with TTS.")
+            if quick_test:
+                print("  [QuickTest] clip_0 缺失 —— Step 3 将用黑色占位")
+            else:
+                scene_clip_thread = threading.Thread(
+                    target=_generate_video_clips,
+                    args=([scene_clip_task], clips_dir, clip_paths),
+                    kwargs={"stop_check": stop_check, "max_concurrency": 1},
+                    daemon=True,
+                )
+                scene_clip_thread.start()
+                print("  [Video] Scene clip (clip_0) generation started in parallel with TTS.")
         else:
             print("  [Resume] clip_0 already exists, reusing.")
 
@@ -718,6 +956,21 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
 
     if all(p is not None for p in clip_paths):
         print("  [Resume] Step 3 already done — all clips present.")
+    elif getattr(args, "quick_test", False):
+        # 快速测试：缺失 clip 用黑底静音占位视频（零积分；compose 按 setpts 匹配音长）
+        made = 0
+        for ci in range(len(clip_paths)):
+            p = clip_paths[ci] or str(clips_dir / f"clip_{ci}.mp4")
+            if os.path.exists(p) and os.path.getsize(p) > 1000:
+                clip_paths[ci] = p
+                continue
+            dur = groups[ci - 1]["total_audio"] if ci > 0 else 8.0
+            if _quick_test_placeholder_clip(p, dur):
+                clip_paths[ci] = p
+                made += 1
+        print(f"  [QuickTest] 黑色占位 clip ×{made}")
+        if not (stop_check and stop_check()):
+            _save_checkpoint(work_dir, "step3_video")
     else:
         video_thread = threading.Thread(
             target=_generate_video_clips,
@@ -828,8 +1081,9 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
         char_scene_cdn = ctx["image_urls"].get("pose_char_a_0.png", "")
     else:
         char_scene_cdn = ctx["image_urls"].get("char_scene.png", "")
-    if args.no_thumbnail:
-        print("  [Thumbnail] 跳过缩略图生成（no_thumbnail）——仅生成 YouTube 元数据")
+    if args.no_thumbnail or getattr(args, "quick_test", False):
+        _skip_why = ("no_thumbnail" if args.no_thumbnail else "quick_test")
+        print(f"  [Thumbnail] 跳过缩略图生成（{_skip_why}）——仅生成 YouTube 元数据")
     else:
         generate_thumbnail(
             script=script,

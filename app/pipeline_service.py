@@ -1101,6 +1101,8 @@ class PipelineService:
             no_zh_subtitle=bool(config.get("no_zh_subtitle", False)),
             no_4k=bool(config.get("no_4k", False)),
             no_thumbnail=bool(config.get("no_thumbnail", False)),
+            quick_test=bool(config.get("quick_test", False)),
+            output_dir=config.get("output_dir", "./output"),
             tts_engine=config.get("tts_engine", "kokoro"),
             tts_rate=tts_rate,
             tts_rate_en=config.get("tts_rate_en", "") or None,
