@@ -917,7 +917,9 @@ async def api_library_pose_file(lib_id: str, filename: str):
 # ===========================================================================
 
 _CLIP_ACTIONS_BASE = ("talking_01", "talking_02", "talking_03", "idle_01", "idle_02")
-_CLIP_ACTIONS_HOST = _CLIP_ACTIONS_BASE + ("wave",)
+# 主持人不生成/上传 idle（几乎一直在讲话，用户决策 2026-09-05）；
+# wave 仅用于 outro 送别 take
+_CLIP_ACTIONS_HOST = ("talking_01", "talking_02", "talking_03", "wave")
 
 _clip_gen_status: dict[str, dict] = {}  # lib_id → {status, done, total, current_action, error}
 
@@ -963,35 +965,39 @@ def _list_action_frames(lib_dir: Path, action: str) -> list[str]:
     return [str(p) for p in sorted(lib_dir.glob(f"clip_{action}_*.png"), key=_key)]
 
 
-# 单动作帧数上限（15s @ 8fps）：防超长视频抽帧过多撑爆渲染内存
-MAX_CLIP_FRAMES = 120
+# 单动作帧数上限（10s @ 24fps）：防超长视频抽帧过多撑爆渲染内存
+MAX_CLIP_FRAMES = 240
 
 
 def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
                               label: str = "") -> bool:
-    """本地处理：视频 → ffmpeg 全程抽帧(8fps) → 抠图统一几何 → 存库内帧。
+    """本地处理：视频 → ffmpeg 全程抽帧(24fps) → 抠图统一几何 → 存库内帧。
 
-    帧数 = 上传视频实际时长 × 8fps（上限 MAX_CLIP_FRAMES，超出截断告警），
-    不固定 6s/48 帧；复用 pipeline/sprite_seq.py 纯函数（抠图与几何统一规格
-    与管线内序列帧产出一致），MCP 自动生成与外部视频回传两条路线共用。
+    talking/wave 帧数 = 上传视频实际时长 × 24fps（上限 MAX_CLIP_FRAMES，超出
+    截断告警）；idle 循环型动作均匀采样回 16 帧（防循环周期被拉长成慢动作）。
+    复用 pipeline/sprite_seq.py 纯函数（抠图与几何统一规格与管线内序列帧产出
+    一致），MCP 自动生成与外部视频回传两条路线共用。
     重新上传为替换语义：统一几何成功后先清该动作旧帧再写新帧。
     """
     import shutil
     import tempfile
 
     from PIL import Image
-    from sprite_seq import _extract_video_frames, _unify_clip_frames
+    from sprite_seq import (EXTRACT_FPS, FRAMES_PER_CLIP, _extract_video_frames,
+                            _sample_frames, _unify_clip_frames)
 
     frames_dir = Path(tempfile.gettempdir()) / f"libclip_{lib_dir.name}_{action}"
     shutil.rmtree(str(frames_dir), ignore_errors=True)
     try:
-        all_frames = _extract_video_frames(video_path, frames_dir, fps=8)
+        all_frames = _extract_video_frames(video_path, frames_dir, fps=EXTRACT_FPS)
         if not all_frames:
             return False
         if len(all_frames) > MAX_CLIP_FRAMES:
             print(f"    [LibClips] {label or action} {len(all_frames)} 帧 "
                   f"超过上限 {MAX_CLIP_FRAMES}，截断保留前 {MAX_CLIP_FRAMES} 帧")
             all_frames = all_frames[:MAX_CLIP_FRAMES]
+        if action.startswith("idle") and len(all_frames) > FRAMES_PER_CLIP:
+            all_frames = _sample_frames(all_frames, FRAMES_PER_CLIP)
         if len(all_frames) < 4:
             print(f"    [LibClips] {label or action} too few frames ({len(all_frames)})")
             return False
@@ -1233,7 +1239,7 @@ async def api_library_gen_prompts(lib_id: str):
             "sample_file": ref_file,
         },
         "video_suggested": ("16:9、720p 及以上、纯白背景、无文字水印、人物始终完整在画面中央；"
-                            "时长不限，全程按 8fps 抽帧入库（几秒就抽几秒）"),
+                            "时长不限，全程按 24fps 抽帧入库（几秒就抽几秒）"),
     }
 
 

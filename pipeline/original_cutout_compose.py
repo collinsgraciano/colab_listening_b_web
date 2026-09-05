@@ -106,7 +106,9 @@ def _render_host_segment(seg_type: str, seg_idx: int, host_poses: list[str] | No
     if host_clip_map:
         layer["clips"] = host_clip_map
         layer["clip_fps"] = clip_fps
-        if take_mode:
+        # 显式 take_action（outro=wave 送别）在新旧模式都强制单 take；
+        # 讲话段（welcome/hook 未显式指定）仅在 sprite_take_mode 走 take
+        if take_mode or take_action:
             layer["take_mode"] = True
             if take_action:
                 layer["take_action"] = take_action

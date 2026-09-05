@@ -27,15 +27,24 @@ SPRITE_ACTIONS = ("talking_01", "idle_01", "wave",
                   "talking_02", "talking_03", "idle_02")
 FIRST_ACTION = "talking_01"
 FRAMES_PER_CLIP = 16
-TALKING_FRAMES = 48     # talking take：6s 源视频 @8fps 全帧（整句单 take 铺放）
+TALKING_FRAMES = 144    # talking/wave take：6s 源视频 @24fps 全帧（整句单 take 铺放）
 CLIP_FPS = 12           # 循环型动作播放帧率（与成片 25fps 解耦，游戏式采样）
 MANIFEST_NAME = "sprite_clips.json"
 SOURCE = "video_frames"
+EXTRACT_FPS = 24        # 源视频抽帧密度（用户决策 2026-09-05：8fps→24fps 提升流畅度）
 
 
 def frames_for_action(action: str) -> int:
-    """talking 变体整句单 take 需要全帧（6s@8fps=48）；循环型动作 16 帧足够。"""
-    return TALKING_FRAMES if action.startswith("talking") else FRAMES_PER_CLIP
+    """talking/wave 变体整句单 take 需要全帧（6s@24fps=144）；idle 循环 16 帧。"""
+    return TALKING_FRAMES if (action.startswith("talking")
+                              or action == "wave") else FRAMES_PER_CLIP
+
+
+def actions_for_char(char_key: str) -> tuple:
+    """该角色需生成的动作集：主持人不生成 idle（几乎一直在讲话，用户决策）。"""
+    if char_key == "host":
+        return tuple(a for a in SPRITE_ACTIONS if not a.startswith("idle"))
+    return SPRITE_ACTIONS
 
 # 动作提示词：强调"同一人物连续微动作"（flip book 式）。
 # talking ×3 / idle ×2 为变体：新模式（take_mode）说话者整句播一个 take、
@@ -217,7 +226,7 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
                   ref_frame: str | None, stop_check=None) -> list:
     """产出单个动作 clip，返回帧路径列表（空列表=失败）。
 
-    talking 变体存全帧（48）供整句单 take 铺放；循环型动作取样 16 帧。
+    talking/wave 变体存全帧（144=6s@24fps）供整句单 take 铺放；idle 取样 16 帧。
     返回前完成：抽帧 → _unify_clip_frames 统一几何 → 覆盖保存目标帧。
     """
     n_frames = frames_for_action(action)
@@ -235,7 +244,7 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
     got = _gen_action_video(prompt, video, ref_url=ref_url, stop_check=stop_check)
     if not got:
         return []
-    all_frames = _extract_video_frames(video, work_dir / "frames", fps=8)
+    all_frames = _extract_video_frames(video, work_dir / "frames", fps=EXTRACT_FPS)
     if len(all_frames) <= n_frames:
         raw_paths = [str(p) for p in all_frames]
     else:
@@ -307,7 +316,7 @@ def generate_sprite_clips(script, img_dir,
                           char_keys=None, stop_check=None) -> dict | None:
     """生成全部角色的动作变体序列帧素材，返回 manifest dict（完全失败返回 None）。
 
-    resume：目标帧文件齐该动作应有帧数（talking 48 / 其余 16）直接登记跳过；
+    resume：目标帧文件齐该动作应有帧数（talking/wave 144 / idle 16）直接登记跳过；
     单动作失败记日志继续。
     from_library 角色（绑定素材库序列帧角色）：缺失动作不自动补齐（用户决策
     「缺什么用什么」，零积分），已有动作沿用原 manifest 帧清单——帧数随上传
@@ -332,10 +341,11 @@ def generate_sprite_clips(script, img_dir,
         manifest["from_library"] = sorted(library_chars)
     todo: dict[str, list] = {}
     for char_key, _desc in chars:
+        char_actions = actions_for_char(char_key)
         prior = prior_chars.get(char_key) or {}
         entry = {}
         missing = []
-        for action in SPRITE_ACTIONS:
+        for action in char_actions:
             prior_frames = [p for p in (prior.get(action) or [])
                             if os.path.exists(p)]
             if len(prior_frames) >= 4:
@@ -352,7 +362,7 @@ def generate_sprite_clips(script, img_dir,
             todo[char_key] = missing
 
     n_done = sum(len(v) for v in manifest["chars"].values())
-    n_total = len(chars) * len(SPRITE_ACTIONS)
+    n_total = sum(len(actions_for_char(ck)) for ck, _ in chars)
     if not todo:
         print(f"  [SpriteSeq] All {n_total} clips already exist, skipping")
         _write_manifest(img_dir, manifest)

@@ -269,7 +269,9 @@ def _build_pose_schedule(n_poses: int, total_frames: int, fps: float,
 
 _CLIP_BASE = "talking"
 _CLIP_IDLE = "idle"
-_CLIP_INSERTS = ("gesture", "wave")
+# 讲话段禁插 wave（用户决策 2026-09-05：主持人/角色讲话时挥手很怪，wave 仅
+# outro 送别 take）。gesture 已随 A/C 路线删除 → 实际零插入，调度退化为纯 talking。
+_CLIP_INSERTS = ("gesture",)
 
 
 def _clip_variants(clips: dict, base: str) -> list:
@@ -597,14 +599,18 @@ def _render_sm_segment_inner(
                     group = (layer_clips.get(layer.get("take_action") or "")
                              or layer_clips.get(_CLIP_BASE))
                     if not group:
-                        gkeys = _clip_variants(layer_clips, _CLIP_BASE) \
-                            or sorted(layer_clips)
-                        group = layer_clips[gkeys[0]]
-                    idx = min(int(fidx / max(1, total_frames) * len(group)),
-                              len(group) - 1)
-                    sprite = transform_pose(group[idx])
-                    paste_with_shadow(canvas, sprite, x, cy, centered=True)
-                    continue
+                        gkeys = _clip_variants(layer_clips, _CLIP_BASE)
+                        if not gkeys:
+                            # 无 talking 变体（讲话段不用 wave）→ 回退姿势图集路径
+                            pass
+                        else:
+                            group = layer_clips[gkeys[0]]
+                    if group:
+                        idx = min(int(fidx / max(1, total_frames) * len(group)),
+                                  len(group) - 1)
+                        sprite = transform_pose(group[idx])
+                        paste_with_shadow(canvas, sprite, x, cy, centered=True)
+                        continue
                 # 倾听者：idle 变体按 seed 选其一，循环播放；无 idle 变体时
                 # 落入下方姿势图集路径（不循环 talking —— 静默角色嘴动属视觉 bug）
                 gkeys = _clip_variants(layer_clips, _CLIP_IDLE)
@@ -814,8 +820,10 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
             host_layer["clip_fps"] = sprite_clip_fps
             if sprite_take_mode:
                 host_layer["take_mode"] = True
-                if seg_type == "outro":
-                    host_layer["take_action"] = "wave"  # 送别挥手
+            if seg_type == "outro":
+                # 结尾送别（用户决策）：新旧模式都用 wave take；讲话段仍只用 talking
+                host_layer["take_mode"] = True
+                host_layer["take_action"] = "wave"
         char_layers = [host_layer]
         frames_dir = sm_root / f"{seg_type}_{seg_idx}"
         direction = 1 if seg_idx % 2 == 0 else -1
