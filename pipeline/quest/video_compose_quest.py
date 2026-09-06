@@ -478,11 +478,15 @@ def _render_sm_segment_inner(
                     print(f"  [Quest] clip frame error {fp}: {e}")
             if cframes:
                 processed_clips[act] = cframes
+        # take_mode/take_action 必须透传 —— 渲染循环读的就是 processed 层；
+        # 丢失会让整句单 take 分支成为死代码（wave 送别/跨行随机轮换全部失效）
         processed_layers.append({
             "poses": processed,
             "clips": processed_clips,
             "clip_fps": int(layer.get("clip_fps", 12)),
             "is_speaker": is_speaker,
+            "take_mode": bool(layer.get("take_mode")),
+            "take_action": layer.get("take_action", ""),
         })
 
     # Load background
@@ -820,6 +824,14 @@ def _prepare_segment(seg_idx, seg, timeline, dialogue, narration,
             host_layer["clip_fps"] = sprite_clip_fps
             if sprite_take_mode:
                 host_layer["take_mode"] = True
+                if seg_type != "outro":
+                    # welcome/hook 说话段：talking 变体按段随机（不与上一段重复）
+                    from stop_motion import pick_take_variant
+                    tkeys = sorted(k for k in _host_clips
+                                   if k == "talking" or k.startswith("talking_"))
+                    picked = pick_take_variant(tkeys, seg_idx)
+                    if picked:
+                        host_layer["take_action"] = picked
             if seg_type == "outro":
                 # 结尾送别（用户决策）：新旧模式都用 wave take；讲话段仍只用 talking
                 host_layer["take_mode"] = True
