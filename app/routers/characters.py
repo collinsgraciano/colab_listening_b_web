@@ -281,7 +281,7 @@ async def api_library_save(request: Request):
         if lib_actions:
             (lib_dir / "sprite_clips.json").write_text(
                 json.dumps({"version": 1,
-                            "fps": int(run_clips.get("fps", 12)),
+                            "fps": int(run_clips.get("fps", 24)),
                             "source": run_clips.get("source", "video_frames"),
                             "desc_snapshot": desc,
                             "actions": lib_actions},
@@ -973,8 +973,8 @@ def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
                               label: str = "") -> bool:
     """本地处理：视频 → ffmpeg 全程抽帧(24fps) → 抠图统一几何 → 存库内帧。
 
-    talking/wave 帧数 = 上传视频实际时长 × 24fps（上限 MAX_CLIP_FRAMES，超出
-    截断告警）；idle 循环型动作均匀采样回 16 帧（防循环周期被拉长成慢动作）。
+    帧数 = 上传视频实际时长 × 24fps（上限 MAX_CLIP_FRAMES，超出截断告警），
+    全动作一致不固定帧数；循环型动作以 manifest fps=24 原速播放。
     复用 pipeline/sprite_seq.py 纯函数（抠图与几何统一规格与管线内序列帧产出
     一致），MCP 自动生成与外部视频回传两条路线共用。
     重新上传为替换语义：统一几何成功后先清该动作旧帧再写新帧。
@@ -983,8 +983,7 @@ def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
     import tempfile
 
     from PIL import Image
-    from sprite_seq import (EXTRACT_FPS, FRAMES_PER_CLIP, _extract_video_frames,
-                            _sample_frames, _unify_clip_frames)
+    from sprite_seq import EXTRACT_FPS, _extract_video_frames, _unify_clip_frames
 
     frames_dir = Path(tempfile.gettempdir()) / f"libclip_{lib_dir.name}_{action}"
     shutil.rmtree(str(frames_dir), ignore_errors=True)
@@ -996,8 +995,6 @@ def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
             print(f"    [LibClips] {label or action} {len(all_frames)} 帧 "
                   f"超过上限 {MAX_CLIP_FRAMES}，截断保留前 {MAX_CLIP_FRAMES} 帧")
             all_frames = all_frames[:MAX_CLIP_FRAMES]
-        if action.startswith("idle") and len(all_frames) > FRAMES_PER_CLIP:
-            all_frames = _sample_frames(all_frames, FRAMES_PER_CLIP)
         if len(all_frames) < 4:
             print(f"    [LibClips] {label or action} too few frames ({len(all_frames)})")
             return False
@@ -1026,21 +1023,29 @@ def _produce_clips_from_video(video_path: str, lib_dir: Path, action: str,
 def _refresh_clip_manifest(lib_dir: Path, description: str) -> int:
     """扫描库内已有帧的动作重建 sprite_clips.json 并更新 meta.sprite_clips。
 
-    帧数按实际上传时长（≥4 帧即登记，不要求固定 48/16 全齐）；
+    扫描动作清单按角色 is_host 选择（host 无 idle，二者互不为超集）；
+    帧数按实际上传时长（≥4 帧即登记，不要求固定全齐）；
     无任何动作时不写 manifest（与运行导入语义一致）。
     """
+    is_host = False
+    meta_path = lib_dir / "meta.json"
+    if meta_path.exists():
+        try:
+            is_host = _lib_is_host(json.loads(
+                meta_path.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, OSError):
+            is_host = False
     actions: dict[str, list[str]] = {}
-    for action in _CLIP_ACTIONS_HOST:  # host 是超集（含 wave）
+    for action in (_CLIP_ACTIONS_HOST if is_host else _CLIP_ACTIONS_BASE):
         frames = _list_action_frames(lib_dir, action)
         if len(frames) >= 4:
             actions[action] = [Path(p).name for p in frames]
     if actions:
         (lib_dir / "sprite_clips.json").write_text(
-            json.dumps({"version": 1, "fps": 12, "source": "video_frames",
+            json.dumps({"version": 1, "fps": 24, "source": "video_frames",
                         "desc_snapshot": description, "actions": actions},
                        ensure_ascii=False, indent=2),
             encoding="utf-8")
-    meta_path = lib_dir / "meta.json"
     if meta_path.exists():
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))

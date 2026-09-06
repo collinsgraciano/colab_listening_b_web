@@ -311,7 +311,7 @@ def _build_clip_schedule(clips: dict, total_frames: int, fps: float,
     if not inserts:
         return schedule
     rng = random.Random(seed)
-    loop_frames = 16  # 与 FRAMES_PER_CLIP 对齐的插入循环长度
+    loop_frames = 16  # 插入循环长度（gesture 已废弃，_CLIP_INSERTS 实际为空，此分支保留兼容）
     tail_guard = round(1.2 * fps)
     switch_frames = []
     if audio_file and os.path.exists(audio_file):

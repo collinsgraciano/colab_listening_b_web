@@ -91,7 +91,7 @@ def _cfg_int(config: dict, key: str, default: int) -> int:
 
 
 def _merge_run_clip_manifest(dst_img_dir: Path, char_key: str,
-                             actions: dict, fps: int = 12,
+                             actions: dict, fps: int = 24,
                              from_library: bool = False) -> None:
     """把复制的序列帧 clips 合并写入运行 manifest。
 
@@ -617,7 +617,7 @@ class PipelineService:
                                 if clip_entries:
                                     _merge_run_clip_manifest(
                                         dst_img_dir, key, clip_entries,
-                                        int(scm.get("fps", 12)))
+                                        int(scm.get("fps", 24)))
                                     copied.append(f"{key} clips×{len(clip_entries)}")
                         else:
                             if "char_a" in image_keys and "char_b" in image_keys:
@@ -751,7 +751,7 @@ class PipelineService:
                             clip_entries[action] = paths
                     if clip_entries:
                         _merge_run_clip_manifest(dst_img_dir, key, clip_entries,
-                                                 int(lcm.get("fps", 12)),
+                                                 int(lcm.get("fps", 24)),
                                                  from_library=True)
                         copied.append(f"{key} clips×{len(clip_entries)}")
                         snap = lcm.get("desc_snapshot", "")
@@ -763,7 +763,7 @@ class PipelineService:
                         # 库有 clips 清单但本次无可复制动作（源文件缺失）：
                         # 仍标记 from_library，防止运行中意外 MCP 补齐
                         _merge_run_clip_manifest(dst_img_dir, key, {},
-                                                 int(lcm.get("fps", 12)),
+                                                 int(lcm.get("fps", 24)),
                                                  from_library=True)
                 self._on_log_line(f"  [Library] {key} ← {lib_id} ({lib_meta.get('name', '')})")
 

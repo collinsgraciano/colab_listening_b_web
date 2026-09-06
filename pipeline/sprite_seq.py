@@ -1,12 +1,14 @@
 """游戏角色式序列帧素材生成（sprite_sequence 动画模式）。
 
-素材生产路线（唯一）：Seedance2 参考图生成白底动作视频 → ffmpeg 抽帧 →
-抠图 → 取样 16 帧（帧间一致性最好）。
+素材生产路线（唯一）：Seedance2 参考图生成白底动作视频 → ffmpeg 全程抽帧
+(24fps) → 抠图（帧间一致性最好）。
 
-产出规格：每角色 4 个动作循环（talking/idle/gesture/wave）× 16 帧，
+产出规格：帧数 = 源视频实际时长 × 24fps（全动作一致，不固定帧数），
 文件 clip_{char}_{action}_{j:02d}.png —— 已统一 remove_bg + 整组 union bbox
 对齐 + 共同比例缩放居中到 POSE 画布（渲染层直接加载，无需再处理）。
-清单 images/sprite_clips.json 记录 {char: {action: [帧路径]}} + fps + source。
+take 型动作（talking/wave）整句均匀铺放；循环型动作（idle）以 manifest
+fps=24 原速循环。清单 images/sprite_clips.json 记录 {char: {action: [帧路径]}}
++ fps + source。
 """
 import json
 import os
@@ -26,18 +28,10 @@ from image_gen import reupload_for_cdn
 SPRITE_ACTIONS = ("talking_01", "idle_01", "wave",
                   "talking_02", "talking_03", "idle_02")
 FIRST_ACTION = "talking_01"
-FRAMES_PER_CLIP = 16
-TALKING_FRAMES = 144    # talking/wave take：6s 源视频 @24fps 全帧（整句单 take 铺放）
-CLIP_FPS = 12           # 循环型动作播放帧率（与成片 25fps 解耦，游戏式采样）
+CLIP_FPS = 24           # 循环型动作播放帧率 = 抽帧密度 → 循环以原速播放（用户决策 2026-09-05）
 MANIFEST_NAME = "sprite_clips.json"
 SOURCE = "video_frames"
 EXTRACT_FPS = 24        # 源视频抽帧密度（用户决策 2026-09-05：8fps→24fps 提升流畅度）
-
-
-def frames_for_action(action: str) -> int:
-    """talking/wave 变体整句单 take 需要全帧（6s@24fps=144）；idle 循环 16 帧。"""
-    return TALKING_FRAMES if (action.startswith("talking")
-                              or action == "wave") else FRAMES_PER_CLIP
 
 
 def actions_for_char(char_key: str) -> tuple:
@@ -131,18 +125,6 @@ def _extract_video_frames(video_path: str, out_dir: Path, fps: int = 8) -> list:
     return sorted(out_dir.glob("f*.png"))
 
 
-def _sample_frames(frame_paths: list, n: int = FRAMES_PER_CLIP) -> list:
-    """均匀取样 n 帧（覆盖整个动作循环，避免只取开头）。"""
-    if len(frame_paths) <= n:
-        return list(frame_paths)
-    idxs = []
-    for i in range(n):
-        k = round(i * (len(frame_paths) - 1) / (n - 1))
-        if not idxs or k != idxs[-1]:
-            idxs.append(k)
-    return [frame_paths[k] for k in idxs]
-
-
 # ---------------------------------------------------------------------------
 # 帧统一处理：整组 union bbox 对齐 + 共同比例缩放 + 居中到 POSE 画布
 # ---------------------------------------------------------------------------
@@ -207,34 +189,38 @@ def _unify_clip_frames(raw_frames: list, label: str = "") -> list:
 # 单动作产出与编排
 # ---------------------------------------------------------------------------
 
-def clip_frame_paths(img_dir, char_key: str, action: str,
-                     count: int | None = None) -> list:
-    """该角色该动作的目标帧路径（count 缺省按动作类型取 48/16）。"""
-    n = count if count is not None else frames_for_action(action)
-    return [str(Path(img_dir) / f"clip_{char_key}_{action}_{j:02d}.png")
-            for j in range(n)]
+def _action_frame_paths(img_dir, char_key: str, action: str) -> list:
+    """该角色该动作磁盘上实际存在的帧（clip_{char}_{action}_*.png，帧号数值序）。
+
+    帧数由源视频实际时长决定（24fps 全程抽帧，不固定 144/16）；
+    帧号两位/三位混排（j≥100 自然进位），必须按数值排序。
+    """
+    import re
+
+    def _key(p: Path) -> int:
+        m = re.search(r"_(\d+)\.png$", p.name)
+        return int(m.group(1)) if m else 0
+
+    return [str(p) for p in
+            sorted(Path(img_dir).glob(f"clip_{char_key}_{action}_*.png"), key=_key)]
 
 
-def _clip_complete(img_dir, char_key: str, action: str,
-                   count: int | None = None) -> bool:
-    return all(os.path.exists(p)
-               for p in clip_frame_paths(img_dir, char_key, action, count))
+def _clip_complete(img_dir, char_key: str, action: str) -> bool:
+    return len(_action_frame_paths(img_dir, char_key, action)) >= 4
 
 
 def _produce_clip(char_key: str, action: str, char_desc: str,
                   img_dir: Path, style_prompt: str,
                   ref_frame: str | None, stop_check=None) -> list:
-    """产出单个动作 clip，返回帧路径列表（空列表=失败）。
+    """产出单个动作 clip，返回实际帧路径列表（空列表=失败）。
 
-    talking/wave 变体存全帧（144=6s@24fps）供整句单 take 铺放；idle 取样 16 帧。
-    返回前完成：抽帧 → _unify_clip_frames 统一几何 → 覆盖保存目标帧。
+    全动作全程抽帧（EXTRACT_FPS，帧数=源视频实际时长×fps），不做固定帧数
+    取样/补齐——take 靠均匀铺放、循环靠 fps=24 原速播放，任意帧数都正确。
+    返回前完成：抽帧 → _unify_clip_frames 统一几何 → 清该动作旧帧（替换
+    语义，防不同帧数残留混入）→ 保存。
     """
-    n_frames = frames_for_action(action)
     work_dir = Path(tempfile.gettempdir()) / f"sprite_work_{char_key}_{action}"
     work_dir.mkdir(parents=True, exist_ok=True)
-    final_paths = clip_frame_paths(img_dir, char_key, action, n_frames)
-    if all(os.path.exists(p) for p in final_paths):
-        return final_paths
 
     prompt = _video_prompt(action, char_desc, style_prompt)
     video = str(work_dir / "action.mp4")
@@ -245,10 +231,7 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
     if not got:
         return []
     all_frames = _extract_video_frames(video, work_dir / "frames", fps=EXTRACT_FPS)
-    if len(all_frames) <= n_frames:
-        raw_paths = [str(p) for p in all_frames]
-    else:
-        raw_paths = [str(p) for p in _sample_frames(all_frames, n_frames)]
+    raw_paths = [str(p) for p in all_frames]
 
     if len(raw_paths) < 4:
         print(f"    [SpriteSeq] {char_key}/{action} too few frames ({len(raw_paths)})")
@@ -264,16 +247,19 @@ def _produce_clip(char_key: str, action: str, char_desc: str,
     if len(unified) < 4:
         return []
 
-    # 帧数对齐 n_frames：不足时循环补齐，超出时均匀取样
-    if len(unified) != n_frames:
-        idxs = [round(i * (len(unified) - 1) / (n_frames - 1))
-                for i in range(n_frames)]
-        unified = [unified[k] for k in idxs]
-
+    # 替换语义：清该动作旧帧再按实际帧数写盘（不同帧数残留会污染 manifest）
+    for old in Path(img_dir).glob(f"clip_{char_key}_{action}_*.png"):
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    saved = []
     for j, frame in enumerate(unified):
-        frame.save(final_paths[j], compress_level=2)
-    print(f"    [SpriteSeq] {char_key}/{action}: {n_frames} frames saved")
-    return final_paths
+        p = Path(img_dir) / f"clip_{char_key}_{action}_{j:02d}.png"
+        frame.save(str(p), compress_level=2)
+        saved.append(str(p))
+    print(f"    [SpriteSeq] {char_key}/{action}: {len(saved)} frames saved")
+    return saved
 
 
 def _pick_ref_frame(frame_paths: list) -> str | None:
@@ -293,21 +279,20 @@ def _pick_ref_frame(frame_paths: list) -> str | None:
     return best
 
 
-def _load_prior_manifest(img_dir) -> tuple[dict, set]:
-    """读运行目录已有 manifest（存在时），返回 (chars dict, from_library 集合)。
+def _load_library_flag(img_dir) -> set:
+    """读运行目录已有 manifest 的 from_library 集合（不存在/损坏返回空集）。
 
     from_library 由 app/pipeline_service._merge_run_clip_manifest 写入：
     这些角色的序列帧素材以素材库为权威来源。
     """
     path = Path(img_dir) / MANIFEST_NAME
     if not path.exists():
-        return {}, set()
+        return set()
     try:
         with open(path, "r", encoding="utf-8") as f:
-            m = json.load(f)
-        return (m.get("chars") or {}), set(m.get("from_library") or [])
+            return set(json.load(f).get("from_library") or [])
     except (json.JSONDecodeError, OSError):
-        return {}, set()
+        return set()
 
 
 def generate_sprite_clips(script, img_dir,
@@ -316,14 +301,14 @@ def generate_sprite_clips(script, img_dir,
                           char_keys=None, stop_check=None) -> dict | None:
     """生成全部角色的动作变体序列帧素材，返回 manifest dict（完全失败返回 None）。
 
-    resume：目标帧文件齐该动作应有帧数（talking/wave 144 / idle 16）直接登记跳过；
+    resume：磁盘上该动作已有 ≥4 帧（帧数随源视频时长可变）直接登记跳过；
     单动作失败记日志继续。
     from_library 角色（绑定素材库序列帧角色）：缺失动作不自动补齐（用户决策
-    「缺什么用什么」，零积分），已有动作沿用原 manifest 帧清单——帧数随上传
-    视频时长可变，固定 48/16 判定会截断长视频素材。
+    「缺什么用什么」，零积分）；帧登记一律以磁盘 glob 为准——帧数随上传视频
+    时长可变，固定帧数判定会截断长视频素材。
     """
     img_dir = Path(img_dir)
-    prior_chars, library_chars = _load_prior_manifest(img_dir)
+    library_chars = _load_library_flag(img_dir)
     all_chars = [
         ("char_a", script.get("char_a_description", "friendly young man")),
         ("char_b", script.get("char_b_description", "friendly young woman")),
@@ -342,16 +327,12 @@ def generate_sprite_clips(script, img_dir,
     todo: dict[str, list] = {}
     for char_key, _desc in chars:
         char_actions = actions_for_char(char_key)
-        prior = prior_chars.get(char_key) or {}
         entry = {}
         missing = []
         for action in char_actions:
-            prior_frames = [p for p in (prior.get(action) or [])
-                            if os.path.exists(p)]
-            if len(prior_frames) >= 4:
-                entry[action] = prior_frames
-            elif _clip_complete(img_dir, char_key, action):
-                entry[action] = clip_frame_paths(img_dir, char_key, action)
+            existing = _action_frame_paths(img_dir, char_key, action)
+            if len(existing) >= 4:
+                entry[action] = existing
             else:
                 missing.append(action)
         manifest["chars"][char_key] = entry

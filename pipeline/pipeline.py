@@ -466,7 +466,7 @@ def _quick_test_prepare_manifest(img_dir: Path) -> None:
     flags.update({"char_a", "char_b", "char_c", "host"})
     manifest["from_library"] = sorted(flags)
     manifest.setdefault("version", 1)
-    manifest.setdefault("fps", 12)
+    manifest.setdefault("fps", 24)
     manifest.setdefault("source", "video_frames")
     manifest.setdefault("chars", {})
     mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

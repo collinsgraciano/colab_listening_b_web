@@ -1157,7 +1157,11 @@ function renderPromptsModal(libId, data) {
         </div>`;
 }
 
+let _libFolderLastTs = 0;   // explorer 启动慢（1-2s），连点会开两个窗口 —— 3s 防抖
 function openLibFolder(libId, file) {
+    const now = Date.now();
+    if (now - _libFolderLastTs < 3000) return;
+    _libFolderLastTs = now;
     const qs = file ? `?file=${encodeURIComponent(file)}` : '';
     fetch(`/api/character_library/${libId}/open_folder${qs}`, {method: 'POST'})
         .then(r => r.json())
