@@ -55,7 +55,9 @@ _ACTION_PHRASES = {
                 "gentle listening expression"),
     "idle_02": ("standing relaxed with a warm smile, gently shifting weight from "
                 "one side to the other, subtle head tilts while listening"),
-    "wave": ("waving hello in a friendly greeting, right hand raised waving"),
+    "wave": ("waving hello in a friendly greeting while talking, right hand "
+             "raised waving, mouth moving with a warm smile, "
+             "as if warmly welcoming the audience"),
 }
 
 
