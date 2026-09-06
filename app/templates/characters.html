@@ -88,6 +88,7 @@
             </h3>
             <button onclick="loadLibrary()" class="text-xs text-slate-400 hover:text-slate-200">🔄 刷新</button>
         </div>
+        <div id="char-type-tabs" class="flex flex-wrap gap-2 mb-3"></div>
         <div id="char-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <p class="text-xs text-slate-500 col-span-full">加载中...</p>
         </div>
@@ -369,12 +370,55 @@ function previewVoice(speaker, language, regenerate = false, btn = null) {
         });
 }
 
+// --- 角色列表类型筛选（自动分类：按素材形态从现有字段推导，无手动字段） ---
+let _charFilter = 'all';
+
+const CHAR_TYPE_DEFS = [
+    {key: 'all',        label: '全部'},
+    {key: 'full',       label: '完整角色'},
+    {key: 'clips',      label: '序列帧角色'},
+    {key: 'desc_only',  label: '仅描述'},
+    {key: 'voice_only', label: '仅音色+性别'},
+];
+
+function charMatchesFilter(char, key) {
+    if (key === 'all') return true;
+    if (key === 'voice_only') return !char.description;
+    // 仅描述：有描述但既无图也无序列帧（AI 生成后未生图的描述卡）
+    if (key === 'desc_only') return !!char.description && !char.image_url && !char.clip_count;
+    // full 与 clips 可叠加：有图又有帧的角色同时出现在两个标签下
+    if (key === 'full') return !!char.image_url;
+    if (key === 'clips') return !!char.clip_count;
+    return true;
+}
+
+function renderTypeTabs() {
+    const bar = document.getElementById('char-type-tabs');
+    if (!bar) return;
+    bar.innerHTML = CHAR_TYPE_DEFS.map(def => {
+        const n = _libraryChars.filter(c => charMatchesFilter(c, def.key)).length;
+        const active = _charFilter === def.key;
+        const cls = active ? 'bg-indigo-600 text-white'
+                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600';
+        return `<button onclick="setTypeFilter('${def.key}')"
+            class="px-3 py-1 rounded-full text-xs ${cls}">
+            ${def.label} <span class="${active ? 'text-indigo-200' : 'text-slate-500'}">${n}</span></button>`;
+    }).join('');
+}
+
+function setTypeFilter(key) {
+    _charFilter = key;
+    renderTypeTabs();
+    renderCharGrid();
+}
+
 // --- Load library characters ---
 function loadLibrary() {
     fetch('/api/character_library')
         .then(r => r.json())
         .then(data => {
             _libraryChars = data.characters || [];
+            renderTypeTabs();
             renderCharGrid();
             // Check for any in-progress generations
             _libraryChars.forEach(c => {
@@ -390,15 +434,21 @@ function loadLibrary() {
 
 function renderCharGrid() {
     const grid = document.getElementById('char-grid');
-    document.getElementById('char-count').textContent = `(${_libraryChars.length})`;
+    const shown = _libraryChars.filter(c => charMatchesFilter(c, _charFilter));
+    document.getElementById('char-count').textContent =
+        _charFilter === 'all' ? `(${shown.length})` : `(${shown.length}/${_libraryChars.length})`;
 
     if (!_libraryChars.length) {
         grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">素材库为空。在下方新建角色或从运行历史导入。</p>';
         return;
     }
+    if (!shown.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">该分类下暂无角色。</p>';
+        return;
+    }
 
     grid.innerHTML = '';
-    _libraryChars.forEach(char => {
+    shown.forEach(char => {
         const card = createCharCard(char);
         grid.appendChild(card);
     });

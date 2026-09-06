@@ -179,19 +179,11 @@ async def api_library_list():
     """List all saved characters in the library."""
     if not LIBRARY_DIR.exists():
         return {"characters": []}
-    chars = []
-    for d in sorted(LIBRARY_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-        meta_path = d / "meta.json"
-        if not meta_path.exists():
-            continue
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            thumb = d / "thumb.png"
-            meta["image_url"] = f"/api/character_library/{d.name}/image" if thumb.exists() else ""
-            meta["has_host_bg"] = (d / "host_bg.png").exists()
-            chars.append(meta)
-        except (json.JSONDecodeError, OSError):
-            continue
+    # 复用共享实现：附带 pose_count / clip_count（列表页徽章与类型分类依赖）
+    chars = list_library_chars(include_pose_count=True)
+    for meta in chars:
+        lib_dir = LIBRARY_DIR / str(meta.get("id", ""))
+        meta["has_host_bg"] = (lib_dir / "host_bg.png").exists()
     return {"characters": chars}
 
 
