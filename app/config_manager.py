@@ -57,7 +57,6 @@ PARAM_SPEC = {
                       "original_static": "Original Static (4章静态图片)",
                       "original_cutout": "Original Cutout (4章+人物抠图)",
                       "quest": "Quest (任务听力)",
-                      "original_cutout_sprite": "Original Cutout Sprite (4章+序列帧动画)",
                       "original_sprite": "Original Sprite (4章+固定机位)",
                       "quest_sprite": "Quest Sprite (任务+序列帧动画)"}},
     "animation": {"default": "stop_motion", "type": "select", "group": "content",
@@ -258,7 +257,7 @@ PARAM_SPEC = {
                                 "help": "跟读练习前的引导文字卡（逐句显示）。关闭后整段跳过。Quest 模式不适用"},
     "dialogue_xfade": {"default": False, "type": "checkbox", "group": "video",
                        "modes": ["original", "original_static", "original_cutout",
-                                 "original_cutout_sprite", "quest", "quest_sprite"],
+                                 "quest", "quest_sprite"],
                        "label": "对话段叠化过渡",
                        "help": "相邻对话段之间 0.32s 交叉溶解，弱化硬切感（original_sprite 恒开，无需配置）。开启后合成稍慢"},
     "pad": {"default": "", "type": "text", "group": "video",
@@ -411,7 +410,7 @@ GROUP_META = {
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
 
 MODES = ["original", "original_static", "original_cutout", "quest",
-         "original_cutout_sprite", "original_sprite", "quest_sprite"]
+         "original_sprite", "quest_sprite"]
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
     "original_static": "Original Static (4章静态图片)",
@@ -948,6 +947,5 @@ def detect_local_mcp_token() -> str | None:
 
 def structure_family(mode: str) -> str:
     """序列帧新模式 → 行为族名（族内结构分支零改动）；其余模式原样返回。"""
-    return {"original_cutout_sprite": "original_cutout",
-            "original_sprite": "original_cutout",
+    return {"original_sprite": "original_cutout",
             "quest_sprite": "quest"}.get(mode, mode)
