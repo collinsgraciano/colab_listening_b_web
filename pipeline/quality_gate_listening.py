@@ -217,6 +217,18 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
                 add("narration", "warning",
                     f"旁白 {field} 第 {si + 1} 句超长（>{max_line_words} 词）")
 
+    # 主持人族旁白总词数目标（对齐 quest 规格：hook 60-100 / outro 80-110；
+    # warning 级，原因同上——旁白不可 patch，error 会触发 QA 空转保护）
+    if structure == "original_cutout":
+        for field, lo, hi in (("story_hook", 60, 100), ("outro", 80, 110)):
+            ntext = str(script.get(field, "") or "").strip()
+            if not ntext:
+                continue
+            n_words = len(_words(ntext))
+            if n_words < lo or n_words > hi:
+                add("narration", "warning",
+                    f"旁白 {field} 共 {n_words} 词（主持人版建议 {lo}-{hi}）")
+
     # ── 4. 重复 ──────────────────────────────────────────────────────
     seen: dict[str, int] = {}
     for i, t in enumerate(texts):

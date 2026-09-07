@@ -437,6 +437,51 @@ def _seo_hint_line(topic: str) -> str:
             f"where relevant: {hint}.")
 
 
+def _narration_field_desc(structure: str, mw: int) -> tuple[str, str]:
+    """story_hook / outro 字段说明（主持人族为加长版，其余结构保持原句）。
+
+    original_cutout 族（含 sprite 变体，生成时 structure 均归一为
+    original_cutout）主持人出镜开场/结尾：hook 需承接下文（场景铺垫 +
+    预告听什么 + 过渡进对话），outro 需总结上文（引用对白原句复盘 +
+    跟读建议 + CTA）。篇幅对齐 quest 规格，每句仍 ≤ mw 词保证字幕两行内。
+    其余结构返回旧文案（prompt 逐字节不变）。
+    """
+    if structure != "original_cutout":
+        story_hook = (f"a compelling 1-sentence intro that sets the scene "
+                      f"(AT MOST {mw} words)")
+        outro = ('a warm closing that thanks viewers and includes a clear '
+                 'call-to-action — ask them to LIKE the video, SUBSCRIBE to '
+                 'the channel, and COMMENT which scenario they want next '
+                 '(e.g. "That\'s all for today! If this helped, please hit '
+                 'like and subscribe. Tell me in the comments which scenario '
+                 f'you want next!"). Each sentence at most {mw} words')
+        return story_hook, outro
+    story_hook = (
+        "the host's opening narration right after the welcome greeting "
+        "(60-100 words total). It must: (1) set the scene vividly — who the "
+        "two characters are, where they are, and what is about to happen; "
+        "(2) preview what viewers will learn — mention 2-3 things to listen "
+        "for in the upcoming dialogue (real phrases, questions or situations "
+        "that actually appear in it); (3) end with ONE short hand-off line "
+        "leading into the conversation (e.g. \"Let's watch.\"). Do NOT "
+        "repeat the subscribe call-to-action (welcome_en already did it). "
+        "Write in SHORT sentences — every sentence at most "
+        f"{mw} words."
+    )
+    outro = (
+        "the host's closing narration AFTER the practice section (80-110 "
+        "words total). Structure: (1) a short warm reaction to the story "
+        "that just ended; (2) recap 2-3 KEY English phrases that actually "
+        "appear in the dialogue — quote them VERBATIM in quotes and briefly "
+        "say when to use them; (3) encourage viewers to replay the video "
+        "and shadow-repeat each sentence; (4) ask viewers to COMMENT which "
+        "scenario they want next; (5) end with LIKE, SUBSCRIBE and goodbye. "
+        "Write in SHORT sentences — every sentence at most "
+        f"{mw} words."
+    )
+    return story_hook, outro
+
+
 def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = None,
                             num_lines: int = 18,
                             structure: str = "original",
@@ -458,6 +503,8 @@ def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = N
                      "original_cutout": ()}[pf]
     # 每句最大词数（字幕两行约束）：LISTENING_MAX_LINE_WORDS → clamp [4,20]
     mw = resolve_max_line_words()
+    # 主持人族 hook/outro 字段说明（加长版）；其余结构与旧文案逐字一致
+    story_hook_desc, outro_desc = _narration_field_desc(structure, mw)
     # A（风格强化）：默认关闭 — story_line 保持原句，prompt 与旧版逐字一致
     story_line = ("- The dialogue must tell a COMPLETE story with a clear "
                   "beginning, problem/development, and resolution — but keep "
@@ -569,11 +616,11 @@ TECHNICAL REQUIREMENTS:
 - "cefr": the CEFR level of this lesson, exactly "{cefr}" (used for thumbnail level badge)
 - "title_zh": Traditional Chinese short title (max 6 characters, e.g. "在機場")
 - "scene_zh": Traditional Chinese scene description (e.g. "餐廳 · 點餐")
-- "story_hook": a compelling 1-sentence intro that sets the scene (AT MOST {mw} words)
+- "story_hook": {story_hook_desc}
 - "intro_zh": Traditional Chinese translation of the intro
 - "welcome_en": a warm YouTube-host greeting opening the video (2-3 sentences), welcoming viewers, hinting at today's topic, AND ending with a light call-to-action (e.g. "Hi friends! Welcome back! Today we're checking out at a pharmacy. If you're new here, subscribing really helps!"). Keep each sentence at most {mw} words.
 - "welcome_zh": Traditional Chinese translation of the welcome greeting
-- "outro": a warm closing that thanks viewers and includes a clear call-to-action — ask them to LIKE the video, SUBSCRIBE to the channel, and COMMENT which scenario they want next (e.g. "That's all for today! If this helped, please hit like and subscribe. Tell me in the comments which scenario you want next!"). Each sentence at most {mw} words
+- "outro": {outro_desc}
 - "outro_zh": Traditional Chinese translation of the outro
 - "practice_intro_en": English instruction before the 跟讀 section (at most {mw} words)
 - "practice_intro_zh": Traditional Chinese translation of the practice intro
