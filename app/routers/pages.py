@@ -13,7 +13,6 @@ from ..config_manager import (
     load_llm_providers, load_mode_config, set_active_mode,
 )
 from ..library_io import list_library_chars
-from ..mode_test_service import get_mode_test_service
 from ..paths import TRASH_META_FILENAME
 from ..pipeline_service import get_service
 from ..templating import templates
@@ -305,16 +304,6 @@ async def runs_page(request: Request):
         "mode_labels": MODE_LABELS,
         "subtitle_style_options": subtitle_style_lib.get_style_options(),
         "active_page": "runs",
-    })
-
-
-@router.get("/mode-test", response_class=HTMLResponse)
-async def mode_test_page(request: Request):
-    service = get_mode_test_service()
-    return templates.TemplateResponse(request, "mode_test.html", {
-        "active_page": "mode_test",
-        "mode_labels": MODE_LABELS,
-        "status": service.full_status(),
     })
 
 

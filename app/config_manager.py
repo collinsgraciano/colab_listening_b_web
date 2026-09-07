@@ -27,7 +27,7 @@ def normalize_animation(value: str) -> str:
     cutout/quest 渲染器不读 animation 值（三值渲染完全等效）；sprite_sequence 是
     唯一有真实分支的值。与 pipeline.pipeline._norm_animation 语义一致（pipeline
     自包含不 import app，故此处独立实现）。用于 Web 启动链路：build_cli_args /
-    _build_args / mode_test manifest 回放，保证旧配置与旧 checkpoint resume 兼容。
+    _build_args，保证旧配置与旧 checkpoint resume 兼容。
     """
     return "stop_motion" if value in ("none", "landing") else value
 

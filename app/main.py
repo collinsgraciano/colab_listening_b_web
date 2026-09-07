@@ -1,6 +1,6 @@
 """FastAPI main application — 应用装配层：静态资源、路由注册、启动任务。
 
-路由实现按领域拆分在 app/routers/（pages / health / config / run / mode_test /
+路由实现按领域拆分在 app/routers/（pages / health / config / run /
 topics / scripts / styles / subtitle_styles / runs / mcp_tokens / characters /
 voices_qwen / voices_kokoro / voices_moss / ai_test），include 顺序与拆分前的
 banner 顺序一致，保证路径匹配优先级不变。
@@ -22,7 +22,6 @@ from .routers import (
     config as config_routes,
     health as health_routes,
     mcp_tokens as mcp_tokens_routes,
-    mode_test as mode_test_routes,
     pages as pages_routes,
     run as run_routes,
     runs as runs_routes,
@@ -57,7 +56,6 @@ app.include_router(config_routes.router)
 app.include_router(run_routes.router)
 # 批量队列紧跟 run 路由注册（领域分组；批量队列与主 pipeline 互斥，见 run.py 保护）
 app.include_router(batch_queue_routes.router)
-app.include_router(mode_test_routes.router)
 app.include_router(topics_routes.router)
 app.include_router(styles_routes.router)
 app.include_router(subtitle_styles_routes.router)
