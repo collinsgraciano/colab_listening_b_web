@@ -571,6 +571,18 @@ def _probe_audio_duration(path: str) -> float | None:
         return None
 
 
+def _probe_video_duration(path: str) -> float | None:
+    """探测视频流容器时长（秒），供 xfade 偏移计算。失败返回 None。"""
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True)
+    try:
+        return float(r.stdout.strip().splitlines()[0])
+    except (ValueError, IndexError):
+        return None
+
+
 def concat_segments(segment_paths: list[str], output_path: str,
                     tmp_dir: str | Path = None) -> str:
     """Concatenate segment files (video stream copy + audio filter re-encode).
@@ -668,6 +680,88 @@ def concat_segments(segment_paths: list[str], output_path: str,
 # Subtitle rendering + overlay burn
 # ---------------------------------------------------------------------------
 
+_SENT_SPLIT_MARK = "\x00"
+
+
+def _split_narration_subtitles(en: str, zh: str, audio_d: float, t_start: float,
+                               pauses: list[float] | None = None) -> list[dict]:
+    """Split long narration into per-sentence subtitle entries.
+
+    引号兼容分句：句末标点可带闭引号再断句（EN 如 ...that?"、ZH 如 「…？」）。
+    outro 文案按 prompt 要求逐字引用对白金句，旧正则 (?<=[.!?])\\s+ 在
+    "句号+闭引号+空格" 处不匹配，导致多句挤成一条巨型字幕；ZH 旧正则还会把
+    「…？」从闭引号前劈开，产生孤悬 」 开头的碎条。无引号文本的分句结果与
+    旧逻辑一致。
+
+    First splits by sentence-ending punctuation, then further splits
+    very long sentences by commas/semicolons so text doesn't cram.
+    Interior boundaries are snapped to measured speech onsets (pauses)
+    when available — precise sync with actual TTS timing.
+    Returns list of subtitle entry dicts.
+    """
+    EN_MAX_CHARS = 80
+    EN_MAX_WORDS = 12
+    ZH_MAX_CHARS = 30
+    _CLOSE = "\"'\u201d\u2019\u300d\u300f"  # 中英常用闭引号/闭括号
+
+    def _mark_sentence_ends(text: str, is_en: bool) -> list[str]:
+        # 在句末单元（标点+可选闭引号）之后的空白处插分隔标记再切分
+        if is_en:
+            marked = re.sub(r'([.!?][' + _CLOSE + r']?)(?=\s)',
+                            lambda m: m.group(1) + _SENT_SPLIT_MARK, text)
+        else:
+            # 闭引号并入前句单元，避免从 ？ 与 」 之间劈开
+            marked = re.sub(r'([。！？][' + _CLOSE + r']?)',
+                            lambda m: m.group(1) + _SENT_SPLIT_MARK, text)
+        return [p.strip() for p in marked.split(_SENT_SPLIT_MARK) if p.strip()]
+
+    def _further_split_en(text: str) -> list[str]:
+        """Split EN by [.!?] first (quote-aware), then by [,;] if still too long."""
+        parts = _mark_sentence_ends(text.strip(), True)
+        result = []
+        for p in parts:
+            if len(p) > EN_MAX_CHARS or len(p.split()) > EN_MAX_WORDS:
+                sub_parts = re.split(r'(?<=[,;])\s+', p)
+                result.extend(s.strip() for s in sub_parts if s.strip())
+            else:
+                result.append(p)
+        return result if result else [text.strip()]
+
+    def _further_split_zh(text: str) -> list[str]:
+        """Split ZH by [。！？] first (quote-aware), then by [，；] if still too long."""
+        parts = _mark_sentence_ends(text.strip(), False)
+        result = []
+        for p in parts:
+            if len(p) > ZH_MAX_CHARS:
+                sub_parts = re.split(r'(?<=[，；])\s*', p)
+                result.extend(s.strip() for s in sub_parts if s.strip())
+            else:
+                result.append(p)
+        return result if result else [text.strip()]
+
+    en_parts = _further_split_en(en) if en else []
+    zh_parts = _further_split_zh(zh) if zh else []
+    n = max(len(en_parts), len(zh_parts), 1)
+    total_chars = sum(len(s) for s in en_parts) or 1
+    entries = []
+    cursor = t_start
+    for i in range(n):
+        sent_en = en_parts[i] if i < len(en_parts) else ""
+        sent_zh = zh_parts[i] if i < len(zh_parts) else ""
+        sent_frac = (len(sent_en) if sent_en else len(sent_zh) or 1) / total_chars
+        sent_dur = audio_d * sent_frac if i < n - 1 else audio_d - (cursor - t_start)
+        entries.append({
+            "start": cursor,
+            "end": cursor + sent_dur,
+            "en": sent_en,
+            "zh": sent_zh,
+        })
+        cursor += sent_dur
+    if pauses and len(entries) >= 2:
+        _align_entries_to_pauses(entries, pauses)
+    return entries
+
+
 def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
                    work_dir: str, srt_dir: str, pad: float = 0.4,
                    progress_cb=None, show_zh: bool = True,
@@ -705,73 +799,12 @@ def burn_subtitles(no_sub_path: str, timeline: list[dict], script: dict,
     final_path = str(work / f"{safe_filename(script.get('youtube_title', script.get('title', 'final_video')))}.mp4")
 
     # Extract subtitle entries from timeline
-    import re as _re
-
+    # 引号兼容分句实现为模块级 _split_narration_subtitles（可独立单测），
+    # 此处保留嵌套名作薄包装，调用点零改动。
     def _split_subtitles(en: str, zh: str, audio_d: float, t_start: float,
                          pauses: list[float] | None = None):
-        """Split long narration into per-sentence subtitle entries.
-
-        First splits by sentence-ending punctuation, then further splits
-        very long sentences by commas/semicolons so text doesn't cram.
-        Interior boundaries are snapped to measured speech onsets (pauses)
-        when available — precise sync with actual TTS timing.
-        Returns list of subtitle entry dicts.
-        """
-        EN_MAX_CHARS = 80
-        EN_MAX_WORDS = 12
-        ZH_MAX_CHARS = 30
-
-        def _further_split_en(text: str) -> list[str]:
-            """Split EN by [.!?] first, then by [,;] if still too long."""
-            parts = _re.split(r'(?<=[.!?])\s+', text.strip())
-            result = []
-            for p in parts:
-                p = p.strip()
-                if not p:
-                    continue
-                if len(p) > EN_MAX_CHARS or len(p.split()) > EN_MAX_WORDS:
-                    sub_parts = _re.split(r'(?<=[,;])\s+', p)
-                    result.extend(s.strip() for s in sub_parts if s.strip())
-                else:
-                    result.append(p)
-            return result if result else [text.strip()]
-
-        def _further_split_zh(text: str) -> list[str]:
-            """Split ZH by [。！？] first, then by [，；] if still too long."""
-            parts = _re.split(r'(?<=[。！？])\s*', text.strip())
-            result = []
-            for p in parts:
-                p = p.strip()
-                if not p:
-                    continue
-                if len(p) > ZH_MAX_CHARS:
-                    sub_parts = _re.split(r'(?<=[，；])\s*', p)
-                    result.extend(s.strip() for s in sub_parts if s.strip())
-                else:
-                    result.append(p)
-            return result if result else [text.strip()]
-
-        en_parts = _further_split_en(en) if en else []
-        zh_parts = _further_split_zh(zh) if zh else []
-        n = max(len(en_parts), len(zh_parts), 1)
-        total_chars = sum(len(s) for s in en_parts) or 1
-        entries = []
-        cursor = t_start
-        for i in range(n):
-            sent_en = en_parts[i] if i < len(en_parts) else ""
-            sent_zh = zh_parts[i] if i < len(zh_parts) else ""
-            sent_frac = (len(sent_en) if sent_en else len(sent_zh) or 1) / total_chars
-            sent_dur = audio_d * sent_frac if i < n - 1 else audio_d - (cursor - t_start)
-            entries.append({
-                "start": cursor,
-                "end": cursor + sent_dur,
-                "en": sent_en,
-                "zh": sent_zh,
-            })
-            cursor += sent_dur
-        if pauses and len(entries) >= 2:
-            _align_entries_to_pauses(entries, pauses)
-        return entries
+        return _split_narration_subtitles(en, zh, audio_d, t_start,
+                                          pauses=pauses)
 
     # 静音对齐：自动检测或使用调用方提供的停顿提示
     all_pauses: list[tuple[float, float]] = []

@@ -465,6 +465,10 @@ def _narration_field_desc(structure: str, mw: int) -> tuple[str, str]:
         "that actually appear in it); (3) end with ONE short hand-off line "
         "leading into the conversation (e.g. \"Let's watch.\"). Do NOT "
         "repeat the subscribe call-to-action (welcome_en already did it). "
+        "Do NOT greet the viewers again — no \"Welcome back\", \"Hi "
+        "everyone\", \"Hello\", \"Hey friends\" or any other greeting "
+        "(welcome_en already greeted them); start directly with the "
+        "scene/story. "
         "Write in SHORT sentences — every sentence at most "
         f"{mw} words."
     )
@@ -480,6 +484,37 @@ def _narration_field_desc(structure: str, mw: int) -> tuple[str, str]:
         f"{mw} words."
     )
     return story_hook, outro
+
+
+_GREETING_RE = re.compile(
+    r'\b(welcome\s+back|hi\s+(?:friends|everyone|everybody|guys|there)|'
+    r'hello\s+(?:everyone|everybody|friends|again|guys|there)|'
+    r'hey\s+(?:friends|everyone|everybody|guys|there))\b',
+    re.IGNORECASE)
+
+
+def _dedupe_hook_greeting(script: dict) -> None:
+    """cutout 族兜底：hook 首句与 welcome_en 重复问候语时删掉该句。
+
+    welcome_en 已向观众打招呼，LLM 偶尔把 "Welcome back, everyone!" 又写进
+    story_hook 开头，成片会连播两遍问候。仅当两边都命中问候语才删除 hook
+    首句，让 hook 直接从场景句开始。就地修改 script["story_hook"]。
+    """
+    hook = (script.get("story_hook") or "").strip()
+    welcome = (script.get("welcome_en") or "").strip()
+    if not hook or not welcome:
+        return
+    if not (_GREETING_RE.search(welcome) and _GREETING_RE.search(hook)):
+        return
+    # 句末标点（可带闭引号）后的空白处断句，切出第一句
+    marked = re.sub(r'([.!?]["\'\u201d\u2019\u300d\u300f]?)(?=\s)',
+                    lambda m: m.group(1) + "\n", hook)
+    sentences = [s.strip() for s in marked.split("\n") if s.strip()]
+    if len(sentences) < 2 or not _GREETING_RE.search(sentences[0]):
+        return
+    script["story_hook"] = " ".join(sentences[1:])
+    print(f"  [LLM] story_hook 首句与 welcome_en 重复问候，已自动去除: "
+          f"{sentences[0]}")
 
 
 def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = None,
@@ -874,6 +909,10 @@ def _generate_listening_raw(topic: str, cefr: str, used_summaries: list[str],
             line.setdefault("video_prompt", "")
         elif structure == "original_static":
             line.setdefault("image_prompt", "")
+
+    # cutout 族兜底：hook 首句与 welcome_en 重复问候时删句（LLM 偶尔不听话）
+    if structure == "original_cutout":
+        _dedupe_hook_greeting(script)
 
     return script
 

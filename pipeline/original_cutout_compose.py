@@ -37,7 +37,84 @@ from media_utils import (
     get_duration as _get_duration,
     concat_segments, burn_subtitles, apply_final_loudnorm,
     make_silent_fallback_cmd,
+    _probe_video_duration,
 )
+
+# 对话段交叉溶解时长（8 帧 @25fps）。仅 original_sprite（fixed_positions）
+# 的相邻 dialogue 段之间生效，硬切改短叠化，音轨与时间轴零影响。
+DIALOGUE_XFADE_SEC = 0.32
+
+
+def _merge_dialogue_xfade(seg_paths: list[str], out_path: str,
+                          xfade: float = DIALOGUE_XFADE_SEC) -> str | None:
+    """把连续对话段合并为带交叉溶解（crossfade）的单块视频。
+
+    original_sprite 专用：每句对话是独立定格段（说话者 take 从头铺放、
+    倾听者 idle 从头循环、背景按行轮换），硬切边界观感生硬。处理方式：
+    - 除最后一段外，每段视频尾帧 tpad=stop_mode=clone 冻结延展 xfade 秒；
+    - xfade 链 offset_k = 前面各段实测视频流时长之和 → 块总长 = Σ段时长，
+      段 k 的画面内容与音轨都从同一时刻开始（只是开头 xfade 秒与上一段
+      尾帧叠化），时间轴/字幕同步零影响；
+    - 音频用 concat 滤镜拼接各段音轨，一次编码。
+
+    任一探测/执行失败返回 None（fail-open，调用方回退原硬切行为）。
+    """
+    n = len(seg_paths)
+    if n < 2:
+        return None
+    durations: list[float] = []
+    for p in seg_paths:
+        d = _probe_video_duration(p)
+        if not d or d <= 0:
+            return None
+        durations.append(d)
+    # 段太短叠化没意义且 xfade 边界条件不稳，整体回退硬切
+    if min(durations) < xfade * 2:
+        return None
+    total = sum(durations)
+
+    cmd = ["ffmpeg", "-y"]
+    for p in seg_paths:
+        cmd += ["-i", p]
+    parts = []
+    for k in range(n - 1):
+        parts.append(
+            f"[{k}:v]tpad=stop_mode=clone:stop_duration={xfade:.3f}[v{k}]")
+    prev = "v0"
+    offset = 0.0
+    for k in range(1, n):
+        offset += durations[k - 1]
+        in_b = f"v{k}" if k < n - 1 else f"{k}:v"  # 最后一段无 tpad
+        label = f"x{k}"
+        parts.append(
+            f"[{prev}][{in_b}]xfade=transition=fade:duration={xfade:.3f}:"
+            f"offset={offset:.3f}[{label}]")
+        prev = label
+    parts.append("".join(f"[{k}:a]" for k in range(n))
+                 + f"concat=n={n}:v=0:a=1[ba]")
+    cmd += [
+        "-filter_complex", ";".join(parts),
+        "-map", f"[{prev}]", "-map", "[ba]",
+        "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "25",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        "-t", f"{total:.3f}",
+        out_path,
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=1800)
+    except subprocess.TimeoutExpired:
+        print("  [Cutout] dialogue xfade merge timed out — keeping hard cuts")
+        return None
+    if r.returncode != 0 or not os.path.exists(out_path) \
+            or os.path.getsize(out_path) < 1000:
+        print(f"  [Cutout] dialogue xfade merge failed — keeping hard cuts "
+              f"({r.stderr.decode(errors='replace')[-300:] if r.stderr else ''})")
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+        return None
+    return out_path
 
 
 def _run_ffmpeg(cmd: list[str], label: str, out_path: str,
@@ -731,6 +808,33 @@ def compose_original_cutout(
             segments[i] = ph_path
     if missing:
         print(f"  [Cutout] {len(missing)} failed segment(s) handled with placeholders")
+
+    # --- original_sprite：相邻对话段交叉溶解（固定机位专属过渡） ---
+    # 此时 segments 下标与 timeline 对齐（占位已填满），先把连续 dialogue
+    # run 合并成叠化块，再走通用 None 过滤 + concat。合并失败自动回退硬切。
+    if fixed_positions:
+        merged_runs = 0
+        run_start = None
+        for idx in range(total_segs + 1):
+            is_dialogue = (idx < total_segs
+                           and timeline[idx].get("type") == "dialogue"
+                           and segments[idx] is not None)
+            if is_dialogue and run_start is None:
+                run_start = idx
+            elif not is_dialogue and run_start is not None:
+                run = list(range(run_start, idx))
+                if len(run) >= 2:
+                    block_path = str(tmp_dir / f"dialogue_block_{run_start:03d}.mp4")
+                    if _merge_dialogue_xfade([segments[k] for k in run],
+                                             block_path):
+                        segments[run_start] = block_path
+                        for k in run[1:]:
+                            segments[k] = None
+                        merged_runs += 1
+                run_start = None
+        if merged_runs:
+            print(f"  [Cutout] crossfaded {merged_runs} dialogue run(s) "
+                  f"({DIALOGUE_XFADE_SEC:.2f}s dissolve)")
 
     segments = [s for s in segments if s is not None]
 
