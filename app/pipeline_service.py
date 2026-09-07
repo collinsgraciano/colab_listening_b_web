@@ -1096,6 +1096,7 @@ class PipelineService:
             ch3_en_repeats=_cfg_int(config, "ch3_en_repeats", 3),
             ch3_zh_repeats=_cfg_int(config, "ch3_zh_repeats", 1),
             ch3_zh_always=bool(config.get("ch3_zh_always", True)),
+            dialogue_xfade=bool(config.get("dialogue_xfade", False)),
             pad=pad,
             render_fps=int(config.get("render_fps", 8)),
             workers=int(config.get("workers", 1)),

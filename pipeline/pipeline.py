@@ -192,6 +192,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Ch3 practice: always show Chinese text on English frames (default: on)")
     parser.add_argument("--ch3-practice-intro-show", action=argparse.BooleanOptionalAction, default=True,
                         help="Ch3 practice intro text card before practice section (default: on; off = skip the whole segment)")
+    parser.add_argument("--dialogue-xfade", action=argparse.BooleanOptionalAction, default=False,
+                        help="Crossfade between consecutive dialogue segments, 0.32s dissolve (original_sprite always on)")
     parser.add_argument("--pad", type=float, default=None, help="Audio pad between segments (default 0.4; quest mode 5.0 — long thinking pauses for beginners)")
     parser.add_argument("--render-fps", type=int, default=8, help="Quest stop-motion render framerate (default 8; lower=faster but choppier)")
     parser.add_argument("--workers", type=int, default=1, help="Quest render threads (1=single, 2+=multi, 0=auto=cpu_count)")
@@ -1199,6 +1201,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             char_clip_map=char_clip_map or None,
             sprite_clip_fps=sprite_clip_fps,
             sprite_take_mode=sprite_take_mode,
+            dialogue_xfade=bool(getattr(args, "dialogue_xfade", False)),
             render_fps=getattr(args, "render_fps", 12),
             workers=getattr(args, "workers", 1),
             timeline=timeline,
@@ -1237,6 +1240,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             subtitle_style=sub_style,
             show_zh=not getattr(args, "no_zh_subtitle", False),
             ch3_zh_always=bool(getattr(args, "ch3_zh_always", True)),
+            dialogue_xfade=bool(getattr(args, "dialogue_xfade", False)),
         )
     elif args.structure == "original_cutout":
         from original_cutout_compose import compose_original_cutout
@@ -1294,6 +1298,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             sprite_clip_fps=sprite_clip_fps,
             sprite_take_mode=sprite_take_mode,
             fixed_positions=fixed_positions,
+            dialogue_xfade=bool(getattr(args, "dialogue_xfade", False)),
             timeline=timeline,
             script=script,
             narration=narration,
@@ -1330,6 +1335,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             subtitle_style=sub_style,
             show_zh=not getattr(args, "no_zh_subtitle", False),
             ch3_zh_always=bool(getattr(args, "ch3_zh_always", True)),
+            dialogue_xfade=bool(getattr(args, "dialogue_xfade", False)),
         )
     if not final_path:
         print("  [Compose] Interrupted or no output, skipping checkpoint save.")

@@ -18,6 +18,7 @@ from media_utils import (
     has_audio as _has_audio,
     safe_filename, concat_segments, burn_subtitles, apply_final_loudnorm,
     make_silent_fallback_cmd,
+    DIALOGUE_XFADE_SEC, merge_dialogue_runs_xfade,
 )
 
 
@@ -402,6 +403,7 @@ def compose_listening(
     subtitle_style: dict | None = None,
     show_zh: bool = True,
     ch3_zh_always: bool = False,
+    dialogue_xfade: bool = False,
 ) -> str:
     """Compose final listening practice video.
 
@@ -470,12 +472,13 @@ def compose_listening(
 
     # --- Build each segment ---
     segments = []
+    seg_tidx = []  # segments[pos] 对应的 timeline 下标（失败/分组跳过的段不进表）
     seg_idx = 0
     total_segs = len(timeline)
     processed_groups = set()  # track which groups have been rendered as a single segment
     skipped_segs = 0  # count skipped segments for accurate progress
 
-    for seg in timeline:
+    for tidx, seg in enumerate(timeline):
         seg_type = seg["type"]
         duration = seg["duration"]
         audio_idx = seg.get("audio_index", 0)
@@ -548,6 +551,7 @@ def compose_listening(
                         print(f"  Fallback also failed: {r2.stderr[-200:]}")
                         continue
                 segments.append(out_path)
+                seg_tidx.append(tidx)
                 _cb(int(seg_idx / (total_segs - skipped_segs) * 80), f"  Segment {seg_idx}/{total_segs - skipped_segs} (group {gi})")
                 continue
         d_idx = seg.get("dialogue_idx", -1)
@@ -777,8 +781,18 @@ def compose_listening(
                 print(f"  Fallback also failed, skipping segment: {r2.stderr[-200:]}")
                 continue
         segments.append(out_path)
+        seg_tidx.append(tidx)
         _cb(int(seg_idx / (total_segs - skipped_segs) * 80),
             f"  Segment {seg_idx}/{total_segs - skipped_segs} ({seg_type})")
+
+    # --- 对话段交叉溶解（dialogue_xfade 配置）：连续 dialogue run 合并为
+    # 叠化块（fps=24 与本合成器段规格一致），失败自动回退硬切 ---
+    if dialogue_xfade:
+        merged_runs = merge_dialogue_runs_xfade(
+            segments, seg_tidx, timeline, tmp_dir, fps=24)
+        if merged_runs:
+            print(f"  [Compose] crossfaded {merged_runs} dialogue run(s) "
+                  f"({DIALOGUE_XFADE_SEC:.2f}s dissolve)")
 
     # --- Concat all segments ---
     _cb(80, "Concatenating segments...")
@@ -822,6 +836,7 @@ def compose_image(
     subtitle_style: dict | None = None,
     show_zh: bool = True,
     ch3_zh_always: bool = False,
+    dialogue_xfade: bool = False,
     target_w: int = TARGET_W,
     target_h: int = TARGET_H,
 ) -> str:
@@ -949,10 +964,11 @@ def compose_image(
 
     # --- Build each segment ---
     segments = []
+    seg_tidx = []  # segments[pos] 对应的 timeline 下标（失败跳过的段不进表）
     seg_idx = 0
     total_segs = len(timeline)
 
-    for seg in timeline:
+    for tidx, seg in enumerate(timeline):
         seg_type = seg["type"]
         duration = seg["duration"]
         audio_idx = seg.get("audio_index", 0)
@@ -1151,6 +1167,7 @@ def compose_image(
                 # Skip the common FFmpeg try/except below
                 if os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
                     segments.append(out_path)
+                    seg_tidx.append(tidx)
                     _cb(int(seg_idx / total_segs * 80),
                         f"  Segment {seg_idx}/{total_segs} (dialogue {d_idx})")
                 continue
@@ -1220,8 +1237,18 @@ def compose_image(
                 print(f"  Fallback also failed, skipping segment: {r2.stderr[-200:]}")
                 continue
         segments.append(out_path)
+        seg_tidx.append(tidx)
         _cb(int(seg_idx / total_segs * 80),
             f"  Segment {seg_idx}/{total_segs} ({seg_type})")
+
+    # --- 对话段交叉溶解（dialogue_xfade 配置）：连续 dialogue run 合并为
+    # 叠化块（fps=24 与本合成器段规格一致），失败自动回退硬切 ---
+    if dialogue_xfade:
+        merged_runs = merge_dialogue_runs_xfade(
+            segments, seg_tidx, timeline, tmp_dir, fps=24)
+        if merged_runs:
+            print(f"  [Compose] crossfaded {merged_runs} dialogue run(s) "
+                  f"({DIALOGUE_XFADE_SEC:.2f}s dissolve)")
 
     # --- Concat all segments ---
     _cb(80, "Concatenating segments...")

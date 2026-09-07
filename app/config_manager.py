@@ -61,15 +61,15 @@ PARAM_SPEC = {
                       "original_sprite": "Original Sprite (4章+固定机位)",
                       "quest_sprite": "Quest Sprite (任务+序列帧动画)"}},
     "animation": {"default": "stop_motion", "type": "select", "group": "content",
-                  "modes": ["original_cutout", "quest"],
+                  "modes": ["quest"],
                   "label": "动画类型", "options": {
                       "stop_motion": "Stop Motion (定格动画，默认)",
                       "sprite_sequence": "Sprite Sequence (游戏式序列帧动画)"},
-                  "help": "cutout/quest 渲染器固定走双人定格动画。sprite_sequence="
+                  "help": "仅 Quest 模式可选动画类型。sprite_sequence="
                           "游戏角色式动作序列帧（talking/idle/gesture/wave 4 动作循环，"
                           "AI 视频抽帧路线生成）。旧配置/旧运行里的 none/landing "
                           "自动按 stop_motion 处理（三值渲染等效）。"
-                          "original_static 模式动画被强制为 none（不显示此项）"},
+                          "original_static 动画强制为 none（不显示此项）；original_cutout 仅定格动画，序列帧请用 Original Sprite 模式"},
     "visual_style": {"default": "pixar3d", "type": "select", "group": "content",
                      "label": "画面风格",
                      "options": {"pixar3d": "3D 卡通（皮克斯）"},
@@ -85,15 +85,15 @@ PARAM_SPEC = {
     "character_voices": {"default": "", "type": "text", "group": "content",
                           "label": "角色音色绑定", "help": "JSON: {char_a: 'Vivian', 'char_b': 'Ryan'} — 复用角色时绑定 Qwen TTS 音色"},
     "character_zh_voices": {"default": "", "type": "text", "group": "content",
-                            "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                            "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                             "label": "中文声音绑定", "help": "JSON: {char_a: 'zh-CN-YunxiNeural', char_b: 'zh-CN-XiaoxiaoNeural'} — 绑定中文翻译旁白的 edge-tts 声音（quest 不生成中文音频）"},
     "host_character": {"default": "", "type": "select", "group": "content",
-                       "modes": ["original_cutout", "original_cutout_sprite", "original_sprite"],
+                       "modes": ["original_cutout", "original_sprite"],
                        "label": "主持人形象绑定",
                        "options": {"": "独立主持人（新生成）", "char_a": "角色 A", "char_b": "角色 B"},
                        "help": "开场/结尾主持人复用所选角色的姿势图集与音色，不再单独生成主持人"},
     "host_bg_prompt": {"default": "", "type": "text", "group": "content",
-                       "modes": ["quest", "original_cutout", "original_cutout_sprite", "original_sprite", "quest_sprite"],
+                       "modes": ["quest", "original_cutout", "original_sprite", "quest_sprite"],
                        "label": "主持人演播室背景 Prompt",
                        "help": "留空=LLM 按本期主题自动生成；填写后每期固定用该描述生成演播室背景（主持人开场/结尾段）"},
 
@@ -150,7 +150,7 @@ PARAM_SPEC = {
                     "label": "对话英文语速",
                     "help": "如 -15%、0%（留空=模式默认：original/static -15%，quest/cutout 0%）"},
     "tts_rate_zh": {"default": "", "type": "text", "group": "tts",
-                    "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                    "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                     "label": "中文台词语速",
                     "help": "如 -10%（留空=模式默认：original/static -10%，cutout 0%）"},
     "tts_rate_narration": {"default": "", "type": "text", "group": "tts",
@@ -237,32 +237,37 @@ PARAM_SPEC = {
 
     # --- Video ---
     "practice_duration": {"default": 3.0, "type": "number", "group": "video",
-                          "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                          "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                           "label": "Ch3 跟读间隔(秒)",
                           "help": "Ch3 每次朗读（英文/中文）后的停顿秒数。Quest 模式不适用"},
     "ch3_en_repeats": {"default": 3, "type": "number", "group": "video",
-                       "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                       "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                        "label": "Ch3 英文重复次数",
                        "help": "跟读练习每句英文朗读遍数 (0-10, 0=不播英文)。Quest 模式不适用"},
     "ch3_zh_repeats": {"default": 1, "type": "number", "group": "video",
-                       "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                       "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                        "label": "Ch3 中文重复次数",
                        "help": "中文翻译朗读遍数 (0-10, 0=不播中文)。Quest 模式不适用"},
     "ch3_zh_always": {"default": True, "type": "checkbox", "group": "video",
-                      "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                      "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                       "label": "Ch3 中文常显",
                       "help": "英文跟读时画面同步显示中文翻译。Quest 模式不适用"},
     "ch3_practice_intro_show": {"default": True, "type": "checkbox", "group": "video",
-                                "modes": ["original", "original_static", "original_cutout", "original_cutout_sprite", "original_sprite"],
+                                "modes": ["original", "original_static", "original_cutout", "original_sprite"],
                                 "label": "Ch3 练习引导卡",
                                 "help": "跟读练习前的引导文字卡（逐句显示）。关闭后整段跳过。Quest 模式不适用"},
+    "dialogue_xfade": {"default": False, "type": "checkbox", "group": "video",
+                       "modes": ["original", "original_static", "original_cutout",
+                                 "original_cutout_sprite", "quest", "quest_sprite"],
+                       "label": "对话段叠化过渡",
+                       "help": "相邻对话段之间 0.32s 交叉溶解，弱化硬切感（original_sprite 恒开，无需配置）。开启后合成稍慢"},
     "pad": {"default": "", "type": "text", "group": "video",
             "label": "音频间隔(秒)", "help": "留空=自动 (0.4)"},
     "render_fps": {"default": 8, "type": "number", "group": "video",
-                   "modes": ["original_cutout", "quest", "original_cutout_sprite", "original_sprite", "quest_sprite"],
+                   "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite"],
                    "label": "渲染帧率 (定格动画)"},
     "workers": {"default": 1, "type": "number", "group": "video",
-                "modes": ["original_cutout", "quest", "original_cutout_sprite", "original_sprite", "quest_sprite"],
+                "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite"],
                 "label": "渲染线程数", "help": "0=自动(CPU核数)"},
     "subtitle_style": {"default": "", "type": "select", "group": "video",
                        "label": "字幕样式",
@@ -285,7 +290,7 @@ PARAM_SPEC = {
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
                        "label": "4K超时(秒)"},
     "matting_engine": {"default": "auto", "type": "select", "group": "video",
-                       "modes": ["original_cutout", "quest", "original_cutout_sprite", "original_sprite", "quest_sprite"],
+                       "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite"],
                        "label": "抠图引擎",
                        "options": {"auto": "Auto (有权重用MODNet)",
                                    "modnet": "MODNet (AI抠图)",
@@ -818,6 +823,10 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args.append("--ch3-practice-intro-show")
     else:
         args.append("--no-ch3-practice-intro-show")
+    if config.get("dialogue_xfade", False):
+        args.append("--dialogue-xfade")
+    else:
+        args.append("--no-dialogue-xfade")
     if config.get("pad"):
         try:
             pad_val = float(config["pad"])

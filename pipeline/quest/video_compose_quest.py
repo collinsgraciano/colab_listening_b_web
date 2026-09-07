@@ -35,6 +35,7 @@ from media_utils import (
     FONT_EN, FONT_ZH, VF_NORM,
     concat_segments, burn_subtitles, apply_final_loudnorm,
     make_silent_fallback_cmd, write_sync_report,
+    DIALOGUE_XFADE_SEC, merge_dialogue_runs_xfade,
 )
 
 
@@ -960,6 +961,7 @@ def compose_quest(
     char_clip_map: dict | None = None,
     sprite_clip_fps: int = 12,
     sprite_take_mode: bool = False,
+    dialogue_xfade: bool = False,
     render_fps: int = 12,
     show_zh: bool = True,
     workers: int = 1,
@@ -1083,6 +1085,15 @@ def compose_quest(
             segments[i] = ph_path
     if missing:
         print(f"  [Quest] {len(missing)} failed segment(s) handled with placeholders to preserve sync")
+
+    # --- 对话段交叉溶解（dialogue_xfade 配置；此时 segments 下标与 timeline
+    # 对齐）。连续 dialogue run 合并为叠化块，合并失败自动回退硬切。 ---
+    if dialogue_xfade:
+        merged_runs = merge_dialogue_runs_xfade(
+            segments, list(range(total_segs)), timeline, tmp_dir, fps=25)
+        if merged_runs:
+            print(f"  [Quest] crossfaded {merged_runs} dialogue run(s) "
+                  f"({DIALOGUE_XFADE_SEC:.2f}s dissolve)")
 
     # Filter out remaining None segments (placeholder also failed)
     segments = [s for s in segments if s is not None]

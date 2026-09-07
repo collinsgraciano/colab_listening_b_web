@@ -583,6 +583,139 @@ def _probe_video_duration(path: str) -> float | None:
         return None
 
 
+# 对话段交叉溶解时长（8 帧 @25fps）。original_sprite 恒开；其余模式经
+# dialogue_xfade 配置开启（PARAM_SPEC video 组）。
+DIALOGUE_XFADE_SEC = 0.32
+
+
+def _merge_dialogue_xfade(seg_paths: list[str], out_path: str,
+                          xfade: float = DIALOGUE_XFADE_SEC,
+                          fps: int = 25) -> str | None:
+    """把连续对话段合并为带交叉溶解（crossfade）的单块视频。
+
+    相邻对话段（定格动画/静态帧/AI 片段）硬切边界观感生硬，处理方式：
+    - 除最后一段外，每段视频尾帧 tpad=stop_mode=clone 冻结延展 xfade 秒；
+    - xfade 链 offset_k = 前面各段实测视频流时长之和 → 块总长 = Σ段时长，
+      段 k 的画面内容与音轨都从同一时刻开始（只是开头 xfade 秒与上一段
+      尾帧叠化），时间轴/字幕同步零影响；
+    - 音频用 concat 滤镜拼接各段音轨，一次编码（fps 与输入段一致）。
+
+    任一探测/执行失败返回 None（fail-open，调用方回退原硬切行为）。
+    """
+    n = len(seg_paths)
+    if n < 2:
+        return None
+    durations: list[float] = []
+    for p in seg_paths:
+        d = _probe_video_duration(p)
+        if not d or d <= 0:
+            return None
+        durations.append(d)
+    # 段太短叠化没意义且 xfade 边界条件不稳，整体回退硬切
+    if min(durations) < xfade * 2:
+        return None
+    total = sum(durations)
+
+    cmd = ["ffmpeg", "-y"]
+    for p in seg_paths:
+        cmd += ["-i", p]
+    parts = []
+    for k in range(n - 1):
+        parts.append(
+            f"[{k}:v]tpad=stop_mode=clone:stop_duration={xfade:.3f}[v{k}]")
+    prev = "v0"
+    offset = 0.0
+    for k in range(1, n):
+        offset += durations[k - 1]
+        in_b = f"v{k}" if k < n - 1 else f"{k}:v"  # 最后一段无 tpad
+        label = f"x{k}"
+        parts.append(
+            f"[{prev}][{in_b}]xfade=transition=fade:duration={xfade:.3f}:"
+            f"offset={offset:.3f}[{label}]")
+        prev = label
+    parts.append("".join(f"[{k}:a]" for k in range(n))
+                 + f"concat=n={n}:v=0:a=1[ba]")
+    cmd += [
+        "-filter_complex", ";".join(parts),
+        "-map", f"[{prev}]", "-map", "[ba]",
+        "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(fps),
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        "-t", f"{total:.3f}",
+        out_path,
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=1800)
+    except subprocess.TimeoutExpired:
+        print("  [Xfade] dialogue merge timed out — keeping hard cuts")
+        return None
+    if r.returncode != 0 or not os.path.exists(out_path) \
+            or os.path.getsize(out_path) < 1000:
+        print(f"  [Xfade] dialogue merge failed — keeping hard cuts "
+              f"({r.stderr.decode(errors='replace')[-300:] if r.stderr else ''})")
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+        return None
+    return out_path
+
+
+def merge_dialogue_runs_xfade(segments: list[str | None],
+                              seg_tidx: list[int], timeline: list[dict],
+                              tmp_dir: str | Path,
+                              xfade: float = DIALOGUE_XFADE_SEC,
+                              fps: int = 25) -> int:
+    """扫描对话段 run 并就地把相邻段合并为交叉溶解块。返回合并的 run 数。
+
+    两种 segments 布局通用：
+    - 下标对齐（cutout/quest）：segments[i] 对应 timeline[i]（含 None 占位），
+      seg_tidx = list(range(len(timeline)))；
+    - 线性（listening/image）：失败段被跳过不进列表，seg_tidx[pos] 记录该段
+      的 timeline 下标。
+
+    run 判定：相邻两段 timeline 下标之间的条目全部是 dialogue（兼容 original
+    模式分组跳行——被组吞掉的行是 dialogue 但不进 segments）。run 内任一段
+    缺失/文件无效则整个 run 跳过（fail-open）。合并后块替换 run 首位置，
+    其余位置弹出。
+    """
+    runs: list[list[int]] = []
+    cur: list[int] = []
+    prev_tidx: int | None = None
+    for pos, tidx in enumerate(seg_tidx):
+        # None 段（下标对齐布局的失败占位）断开 run：避免单个失败段
+        # 让整条对话 run 弃并（其余分段仍可各自叠化）
+        is_dial = (pos < len(segments) and segments[pos] is not None
+                   and timeline[tidx].get("type") == "dialogue")
+        if is_dial and cur and prev_tidx is not None and tidx > prev_tidx \
+                and all(timeline[k].get("type") == "dialogue"
+                        for k in range(prev_tidx + 1, tidx)):
+            cur.append(pos)
+        elif is_dial:
+            if len(cur) >= 2:
+                runs.append(cur)
+            cur = [pos]
+        else:
+            if len(cur) >= 2:
+                runs.append(cur)
+            cur = []
+        prev_tidx = tidx
+    if len(cur) >= 2:
+        runs.append(cur)
+
+    merged = 0
+    for run in reversed(runs):  # 从后往前处理，位置不失效
+        paths = [segments[p] for p in run]
+        if not all(p and os.path.exists(p) for p in paths):
+            continue
+        block_path = str(Path(tmp_dir) / f"dialogue_block_{run[0]:03d}.mp4")
+        if _merge_dialogue_xfade(paths, block_path, xfade=xfade, fps=fps):
+            segments[run[0]] = block_path
+            for p in reversed(run[1:]):
+                segments.pop(p)
+            merged += 1
+    return merged
+
+
 def concat_segments(segment_paths: list[str], output_path: str,
                     tmp_dir: str | Path = None) -> str:
     """Concatenate segment files (video stream copy + audio filter re-encode).
