@@ -487,6 +487,7 @@ def _render_sm_segment_inner(
             "is_speaker": is_speaker,
             "take_mode": bool(layer.get("take_mode")),
             "take_action": layer.get("take_action", ""),
+            "fixed_x": layer.get("fixed_x"),
         })
 
     # Load background
@@ -494,7 +495,13 @@ def _render_sm_segment_inner(
 
     # Determine positions based on number of characters
     n_chars = len(processed_layers)
-    if n_chars == 0:
+    if any(l.get("fixed_x") is not None for l in processed_layers):
+        # 固定机位（original_sprite）：位置由调用方按角色身份逐层指定，
+        # 不随说话者切换（未指定的层居中兜底）
+        positions = [1280 * l["fixed_x"] if l.get("fixed_x") is not None
+                     else 1280 * 0.5
+                     for l in processed_layers]
+    elif n_chars == 0:
         positions = []
     elif n_chars == 1:
         positions = [1280 * 0.5]

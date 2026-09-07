@@ -1279,7 +1279,11 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
                 char_clip_map["host"] = char_clip_map[_host_bound]
             if char_clip_map:
                 print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
-        sprite_take_mode = getattr(args, "mode_name", "") == "original_cutout_sprite"
+        # original_sprite：take 语义同 cutout_sprite（说话者 talking take / 倾听者
+        # idle 循环），另加固定机位（角色不随说话者换位）
+        sprite_take_mode = getattr(args, "mode_name", "") in ("original_cutout_sprite",
+                                                              "original_sprite")
+        fixed_positions = getattr(args, "mode_name", "") == "original_sprite"
         final_path = compose_original_cutout(
             work_dir=str(work_dir),
             char_pose_map=char_pose_map,
@@ -1289,6 +1293,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             char_clip_map=char_clip_map or None,
             sprite_clip_fps=sprite_clip_fps,
             sprite_take_mode=sprite_take_mode,
+            fixed_positions=fixed_positions,
             timeline=timeline,
             script=script,
             narration=narration,
@@ -1489,10 +1494,10 @@ def main():
     # 序列帧新模式：行为族归一（107 处结构分支零改动），模式身份保留在 args.mode_name
     # （输出目录 / 配置按新模式名分文件夹；checkpoint structure 存族名）
     args.mode_name = args.structure
-    if args.structure in ("original_cutout_sprite", "quest_sprite"):
+    if args.structure in ("original_cutout_sprite", "original_sprite", "quest_sprite"):
         args.animation = "sprite_sequence"
-        args.structure = ("original_cutout" if args.structure == "original_cutout_sprite"
-                          else "quest")
+        args.structure = ("quest" if args.structure == "quest_sprite"
+                          else "original_cutout")
 
     os.environ["LLM_RETRIES"] = str(args.llm_retries)
     # 抠图引擎（stop_motion.remove_bg 读取）：auto/modnet/white_threshold

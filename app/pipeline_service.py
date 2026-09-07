@@ -998,7 +998,10 @@ class PipelineService:
         src_val = str(self.config.get("host_bg_source", "") or "").strip()
         if not src_val:
             return
-        structure = self.config.get("structure", "original")
+        # 族归一：序列帧新模式（original_cutout_sprite/original_sprite）同属 cutout 族，
+        # 直读原始模式名会让绑定在这些模式下静默 no-op
+        from .config_manager import structure_family
+        structure = structure_family(self.config.get("structure", "original"))
         if structure not in ("quest", "original_cutout"):
             return
         dst = dirs["images"] / "host_bg.png"
@@ -1051,7 +1054,7 @@ class PipelineService:
             str(config.get("animation", "") or "stop_motion"))
         if structure == "original_static":
             animation = "none"
-        if mode_name in ("original_cutout_sprite", "quest_sprite"):
+        if mode_name in ("original_cutout_sprite", "original_sprite", "quest_sprite"):
             animation = "sprite_sequence"
 
         # tts_rate 为旧全局覆盖（兼容）；分项参数优先（tts_pipeline.resolve_tts_rate）

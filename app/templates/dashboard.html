@@ -521,8 +521,8 @@ function applyQuickConfigFields() {
         setVal('qc-clip_duration', cfg.clip_duration ?? 15);
         setVal('qc-clip_concurrency', cfg.clip_concurrency ?? 4);
     }
-    // 主持人绑定：仅 original_cutout
-    const isCutout = ACTIVE_MODE === 'original_cutout';
+    // 主持人绑定：original_cutout + original_sprite（同族固定机位模式）
+    const isCutout = ['original_cutout', 'original_sprite'].includes(ACTIVE_MODE);
     document.querySelectorAll('[data-qc-group="host"]').forEach(el => el.style.display = isCutout ? '' : 'none');
     if (isCutout) setVal('qc-host_character', cfg.host_character || '');
     // 主持人演播室背景：quest + cutout（选项由 refreshHostBgOptions 异步填充）
@@ -756,7 +756,7 @@ function getCharKeys() {
         {key: 'char_a', label: '角色A'},
         {key: 'char_b', label: '角色B'},
     ];
-    if (ACTIVE_MODE === 'original_cutout') {
+    if (ACTIVE_MODE === 'original_cutout' || ACTIVE_MODE === 'original_sprite') {
         // 未绑定主持人形象时存在独立主持人，可复用/固定其描述与音色
         keys.push({key: 'host', label: '主持人'});
     }
@@ -781,7 +781,7 @@ function refreshHostBgOptions() {
     if (libGroup.children.length) sel.appendChild(libGroup);
     const STRUCT_TAGS = {
         'original': '[视频]', 'original_static': '[静态]',
-        'original_cutout': '[抠图]', 'quest': '[Quest]',
+        'original_cutout': '[抠图]', 'original_sprite': '[固定机位]', 'quest': '[Quest]',
     };
     const runGroup = document.createElement('optgroup');
     runGroup.label = '历史运行';
@@ -833,7 +833,7 @@ function loadCharSources() {
             sel.innerHTML = '<option value="">生成新角色</option>';
             const STRUCT_TAGS = {
                 'original': '[视频]', 'original_static': '[静态]',
-                'original_cutout': '[抠图]', 'quest': '[Quest]',
+                'original_cutout': '[抠图]', 'original_sprite': '[固定机位]', 'quest': '[Quest]',
             };
             _charSources.forEach(s => {
                 const opt = document.createElement('option');
@@ -1817,7 +1817,7 @@ function connectSSE() {
                                 const parts = data.work_dir ? data.work_dir.split(/[\\/]/).filter(Boolean) : [];
                                 const runName = parts[parts.length - 1] || '';
                                 const parentSeg = parts.length >= 2 ? parts[parts.length - 2] : '';
-                                const isMode = ['original', 'original_static', 'original_cutout', 'quest'].includes(parentSeg);
+                                const isMode = ['original', 'original_static', 'original_cutout', 'original_sprite', 'quest'].includes(parentSeg);
                                 const modeQ = isMode ? `?mode=${parentSeg}` : '';
                                 if (runName) location.href = `/runs/${runName}/gallery${modeQ}`;
                                 else location.href = '/runs';

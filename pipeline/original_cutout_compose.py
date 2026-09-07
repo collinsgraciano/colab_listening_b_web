@@ -168,6 +168,7 @@ def _prepare_segment(
     char_clip_map: dict | None = None,
     sprite_clip_fps: int = 12,
     sprite_take_mode: bool = False,
+    fixed_positions: bool = False,
     stop_check=None,
 ) -> tuple[str | None, str]:
     """Prepare params and render a single segment.
@@ -252,12 +253,21 @@ def _prepare_segment(
             return layer
 
         char_layers = []
-        layer_speaker = _sm_layer(speaker, True)
-        if layer_speaker:
-            char_layers.append(layer_speaker)
-        layer_other = _sm_layer(other, False)
-        if layer_other:
-            char_layers.append(layer_other)
+        if fixed_positions:
+            # 固定机位（original_sprite）：char_a 恒左、char_b 恒右，按角色身份
+            # 定死不随说话者换位；is_speaker 仍驱动 talking/idle
+            for ck in ("char_a", "char_b"):
+                layer = _sm_layer(ck, ck == speaker)
+                if layer:
+                    layer["fixed_x"] = 0.35 if ck == "char_a" else 0.65
+                    char_layers.append(layer)
+        else:
+            layer_speaker = _sm_layer(speaker, True)
+            if layer_speaker:
+                char_layers.append(layer_speaker)
+            layer_other = _sm_layer(other, False)
+            if layer_other:
+                char_layers.append(layer_other)
 
         if not char_layers:
             # 无姿势图 — 回退静态场景（保留有效音频）
@@ -290,7 +300,9 @@ def _prepare_segment(
         line_bg = scene_bgs[bg_idx]
 
         frames_dir = sm_root / f"dialogue_{audio_idx}"
-        direction = 1 if audio_idx % 2 == 0 else -1
+        # 固定机位模式 direction 恒 1：take 路径不读该值；姿势图集回退路径
+        # 的滑入方向随之固定，不再逐行左右横跳
+        direction = 1 if (fixed_positions or audio_idx % 2 == 0) else -1
 
         # Import quest's stop-motion renderer
         from quest.video_compose_quest import _render_sm_segment
@@ -503,6 +515,7 @@ def compose_original_cutout(
     char_clip_map: dict | None = None,
     sprite_clip_fps: int = 12,
     sprite_take_mode: bool = False,
+    fixed_positions: bool = False,
     timeline: list[dict] = None,
     script: dict = None,
     narration: dict = None,
@@ -532,6 +545,8 @@ def compose_original_cutout(
         char_clip_map: 序列帧动作素材 {char: {action: [帧路径]}}（sprite_sequence
                     模式）；缺 clips 的角色自动回退姿势图集，None=完全旧行为。
         sprite_clip_fps: 序列帧播放帧率（manifest fps，默认 12）。
+        fixed_positions: 固定机位（original_sprite 模式）——对话双角色按身份
+                    定死左右位置（char_a 左 / char_b 右），不随说话者换位。
         timeline: Timeline segments from build_listening_timeline.
         script: Lesson script dict.
         narration: {"welcome"/"hook"/"outro"/"practice_intro" paths} (host form)
@@ -617,6 +632,7 @@ def compose_original_cutout(
                 host_poses=host_poses, host_bg=host_bg or scene_img,
                 char_clip_map=char_clip_map, sprite_clip_fps=sprite_clip_fps,
                 sprite_take_mode=sprite_take_mode,
+                fixed_positions=fixed_positions,
                 stop_check=stop_check,
             )
             if out_path:
@@ -638,7 +654,7 @@ def compose_original_cutout(
                 scene_img, pad, render_fps, tmp_dir, sm_root, static_dir,
                 host_poses, host_bg or scene_img,
                 char_clip_map, sprite_clip_fps, sprite_take_mode,
-                stop_check,
+                fixed_positions, stop_check,
             ): seg_idx
             for seg_idx, seg in enumerate(timeline)
         }

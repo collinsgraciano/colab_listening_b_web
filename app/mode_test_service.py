@@ -38,7 +38,7 @@ from . import run_mutex
 
 TEST_DIRNAME = ".mode_test"
 MINI_LINES = {"original": 4, "original_static": 4, "original_cutout": 4, "quest": 8,
-              "original_cutout_sprite": 4, "quest_sprite": 8}
+              "original_cutout_sprite": 4, "original_sprite": 4, "quest_sprite": 8}
 MODES = list(MINI_LINES)
 
 
