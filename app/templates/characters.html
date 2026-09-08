@@ -235,6 +235,26 @@
         <div id="prompts-modal-body" class="p-4 overflow-y-auto space-y-3 text-xs"></div>
     </div>
 </div>
+
+<!-- 动作素材预览弹窗（源视频播放 / flipbook 逐帧兜底 + 帧网格） -->
+<div id="clip-preview-modal" class="hidden fixed inset-0 z-[60] bg-black/90 items-center justify-center p-4"
+    onclick="if(event.target===this) closeClipPreview()">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-slate-700 shrink-0">
+            <div id="clip-preview-name" class="text-sm font-medium text-white truncate">动作预览</div>
+            <button onclick="closeClipPreview()"
+                class="px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded text-xs text-white shrink-0">✕ 关闭</button>
+        </div>
+        <div class="p-4 overflow-y-auto space-y-3">
+            <div class="flex items-center justify-center bg-black rounded-lg min-h-[200px] p-2">
+                <video id="clip-preview-video" class="max-h-[50vh] rounded" controls loop playsinline style="display:none"></video>
+                <img id="clip-preview-img" class="max-h-[50vh] rounded" style="display:none" alt="frame">
+            </div>
+            <div id="clip-preview-controls" class="flex items-center justify-center gap-3 text-xs"></div>
+            <div id="clip-preview-grid" class="grid grid-cols-6 gap-1"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -819,6 +839,10 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
         closeAtlasViewer();
     }
+    const cpModal = document.getElementById('clip-preview-modal');
+    if (e.key === 'Escape' && cpModal && !cpModal.classList.contains('hidden')) {
+        closeClipPreview();
+    }
 });
 
 function startAiGenerate() {
@@ -1112,6 +1136,7 @@ function openPromptsModal(libId) {
     m.classList.remove('hidden');
     m.classList.add('flex');
     loadGenPrompts(libId);
+    checkPromptJobs(libId);
 }
 
 function closePromptsModal() {
@@ -1120,6 +1145,8 @@ function closePromptsModal() {
     m.classList.remove('flex');
     _promptsLibId = null;
     _promptsData = null;
+    clearTimeout(_promptImgPollTimer);
+    clearTimeout(_promptClipPollTimer);
 }
 
 function copyText(text, btn) {
@@ -1178,24 +1205,30 @@ function renderPromptsModal(libId, data) {
                 <div class="text-xs font-semibold text-indigo-300">① 人物参考图${data.structure === 'quest' ? '（4×2 姿势图集）' : '（单张场景图）'}</div>
                 <div class="flex items-center gap-2">
                     ${hasPoses ? `<span class="text-[10px] text-emerald-300">📷 已有 ${hasPoses} 图</span>` : '<span class="text-[10px] text-slate-500">未生成</span>'}
+                    <span id="prompt-img-status" class="text-[10px]"></span>
+                    <button onclick="genLibImage('${libId}')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-[11px] text-white">✨ 生成</button>
+                    ${hasPoses ? `<button onclick="openAtlasById('${libId}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">👁 预览</button>` : ''}
                     <input type="file" id="prompt-pose-file" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="importPoseImageSelected('${libId}', this)">
                     <button onclick="document.getElementById('prompt-pose-file').click()" class="px-2 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-[11px] text-white">📥 上传图片回库</button>
                     <button onclick="openLibFolder('${libId}', '${data.image.sample_file || ''}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">📂 打开目录</button>
                     <button onclick="copyText(_promptsData.image.prompt, this)" class="px-2 py-1 bg-teal-700 hover:bg-teal-600 rounded text-[11px] text-white">📋 复制</button>
                 </div>
             </div>
-            <p class="text-[10px] text-slate-500 mb-1">建议参数：${_esc(data.image.suggested)} · 纯白背景、无文字水印。外部生成后上传回库${data.structure === 'quest' ? '（自动切成 8 张姿势图）' : ''}，作为动作视频的一致性参考。重新上传会替换旧图。</p>
+            <p class="text-[10px] text-slate-500 mb-1">建议参数：${_esc(data.image.suggested)} · 纯白背景、无文字水印。外部生成后上传回库${data.structure === 'quest' ? '（自动切成 8 张姿势图）' : ''}，作为动作视频的一致性参考。重新上传会替换旧图。点「✨ 生成」用 MCP 直接生成（消耗积分）。</p>
             <pre class="bg-slate-950/70 border border-slate-800 rounded p-2 text-[10px] text-slate-300 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">${_esc(data.image.prompt)}</pre>
         </div>
         <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
             <div class="text-xs font-semibold text-indigo-300 mb-1">② 动作视频提示词（${data.clips.length} 段${data.is_host ? ' · 主持人含 wave' : ''}）</div>
             <p class="text-[10px] text-emerald-300/90 mb-1">${data.is_host ? '主持人最少上传：talking ×1 + wave ×1（wave 仅结尾送别用，无需 idle）即可使用；talking 最多 3 段' : '最少上传：talking ×1 + idle ×1 即可使用；talking 最多 3 段、idle 最多 2 段'}，多段自动随机轮换（不与上一行重复），缺的变体不补齐也不回退。</p>
-            <p class="text-[10px] text-slate-500 mb-2">建议参数：${_esc(data.video_suggested)}。每段视频生成后用「📥 上传视频」回库，本地自动抽帧抠图入库（零积分），重新上传会替换旧素材。${data.has_ref ? '<span class="text-emerald-400">已附加一致性约束：视频人物与上传的参考图保持一致（外部工具请同步上传同一张参考图），prompt 已省略外观描述以参考图为准。</span>' : ''}</p>
+            <p class="text-[10px] text-slate-500 mb-2">建议参数：${_esc(data.video_suggested)}。每段视频生成后用「📥 上传视频」回库，本地自动抽帧抠图入库（零积分），重新上传会替换旧素材。点行内「✨ 生成」用 MCP 直接生成该动作（与提示词逐字一致、必须参考已有角色图片，消耗积分）。${data.has_ref ? '<span class="text-emerald-400">已附加一致性约束：视频人物与上传的参考图保持一致（外部工具请同步上传同一张参考图），prompt 已省略外观描述以参考图为准。</span>' : ''}</p>
             ${data.clips.map(c => `
             <div class="border-t border-slate-800 pt-2 mt-2">
                 <div class="flex items-center justify-between gap-2 mb-1">
                     <div class="text-[11px] text-slate-200">🎬 ${c.action} ${c.required === false ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400">可选</span>' : ''} ${c.exists ? '<span class="text-[10px] text-emerald-300">✅ 已入库</span>' : (c.frames ? `<span class="text-[10px] text-amber-300">部分 ${c.frames} 帧</span>` : '')}</div>
                     <div class="flex items-center gap-2">
+                        <span id="prompt-clip-status-${c.action}" class="text-[10px]"></span>
+                        <button id="prompt-clip-gen-${c.action}" onclick="genLibClipAction('${libId}', '${c.action}')" ${data.has_ref ? '' : 'disabled title="需先有参考图（① 生成/上传）"'} class="px-2 py-1 rounded text-[11px] text-white ${data.has_ref ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">✨ 生成</button>
+                        ${(c.exists || c.has_video) ? `<button onclick="openClipPreview('${libId}', '${c.action}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">👁 预览</button>` : ''}
                         <input type="file" id="prompt-clip-file-${c.action}" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" class="hidden" onchange="importClipSelected('${libId}', '${c.action}', this)">
                         <button onclick="document.getElementById('prompt-clip-file-${c.action}').click()" class="px-2 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-[11px] text-white">📥 上传视频</button>
                         <button onclick="openLibFolder('${libId}', '${c.sample_file || ''}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300">📂 打开目录</button>
@@ -1263,6 +1296,235 @@ function importClipSelected(libId, action, input) {
         })
         .catch(e => alert('导入失败: ' + e));
     input.value = '';
+}
+
+// --- 弹窗内一键生成（MCP）+ 状态轮询（独立于卡片轮询，仅读状态互不干扰） ---
+let _promptImgPollTimer = null;
+let _promptClipPollTimer = null;
+
+function _setPromptImgStatus(html) {
+    const el = document.getElementById('prompt-img-status');
+    if (el) el.innerHTML = html;
+}
+
+function _setPromptClipStatus(action, html) {
+    const el = document.getElementById(`prompt-clip-status-${action}`);
+    if (el) el.innerHTML = html;
+}
+
+function _disablePromptClipBtn(action, dis) {
+    const btn = document.getElementById(`prompt-clip-gen-${action}`);
+    if (!btn) return;
+    btn.disabled = dis;
+    btn.classList.toggle('opacity-50', dis);
+    btn.classList.toggle('cursor-not-allowed', dis);
+}
+
+function genLibImage(libId) {
+    if (!confirm('生成参考图将通过 MCP 生成 1 张图片，消耗积分。确定继续？')) return;
+    fetch(`/api/character_library/${libId}/generate_images`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                _setPromptImgStatus('<span class="text-indigo-300">⏳ 生成中...</span>');
+                _promptImgPollTimer = setTimeout(() => pollPromptImgStatus(libId), 3000);
+            } else {
+                alert('启动失败: ' + (data.error || ''));
+            }
+        });
+}
+
+function pollPromptImgStatus(libId) {
+    fetch(`/api/character_library/${libId}/generation_status`)
+        .then(r => r.json())
+        .then(data => {
+            if (_promptsLibId !== libId) return;  // 弹窗已关闭/切换，停止轮询
+            if (data.status === 'generating') {
+                _setPromptImgStatus('<span class="text-indigo-300">⏳ 生成中...</span>');
+                _promptImgPollTimer = setTimeout(() => pollPromptImgStatus(libId), 3000);
+            } else if (data.status === 'done') {
+                _setPromptImgStatus('<span class="text-emerald-300">✅ 完成</span>');
+                loadGenPrompts(libId);  // 刷新预览按钮与 has_ref
+                loadLibrary();
+            } else if (data.status === 'error') {
+                _setPromptImgStatus(`<span class="text-red-300">❌ ${_esc(data.error || '失败')}</span>`);
+            } else {
+                _setPromptImgStatus('');
+            }
+        })
+        .catch(() => { if (_promptsLibId === libId) _promptImgPollTimer = setTimeout(() => pollPromptImgStatus(libId), 5000); });
+}
+
+function genLibClipAction(libId, action) {
+    if (!confirm(`生成 1 段「${action}」动作视频将通过 MCP 生成约 6 秒视频（参考已有角色图片保持一致性），消耗积分。确定继续？`)) return;
+    fetch(`/api/character_library/${libId}/generate_clip_action`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action})
+    })
+    .then(r => r.json().then(d => ({ok: r.ok, d})))
+    .then(({ok, d}) => {
+        if (ok && d.ok) {
+            _setPromptClipStatus(action, '<span class="text-teal-300">⏳ 生成中...</span>');
+            _disablePromptClipBtn(action, true);
+            _promptClipPollTimer = setTimeout(() => pollPromptClipActions(libId), 3000);
+        } else {
+            alert('启动失败: ' + ((d && d.error) || ''));
+        }
+    })
+    .catch(e => alert('启动失败: ' + e));
+}
+
+function pollPromptClipActions(libId) {
+    fetch(`/api/character_library/${libId}/clip_action_status`)
+        .then(r => r.json())
+        .then(data => {
+            if (_promptsLibId !== libId) return;
+            let anyGenerating = false;
+            for (const [action, st] of Object.entries(data || {})) {
+                if (!st || !st.status) continue;
+                if (st.status === 'generating') {
+                    anyGenerating = true;
+                    _setPromptClipStatus(action, '<span class="text-teal-300">⏳ 生成中...</span>');
+                    _disablePromptClipBtn(action, true);
+                } else if (st.status === 'done') {
+                    _setPromptClipStatus(action, '<span class="text-emerald-300">✅ 完成</span>');
+                    _disablePromptClipBtn(action, false);
+                } else if (st.status === 'error') {
+                    _setPromptClipStatus(action, `<span class="text-red-300">❌ ${_esc(st.error || '失败')}</span>`);
+                    _disablePromptClipBtn(action, false);
+                }
+            }
+            if (anyGenerating) {
+                _promptClipPollTimer = setTimeout(() => pollPromptClipActions(libId), 3000);
+                return;
+            }
+            // 全部终态：刷新弹窗行内状态（✅ 已入库 / 👁 预览）与卡片徽章
+            loadGenPrompts(libId);
+            loadLibrary();
+        })
+        .catch(() => { if (_promptsLibId === libId) _promptClipPollTimer = setTimeout(() => pollPromptClipActions(libId), 5000); });
+}
+
+function checkPromptJobs(libId) {
+    // 打开弹窗时恢复进行中任务的轮询（与卡片 checkGenStatus/checkClipStatus 同理）
+    fetch(`/api/character_library/${libId}/generation_status`)
+        .then(r => r.json())
+        .then(d => {
+            if (_promptsLibId !== libId || d.status !== 'generating') return;
+            _setPromptImgStatus('<span class="text-indigo-300">⏳ 生成中...</span>');
+            _promptImgPollTimer = setTimeout(() => pollPromptImgStatus(libId), 3000);
+        }).catch(() => {});
+    fetch(`/api/character_library/${libId}/clip_action_status`)
+        .then(r => r.json())
+        .then(d => {
+            if (_promptsLibId !== libId) return;
+            const any = Object.values(d || {}).some(st => st && st.status === 'generating');
+            if (any) _promptClipPollTimer = setTimeout(() => pollPromptClipActions(libId), 3000);
+        }).catch(() => {});
+}
+
+// --- 动作素材预览（源视频播放 / flipbook 逐帧兜底 + 帧网格） ---
+let _cpTimer = null;
+let _cpFrames = [];
+let _cpIdx = 0;
+let _cpIntervalMs = 250;
+let _cpPlaying = false;
+
+function openClipPreview(libId, action) {
+    const char = _libraryChars.find(c => c.id === libId);
+    const name = char ? (char.name || libId) : libId;
+    document.getElementById('clip-preview-name').textContent = `动作预览 — ${name} · ${action}`;
+    const video = document.getElementById('clip-preview-video');
+    const img = document.getElementById('clip-preview-img');
+    const grid = document.getElementById('clip-preview-grid');
+    const controls = document.getElementById('clip-preview-controls');
+    _stopCpTimer();
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    video.style.display = 'none';
+    img.style.display = 'none';
+    img.src = '';
+    controls.innerHTML = '';
+    grid.innerHTML = '<p class="col-span-6 text-slate-400 text-xs">加载中...</p>';
+    const m = document.getElementById('clip-preview-modal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    fetch(`/api/character_library/${libId}/clip_preview/${action}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.video_url) {
+                video.src = data.video_url;
+                video.style.display = '';
+                controls.innerHTML = `<span class="text-slate-400">🎬 源视频循环播放 · 已入库 ${data.total} 帧</span>`;
+                grid.innerHTML = (data.frames || []).map(u =>
+                    `<img src="${u}" loading="lazy" class="w-full aspect-square object-cover rounded bg-slate-700 cursor-pointer hover:opacity-80" onclick="const im=document.getElementById('clip-preview-img');im.style.display='';im.src=this.src" title="点击查看该帧">`).join('');
+            } else if ((data.frames || []).length) {
+                _cpFrames = data.frames;
+                _cpIntervalMs = Math.max(40, data.interval_ms || 250);
+                _cpIdx = 0;
+                _cpPlaying = false;
+                img.style.display = '';
+                img.src = _cpFrames[0];
+                _cpFrames.forEach(u => { const im = new Image(); im.src = u; });  // 预载，减少 flipbook 空帧
+                grid.innerHTML = _cpFrames.map((u, i) =>
+                    `<img src="${u}" loading="lazy" class="w-full aspect-square object-cover rounded bg-slate-700 cursor-pointer hover:opacity-80" onclick="_cpShowFrame(${i})" title="采样帧 ${i + 1}/${_cpFrames.length}">`).join('');
+                _cpRenderControls();
+                _cpPlay();
+            } else {
+                grid.innerHTML = '<p class="col-span-6 text-slate-400 text-xs">该动作暂无素材</p>';
+            }
+        })
+        .catch(() => { grid.innerHTML = '<p class="col-span-6 text-red-300 text-xs">加载失败</p>'; });
+}
+
+function _cpRenderControls() {
+    const controls = document.getElementById('clip-preview-controls');
+    if (controls) controls.innerHTML = `
+        <button onclick="_cpTogglePlay()" class="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 rounded text-xs text-white">${_cpPlaying ? '⏸ 暂停' : '▶ 播放'}</button>
+        <span class="text-slate-400">逐帧播放（${_cpFrames.length} 采样帧 · 原速）</span>`;
+}
+
+function _cpShowFrame(i) {
+    _cpIdx = i;
+    document.getElementById('clip-preview-img').src = _cpFrames[i];
+}
+
+function _cpPlay() {
+    _cpPlaying = true;
+    _stopCpTimer();
+    _cpTimer = setInterval(() => {
+        _cpIdx = (_cpIdx + 1) % _cpFrames.length;
+        document.getElementById('clip-preview-img').src = _cpFrames[_cpIdx];
+    }, _cpIntervalMs);
+    _cpRenderControls();
+}
+
+function _cpPause() {
+    _cpPlaying = false;
+    _stopCpTimer();
+    _cpRenderControls();
+}
+
+function _cpTogglePlay() { _cpPlaying ? _cpPause() : _cpPlay(); }
+
+function _stopCpTimer() {
+    if (_cpTimer) { clearInterval(_cpTimer); _cpTimer = null; }
+}
+
+function closeClipPreview() {
+    _stopCpTimer();
+    const m = document.getElementById('clip-preview-modal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    const video = document.getElementById('clip-preview-video');
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    document.getElementById('clip-preview-img').src = '';
+    document.getElementById('clip-preview-grid').innerHTML = '';
+    document.getElementById('clip-preview-controls').innerHTML = '';
 }
 
 // --- Load poses ---

@@ -929,6 +929,24 @@ def _with_ref_consistency(prompt: str, has_ref: bool) -> str:
     return f"{prompt}, {_REF_CONSISTENCY}" if has_ref and prompt else prompt
 
 
+# 正脸约束（用户要求：生成的视频人物必须正脸对着镜头、面向观众）；
+# 素材库全部动作视频 prompt（MCP 生成与 /gen_prompts 展示）共用，管线 prompt 不受影响
+_VIDEO_FACE_RULE = ("the character must face the camera directly, front-facing "
+                    "toward the viewer, full face clearly visible, "
+                    "never in profile or from behind")
+
+
+def _lib_video_prompt(action: str, description: str, has_ref: bool) -> str:
+    """素材库动作视频 prompt 单一来源（单动作/批量 MCP 生成与 /gen_prompts 展示共用，
+    逐字一致）：基础 prompt + 正脸面向镜头约束，有参考图时再附加一致性约束。
+    """
+    from sprite_seq import _video_prompt
+    from style_manager import DEFAULT_STYLE_PROMPT
+
+    base = _video_prompt(action, "" if has_ref else description, DEFAULT_STYLE_PROMPT)
+    return _with_ref_consistency(f"{base}, {_VIDEO_FACE_RULE}", has_ref)
+
+
 def _lib_ref_file(lib_dir: Path) -> str:
     """该角色当前参考图文件名（姿势图 → 场景图 → 空），供提示词与打开目录用。"""
     for name in ("pose_char_a_0.png", "char_scene.png"):
@@ -1048,6 +1066,68 @@ def _refresh_clip_manifest(lib_dir: Path, description: str) -> int:
     return len(actions)
 
 
+def _gen_clip_action_via_mcp(mcp, lib_dir: Path, action: str,
+                             description: str, ref_url: str) -> tuple[bool, str]:
+    """MCP 生成单个动作视频 → 本地抽帧抠图入库 → 源视频留库供预览。
+
+    批量（_generate_char_clips）与单动作（_generate_single_clip_action）两条
+    路线共用的核心；prompt 走 _lib_video_prompt 单一来源（正脸约束 +
+    有参考图时的一致性约束）。返回 (是否成功, 可能更新的 ref_url)——
+    无参考图时 talking_01 的成功帧升级为后续动作的一致性参考。
+    """
+    import os
+
+    from image_gen import reupload_for_cdn
+    from sprite_seq import _pick_ref_frame
+
+    tmp_video = lib_dir / f"_tmp_{action}.mp4"
+    params = {"prompt": _lib_video_prompt(action, description, bool(ref_url)),
+              "duration": 6, "ratio": "16:9", "resolution": "720p",
+              "generate_audio": False}
+    if ref_url:
+        params.update({"mode": "reference_image", "image_urls": ref_url})
+    else:
+        params.update({"mode": "text_to_video"})
+    result = mcp.call_tool("generate_video", params)
+    task_id = mcp.parse_task_id(result)
+    downloaded = False
+    if task_id:
+        data = mcp.poll_task(task_id, interval=40, max_wait=900)
+        url = data.get("url", "")
+        if (url and mcp.download_file(url, str(tmp_video))
+                and tmp_video.stat().st_size >= 500000):
+            downloaded = True
+    if not downloaded:
+        print(f"  [LibClips] WARNING: {lib_dir.name}/{action} 视频生成失败")
+        return False, ref_url
+    try:
+        produced = _produce_clips_from_video(str(tmp_video), lib_dir, action,
+                                             label=f"{lib_dir.name}/{action}")
+        if not produced:
+            return False, ref_url
+        # 源视频留库供预览（clip_{action}_src.mp4 与帧 glob 命名不冲突，替换旧文件）
+        src_video = lib_dir / f"clip_{action}_src.mp4"
+        try:
+            if src_video.exists():
+                src_video.unlink()
+            tmp_video.replace(src_video)
+        except OSError as e:
+            print(f"  [LibClips] WARNING: 源视频留库失败（不影响帧入库）: {e}")
+    finally:
+        if tmp_video.exists():
+            try:
+                os.remove(str(tmp_video))
+            except OSError:
+                pass
+    # 无参考图时用 talking_01 的帧做其后动作的一致性参考
+    if not ref_url and action == _CLIP_ACTIONS_BASE[0]:
+        ref = _pick_ref_frame(_list_action_frames(lib_dir, action))
+        if ref:
+            ref_url = reupload_for_cdn(ref, Path(ref).name,
+                                       call_tool_fn=mcp.call_tool) or ""
+    return True, ref_url
+
+
 def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
     """后台线程：MCP Seedance2 生成各动作白底视频 → 本地抽帧抠图入库。
 
@@ -1055,11 +1135,7 @@ def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
     文件级续传（帧已齐的动作跳过）；无参考图时 talking_01 先行、其后动作
     用它的帧做一致性参考（与管线 sprite_seq._gen_char 语义一致）。
     """
-    import os
-
     from image_gen import reupload_for_cdn
-    from sprite_seq import _pick_ref_frame, _video_prompt
-    from style_manager import DEFAULT_STYLE_PROMPT
 
     lib_dir = LIBRARY_DIR / lib_id
     actions = list(_CLIP_ACTIONS_HOST if is_host else _CLIP_ACTIONS_BASE)
@@ -1102,48 +1178,12 @@ def _generate_char_clips(lib_id: str, description: str, is_host: bool) -> None:
                 print(f"  [LibClips] {lib_id}/{action} 已存在，跳过")
                 ok += 1
                 continue
-            params = {"prompt": _with_ref_consistency(
-                          _video_prompt(action, "" if ref_url else description,
-                                        DEFAULT_STYLE_PROMPT),
-                          bool(ref_url)),
-                      "duration": 6, "ratio": "16:9", "resolution": "720p",
-                      "generate_audio": False}
-            if ref_url:
-                params.update({"mode": "reference_image", "image_urls": ref_url})
+            produced, ref_url = _gen_clip_action_via_mcp(
+                mcp, lib_dir, action, description, ref_url)
+            if produced:
+                ok += 1
             else:
-                params.update({"mode": "text_to_video"})
-            result = mcp.call_tool("generate_video", params)
-            task_id = mcp.parse_task_id(result)
-            video_path = ""
-            if task_id:
-                data = mcp.poll_task(task_id, interval=40, max_wait=900)
-                url = data.get("url", "")
-                tmp_video = lib_dir / f"_tmp_{action}.mp4"
-                if (url and mcp.download_file(url, str(tmp_video))
-                        and tmp_video.stat().st_size >= 500000):
-                    video_path = str(tmp_video)
-            if not video_path:
-                print(f"  [LibClips] WARNING: {lib_id}/{action} 视频生成失败")
                 failed.append(action)
-                continue
-            try:
-                produced = _produce_clips_from_video(video_path, lib_dir, action,
-                                                     label=f"{lib_id}/{action}")
-            finally:
-                try:
-                    os.remove(video_path)
-                except OSError:
-                    pass
-            if not produced:
-                failed.append(action)
-                continue
-            ok += 1
-            # 无参考图时用 talking_01 的帧做其后动作的一致性参考
-            if not ref_url and action == _CLIP_ACTIONS_BASE[0]:
-                ref = _pick_ref_frame(_list_action_frames(lib_dir, action))
-                if ref:
-                    ref_url = reupload_for_cdn(ref, Path(ref).name,
-                                               call_tool_fn=mcp.call_tool) or ""
 
         _refresh_clip_manifest(lib_dir, description)
         _clip_gen_status[lib_id] = {
@@ -1191,12 +1231,149 @@ async def api_library_clip_status(lib_id: str):
                                          "current_action": "", "error": ""})
 
 
+# 单动作生成状态（提示词弹窗内一键生成）：lib_id → action → {status, error, started_at}
+_clip_action_status: dict[str, dict[str, dict]] = {}
+
+
+def _generate_single_clip_action(lib_id: str, description: str, is_host: bool,
+                                 action: str) -> None:
+    """后台线程：提示词弹窗内单动作 MCP 生成（一致性硬前提：必须已有参考图，
+    恒走 reference_image 模式；入口已守卫，这里兜底再查一次）。"""
+    from image_gen import reupload_for_cdn
+
+    lib_dir = LIBRARY_DIR / lib_id
+    st = _clip_action_status.setdefault(lib_id, {})
+    st[action] = {"status": "generating", "error": "", "started_at": time.time()}
+    try:
+        ref_file = _lib_ref_file(lib_dir)
+        if not ref_file:
+            st[action] = {"status": "error",
+                          "error": "缺少参考图（pose_char_a_0.png / char_scene.png），已取消"}
+            return
+        resolved = resolve_page_tokens("characters")
+        if not resolved["tokens"]:
+            st[action] = {"status": "error",
+                          "error": "未配置 MCP Token（本页专属 / 模式配置 / 本地检测均为空）"}
+            return
+        print(f"  [LibClips] MCP token: {MCP_SOURCE_LABELS[resolved['source']]} "
+              f"×{len(resolved['tokens'])} ({mask_token(resolved['tokens'][0])})")
+        mcp = PageMcpSession(resolved["tokens"]).initialize()
+        ref_url = reupload_for_cdn(str(lib_dir / ref_file), ref_file,
+                                   call_tool_fn=mcp.call_tool) or ""
+        if not ref_url:
+            st[action] = {"status": "error", "error": "参考图上传 CDN 失败，无法保证人物一致性"}
+            return
+        ok, _ = _gen_clip_action_via_mcp(mcp, lib_dir, action, description, ref_url)
+        _refresh_clip_manifest(lib_dir, description)
+        st[action] = ({"status": "done", "error": ""} if ok
+                      else {"status": "error",
+                            "error": "视频生成失败（未返回有效视频或抽帧失败）"})
+        print(f"  [LibClips] {lib_id}/{action}: {'done' if ok else 'failed'}")
+    except RuntimeError as e:
+        msg = ("MCP Token 积分全部耗尽" if "ALL_MCP_TOKENS_EXHAUSTED" in str(e)
+               else str(e)[:200])
+        st[action] = {"status": "error", "error": msg}
+    except Exception as e:  # noqa: BLE001 — 错误信息原样落状态供前端展示
+        print(f"  [LibClips] ERROR {lib_id}/{action}: {e}")
+        st[action] = {"status": "error", "error": str(e)[:200]}
+
+
+@router.post("/api/character_library/{lib_id}/generate_clip_action")
+async def api_library_generate_clip_action(lib_id: str, request: Request):
+    """提示词弹窗内单动作视频 MCP 生成（必须已有参考图保持人物一致性）。"""
+    import threading
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists():
+        return JSONResponse({"ok": False, "error": "未找到"}, status_code=404)
+    try:
+        meta = json.loads((lib_dir / "meta.json").read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse({"ok": False, "error": "meta.json 读取失败"}, status_code=500)
+    description = meta.get("description", "")
+    if not description:
+        return JSONResponse({"ok": False, "error": "角色描述为空，无法生成序列帧"}, status_code=400)
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    action = str(data.get("action", "")).strip()
+    allowed = _CLIP_ACTIONS_HOST if _lib_is_host(meta) else _CLIP_ACTIONS_BASE
+    if action not in allowed:
+        return JSONResponse({"ok": False, "error": f"未知动作: {action or '(空)'}"},
+                            status_code=400)
+    # 一致性硬前提：动作视频必须参考已有/已生成的角色图片
+    if not _lib_ref_file(lib_dir):
+        return JSONResponse(
+            {"ok": False,
+             "error": "请先在 ① 生成/上传参考图——动作视频必须参考角色图片保持人物一致性"},
+            status_code=400)
+    if _clip_gen_status.get(lib_id, {}).get("status") == "generating":
+        return JSONResponse({"ok": False, "error": "该角色的全量序列帧生成任务进行中，请稍候"},
+                            status_code=409)
+    if _clip_action_status.get(lib_id, {}).get(action, {}).get("status") == "generating":
+        return JSONResponse({"ok": False, "error": f"{action} 已在生成中"}, status_code=409)
+    threading.Thread(target=_generate_single_clip_action,
+                     args=(lib_id, description, _lib_is_host(meta), action),
+                     daemon=True).start()
+    return {"ok": True, "message": f"{action} 生成中..."}
+
+
+@router.get("/api/character_library/{lib_id}/clip_action_status")
+async def api_library_clip_action_status(lib_id: str):
+    """单个动作生成状态（提示词弹窗轮询）。"""
+    return _clip_action_status.get(lib_id, {})
+
+
+@router.get("/api/character_library/{lib_id}/clip_preview/{action}")
+async def api_library_clip_preview(lib_id: str, action: str):
+    """动作预览数据：源视频 URL（生成/导入留库时）+ 均匀采样帧（flipbook 兜底）。
+
+    interval_ms = 采样帧间隔，保证逐帧播放速度与原视频一致；帧 URL 带 mtime
+    版本参数防重传后浏览器缓存旧图（同 URL 内容会变约定）。
+    """
+    lib_dir = LIBRARY_DIR / lib_id
+    if not lib_dir.exists() or not lib_dir.is_dir():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    frames = _list_action_frames(lib_dir, action)
+    total = len(frames)
+    sample_count = min(total, 24)
+    sampled = (frames if total <= 24
+               else [frames[int(i * total / sample_count)] for i in range(sample_count)])
+
+    def _frame_url(p: Path) -> str:
+        try:
+            v = p.stat().st_mtime_ns
+        except OSError:
+            v = 0
+        return f"/api/character_library/{lib_id}/poses/{p.name}?v={v}"
+
+    video_url = ""
+    src = lib_dir / f"clip_{action}_src.mp4"
+    if src.exists() and src.stat().st_size > 0:
+        video_url = f"/api/character_library/{lib_id}/clips/{src.name}?v={src.stat().st_mtime_ns}"
+    interval_ms = int(round((total / sample_count) / 24 * 1000)) if sample_count else 0
+    return {"action": action, "total": total, "fps": 24,
+            "interval_ms": interval_ms, "video_url": video_url,
+            "frames": [_frame_url(Path(f)) for f in sampled]}
+
+
+@router.get("/api/character_library/{lib_id}/clips/{filename}")
+async def api_library_clip_file(lib_id: str, filename: str):
+    """服务动作源视频（仅 clip_*_src.mp4 白名单，防路径穿越）。"""
+    if ("/" in filename or "\\" in filename or ".." in filename
+            or Path(filename).name != filename
+            or not (filename.startswith("clip_") and filename.endswith("_src.mp4"))):
+        return JSONResponse({"error": "Invalid filename"}, status_code=400)
+    video_path = LIBRARY_DIR / lib_id / filename
+    if not video_path.exists():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(str(video_path), media_type="video/mp4",
+                        headers={"Cache-Control": "no-cache"})
+
+
 @router.get("/api/character_library/{lib_id}/gen_prompts")
 async def api_library_gen_prompts(lib_id: str):
     """输出参考图 + 各动作视频的完整提示词（复制到外部工具用，与 MCP 路线逐字一致）。"""
-    from sprite_seq import _video_prompt
-    from style_manager import DEFAULT_STYLE_PROMPT
-
     lib_dir = LIBRARY_DIR / lib_id
     if not lib_dir.exists():
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -1214,13 +1391,13 @@ async def api_library_gen_prompts(lib_id: str):
         frames = _list_action_frames(lib_dir, action)
         clips.append({
             "action": action,
-            "prompt": (_with_ref_consistency(
-                _video_prompt(action, "" if has_ref else description, DEFAULT_STYLE_PROMPT),
-                has_ref) if description else ""),
+            "prompt": (_lib_video_prompt(action, description, has_ref)
+                       if description else ""),
             # 最少集语义：talking_01/idle_01（主持人另加 wave）必需，其余变体可选
             "required": action in ("talking_01", "idle_01", "wave"),
             "exists": bool(frames) and len(frames) >= 4,
             "frames": len(frames),
+            "has_video": (lib_dir / f"clip_{action}_src.mp4").exists(),
             "sample_file": (Path(frames[0]).name if frames else ""),
         })
     return {
@@ -1316,6 +1493,15 @@ async def api_library_import_clip(lib_id: str, action: str = Form(""),
     try:
         ok = _produce_clips_from_video(str(tmp_video), lib_dir, action,
                                        label=f"{lib_id}/{action}")
+        if ok:
+            # 源视频留库供预览（与 MCP 生成路线一致，替换旧文件）
+            src_video = lib_dir / f"clip_{action}_src.mp4"
+            try:
+                if src_video.exists():
+                    src_video.unlink()
+                tmp_video.replace(src_video)
+            except OSError as e:
+                print(f"  [LibImport] WARNING: 源视频留库失败（不影响帧入库）: {e}")
     finally:
         try:
             tmp_video.unlink()
