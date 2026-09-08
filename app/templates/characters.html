@@ -203,8 +203,8 @@
     </section>
 </div>
 
-<!-- 图集查看器弹窗（点角色图片/姿势图打开） -->
-<div id="atlas-modal" class="hidden fixed inset-0 z-50 bg-black/80 items-center justify-center p-4"
+<!-- 图集查看器弹窗（点角色图片/姿势图打开；z-[60] 高于提示词弹窗 z-50，从弹窗内打开时置顶） -->
+<div id="atlas-modal" class="hidden fixed inset-0 z-[60] bg-black/80 items-center justify-center p-4"
     onclick="if(event.target===this) closeAtlasViewer()">
     <div class="max-w-[95vw] max-h-[92vh] flex flex-col gap-3">
         <div class="flex items-center justify-between gap-4">
