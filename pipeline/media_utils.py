@@ -588,37 +588,8 @@ def _probe_video_duration(path: str) -> float | None:
 DIALOGUE_XFADE_SEC = 0.32
 
 
-def _merge_dialogue_xfade(seg_paths: list[str], out_path: str,
-                          xfade: float = DIALOGUE_XFADE_SEC,
-                          fps: int = 25) -> str | None:
-    """把连续对话段合并为带交叉溶解（crossfade）的单块视频。
-
-    相邻对话段（定格动画/静态帧/AI 片段）硬切边界观感生硬，处理方式：
-    - 除最后一段外，每段视频尾帧 tpad=stop_mode=clone 冻结延展 xfade 秒；
-    - xfade 链 offset_k = 前面各段实测视频流时长之和 → 块总长 = Σ段时长，
-      段 k 的画面内容与音轨都从同一时刻开始（只是开头 xfade 秒与上一段
-      尾帧叠化），时间轴/字幕同步零影响；
-    - 音频用 concat 滤镜拼接各段音轨，一次编码（fps 与输入段一致）。
-
-    任一探测/执行失败返回 None（fail-open，调用方回退原硬切行为）。
-    """
-    n = len(seg_paths)
-    if n < 2:
-        return None
-    durations: list[float] = []
-    for p in seg_paths:
-        d = _probe_video_duration(p)
-        if not d or d <= 0:
-            return None
-        durations.append(d)
-    # 段太短叠化没意义且 xfade 边界条件不稳，整体回退硬切
-    if min(durations) < xfade * 2:
-        return None
-    total = sum(durations)
-
-    cmd = ["ffmpeg", "-y"]
-    for p in seg_paths:
-        cmd += ["-i", p]
+def _xfade_graph(n: int, durations: list[float], xfade: float) -> tuple[str, str]:
+    """构建 xfade 链的 filter_complex 图。返回 (图文本, 末段视频流标签)。"""
     parts = []
     for k in range(n - 1):
         parts.append(
@@ -635,29 +606,129 @@ def _merge_dialogue_xfade(seg_paths: list[str], out_path: str,
         prev = label
     parts.append("".join(f"[{k}:a]" for k in range(n))
                  + f"concat=n={n}:v=0:a=1[ba]")
+    return ";".join(parts), prev
+
+
+# Windows CreateProcess 命令行上限 32767 字符，超限报 WinError 206（文件名或
+# 扩展名太长）。长对话 run（百行级脚本）的 N 个 -i 路径 + 内联 filter 图很
+# 容易超限，filter 图改走脚本文件后仅剩输入路径，仍留足余量。
+_XFADE_CMD_BUDGET = 24000
+
+
+def _run_xfade_merge(seg_paths: list[str], out_path: str,
+                     xfade: float, fps: int) -> bool:
+    """单次 ffmpeg 调用完成 xfade 合并，成功返回 True。
+
+    filter 图写入脚本文件经 -filter_complex_script 传入（不占命令行）。
+    """
+    n = len(seg_paths)
+    durations = []
+    for p in seg_paths:
+        d = _probe_video_duration(p)
+        if not d or d <= 0:
+            return False
+        durations.append(d)
+    graph, vlabel = _xfade_graph(n, durations, xfade)
+    script_path = out_path + ".filter.txt"
+    cmd = ["ffmpeg", "-y"]
+    for p in seg_paths:
+        cmd += ["-i", p]
     cmd += [
-        "-filter_complex", ";".join(parts),
-        "-map", f"[{prev}]", "-map", "[ba]",
+        "-filter_complex_script", script_path,
+        "-map", f"[{vlabel}]", "-map", "[ba]",
         "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(fps),
         "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
-        "-t", f"{total:.3f}",
+        "-t", f"{sum(durations):.3f}",
         out_path,
     ]
+    ok = False
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=1800)
-    except subprocess.TimeoutExpired:
-        print("  [Xfade] dialogue merge timed out — keeping hard cuts")
-        return None
-    if r.returncode != 0 or not os.path.exists(out_path) \
-            or os.path.getsize(out_path) < 1000:
-        print(f"  [Xfade] dialogue merge failed — keeping hard cuts "
-              f"({r.stderr.decode(errors='replace')[-300:] if r.stderr else ''})")
+        with open(script_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(graph)
         try:
-            os.remove(out_path)
+            r = subprocess.run(cmd, capture_output=True, timeout=1800)
+        except subprocess.TimeoutExpired:
+            print("  [Xfade] dialogue merge timed out — keeping hard cuts")
+            return False
+        if r.returncode == 0 and os.path.exists(out_path) \
+                and os.path.getsize(out_path) > 1000:
+            ok = True
+        else:
+            print(f"  [Xfade] dialogue merge failed — keeping hard cuts "
+                  f"({r.stderr.decode(errors='replace')[-300:] if r.stderr else ''})")
+            try:
+                os.remove(out_path)
+            except OSError:
+                pass
+    finally:
+        try:
+            os.remove(script_path)
         except OSError:
             pass
+    return ok
+
+
+def _merge_dialogue_xfade(seg_paths: list[str], out_path: str,
+                          xfade: float = DIALOGUE_XFADE_SEC,
+                          fps: int = 25) -> str | None:
+    """把连续对话段合并为带交叉溶解（crossfade）的单块视频。
+
+    相邻对话段（定格动画/静态帧/AI 片段）硬切边界观感生硬，处理方式：
+    - 除最后一段外，每段视频尾帧 tpad=stop_mode=clone 冻结延展 xfade 秒；
+    - xfade 链 offset_k = 前面各段实测视频流时长之和 → 块总长 = Σ段时长，
+      段 k 的画面内容与音轨都从同一时刻开始（只是开头 xfade 秒与上一段
+      尾帧叠化），时间轴/字幕同步零影响；
+    - 音频用 concat 滤镜拼接各段音轨，一次编码（fps 与输入段一致）。
+
+    命令行长度超预算（长对话 run，Windows 上限 32767 报 WinError 206）时
+    二分递归：先各合并半段为中间块再合并两块——块内/块间相邻对与单链完全
+    相同，块时长 = Σ成员段时长，产物与单链等价（中间段仅多一次 crf18 重编码）。
+
+    任一探测/执行失败返回 None（fail-open，调用方回退原硬切行为）。
+    """
+
+    def _group(paths: list[str], dst: str) -> str | None:
+        m = len(paths)
+        if m < 2:
+            return paths[0]
+        est = sum(len(p) + 20 for p in paths) + 500
+        # 段数太少时不再二分（递归归底，超预算极端场景交给 fail-open）
+        if m < 4 or est <= _XFADE_CMD_BUDGET:
+            return dst if _run_xfade_merge(paths, dst, xfade=xfade, fps=fps) \
+                else None
+        parent = Path(dst).parent
+        stem = Path(dst).stem
+        half_a = _group(paths[:m // 2], str(parent / f"{stem}_a.mp4"))
+        if not half_a:
+            return None
+        half_b = _group(paths[m // 2:], str(parent / f"{stem}_b.mp4"))
+        if not half_b:
+            return None
+        return _group([half_a, half_b], dst)
+
+    n = len(seg_paths)
+    if n < 2:
         return None
-    return out_path
+    durations = []
+    for p in seg_paths:
+        d = _probe_video_duration(p)
+        if not d or d <= 0:
+            return None
+        durations.append(d)
+    # 段太短叠化没意义且 xfade 边界条件不稳，整体回退硬切
+    if min(durations) < xfade * 2:
+        return None
+
+    try:
+        return _group(list(seg_paths), out_path)
+    finally:
+        # 清理递归产生的中间块（out_path 本身不带 "_" 不会误删）
+        stem = Path(out_path).stem
+        for f in Path(out_path).parent.glob(f"{stem}_*.mp4"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
 
 
 def merge_dialogue_runs_xfade(segments: list[str | None],
