@@ -215,7 +215,11 @@ def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
                 [lw for _, lw, _ in en_lines] + [lw for _, lw, _ in zh_lines])
             x0 = max(0, (w - text_w) // 2 - pad_h)
             x1 = min(w, (w + text_w) // 2 + pad_h)
-            y0 = max(0, min(en_block_y, zh_block_y) - pad_v)
+            # 只按实际有文字的块取上缘（单侧缺失时另一侧 block_y 是 0 占位，
+            # 误取会把条从画布顶画到底——纯英文/纯中文 + 背景条必现）
+            block_ys = [y for y, lines in ((en_block_y, en_lines),
+                                           (zh_block_y, zh_lines)) if lines]
+            y0 = max(0, min(block_ys) - pad_v)
             y1 = min(h, h - BOTTOM_MARGIN + pad_v)
             draw.rounded_rectangle(
                 [x0, y0, x1, y1], radius=12,
