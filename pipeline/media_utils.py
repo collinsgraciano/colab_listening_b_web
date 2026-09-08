@@ -61,6 +61,8 @@ SUBTITLE_FONT_CHOICES: dict[str, tuple[str, str]] = {
     "ariblk": ("Arial Black（仅英文）", r"C:\Windows\Fonts\ariblk.ttf"),
     "segoeuib": ("Segoe UI Bold（仅英文）", r"C:\Windows\Fonts\segoeuib.ttf"),
     "impact": ("Impact（仅英文）", r"C:\Windows\Fonts\impact.ttf"),
+    "nunito": ("Nunito Bold（圆润卡通·仅英文）", str(
+        Path(__file__).resolve().parent / "fonts" / "Nunito-Bold.ttf")),
 }
 
 
@@ -87,6 +89,7 @@ SUBTITLE_STYLE_LEGACY_DEFAULTS: dict = {
     "font_en": "msyhbd",
     "font_zh": "msyh",
     "box": False,
+    "box_color": "#000000",
     "box_opacity": 55,
     "show_zh": True,
 }
@@ -102,8 +105,9 @@ def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
 
     style 可用 key: en_size/zh_size/en_color/zh_color/stroke_color/
     en_stroke/zh_stroke/bottom_margin/line_gap/en_zh_gap/font_en/font_zh/
-    box/box_opacity（box=True 时在文字块后画圆角半透明黑条）/
-    show_zh（False 时隐藏中文行 → 纯英文字幕）。
+    box/box_color/box_opacity（box=True 时在文字块后画圆角背景条，
+    默认黑色 #000000；box_opacity=100 为实心）/show_zh（False 时隐藏
+    中文行 → 纯英文字幕）。
     """
     from PIL import Image, ImageDraw, ImageFont
 
@@ -201,10 +205,11 @@ def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
         en_block_y = 0
         zh_block_y = h - BOTTOM_MARGIN - zh_total_h
 
-    # 半透明圆角背景条（可选）：包住整个字幕文字块
+    # 背景条（可选）：包住整个字幕文字块（颜色/透明度可配，默认黑色半透明=历史行为）
     if st.get("box") and (en_lines or zh_lines):
-        box_opacity = max(0, min(95, int(st.get("box_opacity", 55))))
+        box_opacity = max(0, min(100, int(st.get("box_opacity", 55))))
         if box_opacity > 0:
+            box_rgb = _hex_rgb(st.get("box_color", "#000000"), (0, 0, 0))
             pad_h, pad_v = 28, 14
             text_w = max(
                 [lw for _, lw, _ in en_lines] + [lw for _, lw, _ in zh_lines])
@@ -214,7 +219,7 @@ def render_subtitle_text_overlay(en_text: str, zh_text: str, w: int, h: int,
             y1 = min(h, h - BOTTOM_MARGIN + pad_v)
             draw.rounded_rectangle(
                 [x0, y0, x1, y1], radius=12,
-                fill=(0, 0, 0, int(255 * box_opacity / 100)))
+                fill=(*box_rgb, int(255 * box_opacity / 100)))
 
     # Render EN lines
     cur_y = en_block_y

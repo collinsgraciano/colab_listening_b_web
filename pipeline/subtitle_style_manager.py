@@ -26,9 +26,9 @@ _INT_RANGES = {
     "bottom_margin": (0, 200),
     "line_gap": (0, 30),
     "en_zh_gap": (0, 60),
-    "box_opacity": (20, 90),
+    "box_opacity": (20, 100),
 }
-_COLOR_KEYS = ("en_color", "zh_color", "stroke_color")
+_COLOR_KEYS = ("en_color", "zh_color", "stroke_color", "box_color")
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _ID_RE = re.compile(r"^[a-z0-9_]{1,40}$")
 
@@ -106,6 +106,18 @@ BUILTIN_STYLES: list[dict[str, Any]] = [
         "bottom_margin": 30, "line_gap": 5, "en_zh_gap": 12,
         "font_en": "msyhbd", "font_zh": "msyh",
         "box": False, "box_opacity": 55,
+        "builtin": True,
+    },
+    {
+        "id": "purple_band",
+        "name": "紫底字幕条（卡通风）",
+        "description": "参考竞品截图：深紫色实心圆角背景条（#42116C）+ 白色圆润卡通英文（Nunito Bold）+ 金色繁中，无描边。条宽随文字自适应，高对比不抢画面。",
+        "en_size": 60, "zh_size": 51,
+        "en_color": "#FFFFFF", "zh_color": "#FFD700", "stroke_color": "#000000",
+        "en_stroke": 0, "zh_stroke": 0,
+        "bottom_margin": 36, "line_gap": 6, "en_zh_gap": 15,
+        "font_en": "nunito", "font_zh": "msyh",
+        "box": True, "box_color": "#42116C", "box_opacity": 100,
         "builtin": True,
     },
 ]

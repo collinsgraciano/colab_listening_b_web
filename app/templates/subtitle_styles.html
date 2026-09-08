@@ -229,11 +229,17 @@
                     <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
                         <input type="checkbox" id="sf-box" onchange="onBoxToggle()"
                             class="w-4 h-4 accent-indigo-500">
-                        半透明背景条
+                        背景条
                     </label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="color" id="sf-box-color" oninput="onColorHex('box', true)" disabled
+                            class="h-9 w-12 rounded bg-slate-900 border border-slate-600 cursor-pointer p-0.5">
+                        <input type="text" id="sf-box-color-hex" onchange="onColorHex('box')" disabled
+                            class="w-20 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
+                    </div>
                     <div class="flex items-center gap-2 flex-1 min-w-[180px]">
                         <span class="text-xs text-slate-400">透明度</span>
-                        <input type="range" id="sf-box-opacity" min="20" max="90" step="1" disabled
+                        <input type="range" id="sf-box-opacity" min="20" max="100" step="1" disabled
                             oninput="onParam('box-opacity')" class="flex-1 accent-indigo-500">
                         <span id="sf-box-opacity-v" class="text-xs text-indigo-300 font-mono w-8 text-right"></span>
                     </div>
@@ -397,6 +403,7 @@ function collectStyle() {
         bottom_margin: +val('bottom-margin'), line_gap: +val('line-gap'),
         en_zh_gap: +val('en-zh-gap'),
         box: document.getElementById('sf-box').checked,
+        box_color: document.getElementById('sf-box-color').value.toUpperCase(),
         box_opacity: +val('box-opacity'),
         show_zh: !document.getElementById('sf-hide-zh').checked,
     };
@@ -420,7 +427,7 @@ function fillForm(style) {
     document.getElementById('sf-box').checked = style ? !!style.box : false;
     // 老样式无 show_zh 字段 → 视为显示中文（未勾选纯英文）
     document.getElementById('sf-hide-zh').checked = style ? (style.show_zh === false) : false;
-    for (const [id, key] of Object.entries({en: 'en_color', zh: 'zh_color', stroke: 'stroke_color'})) {
+    for (const [id, key] of Object.entries({en: 'en_color', zh: 'zh_color', stroke: 'stroke_color', box: 'box_color'})) {
         const v = (style && style[key]) || (key === 'en_color' ? '#FFFFFF' : key === 'zh_color' ? '#FFD700' : '#000000');
         document.getElementById(`sf-${id}-color`).value = v;
         document.getElementById(`sf-${id}-color-hex`).value = v.toUpperCase();
@@ -465,6 +472,8 @@ function onColorHex(which, fromPicker = false) {
 function onBoxToggle() {
     const box = document.getElementById('sf-box').checked;
     document.getElementById('sf-box-opacity').disabled = !box;
+    document.getElementById('sf-box-color').disabled = !box;
+    document.getElementById('sf-box-color-hex').disabled = !box;
     syncLabels();
     refreshPreview();
 }
