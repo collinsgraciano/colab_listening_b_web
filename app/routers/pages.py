@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from ..config_manager import (
     GROUP_META, MODES, MODE_LABELS, MODE_SHORT_LABELS, PARAM_SPEC,
     RECYCLE_DIRNAME, LEGACY_RECYCLE_DIRNAME,
+    DEFAULT_QUICK_FIELDS, EXCLUDED_QUICK_KEYS, load_all_quick_fields,
     effective_param_spec, find_run_dir, get_active_mode, get_provider_options,
     iter_run_dirs, list_presets, load_all_mode_configs, load_config,
     load_llm_providers, load_mode_config, set_active_mode,
@@ -40,6 +41,24 @@ async def dashboard(request: Request):
         vs = mcfg.get("visual_style")
         if vs and vs not in style_options:
             style_options[vs] = f"{vs}（已失效，请重新选择）"
+    # 「常用配置」面板动态渲染上下文：全参数规格（前端按模式过滤渲染/挑选）
+    quick_spec = {}
+    for key, spec in PARAM_SPEC.items():
+        if key in EXCLUDED_QUICK_KEYS:
+            continue
+        entry = {"label": spec.get("label", key), "type": spec.get("type", "text"),
+                 "group": spec.get("group", ""), "default": spec.get("default", ""),
+                 "modes": spec.get("modes"), "help": spec.get("help", "")}
+        if key == "llm_provider":
+            entry["options"] = get_provider_options()
+        elif key == "visual_style":
+            entry["options"] = style_options
+        elif key == "subtitle_style":
+            entry["options"] = {"": "跟随参数配置（默认）",
+                                **subtitle_style_lib.get_style_options()}
+        elif "options" in spec:
+            entry["options"] = spec["options"]
+        quick_spec[key] = entry
     return templates.TemplateResponse(request, "dashboard.html", {
         "config": config,
         "runner": service,
@@ -48,6 +67,10 @@ async def dashboard(request: Request):
         "active_mode": get_active_mode(),
         "mode_labels": MODE_LABELS,
         "style_options": style_options,
+        "quick_spec": quick_spec,
+        "quick_fields_map": load_all_quick_fields(),
+        "quick_group_meta": GROUP_META,
+        "quick_default_fields": DEFAULT_QUICK_FIELDS,
     })
 
 

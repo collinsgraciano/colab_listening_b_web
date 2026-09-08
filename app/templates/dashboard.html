@@ -68,128 +68,45 @@
             </div>
         </div>
 
-        <!-- 常用配置（折叠面板，默认收起；各模式独立保存） -->
+        <!-- 常用配置（折叠面板，默认收起；字段清单每模式独立，✏️ 自定义可挑选） -->
         <div class="mb-4 border border-slate-700 rounded-lg overflow-hidden">
-            <button type="button" onclick="toggleQuickConfig()"
-                class="w-full flex items-center justify-between px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 transition">
-                <span class="font-medium">⚙️ 常用配置
-                    <span class="text-xs text-slate-500 font-normal">（各模式独立保存 · 完整参数见「完整配置」页）</span>
-                </span>
-                <span id="quick-config-arrow" class="text-slate-400">▸</span>
-            </button>
+            <div class="flex items-stretch">
+                <button type="button" onclick="toggleQuickConfig()"
+                    class="flex-1 flex items-center justify-between px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 transition">
+                    <span class="font-medium">⚙️ 常用配置
+                        <span class="text-xs text-slate-500 font-normal">（字段可自定义 · 各模式独立保存 · 完整参数见「完整配置」页）</span>
+                    </span>
+                    <span id="quick-config-arrow" class="text-slate-400">▸</span>
+                </button>
+                <button type="button" onclick="openQcCustomize()"
+                    class="shrink-0 self-center mr-3 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300"
+                    title="选择本模式面板显示哪些参数（从全部配置中挑选）">✏️ 自定义</button>
+            </div>
             <div id="quick-config-panel" class="hidden px-4 pb-4">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">TTS 引擎</label>
-                        <select id="qc-tts_engine" onchange="onQuickInput('tts_engine', this.value)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                            <option value="kokoro">Kokoro (本地)</option>
-                            <option value="qwen">Qwen3-TTS (本地 GPU)</option>
-                            <option value="moss">MOSS-TTS-Nano (本地 CPU)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">对话英文语速</label>
-                        <input type="text" id="qc-tts_rate_en" oninput="onQuickInput('tts_rate_en', this.value)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                            placeholder="留空=模式默认，如 -15%">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">对话行数</label>
-                        <input type="number" id="qc-num_lines" oninput="onQuickInput('num_lines', this.value)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                            placeholder="留空=自动 (original:18, quest:48)">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">画面风格</label>
-                        <select id="qc-visual_style" onchange="onQuickInput('visual_style', this.value)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                            {% for v, l in style_options.items() %}
-                            <option value="{{ v }}">{{ l }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div data-qc-group="ch3">
-                        <label class="block text-xs text-slate-400 mb-1">Ch3 英文重复</label>
-                        <input type="number" min="0" max="10" id="qc-ch3_en_repeats"
-                            oninput="onQuickInput('ch3_en_repeats', this.value, 3)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
-                    </div>
-                    <div data-qc-group="ch3">
-                        <label class="block text-xs text-slate-400 mb-1">Ch3 中文重复</label>
-                        <input type="number" min="0" max="10" id="qc-ch3_zh_repeats"
-                            oninput="onQuickInput('ch3_zh_repeats', this.value, 1)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
-                    </div>
-                    <div data-qc-group="ch3">
-                        <label class="block text-xs text-slate-400 mb-1">Ch3 中文常显</label>
-                        <label class="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer">
-                            <input type="checkbox" id="qc-ch3_zh_always"
-                                onchange="onQuickInput('ch3_zh_always', this.checked)" class="accent-indigo-500 w-4 h-4">
-                            英文轮次显示中文
-                        </label>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Ch3 跟读间隔(秒)</label>
-                        <input type="number" step="0.1" min="0" id="qc-practice_duration"
-                            oninput="onQuickInput('practice_duration', this.value, 3)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">字幕字号</label>
-                        <input type="number" min="10" id="qc-subtitle_font_size"
-                            oninput="onQuickInput('subtitle_font_size', this.value, 60)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">中文字幕</label>
-                        <label class="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer">
-                            <input type="checkbox" id="qc-no_zh_subtitle"
-                                onchange="onQuickInput('no_zh_subtitle', this.checked)" class="accent-indigo-500 w-4 h-4">
-                            隐藏中文字幕
-                        </label>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">4K 超分</label>
-                        <label class="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer">
-                            <input type="checkbox" id="qc-no_4k"
-                                onchange="onQuickInput('no_4k', this.checked)" class="accent-indigo-500 w-4 h-4">
-                            跳过 4K
-                        </label>
-                    </div>
-                    <div data-qc-group="clip">
-                        <label class="block text-xs text-slate-400 mb-1">片段时长(秒)</label>
-                        <input type="number" min="4" max="15" id="qc-clip_duration"
-                            oninput="onQuickInput('clip_duration', this.value, 15)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
-                    </div>
-                    <div data-qc-group="clip">
-                        <label class="block text-xs text-slate-400 mb-1">片段并发</label>
-                        <input type="number" min="1" max="5" id="qc-clip_concurrency"
-                            oninput="onQuickInput('clip_concurrency', this.value, 4)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none">
-                    </div>
-                    <div data-qc-group="host">
-                        <label class="block text-xs text-slate-400 mb-1">主持人形象绑定</label>
-                        <select id="qc-host_character" onchange="onQuickInput('host_character', this.value)"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                            <option value="">独立主持人（新生成）</option>
-                            <option value="char_a">角色 A</option>
-                            <option value="char_b">角色 B</option>
-                        </select>
-                    </div>
-                    <div data-qc-group="hostbg">
-                        <label class="block text-xs text-slate-400 mb-1">主持人演播室背景</label>
-                        <select id="qc-host_bg_source" onchange="onQuickInput('host_bg_source', this.value); updateHostBgPreview()"
-                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
-                            <option value="">每期自动生成（按主题）</option>
-                        </select>
-                        <img id="qc-host_bg_preview" alt="主持人演播室背景预览"
-                            class="hidden mt-2 w-full max-h-40 object-contain rounded-lg border border-slate-700 bg-slate-900 cursor-zoom-in">
+                <div id="quick-config-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+            </div>
+        </div>
+
+        <!-- 常用配置自定义弹窗：勾选本模式面板显示的参数（清单每模式独立保存） -->
+        <div id="qc-customize-modal" class="hidden fixed inset-0 z-50 bg-black/70 items-center justify-center p-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-700">
+                    <h4 class="text-sm font-semibold text-white">✏️ 自定义常用配置
+                        <span class="text-xs text-slate-400 font-normal">（<span id="qc-modal-mode"></span> · 勾选显示在面板 · 新勾选追加在末尾）</span>
+                    </h4>
+                    <button type="button" onclick="closeQcCustomize()" class="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+                </div>
+                <div id="qc-modal-list" class="px-5 py-4 overflow-y-auto space-y-4"></div>
+                <div class="flex items-center justify-between px-5 py-3.5 border-t border-slate-700">
+                    <button type="button" onclick="resetQcFields()" class="text-xs text-slate-400 hover:text-slate-200">↺ 恢复默认清单</button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeQcCustomize()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">取消</button>
+                        <button type="button" onclick="saveQcFields()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white font-medium">✓ 保存</button>
                     </div>
                 </div>
             </div>
         </div>
+
 
         <!-- Script library source -->
         <div class="mb-4">
@@ -465,6 +382,11 @@ const MODE_CONFIGS = {{ mode_configs | tojson }};
 let ACTIVE_MODE = {{ active_mode | tojson }};
 const MODE_LABELS = {{ mode_labels | tojson }};
 
+// --- 常用配置面板数据：全参数规格 + 每模式字段清单（服务端 pages.py dashboard 注入） ---
+const QC_SPEC = {{ quick_spec | tojson }};
+const QC_FIELDS_MAP = {{ quick_fields_map | tojson }};
+const QC_GROUP_META = {{ quick_group_meta | tojson }};
+const QC_DEFAULT_FIELDS = {{ quick_default_fields | tojson }};
 // --- 模式 Tab 切换：每个模式独立记住快捷项 + 角色绑定 ---
 function applyModeTabStyles() {
     document.querySelectorAll('.mode-tab').forEach(b => {
@@ -489,48 +411,230 @@ function applyQuickFields() {
     applyQuickConfigFields();
 }
 
-// --- 常用配置面板：回显当前模式的常用参数，按模式显隐专属组 ---
-function applyQuickConfigFields() {
-    const cfg = MODE_CONFIGS[ACTIVE_MODE];
-    const setVal = (id, v) => {
-        const el = document.getElementById(id);
-        if (el) el.value = (v === undefined || v === null) ? '' : v;
-    };
-    const setChk = (id, v) => {
-        const el = document.getElementById(id);
-        if (el) el.checked = !!v;
-    };
-    setVal('qc-tts_engine', cfg.tts_engine || 'kokoro');
-    setVal('qc-tts_rate_en', cfg.tts_rate_en || '');
-    setVal('qc-num_lines', cfg.num_lines ?? '');
-    setVal('qc-visual_style', cfg.visual_style || 'pixar3d');
-    setVal('qc-practice_duration', cfg.practice_duration ?? 3);
-    setVal('qc-subtitle_font_size', cfg.subtitle_font_size ?? 60);
-    setChk('qc-no_zh_subtitle', cfg.no_zh_subtitle);
-    setChk('qc-no_4k', cfg.no_4k);
-    // Ch3 跟读组：quest 不适用，整组隐藏
-    const isQuest = ACTIVE_MODE === 'quest';
-    document.querySelectorAll('[data-qc-group="ch3"]').forEach(el => el.style.display = isQuest ? 'none' : '');
-    if (!isQuest) {
-        setVal('qc-ch3_en_repeats', cfg.ch3_en_repeats ?? 3);
-        setVal('qc-ch3_zh_repeats', cfg.ch3_zh_repeats ?? 1);
-        setChk('qc-ch3_zh_always', cfg.ch3_zh_always !== false);
+// --- 常用配置面板：按当前模式动态渲染字段（清单每模式独立，✏️ 自定义可挑选） ---
+const QC_FIELD_CLASSES = 'w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none';
+
+function qcEffective(key, mode) {
+    const spec = QC_SPEC[key];
+    return !!spec && (!spec.modes || spec.modes.includes(mode));
+}
+
+function qcFieldValue(key) {
+    const spec = QC_SPEC[key] || {};
+    let v = MODE_CONFIGS[ACTIVE_MODE][key];
+    if (v === undefined || v === null) v = spec.default;
+    return (v === undefined || v === null) ? '' : v;
+}
+
+// 清空回落默认值：整型默认转字符串（浮点 3.0 → "3"，避免输入框出现 "3.0"）
+function qcFallback(key) {
+    const d = (QC_SPEC[key] || {}).default;
+    return (typeof d === 'number' && Number.isInteger(d)) ? String(d) : d;
+}
+
+function qcBindValue(el, key) {
+    const spec = QC_SPEC[key];
+    if (spec.type === 'checkbox') {
+        el.onchange = function() { onQuickInput(key, this.checked); };
+    } else if (spec.type === 'select') {
+        el.onchange = function() { onQuickInput(key, this.value, qcFallback(key)); };
+    } else {
+        el.oninput = function() { onQuickInput(key, this.value, qcFallback(key)); };
     }
-    // 片段组：仅 original 走 Step 3 视频片段生成
-    const isOriginal = ACTIVE_MODE === 'original';
-    document.querySelectorAll('[data-qc-group="clip"]').forEach(el => el.style.display = isOriginal ? '' : 'none');
-    if (isOriginal) {
-        setVal('qc-clip_duration', cfg.clip_duration ?? 15);
-        setVal('qc-clip_concurrency', cfg.clip_concurrency ?? 4);
+}
+
+function qcBuildField(key) {
+    const spec = QC_SPEC[key];
+    const val = qcFieldValue(key);
+    const wrap = document.createElement('div');
+    if (spec.type === 'checkbox') {
+        const box = document.createElement('label');
+        box.className = 'flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white cursor-pointer';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = !!val;
+        input.className = 'accent-indigo-500 w-4 h-4';
+        const txt = document.createElement('span');
+        txt.textContent = spec.label;
+        if (spec.help) txt.title = spec.help;
+        box.appendChild(input);
+        box.appendChild(txt);
+        qcBindValue(input, key);
+        wrap.appendChild(box);
+        return wrap;
     }
-    // 主持人绑定：original_cutout + original_sprite（同族固定机位模式）
-    const isCutout = ['original_cutout', 'original_sprite'].includes(ACTIVE_MODE);
-    document.querySelectorAll('[data-qc-group="host"]').forEach(el => el.style.display = isCutout ? '' : 'none');
-    if (isCutout) setVal('qc-host_character', cfg.host_character || '');
-    // 主持人演播室背景：quest + cutout（选项由 refreshHostBgOptions 异步填充）
-    document.querySelectorAll('[data-qc-group="hostbg"]').forEach(el => el.style.display = (isQuest || isCutout) ? '' : 'none');
+    const label = document.createElement('label');
+    label.className = 'block text-xs text-slate-400 mb-1';
+    label.textContent = spec.label;
+    if (spec.help) label.title = spec.help;
+    wrap.appendChild(label);
+    let el;
+    if (spec.type === 'select') {
+        el = document.createElement('select');
+        const opts = spec.options || {};
+        const entries = Array.isArray(opts) ? opts.map(v => [v, v]) : Object.entries(opts);
+        entries.forEach(function(pair) {
+            const opt = document.createElement('option');
+            opt.value = pair[0];
+            opt.textContent = pair[1];
+            el.appendChild(opt);
+        });
+        // 当前值不在选项中时兜底显示，避免静默重置
+        if (val !== '' && val !== null && val !== undefined
+                && !Array.from(el.options).some(o => o.value === String(val))) {
+            const opt = document.createElement('option');
+            opt.value = String(val);
+            opt.textContent = String(val) + '（当前值，请重新选择）';
+            el.appendChild(opt);
+        }
+        el.value = String(val);
+    } else if (spec.type === 'textarea') {
+        el = document.createElement('textarea');
+        el.rows = 2;
+        el.className = QC_FIELD_CLASSES + ' font-mono';
+        el.value = val;
+    } else if (spec.type === 'number') {
+        el = document.createElement('input');
+        el.type = 'number';
+        el.step = 'any';
+        el.className = QC_FIELD_CLASSES;
+        el.value = val;
+    } else {
+        el = document.createElement('input');
+        el.type = (spec.type === 'password') ? 'password' : 'text';
+        el.className = QC_FIELD_CLASSES;
+        el.value = val;
+        if (spec.type === 'password') el.autocomplete = 'new-password';
+    }
+    qcBindValue(el, key);
+    wrap.appendChild(el);
+    return wrap;
+}
+
+// 固定尾块：主持人演播室背景（控制台专属键 host_bg_source，含动态下拉+预览；
+// 显隐沿用 host_bg_prompt 的模式标注 = quest/cutout 族）
+function qcBuildHostBg() {
+    const wrap = document.createElement('div');
+    const label = document.createElement('label');
+    label.className = 'block text-xs text-slate-400 mb-1';
+    label.textContent = '主持人演播室背景';
+    wrap.appendChild(label);
+    const sel = document.createElement('select');
+    sel.id = 'qc-host_bg_source';
+    sel.className = QC_FIELD_CLASSES;
+    sel.innerHTML = '<option value="">每期自动生成（按主题）</option>';
+    sel.onchange = function() { onQuickInput('host_bg_source', this.value); updateHostBgPreview(); };
+    wrap.appendChild(sel);
+    const img = document.createElement('img');
+    img.id = 'qc-host_bg_preview';
+    img.alt = '主持人演播室背景预览';
+    img.className = 'hidden mt-2 w-full max-h-40 object-contain rounded-lg border border-slate-700 bg-slate-900 cursor-zoom-in';
+    wrap.appendChild(img);
+    return wrap;
+}
+
+function renderQuickConfig() {
+    const grid = document.getElementById('quick-config-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const fields = (QC_FIELDS_MAP[ACTIVE_MODE] || []).filter(k => qcEffective(k, ACTIVE_MODE));
+    if (!fields.length) {
+        const empty = document.createElement('p');
+        empty.className = 'col-span-full text-xs text-slate-500 py-2';
+        empty.textContent = '未选择常用参数，点击「✏️ 自定义」添加';
+        grid.appendChild(empty);
+    }
+    fields.forEach(key => grid.appendChild(qcBuildField(key)));
+    if (qcEffective('host_bg_prompt', ACTIVE_MODE)) grid.appendChild(qcBuildHostBg());
     refreshHostBgOptions();
 }
+
+function applyQuickConfigFields() {
+    renderQuickConfig();
+}
+
+// --- 常用配置自定义弹窗：勾选本模式显示的参数，按 GROUP_META 分组、组内按声明序 ---
+function openQcCustomize() {
+    document.getElementById('qc-modal-mode').textContent = MODE_LABELS[ACTIVE_MODE] || ACTIVE_MODE;
+    const list = document.getElementById('qc-modal-list');
+    list.innerHTML = '';
+    const selected = new Set(QC_FIELDS_MAP[ACTIVE_MODE] || []);
+    const groups = {};
+    Object.keys(QC_SPEC).forEach(key => {
+        if (!qcEffective(key, ACTIVE_MODE)) return;
+        const g = QC_SPEC[key].group || '_other';
+        (groups[g] = groups[g] || []).push(key);
+    });
+    const order = Object.keys(QC_GROUP_META).sort((a, b) =>
+        ((QC_GROUP_META[a] || {}).order || 99) - ((QC_GROUP_META[b] || {}).order || 99));
+    if (groups._other) order.push('_other');
+    order.forEach(g => {
+        if (!groups[g]) return;
+        const meta = QC_GROUP_META[g] || { label: '其他', icon: '•' };
+        const sec = document.createElement('div');
+        const head = document.createElement('div');
+        head.className = 'text-xs font-semibold text-slate-300 mb-2';
+        head.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.label;
+        sec.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-2';
+        groups[g].forEach(key => {
+            const spec = QC_SPEC[key];
+            const lab = document.createElement('label');
+            lab.className = 'flex items-start gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 cursor-pointer';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'accent-indigo-500 w-4 h-4 mt-0.5 shrink-0';
+            cb.setAttribute('data-qc-pick', key);
+            cb.checked = selected.has(key);
+            const txt = document.createElement('span');
+            txt.className = 'text-xs text-slate-300';
+            txt.textContent = spec.label;
+            if (spec.help) txt.title = spec.help;
+            lab.appendChild(cb);
+            lab.appendChild(txt);
+            grid.appendChild(lab);
+        });
+        sec.appendChild(grid);
+        list.appendChild(sec);
+    });
+    const modal = document.getElementById('qc-customize-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeQcCustomize() {
+    const modal = document.getElementById('qc-customize-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+// 保存勾选：原清单中仍勾选的保持原顺序在前，新勾选按声明序追加
+function _qcPickedFields() {
+    const picked = Array.from(document.querySelectorAll('#qc-modal-list input[data-qc-pick]:checked'))
+        .map(el => el.getAttribute('data-qc-pick'));
+    const kept = (QC_FIELDS_MAP[ACTIVE_MODE] || []).filter(k => picked.includes(k));
+    return kept.concat(picked.filter(k => !kept.includes(k)));
+}
+
+function _qcSaveFields(fields, reopen) {
+    fetch('/api/quick_config/fields', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mode: ACTIVE_MODE, fields: fields})
+    }).then(r => r.json()).then(data => {
+        if (data.ok) {
+            QC_FIELDS_MAP[ACTIVE_MODE] = data.fields || fields;
+            renderQuickConfig();
+        }
+        if (reopen) openQcCustomize();
+        else closeQcCustomize();
+    }).catch(() => {});
+}
+
+function saveQcFields() { _qcSaveFields(_qcPickedFields(), false); }
+function resetQcFields() { _qcSaveFields(QC_DEFAULT_FIELDS, true); }
+
 
 // 折叠面板展开/收起（默认收起，localStorage 记住状态）
 function toggleQuickConfig(force) {

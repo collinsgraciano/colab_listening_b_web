@@ -405,6 +405,76 @@ GROUP_META = {
 }
 
 
+# --- 控制台「常用配置」面板自定义字段 ---
+# 每模式独立一份字段清单（列表顺序 = 面板显示顺序）。存独立文件而非 mode_*.json：
+# /api/config/save_all 会整文件覆盖模式配置，清单放那里会被配置页保存清掉。
+QUICK_CONFIG_PATH = CONFIGS_DIR / "quick_config.json"
+DEFAULT_QUICK_FIELDS = [
+    "tts_engine", "tts_rate_en", "num_lines", "visual_style",
+    "ch3_en_repeats", "ch3_zh_repeats", "ch3_zh_always",
+    "practice_duration", "subtitle_font_size", "no_zh_subtitle",
+    "no_4k", "clip_duration", "clip_concurrency", "host_character",
+]
+# 面板上方快捷区已固定显示的键（structure 由模式标签决定），不允许重复挑选
+EXCLUDED_QUICK_KEYS = {"structure", "topic", "cefr", "animation"}
+
+
+def _valid_quick_fields(fields: Any) -> list[str]:
+    """校验字段清单：仅保留 PARAM_SPEC 内且未被排除的键，去重保序。"""
+    seen: set[str] = set()
+    result: list[str] = []
+    for key in fields if isinstance(fields, list) else []:
+        if (isinstance(key, str) and key in PARAM_SPEC
+                and key not in EXCLUDED_QUICK_KEYS and key not in seen):
+            seen.add(key)
+            result.append(key)
+    return result
+
+
+def _read_quick_config() -> dict[str, list[str]]:
+    if not QUICK_CONFIG_PATH.exists():
+        return {}
+    try:
+        data = json.loads(QUICK_CONFIG_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    modes = data.get("modes") if isinstance(data, dict) else None
+    if not isinstance(modes, dict):
+        return {}
+    return {m: _valid_quick_fields(fields)
+            for m, fields in modes.items() if m in MODES}
+
+
+def load_quick_fields(mode: str) -> list[str]:
+    """某模式的常用配置字段清单（缺文件/缺模式回默认清单；渲染时再按模式过滤生效性）。"""
+    if mode not in MODES:
+        raise ValueError(f"未知模式: {mode}")
+    saved = _read_quick_config().get(mode)
+    return list(saved) if saved is not None else list(DEFAULT_QUICK_FIELDS)
+
+
+def load_all_quick_fields() -> dict[str, list[str]]:
+    """全部模式的字段清单（控制台前端切模式不刷新页面，需一次带全）。"""
+    saved = _read_quick_config()
+    return {m: list(saved[m]) if m in saved else list(DEFAULT_QUICK_FIELDS)
+            for m in MODES}
+
+
+def save_quick_fields(mode: str, fields: list[str]) -> list[str]:
+    """保存某模式字段清单（校验+去重保序+原子写），返回生效清单。"""
+    if mode not in MODES:
+        raise ValueError(f"未知模式: {mode}")
+    valid = _valid_quick_fields(fields)
+    data = _read_quick_config()
+    data[mode] = valid
+    QUICK_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = QUICK_CONFIG_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({"modes": data}, ensure_ascii=False, indent=2),
+                   encoding="utf-8")
+    os.replace(tmp, QUICK_CONFIG_PATH)
+    return valid
+
+
 # --- Per-mode config storage ---
 # 每种视频结构模式各一份完整独立配置，切换互不覆盖。
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。

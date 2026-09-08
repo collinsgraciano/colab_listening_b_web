@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from ..config_manager import (
     MODES, MODE_LABELS,
+    DEFAULT_QUICK_FIELDS, load_quick_fields, save_quick_fields,
     load_config, load_mode_config, save_mode_config, load_all_mode_configs,
     get_active_mode, set_active_mode,
     get_default_config,
@@ -95,3 +96,22 @@ async def api_delete_preset(name: str):
 @router.get("/api/config/presets")
 async def api_list_presets():
     return {"presets": list_presets()}
+
+
+# --- 控制台「常用配置」面板字段清单（每模式独立） ---
+
+@router.get("/api/quick_config/fields")
+async def api_get_quick_fields(mode: str = ""):
+    m = mode if mode in MODES else get_active_mode()
+    return {"mode": m, "fields": load_quick_fields(m),
+            "defaults": DEFAULT_QUICK_FIELDS}
+
+
+@router.post("/api/quick_config/fields")
+async def api_save_quick_fields(request: Request):
+    data = await request.json()
+    mode = data.get("mode", "") or get_active_mode()
+    if mode not in MODES:
+        return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
+    fields = save_quick_fields(mode, data.get("fields", []))
+    return {"ok": True, "mode": mode, "fields": fields}

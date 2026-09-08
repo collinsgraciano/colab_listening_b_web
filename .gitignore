@@ -29,6 +29,9 @@ configs/style_previews/
 # Batch queue runtime state (console batch video generation)
 configs/batch_queue.json
 
+# Quick-config panel field selection per mode (console user preference)
+configs/quick_config.json
+
 # Pipeline run outputs
 output/
 
