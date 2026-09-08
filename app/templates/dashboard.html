@@ -247,9 +247,11 @@
         <!-- Character Library -->
         <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
-                <label class="block text-xs text-slate-400">人物素材库 <span class="text-slate-500">—「分配」绑定到上方角色位（复用图片+描述+性别，一个角色位一个角色）</span></label>
+                <label class="block text-xs text-slate-400">人物素材库 <span class="text-slate-500">—「分配」绑定到上方角色位（复用图片+描述+性别，一个角色位一个角色）</span> <span id="lib-count" class="text-xs text-slate-500"></span></label>
                 <button onclick="loadLibrary()" class="text-xs text-slate-400 hover:text-slate-200">🔄 刷新</button>
             </div>
+            <!-- 角色列表类型筛选（自动分类：按素材形态从现有字段推导，与人物素材库页一致） -->
+            <div id="lib-type-tabs" class="flex flex-wrap gap-2 mb-3"></div>
             <div id="library-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 <p class="text-xs text-slate-500 col-span-full">加载中...</p>
             </div>
@@ -1225,6 +1227,47 @@ let _libraryChars = [];
 // 角色位 → 素材库角色绑定 {char_a: "lib_id", ...}，持久化到 config.character_library
 let _libAssignments = {};
 
+// --- 角色列表类型筛选（自动分类：按素材形态从现有字段推导，与人物素材库页一致，无手动字段） ---
+let _libFilter = 'all';
+
+const LIB_TYPE_DEFS = [
+    {key: 'all',        label: '全部'},
+    {key: 'full',       label: '完整角色'},
+    {key: 'clips',      label: '序列帧角色'},
+    {key: 'desc_only',  label: '仅描述'},
+    {key: 'voice_only', label: '仅音色+性别'},
+];
+
+function libCharMatchesFilter(char, key) {
+    if (key === 'all') return true;
+    if (key === 'voice_only') return !char.description;
+    // 仅描述：有描述但既无图也无序列帧（AI 生成后未生图的描述卡）
+    if (key === 'desc_only') return !!char.description && !char.image_url && !char.clip_count;
+    // full 与 clips 可叠加：有图又有帧的角色同时出现在两个标签下
+    if (key === 'full') return !!char.image_url;
+    if (key === 'clips') return !!char.clip_count;
+    return true;
+}
+
+function renderLibTypeTabs() {
+    const bar = document.getElementById('lib-type-tabs');
+    if (!bar) return;
+    bar.innerHTML = LIB_TYPE_DEFS.map(def => {
+        const n = _libraryChars.filter(c => libCharMatchesFilter(c, def.key)).length;
+        const active = _libFilter === def.key;
+        const cls = active ? 'bg-indigo-600 text-white'
+                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600';
+        return `<button onclick="setLibTypeFilter('${def.key}')"
+            class="px-3 py-1 rounded-full text-xs ${cls}">
+            ${def.label} <span class="${active ? 'text-indigo-200' : 'text-slate-500'}">${n}</span></button>`;
+    }).join('');
+}
+
+function setLibTypeFilter(key) {
+    _libFilter = key;
+    renderLibrary();
+}
+
 function parseLibAssignments() {
     _libAssignments = {};
     try {
@@ -1287,16 +1330,25 @@ function loadLibrary() {
 }
 
 function renderLibrary() {
+    renderLibTypeTabs();
     const grid = document.getElementById('library-grid');
     grid.innerHTML = '';
+
+    const shown = _libraryChars.filter(c => libCharMatchesFilter(c, _libFilter));
+    document.getElementById('lib-count').textContent =
+        _libFilter === 'all' ? `(${shown.length})` : `(${shown.length}/${_libraryChars.length})`;
 
     if (!_libraryChars.length) {
         grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">素材库为空。从上方角色卡片点击「💾 收藏」保存角色</p>';
         return;
     }
+    if (!shown.length) {
+        grid.innerHTML = '<p class="text-xs text-slate-500 col-span-full">该分类下暂无角色。</p>';
+        return;
+    }
 
     const charKeys = getCharKeys();
-    _libraryChars.forEach(char => {
+    shown.forEach(char => {
         const voiceOnly = !char.description;
         const card = document.createElement('div');
         card.className = 'bg-slate-900/50 border border-slate-700 rounded-lg p-2 flex flex-col items-center gap-1.5';
