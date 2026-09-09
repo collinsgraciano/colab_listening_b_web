@@ -16,7 +16,8 @@ from style_manager import DEFAULT_STYLE_PROMPT
 import sensenova_image
 
 
-def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
+def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True,
+                       is_story=False):
     """Check if Step 2 can be resumed from existing files. Returns (tts_results, image_urls) or None.
 
     include_zh=False（ch3_zh_repeats=0，本次运行有意跳过中文音频）时不要求
@@ -41,6 +42,9 @@ def check_step2_resume(checkpoint, script, dirs, n, is_quest, include_zh=True):
     struct_val = checkpoint.get("structure", "")
     if struct_val == "original_cutout":
         narration_names = ["welcome", "hook", "outro", "practice_intro"]
+    elif is_story:
+        # story 冷开场：无任何旁白音频（welcome/hook/outro 由对话行承担）
+        narration_names = []
     elif is_quest:
         narration_names = ["welcome", "hook", "outro"]
     else:
@@ -367,6 +371,12 @@ def generate_quest_atlases(script, img_dir, tts_thread, max_workers=4,
         ("char_c", script.get("char_c_description", "friendly staff member"), 8),
         ("host", script.get("host_description", "friendly young woman with short brown hair, wearing a smart blue blazer, warm smile, professional TV host appearance"), 8),
     ]
+    # story 扩展角色（char_d 家人/char_e 嘉宾）：仅当脚本携带描述时纳入 ——
+    # quest/cutout 脚本无这些字段，行为逐字节不变
+    for _ck in ("char_d", "char_e"):
+        _desc = str(script.get(f"{_ck}_description", "")).strip()
+        if _desc:
+            all_chars.append((_ck, _desc, 8))
     chars = [c for c in all_chars if char_keys is None or c[0] in char_keys]
 
     # Generate atlases directly from text (no separate ref images needed)

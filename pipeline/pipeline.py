@@ -86,7 +86,8 @@ def _get_style_prompt(args) -> str:
 # ---------------------------------------------------------------------------
 
 def _validate_script(script: dict, num_lines: int,
-                     quest: bool = False) -> tuple[bool, str]:
+                     quest: bool = False,
+                     story: bool = False) -> tuple[bool, str]:
     """Validate a generated script. Returns (is_valid, error_message)."""
     dialogue = script.get("dialogue", [])
     if len(dialogue) < num_lines:
@@ -97,11 +98,34 @@ def _validate_script(script: dict, num_lines: int,
             return False, f"Dialogue line {i} has empty 'text'"
         if not line.get("zh", "").strip():
             return False, f"Dialogue line {i} has empty 'zh'"
-        if not quest and not line.get("phonetic", "").strip():
+        if not quest and not story and not line.get("phonetic", "").strip():
             return False, f"Dialogue line {i} has empty 'phonetic'"
         if not line.get("speaker", ""):
             return False, f"Dialogue line {i} has empty 'speaker'"
-    if quest:
+    if story:
+        if not script.get("listening_question_en", "").strip():
+            return False, "Story script has empty 'listening_question_en'"
+        allowed = ("char_a", "char_b", "char_c", "char_d", "char_e")
+        try:
+            from story.quality_gate_story import PHASES as _STORY_PHASES, STORY_KINDS as _KINDS
+        except ImportError:
+            from quality_gate_story import PHASES as _STORY_PHASES, STORY_KINDS as _KINDS
+        kind = str(script.get("story_kind", "plot")).strip().lower()
+        if kind not in _KINDS:
+            return False, f"Story script has unknown story_kind '{kind}'"
+        order = {ph: i for i, ph in enumerate(_STORY_PHASES[kind])}
+        phases = [line.get("phase", "") for line in dialogue]
+        if any(p not in order for p in phases):
+            return False, f"Story dialogue has unknown phase (kind={kind})"
+        seq = [order[p] for p in phases]
+        if any(b < a for a, b in zip(seq, seq[1:])):
+            return False, f"Story dialogue phases are out of order (kind={kind})"
+        for i, line in enumerate(dialogue):
+            if line.get("speaker", "") not in allowed:
+                return False, f"Dialogue line {i} speaker must be one of {allowed}, got '{line.get('speaker', '')}'"
+        if str(script.get("welcome_en", "")).strip() or str(script.get("outro", "")).strip():
+            return False, "Story script must have empty welcome_en/outro (cold open)"
+    elif quest:
         if not script.get("listening_question_en", "").strip():
             return False, "Quest script has empty 'listening_question_en'"
         if not script.get("hook_intro_en", "").strip():
@@ -136,12 +160,18 @@ def _validate_script(script: dict, num_lines: int,
 
 def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                                 quest=False, structure="original",
+                                story=False, family_file=None,
                                 max_attempts=5) -> dict:
     """Generate and validate script, retrying on failure."""
     for attempt in range(max_attempts):
         try:
             print(f"  [Script] Attempt {attempt+1}/{max_attempts}...")
-            if quest:
+            if story:
+                from story.llm_client_story import generate_story_script
+                script = generate_story_script(topic, cefr, lessons_dir=lessons_dir,
+                                               num_lines=num_lines,
+                                               family_file=family_file)
+            elif quest:
                 from quest.llm_client_quest import generate_quest_script
                 script = generate_quest_script(topic, cefr, lessons_dir=lessons_dir,
                                                num_lines=num_lines)
@@ -149,7 +179,8 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                 script = generate_listening_script(topic, cefr, lessons_dir=lessons_dir,
                                                    num_lines=num_lines,
                                                    structure=structure)
-            valid, msg = _validate_script(script, num_lines, quest=quest)
+            valid, msg = _validate_script(script, num_lines, quest=quest,
+                                          story=story)
             if valid:
                 print(f"  [Script] Valid: {len(script['dialogue'])} lines")
                 return script
@@ -200,7 +231,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--lessons-dir", default=None, help="Lessons dir for anti-duplicate check")
     parser.add_argument("--topics-file", default=str(Path(__file__).parent / "topics.json"), help="Path to topics.json")
     parser.add_argument("--used-topics-file", default=None, help="Path to used_topics.json (default: <output>/used_topics.json — persists on Drive across Colab sessions)")
-    parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48)")
+    parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48; story mode: 150)")
+    parser.add_argument("--family-file", default=None, help="story 模式：家庭角色设定 JSON 文件路径（缺省读 STORY_FAMILY_JSON env，再回退内置默认家庭）")
     parser.add_argument("--max-line-words", type=int, default=None, help="Max words per dialogue line / narration sentence (default 10) so on-screen subtitles never exceed 2 lines")
     parser.add_argument("--script-style-boost", action="store_true",
                         help="Script quality boost A: few-shot style examples + random plot devices + tension requirements + cliche ban list (default off)")
@@ -223,8 +255,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--openai-api-key", default=None, help="OpenAI-compatible API key (or set OPENAI_API_KEY env var)")
     parser.add_argument("--openai-model", default=None, help="OpenAI-compatible model name (default: grok-4.6). Available: grok-4.6, grok-4.5, gemini-3.1-pro-preview, gemini-3.7-flash, claude-sonnet-5, gemini-2.5-pro-1m")
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
-    parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout"],
-                        help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation)")
+    parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout", "story"],
+                        help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation), 'story' (同款家庭故事：冷开场剧情/双人对话/独白，无主持人无跟读)")
     parser.add_argument("--host-character", default="", choices=["", "char_a", "char_b"],
                         help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
     parser.add_argument("--host-bg-prompt", default="",
@@ -416,13 +448,28 @@ def _quick_test_copy_materials(src: Path, work_dir: Path, args) -> list:
     return copied
 
 
+def _story_present_chars(script: dict) -> list[str]:
+    """story 模式：本集实际出场的角色键（图集只为出场角色生成）。"""
+    keys = [k for k in ("char_a", "char_b", "char_c", "char_d")
+            if str(script.get(f"{k}_description", "")).strip()]
+    if script.get("has_guest") and str(script.get("char_e_description", "")).strip():
+        keys.append("char_e")
+    return keys or ["char_a"]
+
+
 def _quick_test_fill_placeholders(args, script, img_dir: Path) -> int:
     """按模式为缺失的期望图片生成深灰黑占位（已存在不覆盖）。返回补建数量。"""
     from PIL import Image
 
     structure = args.structure
+    is_story = (getattr(args, "mode_name", "") == "story")
     names = []
-    if structure in ("quest", "original_cutout"):
+    if is_story:
+        for ck in _story_present_chars(script):
+            names += [f"pose_{ck}_{i}.png" for i in range(8)]
+        names += ["scene_0.png"]
+        names += [f"scene_{i}.png" for i in range(12)]
+    elif structure in ("quest", "original_cutout"):
         pose_chars = (["char_a", "char_b", "char_c", "host"]
                       if structure == "quest"
                       else ["char_a", "char_b"]
@@ -588,7 +635,8 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
         if qt_src is not None:
             # 快速测试：脚本复用源运行，运行目录沿用其标题（冲突加 _qt 后缀）
             script = json.loads((qt_src / "script.json").read_text(encoding="utf-8"))
-            script["structure"] = args.structure
+            script["structure"] = ("story" if getattr(args, "mode_name", "") == "story"
+                                   else args.structure)
             yt_title = script.get("youtube_title", script.get("title", topic))
             safe_title = _safe_dirname(yt_title, topic)
             work_dir = parent_dir / safe_title
@@ -599,7 +647,8 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
             script_path = work_dir / "script.json"
             for d in dirs.values():
                 d.mkdir(parents=True, exist_ok=True)
-            script["structure"] = args.structure
+            script["structure"] = ("story" if getattr(args, "mode_name", "") == "story"
+                                   else args.structure)
             script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
             _save_checkpoint(work_dir, "step0_script", topic=topic, cefr=args.cefr,
                              structure=args.structure, animation=args.animation,
@@ -612,7 +661,9 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
             script = _generate_script_with_retry(
                 topic, args.cefr, args.lessons_dir, args.num_lines,
                 quest=(args.structure == "quest"),
-                structure=(args.structure if args.structure != "quest" else "original"))
+                structure=(args.structure if args.structure != "quest" else "original"),
+                story=(getattr(args, "mode_name", "") == "story"),
+                family_file=getattr(args, "family_file", None))
             yt_title = script.get("youtube_title", script.get("title", topic))
             safe_title = _safe_dirname(yt_title, topic)
             work_dir = parent_dir / safe_title
@@ -622,7 +673,8 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
             for d in dirs.values():
                 d.mkdir(parents=True, exist_ok=True)
             qa_report = script.pop("_qa", None)
-            script["structure"] = args.structure
+            script["structure"] = ("story" if getattr(args, "mode_name", "") == "story"
+                                   else args.structure)
             script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
             if qa_report:
                 qa_path = work_dir / "qa_report.json"
@@ -687,6 +739,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     is_original_static = (args.structure == "original_static")
     is_quest = (args.structure == "quest")
     is_original_cutout = (args.structure == "original_cutout")
+    # story 族归一后 structure=="quest"，模式身份在 args.mode_name
+    is_story = (getattr(args, "mode_name", "") == "story")
     # ch3_zh_repeats=0 时时间轴无 listen_zh 段，中文音频无需生成
     include_zh = (not is_quest) and getattr(args, "ch3_zh_repeats", 1) > 0
     img_dir, audio_dir, clips_dir = dirs["images"], dirs["audio"], dirs["clips"]
@@ -705,7 +759,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         script["host_character"] = getattr(args, "host_character", "") or ""
 
     image_prompts = []
-    if not is_quest and not is_original_cutout:
+    if is_story:
+        # story：画面 = 姿势图集（按出场角色）+ 多场景 atlas；无 char_scene/host_bg
+        pass
+    elif not is_quest and not is_original_cutout:
         image_prompts.append(
             (f"Character design sheet, {char_a_desc} on the left, {char_b_desc} on the right, plain white background, full body, front view, {style_prompt}, no text, no background, 16:9", "char_scene.png"))
         image_prompts.append(
@@ -749,7 +806,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
 
     # --- Resume check ---
     resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest,
-                                        include_zh=include_zh)
+                                        include_zh=include_zh, is_story=is_story)
     tts_thread = None
     if resume_result is not None:
         tts_results, image_urls = resume_result
@@ -799,13 +856,21 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                     max_workers=args.image_concurrency,
                     style_prompt=style_prompt)
             elif is_quest:
-                _generate_quest_atlases(script, img_dir, tts_thread,
-                                        max_workers=args.image_concurrency,
-                                        style_prompt=style_prompt)
-                if getattr(args, "animation", "") == "sprite_sequence":
-                    _generate_sprite_clips_for(args, script, img_dir, tts_thread,
-                                               style_prompt, char_keys=None,
-                                               stop_check=stop_check)
+                if is_story:
+                    # story：仅为出场角色生成姿势图集（已存在文件自动跳过 → 配合
+                    # 角色绑定跨集零积分）；无 sprite 序列帧分支
+                    _generate_quest_atlases(script, img_dir, tts_thread,
+                                            max_workers=args.image_concurrency,
+                                            style_prompt=style_prompt,
+                                            char_keys=_story_present_chars(script))
+                else:
+                    _generate_quest_atlases(script, img_dir, tts_thread,
+                                            max_workers=args.image_concurrency,
+                                            style_prompt=style_prompt)
+                    if getattr(args, "animation", "") == "sprite_sequence":
+                        _generate_sprite_clips_for(args, script, img_dir, tts_thread,
+                                                   style_prompt, char_keys=None,
+                                                   stop_check=stop_check)
                 _scene_images = script.get("scene_images", [])
                 _generate_scene_atlas(_scene_images, scene, img_dir, tts_thread,
                                        style_prompt=style_prompt)
@@ -1083,6 +1148,10 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
         char_scene_cdn = ctx["image_urls"].get("pose_char_a_0.png", "")
     else:
         char_scene_cdn = ctx["image_urls"].get("char_scene.png", "")
+    # 缩略图/章节生成感知真实模式（story 族归一后 args.structure=="quest"，
+    # 但缩略图 prompt 与章节标签需要 story 专属分支）
+    thumb_structure = ("story" if getattr(args, "mode_name", "") == "story"
+                       else args.structure)
     if args.no_thumbnail or getattr(args, "quick_test", False):
         _skip_why = ("no_thumbnail" if args.no_thumbnail else "quick_test")
         print(f"  [Thumbnail] 跳过缩略图生成（{_skip_why}）——仅生成 YouTube 元数据")
@@ -1095,14 +1164,14 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
             mcp_parse_task_id=parse_task_id,
             mcp_poll_task=poll_task,
             mcp_download_file=download_file,
-            structure=args.structure,
+            structure=thumb_structure,
             char_scene_url=char_scene_cdn,
         )
     save_youtube_metadata(
         script=script,
         timeline=timeline,
         output_path=yt_meta_path,
-        structure=args.structure,
+        structure=thumb_structure,
     )
     _save_checkpoint(work_dir, "step4.5_thumbnail")
 
@@ -1147,7 +1216,11 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
         from quest.video_compose_quest import compose_quest
         # Build per-character pose map (all chars: 8 poses each)
         char_pose_map = {}
-        for ck in ("char_a", "char_b", "char_c"):
+        # story：收集扩展角色（char_d 家人 / char_e 嘉宾；缺席文件自动跳过）
+        _pose_chars = (("char_a", "char_b", "char_c", "char_d", "char_e")
+                       if getattr(args, "mode_name", "") == "story"
+                       else ("char_a", "char_b", "char_c"))
+        for ck in _pose_chars:
             poses = [str(dirs["images"] / f"pose_{ck}_{j}.png") for j in range(8)]
             if all(os.path.exists(p) for p in poses):
                 char_pose_map[ck] = poses
@@ -1483,9 +1556,15 @@ def main():
 
     # Per-structure defaults (explicit CLI values win)
     if args.num_lines is None:
-        args.num_lines = 48 if args.structure == "quest" else 18
+        if args.structure == "quest":
+            args.num_lines = 48
+        elif args.structure == "story":
+            args.num_lines = 150
+        else:
+            args.num_lines = 18
     if args.pad is None:
-        args.pad = 0.4
+        # story 对话节奏比 quest 快（同款字幕自然衔接，无长思考停顿）
+        args.pad = 1.0 if args.structure == "story" else 0.4
 
     # Ch3 跟读次数：clamp 到 0-10，防止误填导致视频长度失控
     args.ch3_en_repeats = max(0, min(10, int(args.ch3_en_repeats)))
@@ -1499,6 +1578,11 @@ def main():
     # 序列帧新模式：行为族归一（107 处结构分支零改动），模式身份保留在 args.mode_name
     # （输出目录 / 配置按新模式名分文件夹；checkpoint structure 存族名）
     args.mode_name = args.structure
+    if args.structure == "story":
+        # story 族归一：渲染/TTS/时间轴走 quest 分支；模式身份存 args.mode_name
+        # （输出目录 output/story/、配置按 story 分文件夹；checkpoint 存族名 quest）
+        args.animation = "stop_motion"
+        args.structure = "quest"
     if args.structure in ("original_sprite", "quest_sprite"):
         args.animation = "sprite_sequence"
         args.structure = ("quest" if args.structure == "quest_sprite"

@@ -744,6 +744,12 @@ def gender_default_ranks(script: dict) -> dict[str, int]:
         gender = (script.get(f"{key}_gender") or fallback).lower()
         bound = bool((script.get(f"{key}_kokoro_voice") or "").strip())
         entries.append((key, gender, bound))
+    # story 扩展角色：仅当脚本声明其性别时参与同性别分组（不影响旧模式 ranks）
+    for key in ("char_d", "char_e"):
+        gender = (script.get(f"{key}_gender") or "").lower()
+        if gender in ("male", "female"):
+            bound = bool((script.get(f"{key}_kokoro_voice") or "").strip())
+            entries.append((key, gender, bound))
     return _same_gender_ranks(entries)
 
 
@@ -762,11 +768,11 @@ def build_voice_map(script: dict, structure: str | None = None) -> dict:
                                       KOKORO_VOICE_DEFAULTS)
     ranks = gender_default_ranks(script)
     voice_map = {}
-    for key in ["char_a", "char_b", "char_c", "host"]:
+    for key in ["char_a", "char_b", "char_c", "char_d", "char_e", "host"]:
         bound = script.get(f"{key}_kokoro_voice", "").strip()
         if bound:
             voice_map[key] = bound
-    for key in ["char_a", "char_b", "char_c"]:
+    for key in ["char_a", "char_b", "char_c", "char_d", "char_e"]:
         if key in voice_map:
             continue
         fallback = {"char_a": "male", "char_b": "female"}.get(key, "")

@@ -387,7 +387,7 @@ def build_moss_voice_map(script: dict, structure: str | None = None) -> dict:
                                       MOSS_VOICE_DEFAULTS)
     ranks = gender_default_ranks(script)
     voice_map = {}
-    for key in ["char_a", "char_b", "char_c", "host"]:
+    for key in ["char_a", "char_b", "char_c", "char_d", "char_e", "host"]:
         # Priority 1: moss_voice from script (set by library binding)
         voice = script.get(f"{key}_moss_voice", "")
         if voice:

@@ -69,7 +69,9 @@ def _build_thumbnail_prompt(script: dict, structure: str) -> str:
     ])
     icon_lines = "  ".join(f"{i['zh']} {i['en']}" for i in icons[:5])
 
-    if structure == "quest":
+    if structure == "story":
+        top_center = "英文聽力故事"
+    elif structure == "quest":
         top_center = "慢速英文聽力"
     else:
         top_center = "沉浸式英文動畫"
@@ -273,7 +275,9 @@ def _pillow_fallback(script: dict, scene_img: str, output_path: str,
               cefr, font=bfont, fill=(255, 255, 255, 255))
 
     # Bottom bar
-    if structure == "quest":
+    if structure == "story":
+        label = "English Listening Story"
+    elif structure == "quest":
         label = "Slow Listening + Answer Task"
     else:
         label = "Listen + Repeat + Shadowing"
@@ -321,6 +325,16 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
     # YouTube chapter rules: the first chapter MUST start at 00:00 and every
     # chapter must span >= 10 seconds — candidates starting less than 10s
     # after the previously kept one are dropped (e.g. quest's short hook_intro).
+    # story 章节：按对话 phase 首次出现切章（时间轴纯对话，seg.type 无区分度）
+    STORY_CHAPTER_LABELS = {
+        "plot": {"opening": "Opening", "setup": "Daily Life",
+                 "conflict": "Trouble", "twist": "Twist",
+                 "resolution": "Resolution", "finale": "Your Question"},
+        "chat": {"opening": "Opening", "activity": "Main Activity",
+                 "finale": "Your Question"},
+        "solo": {"opening": "Introduction", "body": "Main Content",
+                 "finale": "Your Question"},
+    }
     if structure == "quest":
         seg_labels = {
             "welcome": "Welcome",
@@ -328,6 +342,8 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
             "dialogue": "Slow Dialogue",
             "outro": "Outro · Answer & CTA",
         }
+    elif structure == "story":
+        seg_labels = {}
     else:
         seg_labels = {
             "welcome": "Welcome & Hook",
@@ -339,9 +355,17 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
     marks: list[tuple[float, str]] = []
     seen_types: set[str] = set()
     t_cursor = 0.0
+    story_phase_labels = STORY_CHAPTER_LABELS.get(
+        str(script.get("story_kind", "plot")), STORY_CHAPTER_LABELS["plot"])
     for seg in timeline:
         seg_type = seg.get("type", "")
-        if seg_type in seg_labels and seg_type not in seen_types:
+        if structure == "story":
+            # phase 首次出现即章节（opening 位于 00:00，天然满足首章规则）
+            ph = seg.get("phase", "")
+            if ph in story_phase_labels and ph not in seen_types:
+                seen_types.add(ph)
+                marks.append((t_cursor, story_phase_labels[ph]))
+        elif seg_type in seg_labels and seg_type not in seen_types:
             seen_types.add(seg_type)
             marks.append((t_cursor, seg_labels[seg_type]))
         t_cursor += seg.get("duration", 0)

@@ -249,7 +249,7 @@ def build_qwen_voice_map(script: dict, structure: str | None = None) -> dict:
     ranks = gender_default_ranks(script)
 
     voice_map = {}
-    for key in ["char_a", "char_b", "char_c", "host"]:
+    for key in ["char_a", "char_b", "char_c", "char_d", "char_e", "host"]:
         # Priority 1: qwen_speaker from script (set by library binding)
         speaker = script.get(f"{key}_qwen_speaker", "")
         if speaker:
