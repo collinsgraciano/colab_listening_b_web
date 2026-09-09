@@ -1279,12 +1279,14 @@ def generate_story_script(topic: str, cefr: str = "A2",
                           lessons_dir: str = None,
                           num_lines: int = 150,
                           family: dict | None = None,
+                          family_file: str | None = None,
                           story_kind: str = "") -> dict:
     """Generate a story-mode script via multi-round LLM calls (Phase A-E).
 
     Args:
         family: 家庭角色设定 dict（pipeline 传入）；None 时读
-            STORY_FAMILY_JSON env，再回退内置默认（Watson 一家）。
+            STORY_FAMILY_JSON env → family_file → 共享文件 → 内置默认。
+        family_file: 家庭设定 JSON 文件路径（CLI --family-file）。
         story_kind: plot|chat|solo；空串读 STORY_KIND env，再回退 plot。
     """
     kind = (story_kind or _env_get("STORY_KIND", "") or "plot").strip().lower()
@@ -1292,7 +1294,7 @@ def generate_story_script(topic: str, cefr: str = "A2",
         print(f"  [LLM] WARNING: unknown story_kind '{kind}', fallback to plot")
         kind = "plot"
     if family is None:
-        family = load_story_family()
+        family = load_story_family(family_file)
     if num_lines < len(PHASES[kind]) * 2:
         num_lines = len(PHASES[kind]) * 2
 
