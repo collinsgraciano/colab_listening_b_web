@@ -704,7 +704,7 @@ function renderEditor() {
     document.getElementById('ed-title').textContent = `脚本编辑 — ${doc.topic}`;
 
     const charKeys = [];
-    for (const k of ['char_a', 'char_b', 'char_c', 'host']) {
+    for (const k of ['char_a', 'char_b', 'char_c', 'char_d', 'char_e', 'host']) {
         if ((s[k + '_description'] !== undefined)) charKeys.push(k);
     }
     const speakerOpts = charKeys;

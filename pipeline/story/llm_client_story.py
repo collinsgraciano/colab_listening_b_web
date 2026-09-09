@@ -98,7 +98,8 @@ _FAMILY_KEYS = ("char_a", "char_b", "char_c", "char_d")
 
 
 def load_story_family(family_file: str | None = None) -> dict:
-    """家庭角色设定：STORY_FAMILY_JSON env > family_file > 内置默认（逐槽合并）。
+    """家庭角色设定：STORY_FAMILY_JSON env > family_file >
+    共享文件 configs/story_family.json（Web 编辑卡写入）> 内置默认（逐槽合并）。
 
     每槽 {name, gender, role, description}；gender 非法回退内置；description
     为空回退内置。返回 {char_a..char_d: {...}}。
@@ -119,6 +120,15 @@ def load_story_family(family_file: str | None = None) -> dict:
                 raw_data = json.loads(p.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as e:
                 print(f"  [Story] WARNING: 家庭设定文件读取失败 {p.name}: {e}")
+    if raw_data is None:
+        # 与 Web「家庭角色设定」编辑卡共享的配置文件（tts_engine 读
+        # kokoro_voice_config.json 同款惯例：仓库 configs/ 目录直读）
+        shared = Path(__file__).parent.parent.parent / "configs" / "story_family.json"
+        if shared.exists():
+            try:
+                raw_data = json.loads(shared.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"  [Story] WARNING: 共享家庭设定读取失败: {e}")
     family = {}
     for key in _FAMILY_KEYS:
         base = dict(DEFAULT_FAMILY[key])
