@@ -175,8 +175,7 @@ _KIND_BRIEF = {
         "(conflict escalates) then resolves warmly. A small concrete DETAIL "
         "must be shown naturally early in the story (the PLANT), and the video "
         "ends by asking the AUDIENCE to recall that detail and write the "
-        "answer in the comments (the RECALL question)."),
-    "chat": (
+        "answer in the comments (the RECALL question)."),    "chat": (
         "Design a TWO-PERSON DAILY CONVERSATION episode (char_a + one guest): "
         "a slice-of-life activity done together (shopping, cooking, planning a "
         "weekend, visiting a place). Natural teaching moments about everyday "
@@ -253,7 +252,7 @@ Output JSON ONLY:
 {{
   "story_concept": "one-sentence story concept",
   "scene": "English scene name (e.g. museum, kitchen, countryside farmhouse)",
-  "recall_question_en": "the question asked to the AUDIENCE at the end (max 14 words){' — about the planted detail' if needs_recall_answer else ''}",
+  "recall_question_en": "the question asked to the AUDIENCE at the end (max 14 words){' — about the planted detail' if needs_recall_answer else ''}. NAMING RULE: refer to the planted DETAIL itself (e.g. 'What was hidden inside the vase?') or use ONLY names from the cast above / the guest — NEVER invent a new name",
   "recall_question_zh": "繁體中文 translation",
 {recall_field}  {cta_hint},
   "cta_hint_en": "one short English line describing how the finale CTA sounds (e.g. 'Write your answer in the comments. See you next time!')",
@@ -925,9 +924,11 @@ Family roles: char_a=mom, char_b=dad, char_c=daughter, char_d=son, char_e=guest.
 Find ONLY story-level problems the machine checks cannot detect:
 1. Story regression: a later line re-introduces a settled topic or re-shows the plant detail as if new.
 2. The finale does not naturally turn to the audience / does not ask the recall question clearly.
-3. Character personality drift (mom warm, dad joking, daughter quiet, son playful, guest consistent).
-4. Abrupt transitions; the conflict escalation feels flat; the resolution feels cut off.
-5. Facts contradict each other across the story (names, places, times, objects).
+3. INVENTED NAMES: the recall question (or any line) mentions a character name that is not in the cast
+   (family members' names from the script char_*_description, the guest's name, or generic roles) — flag it.
+4. Character personality drift (mom warm, dad joking, daughter quiet, son playful, guest consistent).
+5. Abrupt transitions; the conflict escalation feels flat; the resolution feels cut off.
+6. Facts contradict each other across the story (names, places, times, objects).
 Report each problem as a line range [start, end] (0-indexed, inclusive)."""
     elif kind_judge == "engagement":
         task = """You are an ENGAGEMENT judge for an ESL story-listening video script (audience: overseas Chinese learners who want vivid family stories).
