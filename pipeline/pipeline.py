@@ -161,6 +161,7 @@ def _validate_script(script: dict, num_lines: int,
 def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                                 quest=False, structure="original",
                                 story=False, family_file=None,
+                                story_kind=None,
                                 max_attempts=5) -> dict:
     """Generate and validate script, retrying on failure."""
     for attempt in range(max_attempts):
@@ -170,7 +171,8 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                 from story.llm_client_story import generate_story_script
                 script = generate_story_script(topic, cefr, lessons_dir=lessons_dir,
                                                num_lines=num_lines,
-                                               family_file=family_file)
+                                               family_file=family_file,
+                                               story_kind=story_kind or "")
             elif quest:
                 from quest.llm_client_quest import generate_quest_script
                 script = generate_quest_script(topic, cefr, lessons_dir=lessons_dir,
@@ -233,6 +235,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--used-topics-file", default=None, help="Path to used_topics.json (default: <output>/used_topics.json — persists on Drive across Colab sessions)")
     parser.add_argument("--num-lines", type=int, default=None, help="Number of dialogue lines (default: 18; quest mode: 48; story mode: 150)")
     parser.add_argument("--family-file", default=None, help="story 模式：家庭角色设定 JSON 文件路径（缺省读 STORY_FAMILY_JSON env，再回退内置默认家庭）")
+    parser.add_argument("--story-kind", default=None, help="story 模式剧本类型: plot(家庭故事剧情)/chat(双人对话)/solo(独白讲解)（缺省读 STORY_KIND env，再回退 plot）")
     parser.add_argument("--max-line-words", type=int, default=None, help="Max words per dialogue line / narration sentence (default 10) so on-screen subtitles never exceed 2 lines")
     parser.add_argument("--script-style-boost", action="store_true",
                         help="Script quality boost A: few-shot style examples + random plot devices + tension requirements + cliche ban list (default off)")
@@ -663,7 +666,8 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
                 quest=(args.structure == "quest"),
                 structure=(args.structure if args.structure != "quest" else "original"),
                 story=(getattr(args, "mode_name", "") == "story"),
-                family_file=getattr(args, "family_file", None))
+                family_file=getattr(args, "family_file", None),
+                story_kind=getattr(args, "story_kind", None))
             yt_title = script.get("youtube_title", script.get("title", topic))
             safe_title = _safe_dirname(yt_title, topic)
             work_dir = parent_dir / safe_title
