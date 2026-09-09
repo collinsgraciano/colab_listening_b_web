@@ -163,11 +163,23 @@
 
         <!-- Story family（story 模式专属：家庭角色设定） -->
         <div id="story-family-wrap" class="mb-4" style="display:none">
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <label class="block text-xs text-slate-400">👨‍👩‍👧‍👦 家庭角色设定 <span class="text-slate-500">— story 模式的固定家庭四人（char_a~char_d）；每集嘉宾由 AI 设计</span></label>
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center flex-wrap">
+                    <select id="sf-preset" onchange="onFamilyPresetChange()"
+                        class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white max-w-[200px]"
+                        title="载入已保存的家庭预设（仅填充编辑卡）">
+                        <option value="">— 已存家庭预设 —</option>
+                    </select>
+                    <button onclick="saveFamilyPreset()"
+                        class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-xs text-white"
+                        title="把当前四槽位存为命名家庭预设">💾 存预设</button>
+                    <button onclick="deleteFamilyPreset()"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300"
+                        title="删除选中的家庭预设">🗑</button>
                     <button onclick="saveStoryFamily()"
-                        class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-xs text-white">💾 保存设定</button>
+                        class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-xs text-white"
+                        title="把编辑卡当前内容写为激活家庭（下次生成生效）">💾 保存设定</button>
                     <button onclick="loadStoryFamily(true)"
                         class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">🔄 重载</button>
                 </div>
@@ -872,8 +884,9 @@ function onScriptLibChange() {
 // --- Character reuse ---
 let _charSources = [];
 
-// --- Story family（story 模式家庭角色设定）---
+// --- Story family（story 模式家庭角色设定 + 家庭预设）---
 let _storyFamilyLoaded = false;
+let _familyPresets = {};
 
 const SF_LABELS = {
     char_a: '角色 A（char_a）', char_b: '角色 B（char_b）',
@@ -899,8 +912,85 @@ function storyFamilySlotHtml(key, c) {
         </div>`;
 }
 
+function loadFamilyPresets() {
+    fetch('/api/story_family/presets').then(r => r.json()).then(data => {
+        _familyPresets = data.presets || {};
+        const sel = document.getElementById('sf-preset');
+        if (!sel) return;
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">— 已存家庭预设 —</option>'
+            + Object.keys(_familyPresets).map(n =>
+                `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+        if (_familyPresets[cur]) sel.value = cur;
+    }).catch(() => {});
+}
+
+function onFamilyPresetChange() {
+    const sel = document.getElementById('sf-preset');
+    const p = (_familyPresets || {})[sel.value];
+    if (!p || !p.family) return;
+    for (const k of ['char_a', 'char_b', 'char_c', 'char_d']) {
+        const c = p.family[k] || {};
+        const set = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.value = v;
+        };
+        set(`sf-${k}-name`, c.name || '');
+        set(`sf-${k}-gender`, c.gender || 'female');
+        set(`sf-${k}-role`, c.role || '');
+        set(`sf-${k}-desc`, c.description || '');
+    }
+}
+
+function saveFamilyPreset() {
+    const name = (prompt('家庭预设名称：') || '').trim();
+    if (!name) return;
+    const family = {};
+    for (const k of ['char_a', 'char_b', 'char_c', 'char_d']) {
+        family[k] = {
+            name: (document.getElementById(`sf-${k}-name`)?.value || '').trim(),
+            gender: document.getElementById(`sf-${k}-gender`)?.value || '',
+            role: (document.getElementById(`sf-${k}-role`)?.value || '').trim(),
+            description: (document.getElementById(`sf-${k}-desc`)?.value || '').trim(),
+        };
+    }
+    fetch('/api/story_family/presets/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, family})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            _familyPresets = d.presets || {};
+            loadFamilyPresets();
+            alert(`✅ 已存为家庭预设「${name}」（切换预设后仍需点「💾 保存设定」才会写入激活家庭）`);
+        } else {
+            alert('❌ ' + (d.error || '保存失败'));
+        }
+    }).catch(e => alert('❌ ' + e));
+}
+
+function deleteFamilyPreset() {
+    const sel = document.getElementById('sf-preset');
+    const name = sel?.value;
+    if (!name) { alert('请先在下拉中选择要删除的预设'); return; }
+    if (!confirm(`删除家庭预设「${name}」？（不影响当前激活家庭）`)) return;
+    fetch('/api/story_family/presets/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            _familyPresets = d.presets || {};
+            loadFamilyPresets();
+        } else {
+            alert('❌ ' + (d.error || '删除失败'));
+        }
+    }).catch(e => alert('❌ ' + e));
+}
+
 function loadStoryFamily(force) {
     if (_storyFamilyLoaded && !force) return;
+    loadFamilyPresets();
     fetch('/api/story_family').then(r => r.json()).then(data => {
         const fam = data.family || {};
         const grid = document.getElementById('story-family-grid');
