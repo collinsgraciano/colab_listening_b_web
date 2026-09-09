@@ -42,18 +42,31 @@ async def api_character_sources():
             # 旧运行缺失时回退文件探测
             structure = script.get("structure", "")
             if structure not in ("original", "original_static",
-                                 "original_cutout", "quest"):
+                                 "original_cutout", "quest", "story"):
                 if (img_dir / "pose_char_a_0.png").exists():
-                    # 姿势图集 → quest 或 cutout：以 char_c 图集存在与否细分
-                    structure = ("quest" if (img_dir / "pose_char_c_0.png").exists()
-                                 else "original_cutout")
+                    # 姿势图集 → quest/cutout/story：以 char_d/char_c 图集存在与否细分
+                    if (img_dir / "pose_char_d_0.png").exists():
+                        structure = "story"
+                    elif (img_dir / "pose_char_c_0.png").exists():
+                        structure = "quest"
+                    else:
+                        structure = "original_cutout"
                 elif (img_dir / "char_scene.png").exists():
                     structure = "original"
                 else:
                     continue  # no character images
 
             # Build character list based on detected structure
-            if structure == "quest":
+            if structure == "story":
+                # 一家四口 + 可选嘉宾（有姿势图集才出卡）
+                char_keys = ([k for k in ("char_a", "char_b", "char_c", "char_d")
+                              if (img_dir / f"pose_{k}_0.png").exists()]
+                             + (["char_e"]
+                                if (img_dir / "pose_char_e_0.png").exists() else []))
+                char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C",
+                               "char_d": "角色D", "char_e": "嘉宾"}
+                img_name_for = lambda key: f"pose_{key}_0.png"
+            elif structure == "quest":
                 char_keys = ["char_a", "char_b", "char_c", "host"]
                 char_labels = {"char_a": "角色A", "char_b": "角色B", "char_c": "角色C", "host": "主持人"}
                 img_name_for = lambda key: f"pose_{key}_0.png"

@@ -161,6 +161,23 @@
             </div>
         </div>
 
+        <!-- Story family（story 模式专属：家庭角色设定） -->
+        <div id="story-family-wrap" class="mb-4" style="display:none">
+            <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs text-slate-400">👨‍👩‍👧‍👦 家庭角色设定 <span class="text-slate-500">— story 模式的固定家庭四人（char_a~char_d）；每集嘉宾由 AI 设计</span></label>
+                <div class="flex gap-2">
+                    <button onclick="saveStoryFamily()"
+                        class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-xs text-white">💾 保存设定</button>
+                    <button onclick="loadStoryFamily(true)"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">🔄 重载</button>
+                </div>
+            </div>
+            <div id="story-family-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <p class="text-xs text-slate-500 col-span-full">加载中...</p>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">每槽位：名字 / 性别 / 剧中角色 / 外貌描述（英文）。描述逐字注入每集生成 prompt（保证跨集角色一致）；保存后下一次生成生效；配合「人物素材库」分配可跨集复用画面素材。留空槽位回退内置默认（Watson 一家）。</p>
+        </div>
+
         <!-- Character Library -->
         <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
@@ -408,6 +425,12 @@ function applyQuickFields() {
     document.getElementById('quick-anim-wrap').style.display = isImage ? '' : 'none';
     document.getElementById('cefr-cell').className = isImage ? '' : 'col-span-2';
     if (isImage) document.getElementById('quick-animation').value = cfg.animation || 'landing';
+    // story 模式专属：家庭角色设定编辑卡
+    const sfWrap = document.getElementById('story-family-wrap');
+    if (sfWrap) {
+        sfWrap.style.display = ACTIVE_MODE === 'story' ? '' : 'none';
+        if (ACTIVE_MODE === 'story') loadStoryFamily();
+    }
     applyQuickConfigFields();
 }
 
@@ -849,7 +872,81 @@ function onScriptLibChange() {
 // --- Character reuse ---
 let _charSources = [];
 
+// --- Story family（story 模式家庭角色设定）---
+let _storyFamilyLoaded = false;
+
+const SF_LABELS = {
+    char_a: '角色 A（char_a）', char_b: '角色 B（char_b）',
+    char_c: '角色 C（char_c）', char_d: '角色 D（char_d）',
+};
+
+function storyFamilySlotHtml(key, c) {
+    return `
+        <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
+            <p class="text-xs text-slate-300 mb-2 font-medium">${SF_LABELS[key] || key}</p>
+            <div class="grid grid-cols-3 gap-2 mb-2">
+                <input id="sf-${key}-name" placeholder="名字" value="${escapeHtml(c.name || '')}"
+                    class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white">
+                <select id="sf-${key}-gender" class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white">
+                    <option value="female" ${c.gender === 'female' ? 'selected' : ''}>女 female</option>
+                    <option value="male" ${c.gender === 'male' ? 'selected' : ''}>男 male</option>
+                </select>
+                <input id="sf-${key}-role" placeholder="剧中角色 mom/dad…" value="${escapeHtml(c.role || '')}"
+                    class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white">
+            </div>
+            <textarea id="sf-${key}-desc" rows="2" placeholder="外貌描述（英文，逐字注入每集 prompt）"
+                class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white">${escapeHtml(c.description || '')}</textarea>
+        </div>`;
+}
+
+function loadStoryFamily(force) {
+    if (_storyFamilyLoaded && !force) return;
+    fetch('/api/story_family').then(r => r.json()).then(data => {
+        const fam = data.family || {};
+        const grid = document.getElementById('story-family-grid');
+        if (!grid) return;
+        grid.innerHTML = ['char_a', 'char_b', 'char_c', 'char_d']
+            .map(k => storyFamilySlotHtml(k, fam[k] || {})).join('');
+        _storyFamilyLoaded = true;
+    }).catch(() => {});
+}
+
+function saveStoryFamily() {
+    const family = {};
+    for (const k of ['char_a', 'char_b', 'char_c', 'char_d']) {
+        family[k] = {
+            name: (document.getElementById(`sf-${k}-name`)?.value || '').trim(),
+            gender: document.getElementById(`sf-${k}-gender`)?.value || '',
+            role: (document.getElementById(`sf-${k}-role`)?.value || '').trim(),
+            description: (document.getElementById(`sf-${k}-desc`)?.value || '').trim(),
+        };
+    }
+    fetch('/api/story_family', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({family})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            _storyFamilyLoaded = false;
+            loadStoryFamily();
+            alert('✅ 家庭角色设定已保存（下一次 story 生成生效）');
+        } else {
+            alert('❌ 保存失败: ' + (d.error || '未知错误'));
+        }
+    }).catch(e => alert('❌ 保存失败: ' + e));
+}
+
 function getCharKeys() {
+    if (ACTIVE_MODE === 'story') {
+        // 一家四口 + 可选嘉宾（无主持人）
+        return [
+            {key: 'char_a', label: '角色A'},
+            {key: 'char_b', label: '角色B'},
+            {key: 'char_c', label: '角色C'},
+            {key: 'char_d', label: '角色D'},
+            {key: 'char_e', label: '嘉宾'},
+        ];
+    }
     if (ACTIVE_MODE === 'quest') {
         return [
             {key: 'char_a', label: '角色A'},
@@ -888,6 +985,7 @@ function refreshHostBgOptions() {
     const STRUCT_TAGS = {
         'original': '[视频]', 'original_static': '[静态]',
         'original_cutout': '[抠图]', 'original_sprite': '[固定机位]', 'quest': '[Quest]',
+        'story': '[故事]',
     };
     const runGroup = document.createElement('optgroup');
     runGroup.label = '历史运行';
@@ -940,6 +1038,7 @@ function loadCharSources() {
             const STRUCT_TAGS = {
                 'original': '[视频]', 'original_static': '[静态]',
                 'original_cutout': '[抠图]', 'original_sprite': '[固定机位]', 'quest': '[Quest]',
+                'story': '[故事]',
             };
             _charSources.forEach(s => {
                 const opt = document.createElement('option');
@@ -1973,7 +2072,7 @@ function connectSSE() {
                                 const parts = data.work_dir ? data.work_dir.split(/[\\/]/).filter(Boolean) : [];
                                 const runName = parts[parts.length - 1] || '';
                                 const parentSeg = parts.length >= 2 ? parts[parts.length - 2] : '';
-                                const isMode = ['original', 'original_static', 'original_cutout', 'original_sprite', 'quest'].includes(parentSeg);
+                                const isMode = ['original', 'original_static', 'original_cutout', 'original_sprite', 'quest', 'quest_sprite', 'story'].includes(parentSeg);
                                 const modeQ = isMode ? `?mode=${parentSeg}` : '';
                                 if (runName) location.href = `/runs/${runName}/gallery${modeQ}`;
                                 else location.href = '/runs';
@@ -2154,22 +2253,26 @@ function loadScriptEditor(runName) {
 
 function getCharacterKeys(script) {
     const keys = [];
-    for (const k of ['char_a', 'char_b', 'char_c', 'host']) {
+    for (const k of ['char_a', 'char_b', 'char_c', 'char_d', 'char_e', 'host']) {
         if (script[k + '_description'] !== undefined) keys.push(k);
     }
     return keys;
 }
 
 function getSpeakerOptions(script) {
-    if (script.char_c_description || script.host_description) {
-        return ['char_a', 'char_b', 'char_c', 'host'];
+    if (script.char_d_description || script.char_e_description
+            || script.char_c_description || script.host_description) {
+        return ['char_a', 'char_b', 'char_c', 'char_d', 'char_e', 'host']
+            .filter(k => script[k + '_description'] !== undefined
+                || k === 'char_a' || k === 'char_b');
     }
     return ['char_a', 'char_b'];
 }
 
 const CHAR_LABELS = {
     'char_a': '角色 A', 'char_b': '角色 B',
-    'char_c': '角色 C', 'host': '主持人',
+    'char_c': '角色 C', 'char_d': '角色 D', 'char_e': '嘉宾',
+    'host': '主持人',
 };
 
 function renderScriptEditor(script) {

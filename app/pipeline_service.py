@@ -281,11 +281,28 @@ class PipelineService:
         if config.get("quest_qa_rounds") is not None and config.get("quest_qa_rounds") != "":
             os.environ["QUEST_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
             os.environ["LISTENING_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
+            os.environ["STORY_QA_MAX_ROUNDS"] = str(config["quest_qa_rounds"])
 
         # 每行最大词数（字幕两行约束）：prompt 硬约束 + QA 门禁 + 渲染兜底共用
         if config.get("max_line_words"):
             os.environ["LISTENING_MAX_LINE_WORDS"] = str(config["max_line_words"])
             os.environ["QUEST_MAX_LINE_WORDS"] = str(config["max_line_words"])
+
+        # story 模式（家庭故事）：剧本类型 + 家庭角色设定。
+        # story_family.json 由 Web「家庭角色设定」编辑卡与 pipeline 共读；
+        # STORY_FAMILY_JSON 用 ensure_ascii=True 全 ASCII，防 Windows 子进程编码坑
+        if str(config.get("structure", "")) == "story":
+            os.environ["STORY_KIND"] = str(config.get("story_kind", "") or "")
+            try:
+                from .config_manager import CONFIGS_DIR
+                _sf_path = CONFIGS_DIR / "story_family.json"
+                if _sf_path.exists():
+                    _fam = json.loads(_sf_path.read_text(encoding="utf-8"))
+                    if isinstance(_fam, dict):
+                        os.environ["STORY_FAMILY_JSON"] = json.dumps(
+                            _fam, ensure_ascii=True)
+            except (OSError, json.JSONDecodeError, ValueError) as e:
+                print(f"  [Story] WARNING: 家庭设定读取失败（回退内置默认）: {e}")
 
         # 脚本质量增强开关（默认全关 = 原流程）
         os.environ["SCRIPT_STYLE_BOOST"] = "1" if config.get("script_style_boost") else ""
@@ -397,7 +414,11 @@ class PipelineService:
         from .config_manager import structure_family
         structure = structure_family(config.get("structure", "original"))
         if structure == "quest":
-            all_keys = ["char_a", "char_b", "char_c", "host"]
+            if config.get("structure") == "story":
+                # story：一家四口 + 可选 NPC 嘉宾（无主持人）
+                all_keys = ["char_a", "char_b", "char_c", "char_d", "char_e"]
+            else:
+                all_keys = ["char_a", "char_b", "char_c", "host"]
         elif structure == "original_cutout":
             # 独立主持人（未绑定角色时）同样参与复用，否则每次新跑随机生成新主持人
             all_keys = ["char_a", "char_b", "host", "narration"]
@@ -527,7 +548,11 @@ class PipelineService:
         from .config_manager import structure_family
         structure = structure_family(self.config.get("structure", "original"))
         if structure == "quest":
-            all_char_keys = ["char_a", "char_b", "char_c", "host"]
+            if self.config.get("structure") == "story":
+                # story：一家四口 + 可选 NPC 嘉宾（无主持人）
+                all_char_keys = ["char_a", "char_b", "char_c", "char_d", "char_e"]
+            else:
+                all_char_keys = ["char_a", "char_b", "char_c", "host"]
         elif structure == "original_cutout":
             # 独立主持人（未绑定角色时）同样参与复用
             all_char_keys = ["char_a", "char_b", "host", "narration"]
@@ -893,7 +918,12 @@ class PipelineService:
         from .config_manager import structure_family
         structure = structure_family(self.config.get("structure", "original"))
         if structure == "quest":
-            keys = ["char_a", "char_b", "char_c"]
+            if self.config.get("structure") == "story":
+                # story：绑定性别收集覆盖一家四口 + 嘉宾（A/B 交换逻辑不变，
+                # char_c/d/e 不匹配仅提示）
+                keys = ["char_a", "char_b", "char_c", "char_d", "char_e"]
+            else:
+                keys = ["char_a", "char_b", "char_c"]
         elif structure == "original_cutout":
             keys = ["char_a", "char_b", "host"]
         else:
@@ -1045,9 +1075,11 @@ class PipelineService:
         mode_name = config.get("structure", "original")
         structure = structure_family(mode_name)
         if num_lines is None:
-            num_lines = 48 if structure == "quest" else 18
+            num_lines = (150 if mode_name == "story" else 48) \
+                if structure == "quest" else 18
         if pad is None:
-            pad = 0.4
+            # story 对话节奏比 quest 快（同款自然衔接，无长思考停顿）
+            pad = 1.0 if mode_name == "story" else 0.4
 
         # original_static: always use static images (no landing/stop_motion)
         animation = normalize_animation(
@@ -1058,6 +1090,9 @@ class PipelineService:
             animation = "sprite_sequence"
         elif mode_name == "original_cutout":
             # original_cutout 已移除 sprite_sequence 选项（序列帧走 original_sprite 模式）
+            animation = "stop_motion"
+        elif mode_name == "story":
+            # story 仅定格动画（姿势图集）；无 sprite 序列帧
             animation = "stop_motion"
 
         # tts_rate 为旧全局覆盖（兼容）；分项参数优先（tts_pipeline.resolve_tts_rate）

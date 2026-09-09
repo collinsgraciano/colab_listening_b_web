@@ -41,7 +41,7 @@ from llm_client import (  # noqa: E402
     _enforce_rate_limit, _extract_json, resolve_max_line_words,
     set_llm_env_override)
 
-DEFAULT_LINES = {"original": 18, "original_static": 18, "original_cutout": 18, "quest": 48}
+DEFAULT_LINES = {"original": 18, "original_static": 18, "original_cutout": 18, "quest": 48, "story": 150}
 
 # 简体独有字（繁体无此字形）— 检测中文文案误用简体
 _SIMP_ONLY_CHARS = set(
@@ -421,6 +421,19 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
         if cfg.get("quest_beat_lines"):
             ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])
         ov["QUEST_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
+    if structure == "story":
+        if cfg.get("quest_beat_lines"):
+            ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])
+        ov["STORY_QA_MAX_ROUNDS"] = str(cfg["quest_qa_rounds"])
+        ov["STORY_KIND"] = str(cfg.get("story_kind", "") or "")
+        try:
+            _sf = WEB_ROOT / "configs" / "story_family.json"
+            if _sf.exists():
+                _fam = json.loads(_sf.read_text(encoding="utf-8"))
+                if isinstance(_fam, dict):
+                    ov["STORY_FAMILY_JSON"] = json.dumps(_fam, ensure_ascii=True)
+        except (OSError, json.JSONDecodeError):
+            pass
     return ov
 
 
@@ -430,10 +443,15 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
     from pipeline import _validate_script
 
     quest = (structure == "quest")
+    story = (structure == "story")
     last_err: Exception | None = None
     for attempt in range(max_attempts):
         try:
-            if quest:
+            if story:
+                from story.llm_client_story import generate_story_script
+                script = generate_story_script(
+                    topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines)
+            elif quest:
                 from quest.llm_client_quest import generate_quest_script
                 script = generate_quest_script(
                     topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines)
@@ -442,7 +460,8 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
                 script = generate_listening_script(
                     topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines,
                     structure=structure)
-            valid, msg = _validate_script(script, num_lines, quest=quest)
+            valid, msg = _validate_script(script, num_lines, quest=quest,
+                                          story=story)
             if valid:
                 return script, attempt + 1
             last_err = RuntimeError(f"校验未通过: {msg}")
@@ -476,8 +495,8 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
 
     mode_cfg = load_mode_config(structure)
     lessons_dir = mode_cfg.get("lessons_dir", "") or None
-    # quest 单次生成 20+ 次 LLM 调用，减少重试次数避免过长等待
-    max_attempts = 2 if structure == "quest" else 3
+    # quest/story 单次生成 20+ 次 LLM 调用，减少重试次数避免过长等待
+    max_attempts = 2 if structure in ("quest", "story") else 3
 
     try:
         override = _build_llm_override(provider, model, structure)
@@ -594,7 +613,7 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
                        "suggestion": "改为对应繁体字"})
 
     # 行长度（与 QA 门禁同源 max_line_words：线程局部 override → os.environ → 默认 10）
-    env_name = ("QUEST_MAX_LINE_WORDS" if structure == "quest"
+    env_name = ("QUEST_MAX_LINE_WORDS" if structure in ("quest", "story")
                 else "LISTENING_MAX_LINE_WORDS")
     cap = resolve_max_line_words(env_name)
     for i, ln in enumerate(script.get("dialogue", []) or []):
@@ -607,7 +626,7 @@ def local_checks(script: dict, structure: str, num_lines: int) -> list[dict]:
                            "suggestion": "拆分为两行或精简"})
 
     # 性别 vs 描述一致性
-    for key in ("char_a", "char_b", "char_c", "host"):
+    for key in ("char_a", "char_b", "char_c", "char_d", "char_e", "host"):
         gender = (script.get(f"{key}_gender") or "").lower()
         desc = f" {(script.get(f'{key}_description') or '').lower()} "
         if not gender or desc.strip() == "":
@@ -746,7 +765,7 @@ def ai_review_script(sid: str, provider_id: str, model: str) -> dict | None:
             entry += f"\n   prompt: {(ln.get(prompt_field) or '')[:250]}"
         lines_ref.append(entry)
     chars = []
-    for key in ("char_a", "char_b", "char_c", "host"):
+    for key in ("char_a", "char_b", "char_c", "char_d", "char_e", "host"):
         if script.get(f"{key}_description"):
             chars.append(f"- {key}: {script[f'{key}_description']} "
                          f"(gender={script.get(f'{key}_gender', '')}, "
@@ -899,7 +918,7 @@ def _patchable_line_keys(structure: str) -> tuple[str, ...]:
     """按结构允许 AI patch 的行级字段。poses 已废弃（管线零消费方）彻底移除；
     quest 行无 phonetic（_validate_script 对 quest 不查 phonetic）。"""
     keys = ["text", "zh", "speaker"]
-    if structure != "quest":
+    if structure not in ("quest", "story"):
         keys.append("phonetic")
     prompt_field = _line_prompt_field(structure)
     if prompt_field:
@@ -1030,13 +1049,14 @@ def _fix_script_inner(sid: str, issues: list[dict], provider_id: str, model: str
         lines_ref = "\n".join(
             f"{i}. [{ln.get('speaker', '?')}] {ln.get('text', '')}\n"
             f"   zh: {ln.get('zh', '')}"
-            + (f"\n   phonetic: {ln.get('phonetic', '')}" if structure != "quest" else "")
+            + (f"\n   phonetic: {ln.get('phonetic', '')}"
+               if structure not in ("quest", "story") else "")
             + (f"\n   prompt: {(ln.get(prompt_field) or '')[:200]}" if prompt_field else "")
             for i, ln in enumerate(dialogue))
         chars = "\n".join(
             f"- {k}: {script.get(k + '_description', '')} "
             f"(gender={script.get(k + '_gender', '')}, role={script.get(k + '_role', '')})"
-            for k in ("char_a", "char_b", "char_c", "host")
+            for k in ("char_a", "char_b", "char_c", "char_d", "char_e", "host")
             if script.get(k + "_description"))
         q.put(("progress",
                f"AI 正在修复选中的问题（第 {round_no}/{_FIX_MAX_ROUNDS} 轮，"

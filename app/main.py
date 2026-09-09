@@ -26,6 +26,7 @@ from .routers import (
     run as run_routes,
     runs as runs_routes,
     scripts as scripts_routes,
+    story_family as story_family_routes,
     styles as styles_routes,
     subtitle_styles as subtitle_styles_routes,
     topics as topics_routes,
@@ -63,6 +64,8 @@ app.include_router(scripts_routes.router)
 app.include_router(runs_routes.router)
 app.include_router(mcp_tokens_routes.router)
 app.include_router(characters_routes.router)
+# story 模式家庭角色设定（configs/story_family.json，Web 编辑卡与 pipeline 共读）
+app.include_router(story_family_routes.router)
 app.include_router(health_routes.router)
 app.include_router(voices_qwen_routes.router)
 app.include_router(voices_kokoro_routes.router)
