@@ -11,9 +11,28 @@
         <div class="flex flex-wrap gap-3 items-center mt-4">
             <input type="text" id="cf-direction" placeholder="频道方向提示（可留空 = 英语学习生态随机细分）"
                 class="flex-1 min-w-[280px] bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-slate-500">
+            <div class="flex items-center gap-1.5 shrink-0" title="一次生成的套数">
+                <span class="text-xs text-slate-400">数量</span>
+                <select id="cf-count" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-white">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="5" selected>5</option>
+                    <option value="8">8</option>
+                    <option value="10">10</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0" title="与勾选参考频道的相似程度（未勾选参考时不生效）">
+                <span class="text-xs text-slate-400">相似度</span>
+                <select id="cf-similarity" class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-white">
+                    <option value="light">轻度参考</option>
+                    <option value="medium" selected>中度参考</option>
+                    <option value="high">高度参考</option>
+                </select>
+            </div>
             <button onclick="startGenerate()" id="btn-generate"
                 class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-white font-medium transition">
-                🎲 生成 5 套
+                🎲 生成
             </button>
             <span id="gen-status" class="text-xs text-slate-400"></span>
         </div>
@@ -62,7 +81,7 @@
         <div id="drafts-grid" class="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4"></div>
         <div id="drafts-empty" class="text-center text-slate-500 text-sm py-10">
             <div class="text-4xl mb-3">🎲</div>
-            <p>还没有候选方案 —— 填写方向提示（可留空），点击「生成 5 套」</p>
+            <p>还没有候选方案 —— 填写方向提示（可留空）、勾选参考频道，点击「生成」</p>
         </div>
     </section>
 
@@ -223,12 +242,14 @@ function renderFavs() {
 async function startGenerate() {
     if (_genBusy) return;
     const direction = document.getElementById('cf-direction').value.trim();
+    const count = parseInt(document.getElementById('cf-count').value, 10) || 5;
+    const similarity = document.getElementById('cf-similarity').value;
     const btn = document.getElementById('btn-generate');
     btn.disabled = true;
     try {
         const resp = await fetch('/api/channel_factory/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ direction, reference_ids: [...SELECTED_REFS] }),
+            body: JSON.stringify({ direction, reference_ids: [...SELECTED_REFS], count, similarity }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);

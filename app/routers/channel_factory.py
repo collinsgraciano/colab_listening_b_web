@@ -235,13 +235,31 @@ def _salvage_profiles_regex(text: str) -> list[dict]:
     return out
 
 
+_SIMILARITY_MODES = {
+    "light": (
+        "Lightly inspired — take only the general positioning, audience and tone "
+        "from the references; the concepts, names and descriptions must be clearly "
+        "distinct and original."),
+    "medium": (
+        "Moderately modeled — follow the reference channels' description structure, "
+        "section organization and bilingual (EN + Traditional Chinese) presentation "
+        "style; keep all names, topics and wording original."),
+    "high": (
+        "Closely modeled — closely follow the reference channels' tone, structure, "
+        "formatting (including bullet/emoji style) and content organization; change "
+        "only the channel name, handle and specific topic details so the result "
+        "feels like the same family of channels."),
+}
+
+
 def _build_prompt(direction: str, avoid_names: list[str],
-                  references: list[dict] | None = None) -> str:
+                  references: list[dict] | None = None,
+                  count: int = 5, similarity: str = "medium") -> str:
     direction_block = (
-        f'\n\nUSER DIRECTION (highest priority — all 5 concepts must fit this '
+        f'\n\nUSER DIRECTION (highest priority — all {count} concepts must fit this '
         f'direction, vary strongly WITHIN it): "{direction}"'
         if direction else
-        "\n\nPick 5 clearly different sub-niches across the English-learning "
+        f"\n\nPick {count} clearly different sub-niches across the English-learning "
         "content ecosystem (no two concepts may be similar)."
     )
     references_block = ""
@@ -254,14 +272,16 @@ def _build_prompt(direction: str, avoid_names: list[str],
             "style, clear learning-point bullets, warm encouraging call-to-action. "
             "Capture their STYLE and appeal; NEVER copy their channel names or "
             "sentences verbatim):\n\n" + "\n\n".join(parts)
+            + "\n\nSIMILARITY LEVEL (how closely to follow the references): "
+            + _SIMILARITY_MODES.get(similarity, _SIMILARITY_MODES["medium"])
         )
     avoid_block = "\n".join(f"- {n}" for n in avoid_names) or "(none)"
     return f"""You are a YouTube channel strategist and brand designer for a content studio producing English-learning videos (audience: overseas Chinese ESL learners).
 
-Design exactly 5 COMPLETELY DIFFERENT YouTube channel concepts. Each concept is a full channel identity package the owner will use to create a brand-new YouTube channel.{direction_block}{references_block}
+Design exactly {count} COMPLETELY DIFFERENT YouTube channel concepts. Each concept is a full channel identity package the owner will use to create a brand-new YouTube channel.{direction_block}{references_block}
 
 Requirements:
-- The 5 concepts must span clearly different sub-niches / tones / target segments — never two similar ones
+- The {count} concepts must span clearly different sub-niches / tones / target segments — never two similar ones
 - "name_en": catchy, brandable, 2-4 words, easy to spell and pronounce; not generic (avoid names like "English Learning Channel")
 - "name_zh": Traditional Chinese (繁體中文) channel name matching the EN brand
 - "handle": YouTube handle suggestion starting with @ (lowercase letters/numbers, no spaces, <=20 chars)
@@ -279,7 +299,7 @@ Do NOT reuse or closely imitate these existing channel names:
 {avoid_block}
 
 Output valid JSON only (no markdown, no explanations):
-{{"channels": [{{"name_en": "...", "name_zh": "...", "handle": "@...", "slogan": "...", "description_en": "...", "description_zh": "...", "niche": "...", "audience": "...", "content_series": ["..."], "tags": ["..."], "brand_colors": ["#RRGGBB", "#RRGGBB", "#RRGGBB"], "brand_style": "..."}} x5]}}"""
+{{"channels": [{{"name_en": "...", "name_zh": "...", "handle": "@...", "slogan": "...", "description_en": "...", "description_zh": "...", "niche": "...", "audience": "...", "content_series": ["..."], "tags": ["..."], "brand_colors": ["#RRGGBB", "#RRGGBB", "#RRGGBB"], "brand_style": "..."}} x{count}]}}"""
 
 
 def _normalize_profile(raw: dict, idx: int) -> dict | None:
@@ -320,10 +340,12 @@ def _normalize_profile(raw: dict, idx: int) -> dict | None:
     }
 
 
-def _generate_batch_worker(direction: str, reference_ids: list | None = None) -> None:
-    """后台线程：LLM 生成 5 套频道信息 → 落盘 drafts。
+def _generate_batch_worker(direction: str, reference_ids: list | None = None,
+                           count: int = 5, similarity: str = "medium") -> None:
+    """后台线程：LLM 生成频道信息 → 落盘 drafts。
 
     reference_ids：勾选的参考频道 id（worker 内重读文件，最多取 3 个）。
+    count：本批套数（1-10）；similarity：与参考的相似程度（light/medium/high）。
     """
     _gen_status.update({"status": "generating", "error": "", "count": 0})
     try:
@@ -335,10 +357,11 @@ def _generate_batch_worker(direction: str, reference_ids: list | None = None) ->
         ref_ids = {r for r in (reference_ids or []) if isinstance(r, str)}
         references = [r for r in _load_references() if r.get("id") in ref_ids][:3]
         avoid = [p.get("name_en", "") for p in _load_favorites() if p.get("name_en")]
-        prompt = _build_prompt(direction, avoid, references)
+        prompt = _build_prompt(direction, avoid, references, count, similarity)
         if references:
             print(f"  [ChannelFactory] Using {len(references)} reference channel(s): "
-                  + ", ".join(r.get("name", "") for r in references))
+                  + ", ".join(r.get("name", "") for r in references)
+                  + f" (similarity={similarity})")
 
         print(f"  [ChannelFactory] Requesting 5 channel concepts from {model} ({p_type})...")
         content, finish_reason = _llm_chat(base_url, api_key, model, p_type, prompt)
@@ -364,6 +387,7 @@ def _generate_batch_worker(direction: str, reference_ids: list | None = None) ->
             p = _normalize_profile(raw, i)
             if p:
                 profiles.append(p)
+        profiles = profiles[:count]  # LLM 偶尔无视数量/兜底提取多收：按请求套数截断
         if not profiles:
             raise RuntimeError("LLM 返回内容中没有有效频道方案（字段缺失或解析失败）")
         _save_drafts(profiles)
@@ -389,10 +413,18 @@ async def api_generate(request: Request):
         reference_ids = []
     reference_ids = [str(r) for r in reference_ids
                      if isinstance(r, str) and _REF_ID_RE.match(r)][:3]
+    try:
+        count = max(1, min(10, int(data.get("count", 5))))
+    except (TypeError, ValueError):
+        count = 5
+    similarity = data.get("similarity")
+    if similarity not in _SIMILARITY_MODES:
+        similarity = "medium"
 
-    threading.Thread(target=_generate_batch_worker, args=(direction, reference_ids),
+    threading.Thread(target=_generate_batch_worker,
+                     args=(direction, reference_ids, count, similarity),
                      daemon=True).start()
-    return {"ok": True, "message": "LLM 生成中（约 1-2 分钟）..."}
+    return {"ok": True, "message": f"LLM 生成中（{count} 套，约 1-2 分钟）..."}
 
 
 @router.get("/api/channel_factory/generate_status")
