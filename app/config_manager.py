@@ -59,9 +59,10 @@ PARAM_SPEC = {
                       "quest": "Quest (任务听力)",
                       "original_sprite": "Original Sprite (4章+固定机位)",
                       "quest_sprite": "Quest Sprite (任务+序列帧动画)",
-                      "story": "Story (家庭故事)"}},
+                      "story": "Story (家庭故事)",
+                      "story_sprite": "Story Sprite (家庭故事+序列帧动画)"}},
     "story_kind": {"default": "plot", "type": "select", "group": "content",
-                   "modes": ["story"],
+                   "modes": ["story", "story_sprite"],
                    "label": "剧本类型", "options": {
                        "plot": "家庭故事剧情（冲突→解决+结尾回收提问）",
                        "chat": "双人日常对话",
@@ -127,7 +128,7 @@ PARAM_SPEC = {
     "llm_min_interval": {"default": 3, "type": "number", "group": "llm",
                          "label": "LLM 最小间隔(秒)"},
     "quest_beat_lines": {"default": 10, "type": "number", "group": "llm",
-                         "modes": ["quest", "quest_sprite", "story"],
+                         "modes": ["quest", "quest_sprite", "story", "story_sprite"],
                          "label": "节拍行数", "help": "节拍表每拍的行数预算 (默认10；story 模式共用此参数)"},
     "quest_qa_rounds": {"default": 3, "type": "number", "group": "llm",
                         "label": "QA 轮数（全模式）",
@@ -265,16 +266,16 @@ PARAM_SPEC = {
                                 "help": "跟读练习前的引导文字卡（逐句显示）。关闭后整段跳过。Quest 模式不适用"},
     "dialogue_xfade": {"default": False, "type": "checkbox", "group": "video",
                        "modes": ["original", "original_static", "original_cutout",
-                                 "quest", "quest_sprite", "story"],
+                                 "quest", "quest_sprite", "story", "story_sprite"],
                        "label": "对话段叠化过渡",
                        "help": "相邻对话段之间 0.32s 交叉溶解，弱化硬切感（original_sprite 恒开，无需配置）。开启后合成稍慢"},
     "pad": {"default": "", "type": "text", "group": "video",
             "label": "音频间隔(秒)", "help": "留空=自动 (0.4, story 1.0)"},
     "render_fps": {"default": 8, "type": "number", "group": "video",
-                   "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite", "story"],
+                   "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite", "story", "story_sprite"],
                    "label": "渲染帧率 (定格动画)"},
     "workers": {"default": 1, "type": "number", "group": "video",
-                "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite", "story"],
+                "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite", "story", "story_sprite"],
                 "label": "渲染线程数", "help": "0=自动(CPU核数)"},
     "subtitle_style": {"default": "", "type": "select", "group": "video",
                        "label": "字幕样式",
@@ -297,7 +298,7 @@ PARAM_SPEC = {
     "upscale_timeout": {"default": 3600, "type": "number", "group": "video",
                        "label": "4K超时(秒)"},
     "matting_engine": {"default": "auto", "type": "select", "group": "video",
-                       "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite", "story"],
+                       "modes": ["original_cutout", "quest", "original_sprite", "quest_sprite", "story", "story_sprite"],
                        "label": "抠图引擎",
                        "options": {"auto": "Auto (有权重用MODNet)",
                                    "modnet": "MODNet (AI抠图)",
@@ -488,7 +489,7 @@ def save_quick_fields(mode: str, fields: list[str]) -> list[str]:
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
 
 MODES = ["original", "original_static", "original_cutout", "quest",
-         "original_sprite", "quest_sprite", "story"]
+         "original_sprite", "quest_sprite", "story", "story_sprite"]
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
     "original_static": "Original Static (4章静态图片)",
@@ -496,6 +497,7 @@ MODE_LABELS = {
     "quest": "Quest (任务听力)",
     "original_sprite": "Original Sprite (4章+固定机位)",
     "story": "Story (家庭故事)",
+    "story_sprite": "Story Sprite (家庭故事+序列帧)",
 }
 ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
 
@@ -513,6 +515,7 @@ MODE_SHORT_LABELS = {
     "quest": "Quest",
     "original_sprite": "Sprite",
     "story": "Story",
+    "story_sprite": "Story Sprite",
 }
 
 
@@ -805,10 +808,13 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         if _cand > 1:
             args += ["--script-candidates", str(min(3, max(1, _cand)))]
     args += ["--structure", str(config.get("structure", "original"))]
-    if config.get("structure") == "story" and config.get("story_kind"):
+    if config.get("structure") in ("story", "story_sprite") and config.get("story_kind"):
         args += ["--story-kind", str(config["story_kind"])]
-    args += ["--animation",
-             normalize_animation(str(config.get("animation", "") or "stop_motion"))]
+    _anim = normalize_animation(str(config.get("animation", "") or "stop_motion"))
+    if config.get("structure") == "story_sprite":
+        # story_sprite 固定序列帧动画（与 _build_args 强制一致）
+        _anim = "sprite_sequence"
+    args += ["--animation", _anim]
     if config.get("host_character"):
         args += ["--host-character", str(config["host_character"])]
     if config.get("host_bg_prompt"):
@@ -1031,4 +1037,5 @@ def structure_family(mode: str) -> str:
     """序列帧/故事新模式 → 行为族名（族内结构分支零改动）；其余模式原样返回。"""
     return {"original_sprite": "original_cutout",
             "quest_sprite": "quest",
-            "story": "quest"}.get(mode, mode)
+            "story": "quest",
+            "story_sprite": "quest"}.get(mode, mode)

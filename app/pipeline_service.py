@@ -291,7 +291,7 @@ class PipelineService:
         # story 模式（家庭故事）：剧本类型 + 家庭角色设定。
         # story_family.json 由 Web「家庭角色设定」编辑卡与 pipeline 共读；
         # STORY_FAMILY_JSON 用 ensure_ascii=True 全 ASCII，防 Windows 子进程编码坑
-        if str(config.get("structure", "")) == "story":
+        if str(config.get("structure", "")) in ("story", "story_sprite"):
             os.environ["STORY_KIND"] = str(config.get("story_kind", "") or "")
             try:
                 from .config_manager import CONFIGS_DIR
@@ -414,7 +414,7 @@ class PipelineService:
         from .config_manager import structure_family
         structure = structure_family(config.get("structure", "original"))
         if structure == "quest":
-            if config.get("structure") == "story":
+            if config.get("structure") in ("story", "story_sprite"):
                 # story：一家四口 + 可选 NPC 嘉宾（无主持人）
                 all_keys = ["char_a", "char_b", "char_c", "char_d", "char_e"]
             else:
@@ -548,7 +548,7 @@ class PipelineService:
         from .config_manager import structure_family
         structure = structure_family(self.config.get("structure", "original"))
         if structure == "quest":
-            if self.config.get("structure") == "story":
+            if self.config.get("structure") in ("story", "story_sprite"):
                 # story：一家四口 + 可选 NPC 嘉宾（无主持人）
                 all_char_keys = ["char_a", "char_b", "char_c", "char_d", "char_e"]
             else:
@@ -918,7 +918,7 @@ class PipelineService:
         from .config_manager import structure_family
         structure = structure_family(self.config.get("structure", "original"))
         if structure == "quest":
-            if self.config.get("structure") == "story":
+            if self.config.get("structure") in ("story", "story_sprite"):
                 # story：绑定性别收集覆盖一家四口 + 嘉宾（A/B 交换逻辑不变，
                 # char_c/d/e 不匹配仅提示）
                 keys = ["char_a", "char_b", "char_c", "char_d", "char_e"]
@@ -1075,18 +1075,18 @@ class PipelineService:
         mode_name = config.get("structure", "original")
         structure = structure_family(mode_name)
         if num_lines is None:
-            num_lines = (150 if mode_name == "story" else 48) \
+            num_lines = (150 if mode_name in ("story", "story_sprite") else 48) \
                 if structure == "quest" else 18
         if pad is None:
             # story 对话节奏比 quest 快（同款自然衔接，无长思考停顿）
-            pad = 1.0 if mode_name == "story" else 0.4
+            pad = 1.0 if mode_name in ("story", "story_sprite") else 0.4
 
         # original_static: always use static images (no landing/stop_motion)
         animation = normalize_animation(
             str(config.get("animation", "") or "stop_motion"))
         if structure == "original_static":
             animation = "none"
-        if mode_name in ("original_sprite", "quest_sprite"):
+        if mode_name in ("original_sprite", "quest_sprite", "story_sprite"):
             animation = "sprite_sequence"
         elif mode_name == "original_cutout":
             # original_cutout 已移除 sprite_sequence 选项（序列帧走 original_sprite 模式）

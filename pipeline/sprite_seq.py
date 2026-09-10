@@ -297,6 +297,26 @@ def _load_library_flag(img_dir) -> set:
         return set()
 
 
+def _all_chars_from_script(script: dict) -> list:
+    """序列帧角色清单：char_a/b/c 恒在（与旧行为一致），story 扩展角色
+    （char_d 家人 / char_e 嘉宾）有描述才追加，host 恒在——实际生成集合
+    由调用方 char_keys 过滤决定。"""
+    chars = [
+        ("char_a", script.get("char_a_description", "friendly young man")),
+        ("char_b", script.get("char_b_description", "friendly young woman")),
+        ("char_c", script.get("char_c_description", "friendly staff member")),
+    ]
+    # quest 脚本无 char_d/e 字段 → 列表与原行为逐字节一致
+    for _sk in ("char_d", "char_e"):
+        _sd = str(script.get(f"{_sk}_description", "")).strip()
+        if _sd:
+            chars.append((_sk, _sd))
+    chars.append(("host", script.get("host_description",
+                                     "friendly young woman with short brown hair, wearing a "
+                                     "smart blue blazer, warm smile, professional TV host appearance")))
+    return chars
+
+
 def generate_sprite_clips(script, img_dir,
                           tts_thread=None, max_workers: int = 2,
                           style_prompt: str = DEFAULT_STYLE_PROMPT,
@@ -311,14 +331,7 @@ def generate_sprite_clips(script, img_dir,
     """
     img_dir = Path(img_dir)
     library_chars = _load_library_flag(img_dir)
-    all_chars = [
-        ("char_a", script.get("char_a_description", "friendly young man")),
-        ("char_b", script.get("char_b_description", "friendly young woman")),
-        ("char_c", script.get("char_c_description", "friendly staff member")),
-        ("host", script.get("host_description",
-                            "friendly young woman with short brown hair, wearing a "
-                            "smart blue blazer, warm smile, professional TV host appearance")),
-    ]
+    all_chars = _all_chars_from_script(script)
     chars = [c for c in all_chars if char_keys is None or c[0] in char_keys]
     if not chars:
         return None

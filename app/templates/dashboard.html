@@ -437,11 +437,12 @@ function applyQuickFields() {
     document.getElementById('quick-anim-wrap').style.display = isImage ? '' : 'none';
     document.getElementById('cefr-cell').className = isImage ? '' : 'col-span-2';
     if (isImage) document.getElementById('quick-animation').value = cfg.animation || 'landing';
-    // story 模式专属：家庭角色设定编辑卡
+    // story 族专属：家庭角色设定编辑卡（story / story_sprite 共用）
     const sfWrap = document.getElementById('story-family-wrap');
     if (sfWrap) {
-        sfWrap.style.display = ACTIVE_MODE === 'story' ? '' : 'none';
-        if (ACTIVE_MODE === 'story') loadStoryFamily();
+        const isStoryFam = ['story', 'story_sprite'].includes(ACTIVE_MODE);
+        sfWrap.style.display = isStoryFam ? '' : 'none';
+        if (isStoryFam) loadStoryFamily();
     }
     applyQuickConfigFields();
 }
@@ -1027,7 +1028,7 @@ function saveStoryFamily() {
 }
 
 function getCharKeys() {
-    if (ACTIVE_MODE === 'story') {
+    if (ACTIVE_MODE === 'story' || ACTIVE_MODE === 'story_sprite') {
         // 一家四口 + 可选嘉宾（无主持人）
         return [
             {key: 'char_a', label: '角色A'},
@@ -2162,7 +2163,7 @@ function connectSSE() {
                                 const parts = data.work_dir ? data.work_dir.split(/[\\/]/).filter(Boolean) : [];
                                 const runName = parts[parts.length - 1] || '';
                                 const parentSeg = parts.length >= 2 ? parts[parts.length - 2] : '';
-                                const isMode = ['original', 'original_static', 'original_cutout', 'original_sprite', 'quest', 'quest_sprite', 'story'].includes(parentSeg);
+                                const isMode = ['original', 'original_static', 'original_cutout', 'original_sprite', 'quest', 'quest_sprite', 'story', 'story_sprite'].includes(parentSeg);
                                 const modeQ = isMode ? `?mode=${parentSeg}` : '';
                                 if (runName) location.href = `/runs/${runName}/gallery${modeQ}`;
                                 else location.href = '/runs';
