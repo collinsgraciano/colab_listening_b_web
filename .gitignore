@@ -32,6 +32,12 @@ configs/batch_queue.json
 # Quick-config panel field selection per mode (console user preference)
 configs/quick_config.json
 
+# Channel factory runtime state (drafts / favorites / references / generated assets)
+configs/channel_drafts.json
+configs/channel_favorites.json
+configs/channel_references.json
+configs/channel_assets/
+
 # Pipeline run outputs
 output/
 

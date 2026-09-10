@@ -17,8 +17,28 @@
             </button>
             <span id="gen-status" class="text-xs text-slate-400"></span>
         </div>
+        <div class="flex flex-wrap gap-2 items-center mt-3">
+            <span class="text-xs text-slate-400 shrink-0">📎 参考频道：</span>
+            <div id="ref-chips" class="flex flex-wrap gap-1.5"></div>
+            <span id="ref-chips-empty" class="text-[11px] text-slate-500">暂无（可在下方「📎 参考频道」区添加，勾选后按其风格生成）</span>
+        </div>
         <p class="text-[11px] text-slate-500 mt-2">文案由当前配置的 LLM Provider 生成；Logo/Banner 跟随参数配置的生图 Provider（MCP 耗积分 / SenseNova 计费）。</p>
     </div>
+
+    <!-- References -->
+    <section id="ref-section" class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">📎 参考频道
+            <span class="text-xs font-normal text-slate-500">收藏标杆频道简介，生成时在上方勾选作为风格参考（只学风格，不抄文案）</span>
+        </h3>
+        <div class="flex flex-wrap gap-2">
+            <input type="text" id="ref-name" placeholder="频道名称（如：天天聽英文 Everyday English Learning）"
+                class="flex-1 min-w-[240px] bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500">
+            <button onclick="addRef()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm text-white transition shrink-0">➕ 保存参考</button>
+        </div>
+        <textarea id="ref-desc" rows="3" placeholder="粘贴该频道的完整简介（EN / 繁中均可）"
+            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 resize-none"></textarea>
+        <div id="ref-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+    </section>
 
     <!-- Asset task status（生成素材时出现） -->
     <div id="asset-panel" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-4">
@@ -64,6 +84,8 @@
 <script>
 let DRAFTS = [];
 let FAVORITES = [];
+let REFS = [];
+let SELECTED_REFS = new Set();
 let _genBusy = false;
 let _assetBusy = false;
 let _genTimer = null;
@@ -206,7 +228,7 @@ async function startGenerate() {
     try {
         const resp = await fetch('/api/channel_factory/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ direction }),
+            body: JSON.stringify({ direction, reference_ids: [...SELECTED_REFS] }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -325,9 +347,64 @@ async function openAssetsFolder(pid) {
     await fetch(`/api/channel_factory/favorites/${encodeURIComponent(pid)}/open_folder`, { method: 'POST' });
 }
 
+// ---------- references ----------
+async function loadRefs() {
+    const d = await fetch('/api/channel_factory/references').then(r => r.json());
+    REFS = d.references || [];
+    // 清理已删除的选中项
+    SELECTED_REFS = new Set([...SELECTED_REFS].filter(id => REFS.some(r => r.id === id)));
+    renderRefChips();
+    renderRefCards();
+}
+function renderRefChips() {
+    document.getElementById('ref-chips').innerHTML = REFS.map(r => `
+        <button onclick="toggleRef('${r.id}')" title="${esc(r.description.slice(0, 100))}"
+            class="px-2.5 py-1 rounded-full text-[11px] transition ${SELECTED_REFS.has(r.id)
+                ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">
+            ${SELECTED_REFS.has(r.id) ? '✓' : '📎'} ${esc(r.name)}
+        </button>`).join('');
+    document.getElementById('ref-chips-empty').classList.toggle('hidden', !!REFS.length);
+}
+function renderRefCards() {
+    document.getElementById('ref-grid').innerHTML = REFS.map(r => `
+        <div class="bg-slate-900 border border-slate-700 rounded-lg p-3">
+            <div class="flex items-start justify-between gap-2">
+                <div class="text-sm font-medium text-white break-words">${esc(r.name)}</div>
+                <button onclick="deleteRef('${r.id}')" class="text-slate-500 hover:text-red-400 text-xs shrink-0 transition">🗑️</button>
+            </div>
+            <div class="text-[11px] text-slate-400 leading-5 mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap">${esc(r.description)}</div>
+        </div>`).join('');
+}
+function toggleRef(id) {
+    if (SELECTED_REFS.has(id)) SELECTED_REFS.delete(id);
+    else SELECTED_REFS.add(id);
+    renderRefChips();
+}
+async function addRef() {
+    const name = document.getElementById('ref-name').value.trim();
+    const description = document.getElementById('ref-desc').value.trim();
+    if (!name || !description) { alert('名称和简介不能为空'); return; }
+    const resp = await fetch('/api/channel_factory/references', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) { alert('保存失败: ' + (data.error || resp.status)); return; }
+    document.getElementById('ref-name').value = '';
+    document.getElementById('ref-desc').value = '';
+    loadRefs();
+}
+async function deleteRef(id) {
+    if (!confirm('删除该参考频道卡片？')) return;
+    const resp = await fetch(`/api/channel_factory/references/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!resp.ok) { alert('删除失败'); return; }
+    loadRefs();
+}
+
 // ---------- init ----------
 window.addEventListener('load', async () => {
     await loadAll();
+    loadRefs();
     // 页面加载时恢复进行中的任务轮询（服务重启后 idle 视为结束）
     const gs = await fetch('/api/channel_factory/generate_status').then(r => r.json());
     if (gs.status === 'generating') {

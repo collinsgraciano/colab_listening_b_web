@@ -28,12 +28,14 @@ from ..config_manager import detect_local_mcp_token, load_config, resolve_provid
 from ..page_mcp import PageMcpSession
 from ..paths import (
     CHANNEL_ASSETS_DIR, CHANNEL_DRAFTS_PATH, CHANNEL_FAVORITES_PATH,
+    CHANNEL_REFERENCES_PATH,
 )
 
 router = APIRouter()
 
 _ASSET_KINDS = ("logo", "banner")
 _ID_RE = re.compile(r"^ch_[A-Za-z0-9_]+$")
+_REF_ID_RE = re.compile(r"^ref_[A-Za-z0-9_]+$")
 _HEX_RE = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
 
@@ -70,6 +72,70 @@ def _load_favorites() -> list:
 
 def _save_favorites(profiles: list) -> None:
     _save_json(CHANNEL_FAVORITES_PATH, {"updated": time.time(), "profiles": profiles})
+
+
+# ===========================================================================
+# 参考频道：用户收藏的标杆频道（名称+简介），生成时勾选作为风格参考
+# ===========================================================================
+
+# 首次访问播种：用户提供的 3 个同赛道参考频道（可删除/可自行新增）
+_SEED_REFERENCES = [
+    {
+        "id": "ref_seed_1",
+        "name": "天天聽英文 Everyday English Learning",
+        "description": (
+            "歡迎來到「天天聽英文」YouTube 頻道，這裡是你學習英文的最佳夥伴。我們精心製作的影片幫助你利用零碎時間反覆聆聽，"
+            "輕鬆提升生活中的英語聽說能力。我們的內容基於日常生活中的真實場景，提供連貫性的對話練習，幫助你在實際情境中流暢地進行英文交流。\n"
+            "Welcome to the \"Everyday English Learning\" YouTube channel! We are your best partner for learning English. "
+            "Our carefully crafted videos help you make the most of your spare time with repeated listening, making it easy "
+            "to enhance your English listening and speaking skills in everyday life. Our content is based on real-life scenarios, "
+            "offering continuous dialogue practice to help you communicate fluently in practical situations."),
+    },
+    {
+        "id": "ref_seed_2",
+        "name": "強效英文 Powerful English",
+        "description": (
+            "Welcome to Powerful English.\n"
+            "Here you can learn English in a fun and efficient way.\n"
+            "Learning English doesn't have to be boring and difficult.\n"
+            "My videos will help you improve your listening and speaking skills.\n"
+            "What are you waiting for?\n"
+            "Subscribe and learn English with us!\n"
+            "這裡是「強效英文Powerful English」唯一的正式頻道！\n"
+            "提供大家免費且實用的學習影片！\n"
+            "讓您用最短的時間、學到最多的內容！\n"
+            "快速提升您的聽力與口說能力！\n"
+            "感謝大家的訂閱跟分享！"),
+    },
+    {
+        "id": "ref_seed_3",
+        "name": "學學英文吧 English with me",
+        "description": (
+            "您是否常常找不到話題，瞬間冷場呢??\n"
+            "包含簡短問題與回答的英文對話，讓你從早到晚都能聊，有滿滿的話題來源可以暢所欲言！\n"
+            "在這個頻道中，您可以獲得有效的英語聽力訓練，幫助您提高聽力、累積詞彙量。不管您是初學者還是想更流利地使用英語，我們都有適合您的內容。\n"
+            "💡 學習重點：\n"
+            "    提升聽力：藉由聽標準英語母語者的發音，快速提高聽力，辨認不同口音和語調。\n"
+            "    流利口語：持之以恆反覆聆聽、經過模仿發音和大聲朗讀，逐步達到流利的英語口語。\n"
+            "    中文配音：我們的影片包含了中文解說，讓您更輕鬆理解，不需一直盯著螢幕，即使是邊做家事也能聆聽，讓學習效果倍增。\n"
+            "    增加詞彙：提供初級詞彙和短語，擴充英語詞彙庫，在面對各種不同的情境時也能從容自信。\n"
+            "👍 請按讚、訂閱並分享我們的影片！訂閱後，點擊通知鈴鐺，就能接收最新影片通知！\n"
+            "❤️ 如果您喜歡我們的內容，請訂閱、分享和點贊。您的支持對我們非常重要🙏🏻。ENGLISH WITH ME!! 讓我們一起學英語!!"),
+    },
+]
+
+
+def _load_references() -> list:
+    if not CHANNEL_REFERENCES_PATH.exists():
+        now = time.time()
+        seeded = [{**r, "created": now} for r in _SEED_REFERENCES]
+        _save_references(seeded)
+        return seeded
+    return _load_json(CHANNEL_REFERENCES_PATH, {}).get("references", [])
+
+
+def _save_references(references: list) -> None:
+    _save_json(CHANNEL_REFERENCES_PATH, {"updated": time.time(), "references": references})
 
 
 # ===========================================================================
@@ -169,7 +235,8 @@ def _salvage_profiles_regex(text: str) -> list[dict]:
     return out
 
 
-def _build_prompt(direction: str, avoid_names: list[str]) -> str:
+def _build_prompt(direction: str, avoid_names: list[str],
+                  references: list[dict] | None = None) -> str:
     direction_block = (
         f'\n\nUSER DIRECTION (highest priority — all 5 concepts must fit this '
         f'direction, vary strongly WITHIN it): "{direction}"'
@@ -177,10 +244,21 @@ def _build_prompt(direction: str, avoid_names: list[str]) -> str:
         "\n\nPick 5 clearly different sub-niches across the English-learning "
         "content ecosystem (no two concepts may be similar)."
     )
+    references_block = ""
+    if references:
+        parts = [f'=== Reference {i}: {r.get("name", "")} ===\n{r.get("description", "")}'
+                 for i, r in enumerate(references, 1)]
+        references_block = (
+            "\n\nREFERENCE CHANNELS the user admires (learn from their positioning, "
+            "description structure, tone and content focus — e.g. bilingual description "
+            "style, clear learning-point bullets, warm encouraging call-to-action. "
+            "Capture their STYLE and appeal; NEVER copy their channel names or "
+            "sentences verbatim):\n\n" + "\n\n".join(parts)
+        )
     avoid_block = "\n".join(f"- {n}" for n in avoid_names) or "(none)"
     return f"""You are a YouTube channel strategist and brand designer for a content studio producing English-learning videos (audience: overseas Chinese ESL learners).
 
-Design exactly 5 COMPLETELY DIFFERENT YouTube channel concepts. Each concept is a full channel identity package the owner will use to create a brand-new YouTube channel.{direction_block}
+Design exactly 5 COMPLETELY DIFFERENT YouTube channel concepts. Each concept is a full channel identity package the owner will use to create a brand-new YouTube channel.{direction_block}{references_block}
 
 Requirements:
 - The 5 concepts must span clearly different sub-niches / tones / target segments — never two similar ones
@@ -242,8 +320,11 @@ def _normalize_profile(raw: dict, idx: int) -> dict | None:
     }
 
 
-def _generate_batch_worker(direction: str) -> None:
-    """后台线程：LLM 生成 5 套频道信息 → 落盘 drafts。"""
+def _generate_batch_worker(direction: str, reference_ids: list | None = None) -> None:
+    """后台线程：LLM 生成 5 套频道信息 → 落盘 drafts。
+
+    reference_ids：勾选的参考频道 id（worker 内重读文件，最多取 3 个）。
+    """
     _gen_status.update({"status": "generating", "error": "", "count": 0})
     try:
         p_type, base_url, api_key, model = resolve_provider(load_config())
@@ -251,8 +332,13 @@ def _generate_batch_worker(direction: str) -> None:
             raise RuntimeError(f"未配置 {p_type} 的 API Key，请在参数配置页面填写")
         if not model:
             raise RuntimeError("未指定模型（该 Provider 未配置模型列表）")
+        ref_ids = {r for r in (reference_ids or []) if isinstance(r, str)}
+        references = [r for r in _load_references() if r.get("id") in ref_ids][:3]
         avoid = [p.get("name_en", "") for p in _load_favorites() if p.get("name_en")]
-        prompt = _build_prompt(direction, avoid)
+        prompt = _build_prompt(direction, avoid, references)
+        if references:
+            print(f"  [ChannelFactory] Using {len(references)} reference channel(s): "
+                  + ", ".join(r.get("name", "") for r in references))
 
         print(f"  [ChannelFactory] Requesting 5 channel concepts from {model} ({p_type})...")
         content, finish_reason = _llm_chat(base_url, api_key, model, p_type, prompt)
@@ -298,8 +384,13 @@ async def api_generate(request: Request):
     except Exception:
         data = {}
     direction = str(data.get("direction", "") or "").strip().replace("\n", " ")[:200]
+    reference_ids = data.get("reference_ids")
+    if not isinstance(reference_ids, list):
+        reference_ids = []
+    reference_ids = [str(r) for r in reference_ids
+                     if isinstance(r, str) and _REF_ID_RE.match(r)][:3]
 
-    threading.Thread(target=_generate_batch_worker, args=(direction,),
+    threading.Thread(target=_generate_batch_worker, args=(direction, reference_ids),
                      daemon=True).start()
     return {"ok": True, "message": "LLM 生成中（约 1-2 分钟）..."}
 
@@ -329,6 +420,46 @@ async def api_drafts_discard(request: Request):
         drafts = []
     _save_drafts(drafts)
     return {"ok": True, "count": len(drafts)}
+
+
+# ===========================================================================
+# 参考频道 API（首次 GET 播种 3 个内置参考；生成时勾选作为风格参考）
+# ===========================================================================
+
+@router.get("/api/channel_factory/references")
+async def api_references():
+    return {"references": _load_references()}
+
+
+@router.post("/api/channel_factory/references")
+async def api_references_add(request: Request):
+    """新增参考频道卡片：{name, description}。"""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "请求体不是 JSON"}, status_code=400)
+    name = str(data.get("name", "") or "").strip()[:120]
+    description = str(data.get("description", "") or "").strip()[:4000]
+    if not name or not description:
+        return JSONResponse({"ok": False, "error": "名称和简介不能为空"}, status_code=400)
+    references = _load_references()
+    ref = {"id": f"ref_{int(time.time() * 1000)}", "name": name,
+           "description": description, "created": time.time()}
+    references.insert(0, ref)
+    _save_references(references)
+    return {"ok": True, "reference": ref}
+
+
+@router.delete("/api/channel_factory/references/{rid}")
+async def api_references_delete(rid: str):
+    if not _REF_ID_RE.match(rid):
+        return JSONResponse({"ok": False, "error": "无效的参考 id"}, status_code=400)
+    references = _load_references()
+    remaining = [r for r in references if r.get("id") != rid]
+    if len(remaining) == len(references):
+        return JSONResponse({"ok": False, "error": "未找到该参考"}, status_code=404)
+    _save_references(remaining)
+    return {"ok": True}
 
 
 @router.post("/api/channel_factory/favorite")
