@@ -18,6 +18,7 @@ from .paths import STATIC_DIR, WEB_ROOT
 from .routers import (
     ai_test as ai_test_routes,
     batch_queue as batch_queue_routes,
+    channel_factory as channel_factory_routes,
     characters as characters_routes,
     config as config_routes,
     health as health_routes,
@@ -66,6 +67,8 @@ app.include_router(mcp_tokens_routes.router)
 app.include_router(characters_routes.router)
 # story 模式家庭角色设定（configs/story_family.json，Web 编辑卡与 pipeline 共读）
 app.include_router(story_family_routes.router)
+# 频道工坊（LLM 频道信息生成 + 收藏 + Logo/Banner 素材）
+app.include_router(channel_factory_routes.router)
 app.include_router(health_routes.router)
 app.include_router(voices_qwen_routes.router)
 app.include_router(voices_kokoro_routes.router)

@@ -439,3 +439,14 @@ async def characters_page(request: Request):
 
 
 # ===========================================================================
+@router.get("/channel_factory", response_class=HTMLResponse)
+async def channel_factory_page(request: Request):
+    """频道工坊：LLM 批量生成频道信息 + 收藏 + Logo/Banner 生成。"""
+    config = load_config()
+    return templates.TemplateResponse(request, "channel_factory.html", {
+        "config": config,
+        "active_page": "channel_factory",
+    })
+
+
+# ===========================================================================

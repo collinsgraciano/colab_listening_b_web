@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-[1600px] mx-auto space-y-6">
+
+    <!-- Header + Toolbar -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div class="flex items-center gap-3 mb-1">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>📺</span> 频道工坊</h2>
+            <span class="text-xs text-slate-500">LLM 随机生成 YouTube 频道信息 → 收藏 → Logo / Banner</span>
+        </div>
+        <div class="flex flex-wrap gap-3 items-center mt-4">
+            <input type="text" id="cf-direction" placeholder="频道方向提示（可留空 = 英语学习生态随机细分）"
+                class="flex-1 min-w-[280px] bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-slate-500">
+            <button onclick="startGenerate()" id="btn-generate"
+                class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-white font-medium transition">
+                🎲 生成 5 套
+            </button>
+            <span id="gen-status" class="text-xs text-slate-400"></span>
+        </div>
+        <p class="text-[11px] text-slate-500 mt-2">文案由当前配置的 LLM Provider 生成；Logo/Banner 跟随参数配置的生图 Provider（MCP 耗积分 / SenseNova 计费）。</p>
+    </div>
+
+    <!-- Asset task status（生成素材时出现） -->
+    <div id="asset-panel" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+            <div class="text-sm font-medium text-white">🎨 素材生成：<span id="asset-profile" class="text-indigo-300"></span>
+                <span id="asset-status" class="text-xs text-slate-400 ml-2"></span>
+            </div>
+        </div>
+        <pre id="asset-logs" class="text-[11px] leading-5 text-slate-400 bg-slate-900 rounded-lg p-3 max-h-40 overflow-y-auto whitespace-pre-wrap"></pre>
+    </div>
+
+    <!-- Drafts -->
+    <section>
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">🎯 候选方案
+                <span id="draft-count" class="text-xs font-normal text-slate-500"></span>
+            </h3>
+            <button onclick="discardAll()" id="btn-discard-all"
+                class="text-xs text-slate-400 hover:text-red-400 transition hidden">🗑️ 清空整批</button>
+        </div>
+        <div id="drafts-grid" class="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4"></div>
+        <div id="drafts-empty" class="text-center text-slate-500 text-sm py-10">
+            <div class="text-4xl mb-3">🎲</div>
+            <p>还没有候选方案 —— 填写方向提示（可留空），点击「生成 5 套」</p>
+        </div>
+    </section>
+
+    <!-- Favorites -->
+    <section id="fav-section">
+        <h3 class="text-base font-bold text-white flex items-center gap-2 mb-3">⭐ 收藏夹
+            <span id="fav-count" class="text-xs font-normal text-slate-500"></span>
+        </h3>
+        <div id="fav-grid" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+        <div id="fav-empty" class="text-center text-slate-500 text-sm py-10">
+            <div class="text-4xl mb-3">⭐</div>
+            <p>收藏喜欢的候选后，在这里为频道生成 Logo 和 Banner</p>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let DRAFTS = [];
+let FAVORITES = [];
+let _genBusy = false;
+let _assetBusy = false;
+let _genTimer = null;
+let _assetTimer = null;
+
+// ---------- utils ----------
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+            const old = btn.textContent;
+            btn.textContent = '✓ 已复制';
+            setTimeout(() => { btn.textContent = old; }, 1500);
+        }
+    });
+}
+function channelInfoText(p) {
+    let t = `Channel name: ${p.name_en}\n`;
+    if (p.name_zh) t += `频道名稱: ${p.name_zh}\n`;
+    if (p.handle) t += `Handle: ${p.handle}\n`;
+    if (p.slogan) t += `Slogan: ${p.slogan}\n`;
+    if (p.description_en) t += `\nAbout (EN):\n${p.description_en}\n`;
+    if (p.description_zh) t += `\n频道简介（繁中）:\n${p.description_zh}\n`;
+    if (p.tags && p.tags.length) t += `\nTags: ${p.tags.join(', ')}\n`;
+    return t;
+}
+
+// ---------- data ----------
+async function loadAll() {
+    const [d, f] = await Promise.all([
+        fetch('/api/channel_factory/drafts').then(r => r.json()),
+        fetch('/api/channel_factory/favorites').then(r => r.json()),
+    ]);
+    DRAFTS = d.profiles || [];
+    FAVORITES = f.profiles || [];
+    renderDrafts();
+    renderFavs();
+}
+
+// ---------- render: drafts ----------
+function renderDrafts() {
+    const grid = document.getElementById('drafts-grid');
+    const empty = document.getElementById('drafts-empty');
+    document.getElementById('draft-count').textContent = DRAFTS.length ? `${DRAFTS.length} 套` : '';
+    document.getElementById('btn-discard-all').classList.toggle('hidden', !DRAFTS.length);
+    empty.classList.toggle('hidden', !!DRAFTS.length);
+    grid.innerHTML = DRAFTS.map(p => {
+        const tags = (p.tags || []).map(t =>
+            `<span class="px-1.5 py-0.5 bg-slate-700 rounded text-[10px] text-slate-300">${esc(t)}</span>`).join('');
+        const colors = (p.brand_colors || []).map(c =>
+            `<span class="inline-block w-4 h-4 rounded-full border border-slate-600" title="${esc(c)}" style="background:${esc(c)}"></span>`).join('');
+        const series = (p.content_series || []).map(s =>
+            `<li class="text-[11px] text-slate-400 leading-5">• ${esc(s)}</li>`).join('');
+        return `
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <div class="text-base font-bold text-white">${esc(p.name_en)}</div>
+                    <div class="text-sm text-amber-300">${esc(p.name_zh)}</div>
+                </div>
+                ${p.handle ? `<span class="px-2 py-0.5 bg-slate-900 rounded-full text-[10px] text-slate-400 shrink-0">${esc(p.handle)}</span>` : ''}
+            </div>
+            ${p.slogan ? `<div class="text-xs italic text-slate-400">“${esc(p.slogan)}”</div>` : ''}
+            <div class="text-[11px] text-slate-400 space-y-0.5">
+                ${p.niche ? `<div>🎯 ${esc(p.niche)}</div>` : ''}
+                ${p.audience ? `<div>👥 ${esc(p.audience)}</div>` : ''}
+                ${p.brand_style ? `<div class="flex items-center gap-1.5">${colors} <span>${esc(p.brand_style)}</span></div>` : ''}
+            </div>
+            ${tags ? `<div class="flex flex-wrap gap-1">${tags}</div>` : ''}
+            ${series ? `<details class="text-slate-400"><summary class="text-[11px] cursor-pointer hover:text-slate-300">📋 内容系列 (${p.content_series.length})</summary><ul class="mt-1 space-y-0.5">${series}</ul></details>` : ''}
+            <details class="text-slate-400"><summary class="text-[11px] cursor-pointer hover:text-slate-300">📝 频道简介</summary>
+                <p class="text-[11px] leading-5 mt-1">${esc(p.description_en)}</p>
+                <p class="text-[11px] leading-5 mt-1 text-amber-200/80">${esc(p.description_zh)}</p>
+            </details>
+            <div class="flex gap-2 mt-auto pt-2 border-t border-slate-700">
+                <button onclick='favorite(${JSON.stringify(p).replace(/'/g, "&#39;")})'
+                    class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-xs text-white transition">⭐ 收藏</button>
+                <button onclick="copyText(channelInfoText(DRAFTS.find(x=>x.id==='${p.id}')), this)"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">📋 复制</button>
+                <button onclick="discardDraft('${p.id}')"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-red-700 rounded text-xs text-red-300 transition">🗑️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ---------- render: favorites ----------
+function assetUrl(pid, kind, at) {
+    return `/api/channel_factory/favorites/${encodeURIComponent(pid)}/asset/${kind}?v=${at || 0}`;
+}
+function renderFavs() {
+    const grid = document.getElementById('fav-grid');
+    const empty = document.getElementById('fav-empty');
+    document.getElementById('fav-count').textContent = FAVORITES.length ? `${FAVORITES.length} 个` : '';
+    empty.classList.toggle('hidden', !!FAVORITES.length);
+    grid.innerHTML = FAVORITES.map(p => {
+        const logo = p.logo
+            ? `<img src="${assetUrl(p.id, 'logo', p.logo_at)}" class="w-24 h-24 rounded-full object-cover border-2 border-slate-600 cursor-pointer" title="点击查看原图" onclick="window.open('${assetUrl(p.id, 'logo', Date.now())}')">`
+            : `<div class="w-24 h-24 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-[10px] text-slate-500">Logo 未生成</div>`;
+        const banner = p.banner
+            ? `<img src="${assetUrl(p.id, 'banner', p.banner_at)}" class="w-full aspect-video object-cover rounded-lg border border-slate-600 cursor-pointer" title="点击查看原图" onclick="window.open('${assetUrl(p.id, 'banner', Date.now())}')">`
+            : `<div class="w-full aspect-video rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-xs text-slate-500">Banner 未生成（2048x1152）</div>`;
+        return `
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-3">
+            <div class="flex items-start gap-3">
+                ${logo}
+                <div class="flex-1 min-w-0">
+                    <div class="text-base font-bold text-white truncate">${esc(p.name_en)}</div>
+                    <div class="text-sm text-amber-300">${esc(p.name_zh)}</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">${esc(p.niche || '')}</div>
+                    <div class="flex gap-1.5 mt-2 flex-wrap">
+                        <button onclick="startAssets('${p.id}')" ${_assetBusy ? 'disabled' : ''}
+                            class="px-3 py-1.5 ${_assetBusy ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'} rounded text-xs transition">🎨 生成 Logo + Banner</button>
+                        <button onclick="openAssetsFolder('${p.id}')"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">📂 目录</button>
+                        <button onclick="copyText(channelInfoText(FAVORITES.find(x=>x.id==='${p.id}')), this)"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">📋 信息</button>
+                        <button onclick="copyText((FAVORITES.find(x=>x.id==='${p.id}')||{}).tags?.join(', ')||'', this)"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">🏷️ 标签</button>
+                        <button onclick="deleteFav('${p.id}')"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-red-700 rounded text-xs text-red-300 transition ml-auto">🗑️</button>
+                    </div>
+                </div>
+            </div>
+            ${banner}
+        </div>`;
+    }).join('');
+}
+
+// ---------- generation ----------
+async function startGenerate() {
+    if (_genBusy) return;
+    const direction = document.getElementById('cf-direction').value.trim();
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+    try {
+        const resp = await fetch('/api/channel_factory/generate', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ direction }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        _genBusy = true;
+        pollGen(Date.now());
+    } catch (e) {
+        alert('启动生成失败: ' + e.message);
+        btn.disabled = false;
+    }
+}
+function pollGen(startedAt) {
+    clearTimeout(_genTimer);
+    fetch('/api/channel_factory/generate_status').then(r => r.json()).then(st => {
+        const el = document.getElementById('gen-status');
+        if (st.status === 'generating') {
+            el.textContent = `⏳ LLM 生成中... ${Math.round((Date.now() - startedAt) / 1000)}s`;
+            _genTimer = setTimeout(pollGen, 2000, startedAt);
+        } else {
+            _genBusy = false;
+            document.getElementById('btn-generate').disabled = false;
+            if (st.status === 'done') {
+                el.textContent = `✅ 已生成 ${st.count} 套候选`;
+                loadAll();
+            } else if (st.status === 'error') {
+                el.textContent = '';
+                alert('生成失败: ' + (st.error || '未知错误'));
+            } else {
+                el.textContent = '';
+            }
+        }
+    }).catch(() => { _genTimer = setTimeout(pollGen, 3000, startedAt); });
+}
+
+// ---------- drafts actions ----------
+async function favorite(profile) {
+    try {
+        const resp = await fetch('/api/channel_factory/favorite', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        await loadAll();
+        document.getElementById('fav-section').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        alert('收藏失败: ' + e.message);
+    }
+}
+async function discardDraft(id) {
+    await fetch('/api/channel_factory/drafts/discard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+    });
+    loadAll();
+}
+async function discardAll() {
+    if (!confirm('丢弃全部候选方案？')) return;
+    await fetch('/api/channel_factory/drafts/discard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    loadAll();
+}
+
+// ---------- favorites actions ----------
+async function deleteFav(pid) {
+    if (!confirm('删除该收藏？（已生成的 Logo/Banner 文件会保留在磁盘）')) return;
+    const resp = await fetch(`/api/channel_factory/favorites/${encodeURIComponent(pid)}`, { method: 'DELETE' });
+    if (!resp.ok) { alert('删除失败'); return; }
+    loadAll();
+}
+async function startAssets(pid) {
+    if (_assetBusy) return;
+    try {
+        const resp = await fetch('/api/channel_factory/generate_assets', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: pid, kinds: ['logo', 'banner'] }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        _assetBusy = true;
+        renderFavs();
+        document.getElementById('asset-panel').classList.remove('hidden');
+        pollAssets(Date.now());
+    } catch (e) {
+        alert('启动素材生成失败: ' + e.message);
+    }
+}
+function pollAssets(startedAt) {
+    clearTimeout(_assetTimer);
+    fetch('/api/channel_factory/assets_status').then(r => r.json()).then(st => {
+        document.getElementById('asset-profile').textContent = st.profile_name || '';
+        document.getElementById('asset-logs').textContent = (st.logs || []).join('\n');
+        const logs = document.getElementById('asset-logs');
+        logs.scrollTop = logs.scrollHeight;
+        const stEl = document.getElementById('asset-status');
+        if (st.status === 'running') {
+            stEl.textContent = `⏳ ${Math.round((Date.now() - startedAt) / 1000)}s`;
+            _assetTimer = setTimeout(pollAssets, 2000, startedAt);
+        } else {
+            _assetBusy = false;
+            document.getElementById('asset-panel').classList.add('hidden');
+            if (st.status === 'done') {
+                const ok = Object.entries(st.results || {}).filter(([, r]) => r.ok).map(([k]) => k);
+                alert(`素材生成完成: ${ok.join(' + ')}`);
+            } else if (st.status === 'error') {
+                alert('素材生成失败: ' + (st.error || '见日志'));
+            }
+            loadAll();
+        }
+    }).catch(() => { _assetTimer = setTimeout(pollAssets, 3000, startedAt); });
+}
+async function openAssetsFolder(pid) {
+    // explorer 启动慢，3 秒防抖防双开
+    if (openAssetsFolder._t) return;
+    openAssetsFolder._t = setTimeout(() => { openAssetsFolder._t = null; }, 3000);
+    await fetch(`/api/channel_factory/favorites/${encodeURIComponent(pid)}/open_folder`, { method: 'POST' });
+}
+
+// ---------- init ----------
+window.addEventListener('load', async () => {
+    await loadAll();
+    // 页面加载时恢复进行中的任务轮询（服务重启后 idle 视为结束）
+    const gs = await fetch('/api/channel_factory/generate_status').then(r => r.json());
+    if (gs.status === 'generating') {
+        _genBusy = true;
+        document.getElementById('btn-generate').disabled = true;
+        pollGen(Date.now());
+    }
+});
+</script>
+{% endblock %}

@@ -19,6 +19,9 @@ KOKORO_VOICE_CONFIG_PATH = CONFIGS_DIR / "kokoro_voice_config.json"
 MOSS_VOICE_CONFIG_PATH = CONFIGS_DIR / "moss_voice_config.json"
 MOSS_VOICES_DIR = CONFIGS_DIR / "moss_voices"
 MOSS_PREVIEWS_DIR = CONFIGS_DIR / "moss_previews"
+CHANNEL_DRAFTS_PATH = CONFIGS_DIR / "channel_drafts.json"
+CHANNEL_FAVORITES_PATH = CONFIGS_DIR / "channel_favorites.json"
+CHANNEL_ASSETS_DIR = CONFIGS_DIR / "channel_assets"
 
 
 def ensure_pipeline_on_path() -> None:
