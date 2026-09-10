@@ -246,13 +246,16 @@ _SIMILARITY_MODES = {
         "style; keep all names, topics and wording original."),
     "high": (
         "Closely modeled (HIGHEST PRIORITY — this overrides any 'be different/original' "
-        "wording elsewhere in this prompt; that wording applies only to topics and names "
-        "BETWEEN concepts). Mirror the reference channels' description structure "
-        "sentence-pattern by sentence-pattern — opening welcome line, what viewers get, "
-        "learning-point bullets (with emoji if the references use them), like/subscribe "
-        "call-to-action — plus their bilingual layout and overall tone. Change only the "
-        "channel name, handle, specific topic details and example wording; the result "
-        "must feel like the same family of channels, not merely 'inspired by' them."),
+        "wording elsewhere in this prompt; that wording applies only to minor name and "
+        "wording details BETWEEN concepts). Mirror the reference channels' description "
+        "structure sentence-pattern by sentence-pattern — opening welcome line, what "
+        "viewers get, learning-point bullets (with emoji if the references use them), "
+        "like/subscribe call-to-action — plus their bilingual layout and overall tone. "
+        "The niche, topic, audience and content focus of every concept MUST closely "
+        "match the references; channel names must follow the same naming pattern as "
+        "the references (similar structure and language mix) while not being identical "
+        "to them. The result must feel like the same family of channels, not merely "
+        "'inspired by' them."),
 }
 
 
@@ -260,7 +263,15 @@ def _build_prompt(direction: str, avoid_names: list[str],
                   references: list[dict] | None = None,
                   count: int = 5, similarity: str = "medium") -> str:
     has_refs = bool(references)
-    if has_refs:
+    high = similarity == "high"
+    if has_refs and high:
+        task_line = (
+            f"Design exactly {count} YouTube channel concepts that are CLOSE VARIANTS "
+            "of the reference channels below — same niche, same audience, same content "
+            "focus and same style family; they differ from each other only in minor "
+            "name and wording variations."
+        )
+    elif has_refs:
         task_line = (
             f"Design exactly {count} YouTube channel concepts that ALL belong to the "
             "SAME style family as the reference channels below — they differ from each "
@@ -276,6 +287,11 @@ def _build_prompt(direction: str, avoid_names: list[str],
         direction_block = (
             f'\n\nUSER DIRECTION (highest priority — all {count} concepts must fit this '
             f'direction, vary strongly WITHIN it): "{direction}"'
+        )
+    elif has_refs and high:
+        direction_block = (
+            f"\n\nKeep every concept on the SAME topic/angle as the reference channels; "
+            f"vary only minor name and wording details between the {count} concepts."
         )
     elif has_refs:
         direction_block = (
@@ -303,9 +319,13 @@ def _build_prompt(direction: str, avoid_names: list[str],
         )
     avoid_block = "\n".join(f"- {n}" for n in avoid_names) or "(none)"
     diversity_bullet = (
-        f"- Each of the {count} concepts targets a clearly different specific topic/angle "
-        "and has its own distinct name — but ALL of them must stay within the reference "
-        "channels' style family at the SIMILARITY LEVEL specified below"
+        (f"- All {count} concepts share the SAME niche/topic/angle as the reference "
+         "channels and follow their naming pattern; they differ only in minor name "
+         "and wording details")
+        if has_refs and high else
+        (f"- Each of the {count} concepts targets a clearly different specific topic/angle "
+         "and has its own distinct name — but ALL of them must stay within the reference "
+         "channels' style family at the SIMILARITY LEVEL specified below")
         if has_refs else
         f"- The {count} concepts must span clearly different sub-niches / tones / target "
         "segments — never two similar ones"
