@@ -199,43 +199,80 @@ function renderDrafts() {
 function assetUrl(pid, kind, at) {
     return `/api/channel_factory/favorites/${encodeURIComponent(pid)}/asset/${kind}?v=${at || 0}`;
 }
+function titleText(p) {
+    return [p.name_zh, p.name_en].filter(Boolean).join(' ');
+}
+function descText(p) {
+    return [p.description_zh, p.description_en].filter(Boolean).join('\n\n');
+}
+function tagsText(p) {
+    return (p.tags || []).join(', ');
+}
 function renderFavs() {
     const grid = document.getElementById('fav-grid');
     const empty = document.getElementById('fav-empty');
-    document.getElementById('fav-count').textContent = FAVORITES.length ? `${FAVORITES.length} 个` : '';
+    const used = FAVORITES.filter(p => p.used);
+    const unused = FAVORITES.filter(p => !p.used);
+    document.getElementById('fav-count').textContent = FAVORITES.length
+        ? `${FAVORITES.length} 个（未使用 ${unused.length} / 已使用 ${used.length}）` : '';
     empty.classList.toggle('hidden', !!FAVORITES.length);
-    grid.innerHTML = FAVORITES.map(p => {
+
+    const card = (p) => {
         const logo = p.logo
-            ? `<img src="${assetUrl(p.id, 'logo', p.logo_at)}" class="w-24 h-24 rounded-full object-cover border-2 border-slate-600 cursor-pointer hover:border-indigo-400 transition" title="点击复制路径：${esc(p.logo_path || p.logo)}" onclick="copyAssetPath('${p.id}','logo')">`
-            : `<div class="w-24 h-24 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-[10px] text-slate-500">Logo 未生成</div>`;
+            ? `<div class="relative shrink-0">
+                <img src="${assetUrl(p.id, 'logo', p.logo_at)}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-600 cursor-pointer hover:border-indigo-400 transition" title="点击复制路径：${esc(p.logo_path || p.logo)}" onclick="copyAssetPath('${p.id}','logo')">
+                <button onclick="startAssets('${p.id}',['logo'])" ${_assetBusy ? 'disabled' : ''} title="重新生成 Logo"
+                    class="absolute -top-1 -right-1 w-5 h-5 ${_assetBusy ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-indigo-600 text-white'} rounded-full text-[10px] leading-none transition">↻</button>
+            </div>`
+            : `<div class="w-16 h-16 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-[9px] text-slate-500 shrink-0">Logo<br>未生成</div>`;
         const banner = p.banner
-            ? `<img src="${assetUrl(p.id, 'banner', p.banner_at)}" class="w-full aspect-video object-cover rounded-lg border border-slate-600 cursor-pointer hover:border-indigo-400 transition" title="点击复制路径：${esc(p.banner_path || p.banner)}" onclick="copyAssetPath('${p.id}','banner')">`
-            : `<div class="w-full aspect-video rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-xs text-slate-500">Banner 未生成（2048x1152）</div>`;
+            ? `<div class="relative mt-2">
+                <img src="${assetUrl(p.id, 'banner', p.banner_at)}" class="w-full aspect-video object-cover rounded-lg border border-slate-600 cursor-pointer hover:border-indigo-400 transition" title="点击复制路径：${esc(p.banner_path || p.banner)}" onclick="copyAssetPath('${p.id}','banner')">
+                <button onclick="startAssets('${p.id}',['banner'])" ${_assetBusy ? 'disabled' : ''} title="重新生成 Banner"
+                    class="absolute top-1 right-1 px-1.5 py-0.5 ${_assetBusy ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-900/80 hover:bg-indigo-600 text-white'} rounded text-[10px] transition">↻ 重绘</button>
+            </div>`
+            : `<div class="w-full aspect-video mt-2 rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-[11px] text-slate-500">Banner 未生成（2048x1152）</div>`;
         return `
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-3">
-            <div class="flex items-start gap-3">
+        <div class="bg-slate-800 border ${p.used ? 'border-emerald-700/60' : 'border-slate-700'} rounded-xl p-3 space-y-2">
+            <div class="flex items-start gap-2.5">
                 ${logo}
                 <div class="flex-1 min-w-0">
-                    <div class="text-base font-bold text-white truncate">${esc(p.name_en)}</div>
-                    <div class="text-sm text-amber-300">${esc(p.name_zh)}</div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">${esc(p.niche || '')}</div>
-                    <div class="flex gap-1.5 mt-2 flex-wrap">
-                        <button onclick="startAssets('${p.id}')" ${_assetBusy ? 'disabled' : ''}
-                            class="px-3 py-1.5 ${_assetBusy ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'} rounded text-xs transition">🎨 生成 Logo + Banner</button>
-                        <button onclick="openAssetsFolder('${p.id}')"
-                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">📂 目录</button>
-                        <button onclick="copyText(channelInfoText(FAVORITES.find(x=>x.id==='${p.id}')), this)"
-                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">📋 信息</button>
-                        <button onclick="copyText((FAVORITES.find(x=>x.id==='${p.id}')||{}).tags?.join(', ')||'', this)"
-                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition">🏷️ 标签</button>
-                        <button onclick="deleteFav('${p.id}')"
-                            class="px-3 py-1.5 bg-slate-700 hover:bg-red-700 rounded text-xs text-red-300 transition ml-auto">🗑️</button>
-                    </div>
+                    <div class="text-sm font-bold text-white truncate" title="${esc(p.name_en)}">${esc(p.name_en)}</div>
+                    <div class="text-xs text-amber-300 truncate">${esc(p.name_zh)}</div>
+                    <div class="text-[10px] text-slate-500 truncate mt-0.5" title="${esc(p.niche || '')}">${esc(p.niche || '')}</div>
                 </div>
+            </div>
+            <div class="flex flex-wrap gap-1">
+                <button onclick="startAssets('${p.id}',['logo','banner'])" ${_assetBusy ? 'disabled' : ''}
+                    class="px-2 py-1 ${_assetBusy ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'} rounded text-[11px] transition">🎨 生成图</button>
+                <button onclick="openAssetsFolder('${p.id}')"
+                    class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300 transition">📂</button>
+                <button onclick="toggleUsed('${p.id}')"
+                    class="px-2 py-1 rounded text-[11px] transition ${p.used ? 'bg-emerald-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}">${p.used ? '✅ 已使用' : '⚪ 未使用'}</button>
+                <button onclick="deleteFav('${p.id}')"
+                    class="px-2 py-1 bg-slate-700 hover:bg-red-700 rounded text-[11px] text-red-300 transition ml-auto">🗑️</button>
+            </div>
+            <div class="flex flex-wrap gap-1">
+                <button onclick="copyText(titleText(FAVORITES.find(x=>x.id==='${p.id}')), this)"
+                    class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300 transition">📛 标题</button>
+                <button onclick="copyText(descText(FAVORITES.find(x=>x.id==='${p.id}')), this)"
+                    class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300 transition">📝 简介</button>
+                <button onclick="copyText(tagsText(FAVORITES.find(x=>x.id==='${p.id}')), this)"
+                    class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-300 transition">🏷️ 标签</button>
             </div>
             ${banner}
         </div>`;
-    }).join('');
+    };
+    const group = (label, list, tone) => !list.length ? '' : `
+        <div class="col-span-full flex items-center gap-2 ${list === used ? 'mt-1' : ''}">
+            <span class="text-xs font-bold ${tone}">${label}</span>
+            <span class="text-[10px] text-slate-500">${list.length}</span>
+            <div class="flex-1 h-px bg-slate-700"></div>
+        </div>` + list.map(card).join('');
+
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3';
+    grid.innerHTML = group('🎯 未使用', unused, 'text-slate-300')
+        + group('✅ 已使用', used, 'text-emerald-400');
 }
 
 // ---------- generation ----------
@@ -342,12 +379,13 @@ async function deleteFav(pid) {
     if (!resp.ok) { alert('删除失败'); return; }
     loadAll();
 }
-async function startAssets(pid) {
+async function startAssets(pid, kinds) {
     if (_assetBusy) return;
+    kinds = kinds || ['logo', 'banner'];
     try {
         const resp = await fetch('/api/channel_factory/generate_assets', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: pid, kinds: ['logo', 'banner'] }),
+            body: JSON.stringify({ id: pid, kinds }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -382,6 +420,17 @@ function pollAssets(startedAt) {
             loadAll();
         }
     }).catch(() => { _assetTimer = setTimeout(pollAssets, 3000, startedAt); });
+}
+async function toggleUsed(pid) {
+    const p = FAVORITES.find(x => x.id === pid);
+    if (!p) return;
+    const resp = await fetch(`/api/channel_factory/favorites/${encodeURIComponent(pid)}/used`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ used: !p.used }),
+    });
+    if (!resp.ok) { alert('更新失败'); return; }
+    p.used = !p.used;
+    renderFavs();
 }
 async function openAssetsFolder(pid) {
     // explorer 启动慢，3 秒防抖防双开

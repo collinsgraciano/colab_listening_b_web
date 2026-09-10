@@ -19,6 +19,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -695,7 +696,7 @@ def _gen_asset_mcp(prompt: str, dest: Path, width: int, height: int,
 
 
 def _generate_assets_worker(profile_id: str, kinds: list[str]) -> None:
-    """后台线程：为收藏的频道生成 Logo/Banner（单槽，顺序逐个）。"""
+    """后台线程：为收藏的频道生成 Logo/Banner（单槽任务；两项之间并发生成）。"""
     _asset_status.update({"status": "running", "error": "", "profile_id": profile_id,
                           "profile_name": "", "kinds": kinds, "results": {}, "logs": []})
 
@@ -716,7 +717,7 @@ def _generate_assets_worker(profile_id: str, kinds: list[str]) -> None:
         provider = str(config.get("image_provider", "mcp"))
         log(f"生图通道: {provider}")
 
-        mcp_session = None
+        tokens: list[str] = []
         if provider == "mcp":
             tokens = [t.strip() for t in str(config.get("mcp_tokens", "") or "").splitlines()
                       if t.strip()]
@@ -726,7 +727,6 @@ def _generate_assets_worker(profile_id: str, kinds: list[str]) -> None:
                     tokens = [local]
             if not tokens:
                 raise RuntimeError("未配置 MCP Token（模式配置 / 本地检测均为空）")
-            mcp_session = PageMcpSession(tokens).initialize()
         else:
             key = str(config.get("sensenova_api_key", "") or "").strip()
             if not key:
@@ -736,21 +736,33 @@ def _generate_assets_worker(profile_id: str, kinds: list[str]) -> None:
 
         sizes = {"logo": ("1024x1024", 1024, 1024),
                  "banner": ("2720x1536", 2048, 1152)}
-        results = {}
-        for kind in kinds:
-            if kind not in _ASSET_KINDS:
-                continue
+        kinds_valid = [k for k in kinds if k in _ASSET_KINDS]
+
+        # Logo/Banner 并发生成（生图最大并发 4，两项仅占 2）；MCP 每个素材
+        # 独立 PageMcpSession（独立 session id/消息序号，天然线程安全）
+        def _gen_one(kind: str):
             dest = out_dir / f"{kind}.png"
-            prompt = _build_logo_prompt(profile) if kind == "logo" else _build_banner_prompt(profile)
+            prompt = (_build_logo_prompt(profile) if kind == "logo"
+                      else _build_banner_prompt(profile))
             log(f"开始生成 {kind} ...")
-            if provider == "mcp":
-                _, w, h = sizes[kind]
-                ok = _gen_asset_mcp(prompt, dest, w, h, mcp_session, log)
-            else:
-                sn_size, _, _ = sizes[kind]
-                ok = _gen_asset_sensenova(prompt, dest, sn_size, log)
-            results[kind] = {"ok": ok, "file": f"{kind}.png" if ok else ""}
+            try:
+                if provider == "mcp":
+                    _, w, h = sizes[kind]
+                    session = PageMcpSession(tokens).initialize()
+                    ok = _gen_asset_mcp(prompt, dest, w, h, session, log)
+                else:
+                    sn_size, _, _ = sizes[kind]
+                    ok = _gen_asset_sensenova(prompt, dest, sn_size, log)
+            except Exception as e:  # noqa: BLE001 — 单个素材失败不拖垮另一个
+                log(f"{kind} 生成异常: {e}")
+                ok = False
             log(f"{kind}: {'OK' if ok else 'FAIL'}")
+            return kind, {"ok": ok, "file": f"{kind}.png" if ok else ""}
+
+        results = {}
+        with ThreadPoolExecutor(max_workers=min(4, max(1, len(kinds_valid)))) as ex:
+            for kind, r in ex.map(_gen_one, kinds_valid):
+                results[kind] = r
 
         # 结束前重读 favorites 再回写素材元数据（缩小与 UI 删除操作的竞态窗口）
         favorites = _load_favorites()
@@ -799,6 +811,24 @@ async def api_generate_assets(request: Request):
 @router.get("/api/channel_factory/assets_status")
 async def api_assets_status():
     return _asset_status
+
+
+@router.post("/api/channel_factory/favorites/{pid}/used")
+async def api_favorite_used(pid: str, request: Request):
+    """标记收藏为已使用/未使用（前端按此分组显示）。"""
+    if not _ID_RE.match(pid):
+        return JSONResponse({"ok": False, "error": "无效的收藏 id"}, status_code=400)
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    favorites = _load_favorites()
+    profile = next((p for p in favorites if p.get("id") == pid), None)
+    if profile is None:
+        return JSONResponse({"ok": False, "error": "未找到该收藏"}, status_code=404)
+    profile["used"] = bool(data.get("used"))
+    _save_favorites(favorites)
+    return {"ok": True, "used": profile["used"]}
 
 
 @router.get("/api/channel_factory/favorites/{pid}/asset/{kind}")
