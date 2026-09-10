@@ -520,7 +520,18 @@ async def api_favorite(request: Request):
 
 @router.get("/api/channel_factory/favorites")
 async def api_favorites():
-    return {"profiles": _load_favorites()}
+    """收藏列表（附带已生成素材的本地绝对路径 logo_path/banner_path，供一键复制）。"""
+    profiles = _load_favorites()
+    for p in profiles:
+        pid = str(p.get("id", ""))
+        for kind in _ASSET_KINDS:
+            path = ""
+            if _ID_RE.match(pid):
+                f = CHANNEL_ASSETS_DIR / pid / f"{kind}.png"
+                if f.exists():
+                    path = str(f)
+            p[f"{kind}_path"] = path
+    return {"profiles": profiles}
 
 
 @router.delete("/api/channel_factory/favorites/{pid}")

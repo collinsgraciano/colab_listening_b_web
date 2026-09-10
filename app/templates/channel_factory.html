@@ -206,10 +206,10 @@ function renderFavs() {
     empty.classList.toggle('hidden', !!FAVORITES.length);
     grid.innerHTML = FAVORITES.map(p => {
         const logo = p.logo
-            ? `<img src="${assetUrl(p.id, 'logo', p.logo_at)}" class="w-24 h-24 rounded-full object-cover border-2 border-slate-600 cursor-pointer" title="点击查看原图" onclick="window.open('${assetUrl(p.id, 'logo', Date.now())}')">`
+            ? `<img src="${assetUrl(p.id, 'logo', p.logo_at)}" class="w-24 h-24 rounded-full object-cover border-2 border-slate-600 cursor-pointer hover:border-indigo-400 transition" title="点击复制路径：${esc(p.logo_path || p.logo)}" onclick="copyAssetPath('${p.id}','logo')">`
             : `<div class="w-24 h-24 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-[10px] text-slate-500">Logo 未生成</div>`;
         const banner = p.banner
-            ? `<img src="${assetUrl(p.id, 'banner', p.banner_at)}" class="w-full aspect-video object-cover rounded-lg border border-slate-600 cursor-pointer" title="点击查看原图" onclick="window.open('${assetUrl(p.id, 'banner', Date.now())}')">`
+            ? `<img src="${assetUrl(p.id, 'banner', p.banner_at)}" class="w-full aspect-video object-cover rounded-lg border border-slate-600 cursor-pointer hover:border-indigo-400 transition" title="点击复制路径：${esc(p.banner_path || p.banner)}" onclick="copyAssetPath('${p.id}','banner')">`
             : `<div class="w-full aspect-video rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-xs text-slate-500">Banner 未生成（2048x1152）</div>`;
         return `
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-3">
@@ -314,6 +314,28 @@ async function discardAll() {
 }
 
 // ---------- favorites actions ----------
+let _toastTimer = null;
+function showToast(msg) {
+    let el = document.getElementById('cf-toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'cf-toast';
+        el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-700 text-white text-sm rounded-lg shadow-lg z-50 transition-opacity duration-300 pointer-events-none';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+}
+function copyAssetPath(pid, kind) {
+    const p = FAVORITES.find(x => x.id === pid);
+    const path = p ? (p[kind + '_path'] || '') : '';
+    if (!path) { alert('素材文件不存在（请先生成）'); return; }
+    navigator.clipboard.writeText(path).then(() => {
+        showToast((kind === 'logo' ? 'Logo' : 'Banner') + ' 路径已复制');
+    });
+}
 async function deleteFav(pid) {
     if (!confirm('删除该收藏？（已生成的 Logo/Banner 文件会保留在磁盘）')) return;
     const resp = await fetch(`/api/channel_factory/favorites/${encodeURIComponent(pid)}`, { method: 'DELETE' });
