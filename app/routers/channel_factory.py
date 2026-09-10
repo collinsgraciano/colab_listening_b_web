@@ -17,6 +17,7 @@ import os
 import re
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -78,8 +79,14 @@ def _save_favorites(profiles: list) -> None:
 _gen_status: dict = {"status": "idle", "error": "", "count": 0}
 
 
-def _llm_chat(base_url: str, api_key: str, model: str, p_type: str, prompt: str) -> str:
-    """同步调 LLM chat/completions（独立小函数，便于测试 monkeypatch）。"""
+def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
+              prompt: str) -> tuple[str, str]:
+    """同步调 LLM chat/completions，返回 (content, finish_reason)。
+
+    max_tokens 优先 16384（5 套长简介易顶到 8192 被截断）；Provider 拒绝该上限
+    （HTTP 400 报文提到 max_tokens）时回退 8192 重试一次。
+    独立小函数，便于测试 monkeypatch。
+    """
     body = {
         "model": model,
         "messages": [
@@ -89,21 +96,77 @@ def _llm_chat(base_url: str, api_key: str, model: str, p_type: str, prompt: str)
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.9,
-        "max_tokens": 8192,
+        "max_tokens": 16384,
     }
     if p_type != "openai":
         body["reasoning_effort"] = "low"
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-    )
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("User-Agent", "CodelyLLM/1.0")
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
-    return result["choices"][0]["message"]["content"]
+    last_err: Exception | None = None
+    for max_tokens in (16384, 8192):
+        body["max_tokens"] = max_tokens
+        req = urllib.request.Request(
+            f"{base_url}/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            method="POST",
+        )
+        req.add_header("Authorization", f"Bearer {api_key}")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", "CodelyLLM/1.0")
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8", errors="replace")[:300]
+            except Exception:  # noqa: BLE001
+                pass
+            last_err = RuntimeError(f"LLM API HTTP {e.code}: {detail}")
+            if max_tokens == 16384 and e.code == 400 and "max_tokens" in detail.lower():
+                print("  [ChannelFactory] Provider 拒绝 max_tokens=16384，回退 8192 重试")
+                continue
+            raise last_err from e
+        choice = (result.get("choices") or [{}])[0]
+        return (str(choice.get("message", {}).get("content", "")),
+                str(choice.get("finish_reason", "")))
+    raise last_err or RuntimeError("LLM 请求失败")
+
+
+# ---------------------------------------------------------------------------
+# 字段级兜底提取：LLM 输出含未转义内层引号 / 结构损坏导致整体 JSON 解析失败时，
+# 按 name_en 键切段、逐字段正则提取（损坏值在引号处截断，只损失该字段不整体失败）
+# ---------------------------------------------------------------------------
+_SALVAGE_STR = r'"((?:[^"\\]|\\.)*)"'
+_SALVAGE_STR_FIELDS = ("name_zh", "handle", "slogan", "description_en",
+                       "description_zh", "niche", "audience", "brand_style")
+
+
+def _json_unescape(s: str) -> str:
+    try:
+        return json.loads(f'"{s}"')
+    except Exception:  # noqa: BLE001 — 非法转义序列原样返回
+        return s.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
+
+
+def _salvage_profiles_regex(text: str) -> list[dict]:
+    out = []
+    for seg in re.split(r'"name_en"\s*:\s*"', text)[1:]:
+        raw = {"name_en": _json_unescape(seg.split('"', 1)[0])}
+        for key in _SALVAGE_STR_FIELDS:
+            m = re.search(rf'"{key}"\s*:\s*{_SALVAGE_STR}', seg)
+            if m:
+                raw[key] = _json_unescape(m.group(1))
+        for key in ("content_series", "tags"):
+            m = re.search(rf'"{key}"\s*:\s*\[(.*?)\]', seg, re.DOTALL)
+            if m:
+                raw[key] = [_json_unescape(x) for x in
+                            re.findall(_SALVAGE_STR, m.group(1))]
+        m = re.search(r'"brand_colors"\s*:\s*\[(.*?)\]', seg, re.DOTALL)
+        if m:
+            raw["brand_colors"] = [
+                x for x in (_json_unescape(s) for s in re.findall(_SALVAGE_STR, m.group(1)))
+                if re.fullmatch(r"#?[0-9a-fA-F]{6}", x)][:3]
+        out.append(raw)
+    return out
 
 
 def _build_prompt(direction: str, avoid_names: list[str]) -> str:
@@ -192,10 +255,24 @@ def _generate_batch_worker(direction: str) -> None:
         prompt = _build_prompt(direction, avoid)
 
         print(f"  [ChannelFactory] Requesting 5 channel concepts from {model} ({p_type})...")
-        content = _llm_chat(base_url, api_key, model, p_type, prompt)
+        content, finish_reason = _llm_chat(base_url, api_key, model, p_type, prompt)
+        if finish_reason == "length":
+            print("  [ChannelFactory] WARNING: LLM 输出被 max_tokens 截断"
+                  "（finish_reason=length），将尝试修复/兜底提取")
 
         from llm_client import _extract_json  # pipeline/ 已在 sys.path
-        raw_list = _extract_json(content).get("channels") or []
+        raw_list: list = []
+        try:
+            data = _extract_json(content)
+            if isinstance(data, dict):
+                raw_list = data.get("channels") or []
+        except Exception as parse_err:  # noqa: BLE001 — 落 salvage 兜底
+            print(f"  [ChannelFactory] 整体 JSON 解析失败，尝试字段级兜底提取: {parse_err}")
+        if not raw_list:
+            raw_list = _salvage_profiles_regex(content)
+        if not raw_list:
+            raise RuntimeError(
+                "LLM 返回内容无法解析（已尝试截断修复与字段级兜底提取），请重试或更换模型")
         profiles = []
         for i, raw in enumerate(raw_list):
             p = _normalize_profile(raw, i)

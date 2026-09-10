@@ -317,11 +317,25 @@ def _repair_truncated_json(text: str) -> str:
                 if stack and stack[-1] == c:
                     stack.pop()
         i += 1
-    # If we're in an unterminated string, close it
+    # If we're in an unterminated string, close it (a trailing lone backslash
+    # must be doubled first, otherwise the appended quote stays escaped)
     if in_string:
+        if escape:
+            text += "\\"
         text += '"'
-    # Remove trailing comma if present
-    text = re.sub(r',\s*$', '', text.strip())
+    stripped = text.rstrip()
+    if stack and stack[-1] == '}':
+        # Cut inside an object: dangling colon → empty value; dangling key
+        # (a full quoted string right after { or ,) → append ": \"\"" so the
+        # object stays parseable instead of "Expecting ',' delimiter"
+        if stripped.endswith(':'):
+            text = stripped + ' ""'
+        elif re.search(r'[{,]\s*"(?:[^"\\]|\\.)*"\s*$', stripped):
+            text = stripped + ': ""'
+        else:
+            text = re.sub(r',\s*$', '', stripped)
+    else:
+        text = re.sub(r',\s*$', '', stripped)
     # Close all open structures
     while stack:
         text += stack.pop()
