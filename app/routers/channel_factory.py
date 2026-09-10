@@ -146,7 +146,7 @@ _gen_status: dict = {"status": "idle", "error": "", "count": 0}
 
 
 def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
-              prompt: str) -> tuple[str, str]:
+              prompt: str, temperature: float = 0.9) -> tuple[str, str]:
     """同步调 LLM chat/completions，返回 (content, finish_reason)。
 
     max_tokens 优先 16384（5 套长简介易顶到 8192 被截断）；Provider 拒绝该上限
@@ -161,7 +161,7 @@ def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
                         "designer. Output valid JSON only — no markdown, no explanations."},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.9,
+        "temperature": temperature,
         "max_tokens": 16384,
     }
     if p_type != "openai":
@@ -245,23 +245,48 @@ _SIMILARITY_MODES = {
         "section organization and bilingual (EN + Traditional Chinese) presentation "
         "style; keep all names, topics and wording original."),
     "high": (
-        "Closely modeled — closely follow the reference channels' tone, structure, "
-        "formatting (including bullet/emoji style) and content organization; change "
-        "only the channel name, handle and specific topic details so the result "
-        "feels like the same family of channels."),
+        "Closely modeled (HIGHEST PRIORITY — this overrides any 'be different/original' "
+        "wording elsewhere in this prompt; that wording applies only to topics and names "
+        "BETWEEN concepts). Mirror the reference channels' description structure "
+        "sentence-pattern by sentence-pattern — opening welcome line, what viewers get, "
+        "learning-point bullets (with emoji if the references use them), like/subscribe "
+        "call-to-action — plus their bilingual layout and overall tone. Change only the "
+        "channel name, handle, specific topic details and example wording; the result "
+        "must feel like the same family of channels, not merely 'inspired by' them."),
 }
 
 
 def _build_prompt(direction: str, avoid_names: list[str],
                   references: list[dict] | None = None,
                   count: int = 5, similarity: str = "medium") -> str:
-    direction_block = (
-        f'\n\nUSER DIRECTION (highest priority — all {count} concepts must fit this '
-        f'direction, vary strongly WITHIN it): "{direction}"'
-        if direction else
-        f"\n\nPick {count} clearly different sub-niches across the English-learning "
-        "content ecosystem (no two concepts may be similar)."
-    )
+    has_refs = bool(references)
+    if has_refs:
+        task_line = (
+            f"Design exactly {count} YouTube channel concepts that ALL belong to the "
+            "SAME style family as the reference channels below — they differ from each "
+            "other only in specific topic, angle and name, NOT in style."
+        )
+    else:
+        task_line = (
+            f"Design exactly {count} COMPLETELY DIFFERENT YouTube channel concepts. "
+            "Each concept is a full channel identity package the owner will use to "
+            "create a brand-new YouTube channel."
+        )
+    if direction:
+        direction_block = (
+            f'\n\nUSER DIRECTION (highest priority — all {count} concepts must fit this '
+            f'direction, vary strongly WITHIN it): "{direction}"'
+        )
+    elif has_refs:
+        direction_block = (
+            f"\n\nVary only the specific topics/angles across the {count} concepts — "
+            "the style stays unified per the SIMILARITY LEVEL below."
+        )
+    else:
+        direction_block = (
+            f"\n\nPick {count} clearly different sub-niches across the English-learning "
+            "content ecosystem (no two concepts may be similar)."
+        )
     references_block = ""
     if references:
         parts = [f'=== Reference {i}: {r.get("name", "")} ===\n{r.get("description", "")}'
@@ -270,18 +295,27 @@ def _build_prompt(direction: str, avoid_names: list[str],
             "\n\nREFERENCE CHANNELS the user admires (learn from their positioning, "
             "description structure, tone and content focus — e.g. bilingual description "
             "style, clear learning-point bullets, warm encouraging call-to-action. "
-            "Capture their STYLE and appeal; NEVER copy their channel names or "
-            "sentences verbatim):\n\n" + "\n\n".join(parts)
-            + "\n\nSIMILARITY LEVEL (how closely to follow the references): "
+            "Never reuse their channel names):\n\n" + "\n\n".join(parts)
+            + "\n\nSIMILARITY LEVEL (HIGHEST-PRIORITY style instruction — it overrides "
+              "any 'be different/original' wording elsewhere in this prompt; that "
+              "wording applies only to topics and names BETWEEN concepts): "
             + _SIMILARITY_MODES.get(similarity, _SIMILARITY_MODES["medium"])
         )
     avoid_block = "\n".join(f"- {n}" for n in avoid_names) or "(none)"
+    diversity_bullet = (
+        f"- Each of the {count} concepts targets a clearly different specific topic/angle "
+        "and has its own distinct name — but ALL of them must stay within the reference "
+        "channels' style family at the SIMILARITY LEVEL specified below"
+        if has_refs else
+        f"- The {count} concepts must span clearly different sub-niches / tones / target "
+        "segments — never two similar ones"
+    )
     return f"""You are a YouTube channel strategist and brand designer for a content studio producing English-learning videos (audience: overseas Chinese ESL learners).
 
-Design exactly {count} COMPLETELY DIFFERENT YouTube channel concepts. Each concept is a full channel identity package the owner will use to create a brand-new YouTube channel.{direction_block}{references_block}
+{task_line}{direction_block}{references_block}
 
 Requirements:
-- The {count} concepts must span clearly different sub-niches / tones / target segments — never two similar ones
+{diversity_bullet}
 - "name_en": catchy, brandable, 2-4 words, easy to spell and pronounce; not generic (avoid names like "English Learning Channel")
 - "name_zh": Traditional Chinese (繁體中文) channel name matching the EN brand
 - "handle": YouTube handle suggestion starting with @ (lowercase letters/numbers, no spaces, <=20 chars)
@@ -364,7 +398,10 @@ def _generate_batch_worker(direction: str, reference_ids: list | None = None,
                   + f" (similarity={similarity})")
 
         print(f"  [ChannelFactory] Requesting 5 channel concepts from {model} ({p_type})...")
-        content, finish_reason = _llm_chat(base_url, api_key, model, p_type, prompt)
+        # 相似度越高温度越低：high 紧贴参考需要稳定的模仿输出
+        temperature = {"light": 0.9, "medium": 0.8, "high": 0.6}.get(similarity, 0.9)
+        content, finish_reason = _llm_chat(base_url, api_key, model, p_type, prompt,
+                                           temperature)
         if finish_reason == "length":
             print("  [ChannelFactory] WARNING: LLM 输出被 max_tokens 截断"
                   "（finish_reason=length），将尝试修复/兜底提取")
