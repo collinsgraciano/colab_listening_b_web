@@ -104,6 +104,8 @@ PROMPT_FIELDS = {
     "original": ("video_prompt",),
     "original_static": ("image_prompt",),
     "original_cutout": (),
+    # sleep：行仅 text/phonetic/zh（画面是 Pillow 卡片，无 AI 生图/视频）
+    "sleep": (),
 }
 
 
@@ -359,7 +361,8 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
             f"title_zh \"{title_zh}\" 超过 6 字（缩略图空间有限）")
 
     # ── 7. 元数据 ────────────────────────────────────────────────────
-    if not str(script.get("welcome_en", "")).strip():
+    # sleep 冷开场（intro 卡+频道名播报，无旁白字段），welcome_en 空串合法
+    if structure != "sleep" and not str(script.get("welcome_en", "")).strip():
         add("metadata", "error", "welcome_en 为空（主持人开场白必需）")
     if not str(script.get("title", "")).strip():
         add("metadata", "warning", "title 为空")

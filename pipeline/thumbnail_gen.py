@@ -344,6 +344,13 @@ def save_youtube_metadata(script: dict, timeline: list[dict],
         }
     elif structure == "story":
         seg_labels = {}
+    elif structure == "sleep":
+        # sleep 时间轴段类型 intro/pair/gap/outro：按类型取首现做三章
+        seg_labels = {
+            "intro": "Intro",
+            "pair": "Phrase Drills",
+            "outro": "Outro",
+        }
     else:
         seg_labels = {
             "welcome": "Welcome & Hook",

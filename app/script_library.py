@@ -41,7 +41,7 @@ from llm_client import (  # noqa: E402
     _enforce_rate_limit, _extract_json, resolve_max_line_words,
     set_llm_env_override)
 
-DEFAULT_LINES = {"original": 18, "original_static": 18, "original_cutout": 18, "quest": 48, "story": 150}
+DEFAULT_LINES = {"original": 18, "original_static": 18, "original_cutout": 18, "quest": 48, "story": 150, "sleep": 400}
 
 # 简体独有字（繁体无此字形）— 检测中文文案误用简体
 _SIMP_ONLY_CHARS = set(
@@ -437,6 +437,15 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
     return ov
 
 
+def _sleep_batch_pairs() -> int:
+    """sleep 模式 LLM 分批组数：读 sleep 模式配置，默认 50，clamp [10, 80]。"""
+    try:
+        raw = load_mode_config("sleep").get("sleep_batch_pairs", 50)
+        return max(10, min(80, int(raw)))
+    except (TypeError, ValueError):
+        return 50
+
+
 def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
                   lessons_dir: str | None, max_attempts: int = 3):
     """Generate + validate a single script with retries. Returns (script, attempts)."""
@@ -447,7 +456,12 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
     last_err: Exception | None = None
     for attempt in range(max_attempts):
         try:
-            if story:
+            if structure == "sleep":
+                from sleep.llm_client_sleep import generate_sleep_script
+                script = generate_sleep_script(
+                    topic, cefr, num_pairs=max(10, num_lines // 2),
+                    batch_pairs=_sleep_batch_pairs(), lessons_dir=lessons_dir)
+            elif story:
                 from story.llm_client_story import generate_story_script
                 script = generate_story_script(
                     topic, cefr, lessons_dir=lessons_dir, num_lines=num_lines)
@@ -495,8 +509,8 @@ def generate_batch(params: dict, q, stop_event: threading.Event) -> None:
 
     mode_cfg = load_mode_config(structure)
     lessons_dir = mode_cfg.get("lessons_dir", "") or None
-    # quest/story 单次生成 20+ 次 LLM 调用，减少重试次数避免过长等待
-    max_attempts = 2 if structure in ("quest", "story") else 3
+    # quest/story/sleep 单次生成多次 LLM 调用，减少重试次数避免过长等待
+    max_attempts = 2 if structure in ("quest", "story", "sleep") else 3
 
     try:
         override = _build_llm_override(provider, model, structure)

@@ -1150,8 +1150,12 @@ class PipelineService:
         mode_name = config.get("structure", "original")
         structure = structure_family(mode_name)
         if num_lines is None:
-            num_lines = (150 if mode_name in ("story", "story_sprite") else 48) \
-                if structure == "quest" else 18
+            if structure == "sleep":
+                # 行数 = 组数×2（与 pipeline.main() 双处一致；--num-lines 对 sleep 不生效）
+                num_lines = max(10, min(400, _cfg_int(config, "sleep_pairs", 200))) * 2
+            else:
+                num_lines = (150 if mode_name in ("story", "story_sprite") else 48) \
+                    if structure == "quest" else 18
         if pad is None:
             # story 对话节奏比 quest 快（同款自然衔接，无长思考停顿）
             pad = 1.0 if mode_name in ("story", "story_sprite") else 0.4
@@ -1206,6 +1210,29 @@ class PipelineService:
             used_topics_file=config.get("used_topics_file", "") or None,
             lessons_dir=config.get("lessons_dir", "") or None,
             practice_duration=float(config.get("practice_duration", 3.0)),
+            sleep_pairs=max(10, min(400, _cfg_int(config, "sleep_pairs", 200))),
+            sleep_slow_rate=float(config.get("sleep_slow_rate", 0.8) or 0.8),
+            sleep_gap_short=float(config.get("sleep_gap_short", 1.0) or 1.0),
+            sleep_gap_long=float(config.get("sleep_gap_long", 2.0) or 2.0),
+            sleep_pair_gap=float(config.get("sleep_pair_gap", 3.0) or 3.0),
+            sleep_batch_pairs=_cfg_int(config, "sleep_batch_pairs", 50),
+            sleep_channel_name=str(config.get("sleep_channel_name", "") or ""),
+            sleep_outro_text=str(config.get("sleep_outro_text", "") or ""),
+            sleep_show_leaves=bool(config.get("sleep_show_leaves", True)),
+            sleep_handwrite_font=str(config.get("sleep_handwrite_font", "") or ""),
+            sleep_color_bg_top=str(config.get("sleep_color_bg_top", "") or ""),
+            sleep_color_bg_bottom=str(config.get("sleep_color_bg_bottom", "") or ""),
+            sleep_color_card=str(config.get("sleep_color_card", "") or ""),
+            sleep_color_card_border=str(config.get("sleep_color_card_border", "") or ""),
+            sleep_color_en_a=str(config.get("sleep_color_en_a", "") or ""),
+            sleep_color_en_b=str(config.get("sleep_color_en_b", "") or ""),
+            sleep_color_phonetic=str(config.get("sleep_color_phonetic", "") or ""),
+            sleep_color_zh=str(config.get("sleep_color_zh", "") or ""),
+            sleep_color_num=str(config.get("sleep_color_num", "") or ""),
+            sleep_color_badge_bg=str(config.get("sleep_color_badge_bg", "") or ""),
+            sleep_color_badge_text=str(config.get("sleep_color_badge_text", "") or ""),
+            sleep_color_channel=str(config.get("sleep_color_channel", "") or ""),
+            sleep_color_leaf=str(config.get("sleep_color_leaf", "") or ""),
             ch3_en_repeats=_cfg_int(config, "ch3_en_repeats", 3),
             ch3_zh_repeats=_cfg_int(config, "ch3_zh_repeats", 1),
             ch3_zh_always=bool(config.get("ch3_zh_always", True)),

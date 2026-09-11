@@ -47,7 +47,7 @@ PARAM_SPEC = {
     "cefr": {"default": "A2", "type": "select", "group": "content",
              "label": "CEFR 等级", "options": ["A1", "A2", "B1", "B2", "C1", "C2"]},
     "num_lines": {"default": "", "type": "number", "group": "content",
-                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48, story:150)"},
+                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48, story:150; sleep=组数×2 由下方 sleep 参数决定)"},
     "max_line_words": {"default": 10, "type": "number", "group": "content",
                        "label": "每行最大词数",
                        "help": "对话每行/旁白每句词数上限（默认 10，建议 5-15），保证字幕最多显示两行；超长行触发 QA 修复"},
@@ -60,7 +60,8 @@ PARAM_SPEC = {
                       "original_sprite": "Original Sprite (4章+固定机位)",
                       "quest_sprite": "Quest Sprite (任务+序列帧动画)",
                       "story": "Story (家庭故事)",
-                      "story_sprite": "Story Sprite (家庭故事+序列帧动画)"}},
+                      "story_sprite": "Story Sprite (家庭故事+序列帧动画)",
+                      "sleep": "Sleep (睡觉听短句循环)"}},
     "story_kind": {"default": "plot", "type": "select", "group": "content",
                    "modes": ["story", "story_sprite"],
                    "label": "剧本类型", "options": {
@@ -104,6 +105,75 @@ PARAM_SPEC = {
                        "modes": ["quest", "original_cutout", "original_sprite", "quest_sprite"],
                        "label": "主持人演播室背景 Prompt",
                        "help": "留空=LLM 按本期主题自动生成；填写后每期固定用该描述生成演播室背景（主持人开场/结尾段）"},
+
+    # --- Sleep（睡觉听短句循环，仅 sleep 模式）---
+    "sleep_pairs": {"default": 200, "type": "number", "group": "sleep",
+                    "modes": ["sleep"],
+                    "label": "对话组数 (10-400)",
+                    "help": "A/B 短对话组数，行数=组数×2（默认 200 组=400 句，对标「400句」参考体量；约 30 秒/组）"},
+    "sleep_slow_rate": {"default": 0.8, "type": "number", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "女声慢速速率",
+                        "help": "慢速版 atempo 速率（0.6-0.95，默认 0.8=八成速；越小越慢，低于 0.6 发音会含糊）"},
+    "sleep_gap_short": {"default": 1.0, "type": "number", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "常速后停顿(秒)",
+                        "help": "男声常速朗读后的静音气口（默认 1.0 秒）"},
+    "sleep_gap_long": {"default": 2.0, "type": "number", "group": "sleep",
+                       "modes": ["sleep"],
+                       "label": "慢速后停顿(秒)",
+                       "help": "女声慢速朗读后的跟读气口（默认 2.0 秒）"},
+    "sleep_pair_gap": {"default": 3.0, "type": "number", "group": "sleep",
+                       "modes": ["sleep"],
+                       "label": "切组停顿(秒)",
+                       "help": "AB 连贯朗读后切下一组的停顿（默认 3.0 秒）"},
+    "sleep_batch_pairs": {"default": 50, "type": "number", "group": "sleep",
+                          "modes": ["sleep"],
+                          "label": "LLM 分批组数",
+                          "help": "每批生成的对话组数（默认 50，批间落盘可断点续传）"},
+    "sleep_channel_name": {"default": "English with me", "type": "text", "group": "sleep",
+                           "modes": ["sleep"],
+                           "label": "频道名",
+                           "help": "卡片左上/片头卡显示 + 片头 TTS 播报（声学标签）"},
+    "sleep_outro_text": {"default": "Thanks for listening. See you next time!", "type": "text", "group": "sleep",
+                         "modes": ["sleep"],
+                         "label": "片尾结束语",
+                         "help": "片尾卡文字 + TTS 播报"},
+    "sleep_show_leaves": {"default": True, "type": "checkbox", "group": "sleep",
+                          "modes": ["sleep"],
+                          "label": "叶片装饰",
+                          "help": "卡片角落浅色叶片装饰（关闭更素净）"},
+    "sleep_handwrite_font": {"default": "", "type": "text", "group": "sleep",
+                             "modes": ["sleep"],
+                             "label": "手写体字体路径",
+                             "help": "频道名字体 .ttf/.ttc 路径；留空=Inkfree→Segoe Script→雅黑 Bold"},
+    "sleep_color_bg_top": {"default": "", "type": "text", "group": "sleep",
+                           "modes": ["sleep"], "label": "背景渐变顶部",
+                           "help": "hex 如 #eaf4e2；留空用默认配色"},
+    "sleep_color_bg_bottom": {"default": "", "type": "text", "group": "sleep",
+                              "modes": ["sleep"], "label": "背景渐变底部", "help": "hex"},
+    "sleep_color_card": {"default": "", "type": "text", "group": "sleep",
+                         "modes": ["sleep"], "label": "卡片底色", "help": "hex"},
+    "sleep_color_card_border": {"default": "", "type": "text", "group": "sleep",
+                                "modes": ["sleep"], "label": "卡片描边", "help": "hex"},
+    "sleep_color_en_a": {"default": "", "type": "text", "group": "sleep",
+                         "modes": ["sleep"], "label": "A句英文颜色", "help": "hex（参考同款=深棕）"},
+    "sleep_color_en_b": {"default": "", "type": "text", "group": "sleep",
+                         "modes": ["sleep"], "label": "B句英文颜色", "help": "hex（参考同款=橙色）"},
+    "sleep_color_phonetic": {"default": "", "type": "text", "group": "sleep",
+                             "modes": ["sleep"], "label": "音标颜色", "help": "hex（参考同款=橄榄绿）"},
+    "sleep_color_zh": {"default": "", "type": "text", "group": "sleep",
+                       "modes": ["sleep"], "label": "中文颜色", "help": "hex"},
+    "sleep_color_num": {"default": "", "type": "text", "group": "sleep",
+                        "modes": ["sleep"], "label": "序号/横条颜色", "help": "hex（参考同款=粉色发光）"},
+    "sleep_color_badge_bg": {"default": "", "type": "text", "group": "sleep",
+                             "modes": ["sleep"], "label": "角标底色", "help": "hex（参考同款=粉）"},
+    "sleep_color_badge_text": {"default": "", "type": "text", "group": "sleep",
+                               "modes": ["sleep"], "label": "角标文字色", "help": "hex"},
+    "sleep_color_channel": {"default": "", "type": "text", "group": "sleep",
+                            "modes": ["sleep"], "label": "频道名颜色", "help": "hex"},
+    "sleep_color_leaf": {"default": "", "type": "text", "group": "sleep",
+                         "modes": ["sleep"], "label": "叶片颜色", "help": "hex"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -411,6 +481,7 @@ GROUP_META = {
     "bgm": {"label": "BGM 音乐（通用）", "icon": "🎵", "order": 6},
     "bgm_amix": {"label": "BGM · amix 模式", "icon": "🎵", "order": 7},
     "bgm_sidechain": {"label": "BGM · sidechain 模式", "icon": "🎵", "order": 8},
+    "sleep": {"label": "Sleep 睡前短句", "icon": "😴", "order": 9},
 }
 
 
@@ -489,7 +560,7 @@ def save_quick_fields(mode: str, fields: list[str]) -> list[str]:
 # default.json 仅作首次迁移源；active_mode.json 记录当前激活模式。
 
 MODES = ["original", "original_static", "original_cutout", "quest",
-         "original_sprite", "quest_sprite", "story", "story_sprite"]
+         "original_sprite", "quest_sprite", "story", "story_sprite", "sleep"]
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
     "original_static": "Original Static (4章静态图片)",
@@ -498,6 +569,7 @@ MODE_LABELS = {
     "original_sprite": "Original Sprite (4章+固定机位)",
     "story": "Story (家庭故事)",
     "story_sprite": "Story Sprite (家庭故事+序列帧)",
+    "sleep": "Sleep (睡觉听短句循环)",
 }
 ACTIVE_MODE_PATH = CONFIGS_DIR / "active_mode.json"
 
@@ -516,6 +588,7 @@ MODE_SHORT_LABELS = {
     "original_sprite": "Sprite",
     "story": "Story",
     "story_sprite": "Story Sprite",
+    "sleep": "Sleep",
 }
 
 
@@ -820,6 +893,35 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     if config.get("host_bg_prompt"):
         args += ["--host-bg-prompt", str(config["host_bg_prompt"])]
     args += ["--visual-style", str(config.get("visual_style", "pixar3d"))]
+
+    # Sleep（sleep 模式专属；其余模式忽略）
+    for _sk, _sf in (("sleep_pairs", "--sleep-pairs"),
+                     ("sleep_slow_rate", "--sleep-slow-rate"),
+                     ("sleep_gap_short", "--sleep-gap-short"),
+                     ("sleep_gap_long", "--sleep-gap-long"),
+                     ("sleep_pair_gap", "--sleep-pair-gap"),
+                     ("sleep_batch_pairs", "--sleep-batch-pairs"),
+                     ("sleep_channel_name", "--sleep-channel-name"),
+                     ("sleep_outro_text", "--sleep-outro-text"),
+                     ("sleep_handwrite_font", "--sleep-handwrite-font"),
+                     ("sleep_color_bg_top", "--sleep-color-bg-top"),
+                     ("sleep_color_bg_bottom", "--sleep-color-bg-bottom"),
+                     ("sleep_color_card", "--sleep-color-card"),
+                     ("sleep_color_card_border", "--sleep-color-card-border"),
+                     ("sleep_color_en_a", "--sleep-color-en-a"),
+                     ("sleep_color_en_b", "--sleep-color-en-b"),
+                     ("sleep_color_phonetic", "--sleep-color-phonetic"),
+                     ("sleep_color_zh", "--sleep-color-zh"),
+                     ("sleep_color_num", "--sleep-color-num"),
+                     ("sleep_color_badge_bg", "--sleep-color-badge-bg"),
+                     ("sleep_color_badge_text", "--sleep-color-badge-text"),
+                     ("sleep_color_channel", "--sleep-color-channel"),
+                     ("sleep_color_leaf", "--sleep-color-leaf")):
+        _sv = config.get(_sk)
+        if _sv not in (None, ""):
+            args += [_sf, str(_sv)]
+    if config.get("sleep_show_leaves") is False:
+        args.append("--no-sleep-show-leaves")
 
     # LLM
     provider = config.get("llm_provider", "sensenova")

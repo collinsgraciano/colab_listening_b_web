@@ -162,12 +162,21 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                                 quest=False, structure="original",
                                 story=False, family_file=None,
                                 story_kind=None,
+                                sleep=False, sleep_pairs=0, sleep_batch=50,
+                                sleep_cache_dir=None,
                                 max_attempts=5) -> dict:
     """Generate and validate script, retrying on failure."""
     for attempt in range(max_attempts):
         try:
             print(f"  [Script] Attempt {attempt+1}/{max_attempts}...")
-            if story:
+            if sleep:
+                from sleep.llm_client_sleep import generate_sleep_script
+                script = generate_sleep_script(topic, cefr,
+                                               num_pairs=int(sleep_pairs or num_lines // 2),
+                                               batch_pairs=int(sleep_batch),
+                                               lessons_dir=lessons_dir,
+                                               cache_dir=sleep_cache_dir)
+            elif story:
                 from story.llm_client_story import generate_story_script
                 script = generate_story_script(topic, cefr, lessons_dir=lessons_dir,
                                                num_lines=num_lines,
@@ -258,8 +267,31 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--openai-api-key", default=None, help="OpenAI-compatible API key (or set OPENAI_API_KEY env var)")
     parser.add_argument("--openai-model", default=None, help="OpenAI-compatible model name (default: grok-4.6). Available: grok-4.6, grok-4.5, gemini-3.1-pro-preview, gemini-3.7-flash, claude-sonnet-5, gemini-2.5-pro-1m")
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
-    parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout", "story", "story_sprite"],
-                        help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation), 'story' (同款家庭故事：冷开场剧情/双人对话/独白，无主持人无跟读), 'story_sprite' (story + 游戏式序列帧动画)")
+    parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout", "story", "story_sprite", "sleep"],
+                        help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation), 'story' (同款家庭故事：冷开场剧情/双人对话/独白，无主持人无跟读), 'story_sprite' (story + 游戏式序列帧动画), 'sleep' (睡觉听·AB短句循环，纯静态卡片零积分)")
+    parser.add_argument("--sleep-pairs", type=int, default=200, help="sleep 模式：A/B 短对话组数（行数=组数×2，默认 200 组=400 行，clamp 10-400）")
+    parser.add_argument("--sleep-slow-rate", type=float, default=0.8, help="sleep 模式：女声慢速版 atempo 速率（0.6-0.95，默认 0.8=八成速）")
+    parser.add_argument("--sleep-gap-short", type=float, default=1.0, help="sleep 模式：常速朗读后停顿秒数（默认 1.0）")
+    parser.add_argument("--sleep-gap-long", type=float, default=2.0, help="sleep 模式：慢速跟读后停顿秒数（默认 2.0）")
+    parser.add_argument("--sleep-pair-gap", type=float, default=3.0, help="sleep 模式：AB 连贯后切组停顿秒数（默认 3.0）")
+    parser.add_argument("--sleep-channel-name", default="English with me", help="sleep 模式：卡片/片头频道名（同步作 TTS 播报）")
+    parser.add_argument("--sleep-outro-text", default="Thanks for listening. See you next time!", help="sleep 模式：片尾结束语（TTS+卡片）")
+    parser.add_argument("--sleep-batch-pairs", type=int, default=50, help="sleep 模式：LLM 分批生成每批组数（默认 50）")
+    parser.add_argument("--sleep-show-leaves", action=argparse.BooleanOptionalAction, default=True, help="sleep 模式：卡片叶片装饰（默认开）")
+    parser.add_argument("--sleep-handwrite-font", default="", help="sleep 模式：手写体字体文件路径（缺省 Inkfree→Segoe Script→msyhbd）")
+    parser.add_argument("--sleep-color-bg-top", default="", help="sleep 模式：背景渐变顶部 hex（空=内置默认）")
+    parser.add_argument("--sleep-color-bg-bottom", default="", help="sleep 模式：背景渐变底部 hex")
+    parser.add_argument("--sleep-color-card", default="", help="sleep 模式：卡片底色 hex")
+    parser.add_argument("--sleep-color-card-border", default="", help="sleep 模式：卡片描边 hex")
+    parser.add_argument("--sleep-color-en-a", default="", help="sleep 模式：A 句英文颜色 hex")
+    parser.add_argument("--sleep-color-en-b", default="", help="sleep 模式：B 句英文颜色 hex")
+    parser.add_argument("--sleep-color-phonetic", default="", help="sleep 模式：IPA 音标颜色 hex")
+    parser.add_argument("--sleep-color-zh", default="", help="sleep 模式：中文翻译颜色 hex")
+    parser.add_argument("--sleep-color-num", default="", help="sleep 模式：序号/横条颜色 hex")
+    parser.add_argument("--sleep-color-badge-bg", default="", help="sleep 模式：角标底色 hex")
+    parser.add_argument("--sleep-color-badge-text", default="", help="sleep 模式：角标文字色 hex")
+    parser.add_argument("--sleep-color-channel", default="", help="sleep 模式：频道名颜色 hex")
+    parser.add_argument("--sleep-color-leaf", default="", help="sleep 模式：叶片颜色 hex")
     parser.add_argument("--host-character", default="", choices=["", "char_a", "char_b"],
                         help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
     parser.add_argument("--host-bg-prompt", default="",
@@ -692,7 +724,11 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
                 structure=(args.structure if args.structure != "quest" else "original"),
                 story=_is_story_mode(args),
                 family_file=getattr(args, "family_file", None),
-                story_kind=getattr(args, "story_kind", None))
+                story_kind=getattr(args, "story_kind", None),
+                sleep=(args.structure == "sleep"),
+                sleep_pairs=int(getattr(args, "sleep_pairs", 200)),
+                sleep_batch=int(getattr(args, "sleep_batch_pairs", 50)),
+                sleep_cache_dir=str(parent_dir / ".sleep_cache"))
             yt_title = script.get("youtube_title", script.get("title", topic))
             safe_title = _safe_dirname(yt_title, topic)
             work_dir = parent_dir / safe_title
@@ -732,6 +768,10 @@ def _step1_mcp(args):
         # 快速测试：素材全部复用/占位，无任何 MCP 消费点，跳过初始化
         print("Step 1: 快速测试 —— 跳过 MCP 初始化")
         return
+    if args.structure == "sleep":
+        # sleep：画面全部 Pillow 卡片渲染，无任何 MCP 消费点（零积分模式）
+        print("Step 1: sleep 模式 —— 跳过 MCP 初始化（零 MCP 消耗）")
+        return
     print("Step 1: Initializing TJGenerators MCP...")
     raw_tokens = args.mcp_tokens or args.mcp_token or ""
     tokens = [t.strip() for t in raw_tokens.split(",") if t.strip()]
@@ -768,6 +808,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     is_original_static = (args.structure == "original_static")
     is_quest = (args.structure == "quest")
     is_original_cutout = (args.structure == "original_cutout")
+    is_sleep = (args.structure == "sleep")
     # story 族归一后 structure=="quest"，模式身份在 args.mode_name
     is_story = _is_story_mode(args)
     # ch3_zh_repeats=0 时时间轴无 listen_zh 段，中文音频无需生成
@@ -788,7 +829,10 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         script["host_character"] = getattr(args, "host_character", "") or ""
 
     image_prompts = []
-    if is_story:
+    if is_sleep:
+        # sleep：零生图（画面全部 Pillow 卡片渲染），TTS 是 Step 2 唯一产物
+        pass
+    elif is_story:
         # story：画面 = 姿势图集（按出场角色）+ 多场景 atlas；无 char_scene/host_bg
         pass
     elif not is_quest and not is_original_cutout:
@@ -817,7 +861,15 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     # --- Quick test：复用上次素材 / 黑色占位（零积分）---
     quick_test = getattr(args, "quick_test", False)
     qt_tts = None
-    if quick_test:
+    if quick_test and is_sleep:
+        # sleep：无画面素材可占位；音频完整性由下方 load_sleep_audio_results 判定
+        qt_src = _find_quick_test_source(args, exclude_dir=work_dir)
+        if qt_src is not None:
+            _quick_test_copy_materials(qt_src, work_dir, args)
+            print(f"  [QuickTest] 复用素材 ← {qt_src.name}")
+        else:
+            print("  [QuickTest] 未找到源运行 —— sleep 音频正常生成（本地零积分）")
+    elif quick_test:
         qt_src = _find_quick_test_source(args, exclude_dir=work_dir)
         if qt_src is not None:
             copied = _quick_test_copy_materials(qt_src, work_dir, args)
@@ -834,10 +886,34 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             print("  [QuickTest] 上次音频不全 —— TTS 按当前引擎正常生成（画面仍零生成）")
 
     # --- Resume check ---
-    resume_result = _check_step2_resume(checkpoint, script, dirs, n, is_quest,
-                                        include_zh=include_zh, is_story=is_story)
+    resume_result = (None if is_sleep else
+                     _check_step2_resume(checkpoint, script, dirs, n, is_quest,
+                                         include_zh=include_zh, is_story=is_story))
     tts_thread = None
-    if resume_result is not None:
+    if is_sleep:
+        # sleep：仅 TTS（本地零积分），文件级续传
+        from sleep.audio_sleep import load_sleep_audio_results, prepare_sleep_audio
+        loaded = load_sleep_audio_results(audio_dir, int(getattr(args, "sleep_pairs", 200)))
+        if loaded is not None:
+            tts_results, image_urls = loaded, {}
+            print("  [Resume] sleep 音频已完整，跳过 TTS。")
+        else:
+            tts_results, image_urls = {}, {}
+            try:
+                tts_results.update(prepare_sleep_audio(
+                    script, audio_dir, int(getattr(args, "sleep_pairs", 200)),
+                    tts_engine=getattr(args, "tts_engine", "kokoro"),
+                    slow_rate=float(getattr(args, "sleep_slow_rate", 0.8)),
+                    channel_name=str(getattr(args, "sleep_channel_name", "") or ""),
+                    outro_text=str(getattr(args, "sleep_outro_text", "") or ""),
+                    stop_check=stop_check))
+            except RuntimeError as e:
+                if str(e) == "stopped":
+                    tts_results["fatal_error"] = "stopped"
+                    print("  [Sleep] Generation stopped by user.", flush=True)
+                else:
+                    raise
+    elif resume_result is not None:
         tts_results, image_urls = resume_result
     elif qt_tts is not None:
         tts_results, image_urls = qt_tts, {}
@@ -946,9 +1022,12 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
     scene_clip_task = None
     scene_clip_thread = None
 
-    if is_original_static or is_quest or is_original_cutout:
+    if is_original_static or is_quest or is_original_cutout or is_sleep:
         clip_paths = []
-        print(f"  [{'Static' if is_original_static else 'Quest' if is_quest else 'Cutout'}] Skipping clip_0 generation (no video clips)")
+        if not is_sleep:
+            print(f"  [{'Static' if is_original_static else 'Quest' if is_quest else 'Cutout'}] Skipping clip_0 generation (no video clips)")
+        else:
+            print("  [Sleep] Skipping clip_0 generation (no video clips)")
     else:
         scene_clip_task = _build_scene_clip_task(scene, scene_url, style_prompt=style_prompt)
         clip0_path = str(clips_dir / "clip_0.mp4")
@@ -995,11 +1074,19 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
             "scene_clip_thread": scene_clip_thread,
             "clip_paths": clip_paths,
         }
-    _got_en = len(tts_results.get("normal_paths", []))
-    if _got_en < n:
-        raise RuntimeError(
-            f"TTS incomplete: got {_got_en}/{n} English dialogue audio files. "
-            f"Re-run with --resume to continue.")
+    if is_sleep:
+        _got_pairs = len(tts_results.get("pair_durs", {}))
+        _need_pairs = int(getattr(args, "sleep_pairs", 200))
+        if _got_pairs < _need_pairs:
+            raise RuntimeError(
+                f"Sleep TTS incomplete: got {_got_pairs}/{_need_pairs} pairs. "
+                f"Re-run with --resume to continue.")
+    else:
+        _got_en = len(tts_results.get("normal_paths", []))
+        if _got_en < n:
+            raise RuntimeError(
+                f"TTS incomplete: got {_got_en}/{n} English dialogue audio files. "
+                f"Re-run with --resume to continue.")
 
     # sprite 模式硬校验（用户决策 2026-09-11：缺序列帧素材直接停止，不回退
     # 姿势图集）。放在 checkpoint 标记前 → resume 会重跑 Step 2，已完成素材
@@ -1034,10 +1121,11 @@ def _step3_clips(args, checkpoint: dict, work_dir: Path, dirs: dict, script: dic
     dialogue_durations = tts_results.get("dialogue_durations", [])
     audio_dir, clips_dir = dirs["audio"], dirs["clips"]
 
-    if args.structure in ("original_static", "quest", "original_cutout"):
+    if args.structure in ("original_static", "quest", "original_cutout", "sleep"):
         print(f"Step 3: Skipped ({args.structure} mode — no video generation)")
         _save_checkpoint(work_dir, "step3_video")
-        print(f"  TTS: {len(normal_paths)} EN + {sum(1 for p in zh_paths if p)} ZH")
+        if args.structure != "sleep":
+            print(f"  TTS: {len(normal_paths)} EN + {sum(1 for p in zh_paths if p)} ZH")
         return [], [], {}
 
     print(f"Step 3: Generating video clips (Seedance2, up to {args.clip_duration}s per group)...")
@@ -1128,7 +1216,16 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
     normal_paths = tts_results.get("normal_paths", [])
     zh_paths = tts_results.get("zh_paths", [])
 
-    if args.structure == "quest":
+    if args.structure == "sleep":
+        from sleep.timeline_sleep import build_sleep_srt, build_sleep_timeline
+        timeline = build_sleep_timeline(
+            script, tts_results, int(getattr(args, "sleep_pairs", 200)),
+            gap_short=float(getattr(args, "sleep_gap_short", 1.0)),
+            gap_long=float(getattr(args, "sleep_gap_long", 2.0)),
+            pair_gap=float(getattr(args, "sleep_pair_gap", 3.0)))
+        # 字幕不上屏（文字预渲染进卡片）；SRT 仅作 sidecar 闭源字幕文件
+        srt = build_sleep_srt(timeline)
+    elif args.structure == "quest":
         from quest.timeline_quest import build_quest_timeline, build_srt_from_timeline_quest
         timeline = build_quest_timeline(script, dialogue_durations, pad=args.pad)
         _enrich_timeline(timeline, tts, args.pad, dialogue_durations, zh_paths, narration, output_fps=25)
@@ -1198,6 +1295,14 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
     if args.no_thumbnail or getattr(args, "quick_test", False):
         _skip_why = ("no_thumbnail" if args.no_thumbnail else "quick_test")
         print(f"  [Thumbnail] 跳过缩略图生成（{_skip_why}）——仅生成 YouTube 元数据")
+    elif args.structure == "sleep":
+        # sleep：Pillow 直出缩略图（不调 MCP 生图，零积分）
+        from sleep.sleep_cards import build_theme, render_sleep_thumbnail
+        render_sleep_thumbnail(script, build_theme(vars(args)), thumb_path,
+                               badge_text="EN",
+                               channel_name=str(getattr(args, "sleep_channel_name", "")
+                                                or "English with me"))
+        print(f"  [Thumbnail] sleep Pillow thumbnail saved: {thumb_path}")
     else:
         generate_thumbnail(
             script=script,
@@ -1255,7 +1360,25 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
         print("  [Resume] Final video already exists, skipping compose...")
         return str(final_video_path), safe_vid_name
 
-    if args.structure == "quest":
+    if args.structure == "sleep":
+        from sleep.sleep_cards import build_theme
+        from sleep.video_compose_sleep import compose_sleep
+        final_path = compose_sleep(
+            work_dir=str(work_dir),
+            timeline=timeline,
+            script=script,
+            audio_results=tts_results,
+            cards_dir=str(work_dir / "cards"),
+            theme=build_theme(vars(args)),
+            channel_name=str(getattr(args, "sleep_channel_name", "")
+                             or "English with me"),
+            badge_text="EN",
+            outro_text=str(getattr(args, "sleep_outro_text", "") or ""),
+            num_pairs=int(getattr(args, "sleep_pairs", 200)),
+            progress_cb=progress_cb,
+            stop_check=stop_check,
+        )
+    elif args.structure == "quest":
         from quest.video_compose_quest import compose_quest
         # Build per-character pose map (all chars: 8 poses each)
         char_pose_map = {}
@@ -1615,8 +1738,12 @@ def main():
             args.num_lines = 48
         elif args.structure in ("story", "story_sprite"):
             args.num_lines = 150
+        elif args.structure == "sleep":
+            # 行数 = 组数×2（num_lines 由 sleep_pairs 派生，--num-lines 对 sleep 不生效）
+            args.num_lines = max(10, min(400, int(args.sleep_pairs))) * 2
         else:
             args.num_lines = 18
+    args.sleep_pairs = max(10, min(400, int(args.sleep_pairs)))
     if args.pad is None:
         # story 对话节奏比 quest 快（同款字幕自然衔接，无长思考停顿）
         args.pad = 1.0 if args.structure in ("story", "story_sprite") else 0.4
