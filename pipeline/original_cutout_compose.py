@@ -230,7 +230,8 @@ def _prepare_segment(
 
         other = "char_b" if speaker == "char_a" else "char_a"
 
-        # sprite_sequence 模式：角色动作序列帧（缺 clips 的角色自动回退姿势图集）
+        # sprite_sequence 模式：角色动作序列帧（素材完整性由管线 Step2/Step5
+        # 硬校验把关；此处缺 clips 仅在渲染故障时走既有失败恢复链）
         clip_map = char_clip_map or {}
 
         def _sm_layer(char_key: str, is_speaker: bool) -> dict | None:

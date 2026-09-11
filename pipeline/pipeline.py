@@ -465,6 +465,26 @@ def _is_story_mode(args) -> bool:
     return getattr(args, "mode_name", "") in ("story", "story_sprite")
 
 
+def _sprite_required_families(args, script: dict) -> dict[str, tuple[str, ...]]:
+    """sprite 模式必需的序列帧动作族表（Step2 / Step5 双处校验共用）。
+
+    用户决策 2026-09-11：普通角色 talking+idle 各 1 段；独立主持人
+    talking+wave；绑定为主持人的角色不生成 wave（outro 送别改播 talking
+    take）。缺任一族 → ensure_sprite_families 报错停止，不回退姿势图集。
+    """
+    mode_name = getattr(args, "mode_name", "")
+    if mode_name == "original_sprite":
+        keys = ["char_a", "char_b"]
+        if not getattr(args, "host_character", ""):
+            keys.append("host")
+    elif mode_name == "story_sprite":
+        keys = _story_present_chars(script)
+    else:  # quest_sprite
+        keys = ["char_a", "char_b", "char_c", "host"]
+    return {k: (("talking", "wave") if k == "host" else ("talking", "idle"))
+            for k in keys}
+
+
 def _quick_test_fill_placeholders(args, script, img_dir: Path) -> int:
     """按模式为缺失的期望图片生成深灰黑占位（已存在不覆盖）。返回补建数量。"""
     from PIL import Image
@@ -724,17 +744,17 @@ def _step1_mcp(args):
 
 def _generate_sprite_clips_for(args, script, img_dir, tts_thread, style_prompt,
                                char_keys, stop_check=None) -> None:
-    """sprite_sequence 模式：生成 4 动作序列帧素材（AI 视频抽帧路线，见 sprite_seq）。"""
+    """sprite_sequence 模式：生成序列帧素材（AI 视频抽帧路线，见 sprite_seq）。
+
+    生成失败直接向上抛 —— 用户决策 2026-09-11：sprite 模式缺素材不回退
+    姿势图集动画，报错停止运行；素材完整性由 _sprite_required_families +
+    ensure_sprite_families 校验把关。
+    """
     from sprite_seq import generate_sprite_clips
-    try:
-        generate_sprite_clips(script, img_dir,
-                              tts_thread=tts_thread, max_workers=2,
-                              style_prompt=style_prompt,
-                              char_keys=char_keys, stop_check=stop_check)
-    except SystemExit:
-        raise
-    except Exception as e:
-        print(f"  [SpriteSeq] 生成失败（{e}），本 run 回退姿势图集动画")
+    generate_sprite_clips(script, img_dir,
+                          tts_thread=tts_thread, max_workers=2,
+                          style_prompt=style_prompt,
+                          char_keys=char_keys, stop_check=stop_check)
 
 
 def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs: dict,
@@ -980,6 +1000,14 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         raise RuntimeError(
             f"TTS incomplete: got {_got_en}/{n} English dialogue audio files. "
             f"Re-run with --resume to continue.")
+
+    # sprite 模式硬校验（用户决策 2026-09-11：缺序列帧素材直接停止，不回退
+    # 姿势图集）。放在 checkpoint 标记前 → resume 会重跑 Step 2，已完成素材
+    # 按文件续传零积分跳过、缺失动作自动重新生成。
+    if (getattr(args, "animation", "") == "sprite_sequence"
+            and not getattr(args, "quick_test", False)):
+        from sprite_seq import ensure_sprite_families
+        ensure_sprite_families(img_dir, _sprite_required_families(args, script))
 
     _save_checkpoint(work_dir, "step2_images_tts")
 
@@ -1270,13 +1298,17 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             else:
                 scene_bg_list.append(scene_img)
 
-        # sprite_sequence：读取序列帧 manifest（缺失/不完整角色自动回退姿势图集）
+        # sprite_sequence：读取序列帧 manifest（缺素材在下方硬校验中报错停止）
         char_clip_map, sprite_clip_fps = {}, 12
         if getattr(args, "animation", "") == "sprite_sequence":
             from sprite_seq import load_clip_map
             char_clip_map, sprite_clip_fps = load_clip_map(dirs["images"])
             if char_clip_map:
                 print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
+            if not getattr(args, "quick_test", False):
+                from sprite_seq import ensure_sprite_families
+                ensure_sprite_families(dirs["images"],
+                                       _sprite_required_families(args, script))
         sprite_take_mode = getattr(args, "mode_name", "") in ("quest_sprite", "story_sprite")
 
         final_path = compose_quest(
@@ -1371,6 +1403,14 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
                 char_clip_map["host"] = char_clip_map[_host_bound]
             if char_clip_map:
                 print(f"  [SpriteSeq] 序列帧角色: {sorted(char_clip_map)} (fps={sprite_clip_fps})")
+            # original_sprite 硬校验：绑定主持人时 host 族降为 talking
+            # （该角色不生成 wave，outro 送别按用户决策改播 talking take）
+            if not getattr(args, "quick_test", False):
+                required = _sprite_required_families(args, script)
+                if _host_bound:
+                    required["host"] = ("talking",)
+                from sprite_seq import ensure_sprite_families
+                ensure_sprite_families(dirs["images"], required)
         # original_sprite：说话者 talking take / 倾听者 idle 循环，
         # 另加固定机位（角色不随说话者换位）
         sprite_take_mode = getattr(args, "mode_name", "") == "original_sprite"

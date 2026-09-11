@@ -136,6 +136,8 @@ class PipelineService:
         self.final_path: str = ""
         self._step_mode: bool = False
         self._paused_after_step: str = ""
+        # sprite 自动入库跳过集（复用/绑定来的角色不重复入库）；每 run 重置
+        self._autosave_skip_keys: set[str] = set()
 
     @property
     def is_running(self) -> bool:
@@ -584,6 +586,7 @@ class PipelineService:
 
                     # --- Mode "image": copy images + override desc + gender (NOT role) ---
                     image_keys = [k for k in all_char_keys if reuse_map.get(k) == "image"]
+                    self._autosave_skip_keys.update(image_keys)
                     if (structure not in ("quest", "original_cutout")
                             and ("char_a" in image_keys) != ("char_b" in image_keys)):
                         # char_scene.png 是 A+B 合图：只选其一无法只复制单个角色
@@ -699,7 +702,8 @@ class PipelineService:
                 pass
 
         if lib_map:
-            lib_base = Path(__file__).parent.parent / "configs" / "character_library"
+            from .paths import LIBRARY_DIR as _LIBRARY_DIR
+            lib_base = _LIBRARY_DIR
             for key, lib_id in lib_map.items():
                 if not lib_id or key not in all_char_keys:
                     continue
@@ -709,6 +713,8 @@ class PipelineService:
                     self._on_log_line(f"  [Library] {lib_id} not found")
                     continue
                 lib_meta = json.loads(lib_meta_path.read_text(encoding="utf-8"))
+                # 库绑定角色不自动入库（权威在素材库，重复入库产生副本）
+                self._autosave_skip_keys.add(key)
                 # Override description + gender（仅音色+性别角色 description 为空
                 # → 只注入 gender + qwen_speaker，外观每次由 LLM 重新生成）
                 for suffix in ["description", "gender", "qwen_speaker",
@@ -755,41 +761,13 @@ class PipelineService:
                         if not dst.exists():
                             shutil.copy2(str(cs), str(dst))
                             copied.append("char_scene.png")
-                # 序列帧 clips（与 structure 无关；素材库存有即复制改名，续传据此跳过生成）
-                lib_clips_mp = lib_char_dir / "sprite_clips.json"
-                if lib_clips_mp.exists():
-                    try:
-                        lcm = json.loads(lib_clips_mp.read_text(encoding="utf-8"))
-                    except (json.JSONDecodeError, OSError):
-                        lcm = {}
-                    clip_entries = {}
-                    for action, names in (lcm.get("actions") or {}).items():
-                        paths = []
-                        for j, name in enumerate(names):
-                            dst = dst_img_dir / f"clip_{key}_{action}_{j:02d}.png"
-                            src_f = lib_char_dir / name
-                            if src_f.exists() and not dst.exists():
-                                shutil.copy2(str(src_f), str(dst))
-                            if dst.exists():
-                                paths.append(str(dst))
-                        if len(paths) >= 4:
-                            clip_entries[action] = paths
-                    if clip_entries:
-                        _merge_run_clip_manifest(dst_img_dir, key, clip_entries,
-                                                 int(lcm.get("fps", 24)),
-                                                 from_library=True)
-                        copied.append(f"{key} clips×{len(clip_entries)}")
-                        snap = lcm.get("desc_snapshot", "")
-                        if snap and snap != script.get(f"{key}_description", ""):
-                            self._on_log_line(
-                                f"  [Library] WARNING: {key} 序列帧外观快照与当前角色描述"
-                                "不一致（描述已改，画面素材未重新生成）")
-                    elif lcm.get("actions") is not None:
-                        # 库有 clips 清单但本次无可复制动作（源文件缺失）：
-                        # 仍标记 from_library，防止运行中意外 MCP 补齐
-                        _merge_run_clip_manifest(dst_img_dir, key, {},
-                                                 int(lcm.get("fps", 24)),
-                                                 from_library=True)
+                # 序列帧 clips（共享实现：resume 补拷贝走同一方法，见
+                # _merge_library_clips_into_run —— 复用块只在非 resume 执行，
+                # 不补调会因 sprite 素材硬校验死锁）
+                n_clips = self._merge_library_clips_into_run(
+                    dst_img_dir, script=script, char_keys=(key,))
+                if n_clips:
+                    copied.append(f"{key} clips×{n_clips}")
                 self._on_log_line(f"  [Library] {key} ← {lib_id} ({lib_meta.get('name', '')})")
 
         # --- character_fixes: custom description (no source needed) ---
@@ -879,6 +857,103 @@ class PipelineService:
         self._on_log_line(f"  [Reuse] Overridden: {', '.join(overridden)}")
         if copied:
             self._on_log_line(f"  [Reuse] Files: {', '.join(copied[:10])}")
+
+    def _merge_library_clips_into_run(self, dst_img_dir: Path, script: dict | None = None,
+                                      char_keys: tuple | None = None) -> int:
+        """素材库绑定角色的序列帧 clips → 运行目录（复制改名 + from_library 标记）。
+
+        从 _reuse_characters 抽出的可独立调用部分，两个调用方：
+        - 复用流程（非 resume）：随角色绑定一并合并；
+        - resume 补拷贝：复用块只在非 resume 执行，用户在素材库补生成动作后，
+          resume 必须经此拿到新素材，否则 sprite 素材硬校验会死锁。
+        幂等（目标文件已存在跳过），重复调用安全。返回本次合并的动作段总数。
+        """
+        import shutil
+        lib_raw = self.config.get("character_library", "")
+        lib_map: dict[str, str] = {}
+        if lib_raw:
+            try:
+                lib_map = json.loads(lib_raw) if isinstance(lib_raw, str) else lib_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not lib_map:
+            return 0
+        from .paths import LIBRARY_DIR
+        lib_base = LIBRARY_DIR
+        n_merged = 0
+        for key, lib_id in lib_map.items():
+            if not lib_id or (char_keys is not None and key not in char_keys):
+                continue
+            lib_char_dir = lib_base / lib_id
+            if not (lib_char_dir / "meta.json").exists():
+                continue
+            lib_clips_mp = lib_char_dir / "sprite_clips.json"
+            if not lib_clips_mp.exists():
+                # 库条目无 clips：仍标记 from_library，防止运行中意外 MCP 补齐
+                _merge_run_clip_manifest(dst_img_dir, key, {}, 24, from_library=True)
+                continue
+            try:
+                lcm = json.loads(lib_clips_mp.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                lcm = {}
+            clip_entries = {}
+            for action, names in (lcm.get("actions") or {}).items():
+                paths = []
+                for j, name in enumerate(names):
+                    dst = dst_img_dir / f"clip_{key}_{action}_{j:02d}.png"
+                    src_f = lib_char_dir / name
+                    if src_f.exists() and not dst.exists():
+                        shutil.copy2(str(src_f), str(dst))
+                    if dst.exists():
+                        paths.append(str(dst))
+                if len(paths) >= 4:
+                    clip_entries[action] = paths
+            if clip_entries:
+                _merge_run_clip_manifest(dst_img_dir, key, clip_entries,
+                                         int(lcm.get("fps", 24)),
+                                         from_library=True)
+                n_merged += len(clip_entries)
+                snap = lcm.get("desc_snapshot", "")
+                if (script is not None and snap
+                        and snap != script.get(f"{key}_description", "")):
+                    self._on_log_line(
+                        f"  [Library] WARNING: {key} 序列帧外观快照与当前角色描述"
+                        "不一致（描述已改，画面素材未重新生成）")
+            elif lcm.get("actions") is not None:
+                # 库有 clips 清单但本次无可复制动作（源文件缺失）：
+                # 仍标记 from_library，防止运行中意外 MCP 补齐
+                _merge_run_clip_manifest(dst_img_dir, key, {},
+                                         int(lcm.get("fps", 24)),
+                                         from_library=True)
+        return n_merged
+
+    def _autosave_sprite_characters(self, args, script: dict, work_dir: Path,
+                                    dirs: dict) -> None:
+        """sprite 模式 Step 2 生成的新角色自动保存到人物素材库。
+
+        用户决策 2026-09-11：管线自己生成的新角色入库，方便后续在素材库
+        补生成/修改动作或跨运行绑定复用（零积分）。跳过：素材库绑定角色
+        （from_library，权威在库）、复用拷贝图片的角色、quick_test 占位运行；
+        dedup 防同 run 重复入库。入库失败只告警，不影响本次运行。
+        """
+        if getattr(args, "quick_test", False):
+            return
+        try:
+            from .routers.characters import save_run_character_to_library
+            mp = dirs["images"] / "sprite_clips.json"
+            if not mp.exists():
+                return
+            manifest = json.loads(mp.read_text(encoding="utf-8"))
+            skip = set(manifest.get("from_library") or []) | self._autosave_skip_keys
+            for key, actions in (manifest.get("chars") or {}).items():
+                if not actions or key in skip:
+                    continue
+                lib_id = save_run_character_to_library(
+                    work_dir, key, str(script.get("structure", "")), dedup=True)
+                if lib_id:
+                    self._on_log_line(f"  [Library] 已自动入库 {key} → {lib_id}")
+        except Exception as e:
+            self._on_log_line(f"  [Library] WARNING: 自动入库失败（不影响本次运行）: {e}")
 
     # ------------------------------------------------------------------
     # 性别冲突处理（脚本库运行）：绑定角色性别与脚本槽位相反时自动交换 A/B
@@ -1296,6 +1371,8 @@ class PipelineService:
         # Build args namespace
         args = self._build_args(config)
         args.resume = resume
+        # 单例服务：自动入库跳过集必须每 run 重置
+        self._autosave_skip_keys = set()
 
         # Redirect stdout to capture print() output
         old_stdout = sys.stdout
@@ -1358,6 +1435,10 @@ class PipelineService:
                 self._resolve_gender_conflicts(script, work_dir)
             if (char_source or char_fixes or char_lib) and not resume:
                 self._reuse_characters(char_source, work_dir, script, dirs)
+            # sprite 模式 resume：补拷贝素材库 clips（复用块只在非 resume 执行；
+            # 用户在素材库补生成动作后，resume 才能通过序列帧硬校验不死锁）
+            if resume and getattr(args, "animation", "") == "sprite_sequence" and char_lib:
+                self._merge_library_clips_into_run(dirs["images"])
 
             # --- Host studio background binding (quest/cutout，幂等，resume 亦生效) ---
             self._apply_host_bg_binding(dirs)
@@ -1399,6 +1480,10 @@ class PipelineService:
             if self._stop_flag.is_set():
                 self._set_stopped()
                 return
+            # sprite 模式新角色自动入库（用户决策 2026-09-11；失败只告警）
+            if getattr(args, "mode_name", "") in ("original_sprite", "quest_sprite",
+                                                  "story_sprite"):
+                self._autosave_sprite_characters(args, script, work_dir, dirs)
             self._wait_for_step_approval("step2_images_tts")
             if self._stop_flag.is_set():
                 self._set_stopped()

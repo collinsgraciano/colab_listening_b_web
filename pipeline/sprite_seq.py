@@ -25,8 +25,11 @@ from stop_motion import remove_bg, POSE_CANVAS_W, POSE_CANVAS_H, POSE_TARGET_H
 from style_manager import DEFAULT_STYLE_PROMPT
 from image_gen import reupload_for_cdn
 
-SPRITE_ACTIONS = ("talking_01", "idle_01", "wave",
-                  "talking_02", "talking_03", "idle_02")
+# 旧全集（6 段变体）仅留作参考：自 2026-09-11 起三 sprite 模式统一最小动作集
+# （用户决策：普通角色 talking+idle 各 1 段、独立主持人 talking+wave 各 1 段，
+# 缺素材不回退直接报错；需要更多变体在素材库手动单动作补生成）。
+LEGACY_FULL_ACTIONS = ("talking_01", "idle_01", "wave",
+                       "talking_02", "talking_03", "idle_02")
 FIRST_ACTION = "talking_01"
 CLIP_FPS = 24           # 循环型动作播放帧率 = 抽帧密度 → 循环以原速播放（用户决策 2026-09-05）
 MANIFEST_NAME = "sprite_clips.json"
@@ -35,10 +38,15 @@ EXTRACT_FPS = 24        # 源视频抽帧密度（用户决策 2026-09-05：8fps
 
 
 def actions_for_char(char_key: str) -> tuple:
-    """该角色需生成的动作集：主持人不生成 idle（几乎一直在讲话，用户决策）。"""
+    """该角色需生成的最小动作集（用户决策 2026-09-11）。
+
+    普通角色 talking+idle 各 1 段；独立主持人 talking+wave（几乎一直讲话
+    不需要 idle，outro 送别用 wave）。被绑为主持人的普通角色不生成 wave
+    ——outro 送别按用户决策改播 talking take。
+    """
     if char_key == "host":
-        return tuple(a for a in SPRITE_ACTIONS if not a.startswith("idle"))
-    return SPRITE_ACTIONS
+        return ("talking_01", "wave")
+    return ("talking_01", "idle_01")
 
 # 动作提示词：强调"同一人物连续微动作"（flip book 式）。
 # talking ×3 / idle ×2 为变体：新模式（take_mode）说话者整句播一个 take、
@@ -364,7 +372,7 @@ def generate_sprite_clips(script, img_dir,
         _write_manifest(img_dir, manifest)
         return manifest
     print(f"  [SpriteSeq] Generating {n_total - n_done}/{n_total} clips "
-          f"(actions={list(SPRITE_ACTIONS)})...")
+          f"(minimal set: char=talking+idle, host=talking+wave)...")
 
     def _gen_char(char_key: str, char_desc: str, actions: list) -> dict:
         produced: dict[str, list] = {}
@@ -392,7 +400,7 @@ def generate_sprite_clips(script, img_dir,
                 raise
             if not frames:
                 print(f"    [SpriteSeq] WARNING: {char_key}/{action} failed, "
-                      f"该动作将回退姿势图集")
+                      f"缺失动作将在素材校验时导致运行停止")
                 continue
             produced[action] = frames
             if action == FIRST_ACTION and not talking_frames:
@@ -417,7 +425,7 @@ def generate_sprite_clips(script, img_dir,
 
     n_ok = sum(len(v) for v in manifest["chars"].values())
     print(f"  [SpriteSeq] Done — {n_ok}/{n_total} clips ready "
-          f"(missing actions fall back to pose atlas)")
+          f"(missing actions will fail validation — run stops)")
     return manifest if n_ok else None
 
 
@@ -452,3 +460,35 @@ def load_clip_map(img_dir) -> tuple:
             clip_map[char_key] = valid
     fps = int(manifest.get("fps") or CLIP_FPS)
     return clip_map, fps
+
+
+def _has_clip_family(clip_map: dict, char_key: str, family: str) -> bool:
+    """该角色是否已有 family 动作族的任一变体（talking / talking_NN 均算）。"""
+    actions = clip_map.get(char_key) or {}
+    return any(k == family or k.startswith(family + "_") for k in actions)
+
+
+def ensure_sprite_families(img_dir, required: dict[str, tuple[str, ...]]) -> None:
+    """序列帧素材硬校验（三 sprite 模式，用户决策 2026-09-11）。
+
+    required = {char_key: 需要的动作族}，族内任一变体即满足（兼容素材库
+    手动生成的 talking_02 等扩展变体）。校验与渲染同源（load_clip_map：
+    manifest + 磁盘 ≥4 帧过滤），不通过直接抛 RuntimeError 停止运行
+    ——不再回退姿势图集动画。
+    """
+    clip_map, _fps = load_clip_map(img_dir)
+    missing: dict[str, list[str]] = {}
+    for char_key, families in required.items():
+        lack = [fam for fam in families
+                if not _has_clip_family(clip_map, char_key, fam)]
+        if lack:
+            missing[char_key] = lack
+    if not missing:
+        return
+    lines = "\n".join(f"  {ck}: 缺少 {', '.join(lack)}"
+                      for ck, lack in missing.items())
+    raise RuntimeError(
+        "序列帧素材不完整 —— 按当前设置直接停止（不回退姿势图集动画）：\n"
+        f"{lines}\n"
+        "补齐方式：① 重新运行（续传会自动补生成缺失动作，已完成素材零积分跳过）；"
+        "② 素材库绑定角色请先在「人物素材库」对应卡片补生成缺失动作后再运行。")

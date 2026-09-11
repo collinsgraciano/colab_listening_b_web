@@ -200,50 +200,56 @@ async def api_library_list():
     return {"characters": chars}
 
 
-@router.post("/api/character_library/save")
-async def api_library_save(request: Request):
-    """Save a character from a run into the library."""
+def save_run_character_to_library(run_dir: Path, char_key: str, structure: str,
+                                  custom_name: str = "",
+                                  dedup: bool = False) -> str | None:
+    """把运行目录中的一个角色保存进人物素材库（共享实现）。
+
+    调用方：POST /api/character_library/save（控制台手动保存）、
+    pipeline_service 自动入库（sprite 模式 Step 2 生成的新角色）。
+
+    返回 lib_id；script/desc 缺失或 dedup 命中同源条目时返回 None。
+
+    相比端点原实现的增强（2026-09-11，配合 sprite 自动入库）：
+    - original_cutout 结构同样复制姿势图集（原只复制 char_scene.png，而
+      cutout 运行不生成该文件 → 什么图都没存）；
+    - host 额外复制 host_bg.png（供「主持人演播室背景 lib: 绑定」下拉）；
+    - 写 thumb.png（列表卡片 image_url 只认 thumb.png）。
+    """
     import shutil
-    data = await request.json()
-    run_name = data.get("run_name", "")
-    char_key = data.get("char_key", "")
-    custom_name = data.get("name", "").strip()
-    structure = structure_family(data.get("structure", "quest"))
-
-    if not run_name or not char_key:
-        return JSONResponse({"ok": False, "error": "缺少参数"}, status_code=400)
-
-    config = load_config()
-    output_dir = Path(config.get("output_dir", "./output"))
-    run_dir = find_run_dir(output_dir, run_name)
-    script_path = run_dir / "script.json" if run_dir else None
-    if not script_path or not script_path.exists():
-        return JSONResponse({"ok": False, "error": "运行不存在"}, status_code=404)
-
+    script_path = run_dir / "script.json"
+    if not script_path.exists():
+        return None
     script = json.loads(script_path.read_text(encoding="utf-8"))
     desc = script.get(f"{char_key}_description", "")
+    if not desc:
+        return None
     gender = script.get(f"{char_key}_gender", "")
     role = script.get(f"{char_key}_role", "")
     qwen_speaker = script.get(f"{char_key}_qwen_speaker", "")
     moss_voice = script.get(f"{char_key}_moss_voice", "")
     kokoro_voice = script.get(f"{char_key}_kokoro_voice", "")
-    if not desc:
-        return JSONResponse({"ok": False, "error": "角色描述为空"}, status_code=400)
+    structure = structure_family(structure or "quest")
+
+    if dedup:
+        for meta in list_library_chars():
+            if (meta.get("source_run") == run_dir.name
+                    and meta.get("source_key") == char_key
+                    and structure_family(str(meta.get("structure", ""))) == structure):
+                return None
 
     # Generate ID
     lib_id = f"char_{int(time.time())}_{char_key}"
     lib_dir = LIBRARY_DIR / lib_id
     lib_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy images
+    # Copy images（quest / cutout 同款姿势图集命名）
     src_img_dir = run_dir / "images"
-    copied_files = []
-    if structure == "quest":
+    if structure in ("quest", "original_cutout"):
         for j in range(8):
             src = src_img_dir / f"pose_{char_key}_{j}.png"
             if src.exists():
                 shutil.copy2(str(src), str(lib_dir / src.name))
-                copied_files.append(src.name)
         atlas = src_img_dir / f"pose_atlas_{char_key}.png"
         if atlas.exists():
             shutil.copy2(str(atlas), str(lib_dir / atlas.name))
@@ -256,10 +262,12 @@ async def api_library_save(request: Request):
         if cs.exists():
             shutil.copy2(str(cs), str(lib_dir / "char_scene.png"))
 
-    # Copy thumbnail (pose_0 or char_scene)
-    thumb_src = src_img_dir / f"pose_{char_key}_0.png" if structure == "quest" else src_img_dir / "char_scene.png"
+    # Thumbnail → thumb.png（列表卡片 image_url 只认 thumb.png）
+    thumb_src = (src_img_dir / f"pose_{char_key}_0.png"
+                 if structure in ("quest", "original_cutout")
+                 else src_img_dir / "char_scene.png")
     if thumb_src.exists():
-        shutil.copy2(str(thumb_src), str(lib_dir / thumb_src.name))
+        shutil.copy2(str(thumb_src), str(lib_dir / "thumb.png"))
 
     # 序列帧 clips（sprite_sequence 运行产出；与 structure 无关，cutout/quest 通用）
     clips_saved = 0
@@ -303,14 +311,44 @@ async def api_library_save(request: Request):
         "qwen_speaker": qwen_speaker,
         "moss_voice": moss_voice,
         "kokoro_voice": kokoro_voice,
-        "source_run": run_name,
+        "source_run": run_dir.name,
         "source_key": char_key,
         "sprite_clips": clips_saved,
         "created": time.time(),
     }
     (lib_dir / "meta.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return lib_id
 
+
+@router.post("/api/character_library/save")
+async def api_library_save(request: Request):
+    """Save a character from a run into the library."""
+    data = await request.json()
+    run_name = data.get("run_name", "")
+    char_key = data.get("char_key", "")
+    custom_name = data.get("name", "").strip()
+    structure = structure_family(data.get("structure", "quest"))
+
+    if not run_name or not char_key:
+        return JSONResponse({"ok": False, "error": "缺少参数"}, status_code=400)
+
+    config = load_config()
+    output_dir = Path(config.get("output_dir", "./output"))
+    run_dir = find_run_dir(output_dir, run_name)
+    script_path = run_dir / "script.json" if run_dir else None
+    if not script_path or not script_path.exists():
+        return JSONResponse({"ok": False, "error": "运行不存在"}, status_code=404)
+
+    script = json.loads(script_path.read_text(encoding="utf-8"))
+    if not script.get(f"{char_key}_description", ""):
+        return JSONResponse({"ok": False, "error": "角色描述为空"}, status_code=400)
+
+    lib_id = save_run_character_to_library(run_dir, char_key, structure,
+                                           custom_name=custom_name)
+    if not lib_id:
+        return JSONResponse({"ok": False, "error": "保存失败"}, status_code=500)
+    meta = json.loads((LIBRARY_DIR / lib_id / "meta.json").read_text(encoding="utf-8"))
     return {"ok": True, "id": lib_id, "meta": meta}
 
 
