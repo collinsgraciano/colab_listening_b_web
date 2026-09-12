@@ -127,8 +127,8 @@
             <p id="script-lib-info" class="text-xs text-indigo-300 mt-1 hidden"></p>
         </div>
 
-        <!-- Character reuse -->
-        <div class="mb-4">
+        <!-- Character reuse（sleep 模式无角色链路，整块隐藏） -->
+        <div class="mb-4" id="char-reuse-wrap">
             <label class="block text-xs text-slate-400 mb-1">复用角色 (可选)</label>
             <!-- Character sets (角色套装：整套角色配置命名保存 / 一键应用) -->
             <div class="flex gap-2 mb-2">
@@ -190,8 +190,8 @@
             <p class="text-xs text-slate-500 mt-2">每槽位：名字 / 性别 / 剧中角色 / 外貌描述（英文）。描述逐字注入每集生成 prompt（保证跨集角色一致）；保存后下一次生成生效；配合「人物素材库」分配可跨集复用画面素材。留空槽位回退内置默认（Watson 一家）。</p>
         </div>
 
-        <!-- Character Library -->
-        <div class="mb-4">
+        <!-- Character Library（sleep 模式无角色位可绑定，整块隐藏） -->
+        <div class="mb-4" id="char-library-wrap">
             <div class="flex items-center justify-between mb-2">
                 <label class="block text-xs text-slate-400">人物素材库 <span class="text-slate-500">—「分配」绑定到上方角色位（复用图片+描述+性别，一个角色位一个角色）</span> <span id="lib-count" class="text-xs text-slate-500"></span></label>
                 <button onclick="loadLibrary()" class="text-xs text-slate-400 hover:text-slate-200">🔄 刷新</button>
@@ -444,6 +444,12 @@ function applyQuickFields() {
         sfWrap.style.display = isStoryFam ? '' : 'none';
         if (isStoryFam) loadStoryFamily();
     }
+    // sleep 模式无角色/图集/素材库链路：隐藏角色区（复用/套装/编辑器）与人物素材库
+    const isSleepMode = ACTIVE_MODE === 'sleep';
+    const crWrap = document.getElementById('char-reuse-wrap');
+    if (crWrap) crWrap.style.display = isSleepMode ? 'none' : '';
+    const clWrap = document.getElementById('char-library-wrap');
+    if (clWrap) clWrap.style.display = isSleepMode ? 'none' : '';
     applyQuickConfigFields();
 }
 

@@ -110,6 +110,12 @@ async def config_page(request: Request, mode: str = ""):
         grouped[g].append((key, spec, config.get(key, spec["default"])))
     # Sort groups by order
     sorted_groups = sorted(grouped.items(), key=lambda x: GROUP_META.get(x[0], {}).get("order", 99))
+    # sleep 组色盘「留空=内置默认」显示色（来自 pipeline/sleep/sleep_cards）
+    try:
+        from sleep.sleep_cards import color_defaults
+        sleep_color_defaults = color_defaults()
+    except Exception:
+        sleep_color_defaults = {}
     return templates.TemplateResponse(request, "config.html", {
         "config": config,
         "params": PARAM_SPEC,
@@ -119,6 +125,7 @@ async def config_page(request: Request, mode: str = ""):
         "active_page": "config",
         "mode": mode,
         "mode_labels": MODE_LABELS,
+        "sleep_color_defaults": sleep_color_defaults,
         # 自定义 Provider 模型列表（不含 api_key 等敏感字段；去重保持顺序）
         "custom_providers": [
             {"id": p.get("id", ""), "name": p.get("name", ""),

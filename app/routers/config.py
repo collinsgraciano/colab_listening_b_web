@@ -1,6 +1,11 @@
 """Config API — 参数配置 / 预设 / 模式切换."""
+import asyncio
+import io
+import tempfile
+from pathlib import Path
+
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from ..config_manager import (
     MODES, MODE_LABELS,
@@ -115,3 +120,60 @@ async def api_save_quick_fields(request: Request):
         return JSONResponse({"ok": False, "error": f"未知模式: {mode}"}, status_code=400)
     fields = save_quick_fields(mode, data.get("fields", []))
     return {"ok": True, "mode": mode, "fields": fields}
+
+
+# --- Sleep 卡片实时预览（配置页 😴 Sleep 组边改边看，真实 Pillow 渲染）---
+
+_SLEEP_SAMPLE_A = {"text": "The house is quiet now",
+                   "phonetic": "/ðə haʊs ɪz ˈkwaɪət naʊ/",
+                   "zh": "房子現在安靜下來了"}
+_SLEEP_SAMPLE_B = {"text": "Time to close your eyes",
+                   "phonetic": "/taɪm tə kloʊz jɔːr aɪz/",
+                   "zh": "該閉上眼睛了"}
+
+
+def _render_sleep_preview_png(cfg: dict) -> bytes:
+    """intro/pair/outro 三卡纵向合成 → PNG bytes（同步渲染，跑线程池）。"""
+    from PIL import Image
+
+    from sleep.sleep_cards import (build_theme, render_intro_card,
+                                   render_outro_card, render_pair_card)
+
+    cfg = cfg or {}
+    theme = build_theme(cfg)
+    channel = str(cfg.get("sleep_channel_name", "") or "")
+    with tempfile.TemporaryDirectory() as td:
+        base = Path(td)
+        intro = render_intro_card(theme, str(base / "intro.png"), channel_name=channel)
+        pair = render_pair_card(_SLEEP_SAMPLE_A, _SLEEP_SAMPLE_B, 1, theme,
+                                str(base / "pair.png"), channel_name=channel)
+        outro = render_outro_card(theme, str(base / "outro.png"),
+                                  str(cfg.get("sleep_outro_text", "") or ""),
+                                  channel_name=channel)
+        imgs = [Image.open(p) for p in (intro, pair, outro)]
+        canvas = Image.new("RGB", (max(im.width for im in imgs),
+                                   sum(im.height for im in imgs)), (255, 255, 255))
+        y = 0
+        for im in imgs:
+            canvas.paste(im, (0, y))
+            y += im.height
+        buf = io.BytesIO()
+        canvas.save(buf, "PNG")
+        return buf.getvalue()
+
+
+@router.get("/api/config/sleep_preview")
+async def api_sleep_preview_get():
+    """用已保存的 sleep 模式配置渲染预览（页面首图）。"""
+    png = await asyncio.to_thread(_render_sleep_preview_png, load_mode_config("sleep"))
+    return Response(content=png, media_type="image/png")
+
+
+@router.post("/api/config/sleep_preview")
+async def api_sleep_preview_post(request: Request):
+    """配置页实时预览：body = 表单收集的 sleep_* 键值（未保存草稿值亦可）。"""
+    data = await request.json()
+    cfg = {k: v for k, v in data.items()
+           if isinstance(k, str) and k.startswith("sleep_")}
+    png = await asyncio.to_thread(_render_sleep_preview_png, cfg)
+    return Response(content=png, media_type="image/png")

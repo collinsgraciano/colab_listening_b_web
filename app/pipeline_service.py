@@ -1212,6 +1212,7 @@ class PipelineService:
             practice_duration=float(config.get("practice_duration", 3.0)),
             sleep_pairs=max(10, min(400, _cfg_int(config, "sleep_pairs", 200))),
             sleep_slow_rate=float(config.get("sleep_slow_rate", 0.8) or 0.8),
+            sleep_male_rate=float(config.get("sleep_male_rate", 1.0) or 1.0),
             sleep_gap_short=float(config.get("sleep_gap_short", 1.0) or 1.0),
             sleep_gap_long=float(config.get("sleep_gap_long", 2.0) or 2.0),
             sleep_pair_gap=float(config.get("sleep_pair_gap", 3.0) or 3.0),

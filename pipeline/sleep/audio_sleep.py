@@ -1,8 +1,9 @@
-"""sleep 模式音频准备：每 4 次常速 TTS 派生整组 9 段音频。
+"""sleep 模式音频准备：整组音频直接按目标速率经引擎 rate 机制合成。
 
-每组生成：a_m/b_m（男声常速）、a_f/b_f（女声常速，中间产物）、
-a_slow/b_slow（atempo 派生慢速，保音高）、combo（A男+B女 0.15s 间隔拼接）；
-另有 intro（频道名播报）/ outro（结束语），均男声。
+每组生成：a_m/b_m（男声，male_rate 速率）、b_f（女声常速，combo 消费）、
+a_slow/b_slow（女声慢速——Kokoro 用原生 speed 参数变速不变调，
+Qwen/MOSS 引擎内部 atempo）、combo（A男+B女 0.15s 间隔拼接）；
+另有 intro（频道名播报）/ outro（结束语），均男声（male_rate 速率）。
 跨引擎（kokoro/qwen/moss）复用 tts_pipeline 同款引擎装配 + kokoro 单句回退。
 音频文件保持引擎原生格式，块合成时统一 aresample/立体声（video_compose_sleep）。
 """
@@ -13,8 +14,13 @@ from pathlib import Path
 from media_utils import get_duration
 
 
-def _sleep_meta_sig(tts_engine: str, slow_rate: float) -> str:
-    return f"sleep|{tts_engine}|{slow_rate:.3f}"
+def _rate_str(mult: float) -> str:
+    """速率倍率 → 引擎 rate 字符串（1.0→"+0%"，0.8→"-20%"）。"""
+    return f"{(float(mult) - 1.0) * 100:+.0f}%"
+
+
+def _sleep_meta_sig(tts_engine: str, slow_rate: float, male_rate: float) -> str:
+    return f"sleep|{tts_engine}|{slow_rate:.3f}|{male_rate:.3f}"
 
 
 def _check_sleep_cache(audio_dir: Path, sig: str) -> None:
@@ -36,18 +42,6 @@ def _check_sleep_cache(audio_dir: Path, sig: str) -> None:
         if removed:
             print(f"  [Sleep] TTS 参数变化（{current} → {sig}），清除 {removed} 个旧音频缓存")
     meta_path.write_text(sig, encoding="utf-8")
-
-
-def _atempo_file(src: str, dst: str, rate: float) -> float:
-    """常速音频 atempo 变慢（rate<1 变慢），保音高。返回新时长。"""
-    cmd = ["ffmpeg", "-y", "-i", src,
-           "-filter:a", f"atempo={rate:.4f}",
-           "-c:a", "libmp3lame", "-b:a", "128k", dst]
-    r = subprocess.run(cmd, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=120)
-    if r.returncode != 0 or not os.path.exists(dst):
-        raise RuntimeError(f"atempo failed for {Path(src).name}: {r.stderr[-200:]}")
-    return get_duration(dst)
 
 
 def _combo_file(src_a: str, src_b: str, dst: str, gap: float = 0.15) -> float:
@@ -101,12 +95,21 @@ def load_sleep_audio_results(audio_dir: Path, num_pairs: int) -> dict | None:
 
 def prepare_sleep_audio(script: dict, audio_dir: Path, num_pairs: int,
                         tts_engine: str = "kokoro", slow_rate: float = 0.8,
+                        male_rate: float = 1.0,
                         channel_name: str = "", outro_text: str = "",
                         stop_check=None) -> dict:
-    """生成全部 sleep 音频（文件级续传）。返回 results dict（见 load_*）。"""
+    """生成全部 sleep 音频（文件级续传）。返回 results dict（见 load_*）。
+
+    slow_rate/male_rate 为速率倍率（0.8=八成速），经各引擎 synth_english
+    的 rate 参数实现（Kokoro 原生 speed 变速不变调；Qwen/MOSS 引擎内部处理）。
+    """
     audio_dir = Path(audio_dir)
     audio_dir.mkdir(parents=True, exist_ok=True)
-    _check_sleep_cache(audio_dir, _sleep_meta_sig(tts_engine, slow_rate))
+    slow_rate = float(slow_rate or 0.8)
+    male_rate = min(1.5, max(0.5, float(male_rate or 1.0)))
+    male_rate_str = _rate_str(male_rate)
+    slow_rate_str = _rate_str(slow_rate)
+    _check_sleep_cache(audio_dir, _sleep_meta_sig(tts_engine, slow_rate, male_rate))
 
     # --- 引擎装配（照抄 tts_pipeline 三分支 + kokoro 回退）---
     if tts_engine == "qwen":
@@ -145,25 +148,26 @@ def prepare_sleep_audio(script: dict, audio_dir: Path, num_pairs: int,
             _fb["map"] = build_voice_map(script, "sleep")
         return _fb["eng"], _fb["map"]
 
-    def _synth(text: str, voice: str, path: str) -> float:
+    def _synth(text: str, voice: str, path: str, rate: str = "+0%") -> float:
         try:
-            return tts.synth_english(text, voice, path, rate="+0%")
+            return tts.synth_english(text, voice, path, rate=rate)
         except Exception as e:
             if tts_engine == "kokoro":
                 raise
             print(f"  [Sleep][Fallback] {Path(path).name} {type(e).__name__}: {e}")
             eng, kmap = _kokoro()
             fb_voice = kmap.get("char_a") if voice == male_voice else kmap.get("char_b")
-            return eng.synth_english(text, fb_voice or "af_sarah", path, rate="+0%")
+            return eng.synth_english(text, fb_voice or "af_sarah", path, rate=rate)
 
     narration_voice = male_voice
     intro = audio_dir / "intro_sleep.mp3"
     outro = audio_dir / "outro_sleep.mp3"
     if not intro.exists():
-        _synth(channel_name or "English with me", narration_voice, str(intro))
+        _synth(channel_name or "English with me", narration_voice, str(intro),
+               rate=male_rate_str)
     if not outro.exists():
         _synth(outro_text or "Thanks for listening. See you next time!",
-               narration_voice, str(outro))
+               narration_voice, str(outro), rate=male_rate_str)
 
     dialogue = script.get("dialogue", [])
     rows_a = dialogue[0::2]
@@ -178,24 +182,22 @@ def prepare_sleep_audio(script: dict, audio_dir: Path, num_pairs: int,
         paths = pair_steps(audio_dir, i)
         text_a = rows_a[i - 1].get("text", "")
         text_b = rows_b[i - 1].get("text", "")
-        # 5 个消费步骤齐全 → 整组跳过（中间产物 a_f/b_f 可缺席，缺则按需补）
+        # 5 个消费步骤齐全 → 整组跳过（b_f 为 combo 消费品，缺则按需补）
         if all(os.path.exists(paths[s]) for s in ("a_m", "a_slow", "b_m", "b_slow", "combo")):
             pair_paths[str(i).zfill(4)] = paths
             pair_durs[str(i).zfill(4)] = {
                 s: get_duration(paths[s]) for s in paths if s != "a_f" and s != "b_f"}
             continue
         if not os.path.exists(paths["a_m"]):
-            _synth(text_a, male_voice, paths["a_m"])
+            _synth(text_a, male_voice, paths["a_m"], rate=male_rate_str)
         if not os.path.exists(paths["b_m"]):
-            _synth(text_b, male_voice, paths["b_m"])
-        if not os.path.exists(paths["a_f"]):
-            _synth(text_a, female_voice, paths["a_f"])
+            _synth(text_b, male_voice, paths["b_m"], rate=male_rate_str)
         if not os.path.exists(paths["b_f"]):
             _synth(text_b, female_voice, paths["b_f"])
         if not os.path.exists(paths["a_slow"]):
-            _atempo_file(paths["a_f"], paths["a_slow"], slow_rate)
+            _synth(text_a, female_voice, paths["a_slow"], rate=slow_rate_str)
         if not os.path.exists(paths["b_slow"]):
-            _atempo_file(paths["b_f"], paths["b_slow"], slow_rate)
+            _synth(text_b, female_voice, paths["b_slow"], rate=slow_rate_str)
         if not os.path.exists(paths["combo"]):
             _combo_file(paths["a_m"], paths["b_f"], paths["combo"])
         pair_paths[str(i).zfill(4)] = paths

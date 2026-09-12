@@ -270,7 +270,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout", "story", "story_sprite", "sleep"],
                         help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation), 'story' (同款家庭故事：冷开场剧情/双人对话/独白，无主持人无跟读), 'story_sprite' (story + 游戏式序列帧动画), 'sleep' (睡觉听·AB短句循环，纯静态卡片零积分)")
     parser.add_argument("--sleep-pairs", type=int, default=200, help="sleep 模式：A/B 短对话组数（行数=组数×2，默认 200 组=400 行，clamp 10-400）")
-    parser.add_argument("--sleep-slow-rate", type=float, default=0.8, help="sleep 模式：女声慢速版 atempo 速率（0.6-0.95，默认 0.8=八成速）")
+    parser.add_argument("--sleep-slow-rate", type=float, default=0.8, help="sleep 模式：女声慢速版速率倍率（0.6-0.95，默认 0.8=八成速；经引擎 rate 机制调速，Kokoro 原生变速不变调）")
+    parser.add_argument("--sleep-male-rate", type=float, default=1.0, help="sleep 模式：男声速率倍率（0.5-1.5，默认 1.0=原速；<1 更慢更催眠，经引擎 rate 机制调速）")
     parser.add_argument("--sleep-gap-short", type=float, default=1.0, help="sleep 模式：常速朗读后停顿秒数（默认 1.0）")
     parser.add_argument("--sleep-gap-long", type=float, default=2.0, help="sleep 模式：慢速跟读后停顿秒数（默认 2.0）")
     parser.add_argument("--sleep-pair-gap", type=float, default=3.0, help="sleep 模式：AB 连贯后切组停顿秒数（默认 3.0）")
@@ -904,6 +905,7 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                     script, audio_dir, int(getattr(args, "sleep_pairs", 200)),
                     tts_engine=getattr(args, "tts_engine", "kokoro"),
                     slow_rate=float(getattr(args, "sleep_slow_rate", 0.8)),
+                    male_rate=float(getattr(args, "sleep_male_rate", 1.0) or 1.0),
                     channel_name=str(getattr(args, "sleep_channel_name", "") or ""),
                     outro_text=str(getattr(args, "sleep_outro_text", "") or ""),
                     stop_check=stop_check))

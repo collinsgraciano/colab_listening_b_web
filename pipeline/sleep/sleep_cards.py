@@ -50,20 +50,28 @@ def _hex_rgb(value, fallback: tuple) -> tuple:
         return fallback
 
 
+# sleep_color_* 配置键 → 主题键（build_theme 与 color_defaults 的唯一映射来源）
+CONFIG_COLOR_KEYS = {
+    "sleep_color_bg_top": "bg_top", "sleep_color_bg_bottom": "bg_bottom",
+    "sleep_color_card": "card", "sleep_color_card_border": "card_border",
+    "sleep_color_en_a": "en_a", "sleep_color_en_b": "en_b",
+    "sleep_color_phonetic": "phonetic", "sleep_color_zh": "zh_text",
+    "sleep_color_num": "num", "sleep_color_badge_bg": "badge_bg",
+    "sleep_color_badge_text": "badge_text", "sleep_color_channel": "channel_text",
+    "sleep_color_leaf": "leaf_a",
+}
+
+
+def color_defaults() -> dict[str, str]:
+    """sleep_color_* 配置键 → 内置默认 hex（配置页色盘「留空=默认」的显示色）。"""
+    return {ck: DEFAULT_THEME[tk] for ck, tk in CONFIG_COLOR_KEYS.items()}
+
+
 def build_theme(cfg: dict) -> dict:
     """配置 dict（含 sleep_color_* / sleep_show_leaves 键）→ 渲染主题 dict。"""
     cfg = cfg or {}
     theme = dict(DEFAULT_THEME)
-    mapping = {
-        "sleep_color_bg_top": "bg_top", "sleep_color_bg_bottom": "bg_bottom",
-        "sleep_color_card": "card", "sleep_color_card_border": "card_border",
-        "sleep_color_en_a": "en_a", "sleep_color_en_b": "en_b",
-        "sleep_color_phonetic": "phonetic", "sleep_color_zh": "zh_text",
-        "sleep_color_num": "num", "sleep_color_badge_bg": "badge_bg",
-        "sleep_color_badge_text": "badge_text", "sleep_color_channel": "channel_text",
-        "sleep_color_leaf": "leaf_a",
-    }
-    for ck, tk in mapping.items():
+    for ck, tk in CONFIG_COLOR_KEYS.items():
         v = str(cfg.get(ck, "") or "").strip()
         if v:
             theme[tk] = v

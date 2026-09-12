@@ -47,7 +47,7 @@ PARAM_SPEC = {
     "cefr": {"default": "A2", "type": "select", "group": "content",
              "label": "CEFR 等级", "options": ["A1", "A2", "B1", "B2", "C1", "C2"]},
     "num_lines": {"default": "", "type": "number", "group": "content",
-                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48, story:150; sleep=组数×2 由下方 sleep 参数决定)"},
+                  "label": "对话行数", "help": "留空=自动 (original:18, quest:48, story:150)"},
     "max_line_words": {"default": 10, "type": "number", "group": "content",
                        "label": "每行最大词数",
                        "help": "对话每行/旁白每句词数上限（默认 10，建议 5-15），保证字幕最多显示两行；超长行触发 QA 修复"},
@@ -114,7 +114,11 @@ PARAM_SPEC = {
     "sleep_slow_rate": {"default": 0.8, "type": "number", "group": "sleep",
                         "modes": ["sleep"],
                         "label": "女声慢速速率",
-                        "help": "慢速版 atempo 速率（0.6-0.95，默认 0.8=八成速；越小越慢，低于 0.6 发音会含糊）"},
+                        "help": "女声慢速朗读速率倍率（0.6-0.95，默认 0.8=八成速；越小越慢，低于 0.6 发音会含糊）；经引擎 rate 机制调速，Kokoro 原生变速不变调"},
+    "sleep_male_rate": {"default": 1.0, "type": "number", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "男声速率",
+                        "help": "男声常速朗读速率倍率（0.5-1.5，默认 1.0=原速；<1 更慢更催眠，>1 加快）；同样作用于片头/片尾男声播报；经引擎 rate 机制调速不变调"},
     "sleep_gap_short": {"default": 1.0, "type": "number", "group": "sleep",
                         "modes": ["sleep"],
                         "label": "常速后停顿(秒)",
@@ -147,32 +151,32 @@ PARAM_SPEC = {
                              "modes": ["sleep"],
                              "label": "手写体字体路径",
                              "help": "频道名字体 .ttf/.ttc 路径；留空=Inkfree→Segoe Script→雅黑 Bold"},
-    "sleep_color_bg_top": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_bg_top": {"default": "", "type": "color", "group": "sleep",
                            "modes": ["sleep"], "label": "背景渐变顶部",
                            "help": "hex 如 #eaf4e2；留空用默认配色"},
-    "sleep_color_bg_bottom": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_bg_bottom": {"default": "", "type": "color", "group": "sleep",
                               "modes": ["sleep"], "label": "背景渐变底部", "help": "hex"},
-    "sleep_color_card": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_card": {"default": "", "type": "color", "group": "sleep",
                          "modes": ["sleep"], "label": "卡片底色", "help": "hex"},
-    "sleep_color_card_border": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_card_border": {"default": "", "type": "color", "group": "sleep",
                                 "modes": ["sleep"], "label": "卡片描边", "help": "hex"},
-    "sleep_color_en_a": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_en_a": {"default": "", "type": "color", "group": "sleep",
                          "modes": ["sleep"], "label": "A句英文颜色", "help": "hex（参考同款=深棕）"},
-    "sleep_color_en_b": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_en_b": {"default": "", "type": "color", "group": "sleep",
                          "modes": ["sleep"], "label": "B句英文颜色", "help": "hex（参考同款=橙色）"},
-    "sleep_color_phonetic": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_phonetic": {"default": "", "type": "color", "group": "sleep",
                              "modes": ["sleep"], "label": "音标颜色", "help": "hex（参考同款=橄榄绿）"},
-    "sleep_color_zh": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_zh": {"default": "", "type": "color", "group": "sleep",
                        "modes": ["sleep"], "label": "中文颜色", "help": "hex"},
-    "sleep_color_num": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_num": {"default": "", "type": "color", "group": "sleep",
                         "modes": ["sleep"], "label": "序号/横条颜色", "help": "hex（参考同款=粉色发光）"},
-    "sleep_color_badge_bg": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_badge_bg": {"default": "", "type": "color", "group": "sleep",
                              "modes": ["sleep"], "label": "角标底色", "help": "hex（参考同款=粉）"},
-    "sleep_color_badge_text": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_badge_text": {"default": "", "type": "color", "group": "sleep",
                                "modes": ["sleep"], "label": "角标文字色", "help": "hex"},
-    "sleep_color_channel": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_channel": {"default": "", "type": "color", "group": "sleep",
                             "modes": ["sleep"], "label": "频道名颜色", "help": "hex"},
-    "sleep_color_leaf": {"default": "", "type": "text", "group": "sleep",
+    "sleep_color_leaf": {"default": "", "type": "color", "group": "sleep",
                          "modes": ["sleep"], "label": "叶片颜色", "help": "hex"},
 
     # --- LLM ---
@@ -201,7 +205,7 @@ PARAM_SPEC = {
                          "modes": ["quest", "quest_sprite", "story", "story_sprite"],
                          "label": "节拍行数", "help": "节拍表每拍的行数预算 (默认10；story 模式共用此参数)"},
     "quest_qa_rounds": {"default": 3, "type": "number", "group": "llm",
-                        "label": "QA 轮数（全模式）",
+                        "label": "QA 审查轮数",
                         "help": "最少审查-修复轮数；有 error 时一直修到 0 error 或 10 轮上限 (默认3, 0=关闭)"},
 
     # --- 脚本质量增强（四开关独立，默认全关 = 原生成流程不变） ---
@@ -561,6 +565,26 @@ def save_quick_fields(mode: str, fields: list[str]) -> list[str]:
 
 MODES = ["original", "original_static", "original_cutout", "quest",
          "original_sprite", "quest_sprite", "story", "story_sprite", "sleep"]
+
+# --- sleep 模式不消费的参数（配置页对 sleep 隐藏；保存后回落默认值）---
+# sleep 为纯 Pillow 卡片 + TTS 模式，生效性以管线实际消费方为准
+# （pipeline.py sleep 分支 + pipeline/sleep/ 模块逐一核实）：
+# 无图片/角色/复用/视频片段/字幕烧录/QA/风格/词长/语速/MCP 消费点。
+_SLEEP_UNUSED_KEYS = (
+    "num_lines", "max_line_words", "visual_style",
+    "character_source", "character_reuse", "character_fixes",
+    "character_library", "character_voices",
+    "quest_qa_rounds",
+    "script_style_boost", "script_outline_first",
+    "script_engagement_qa", "script_candidates",
+    "tts_rate_en", "tts_rate_narration",
+    "mcp_tokens", "image_concurrency", "image_provider", "lessons_dir",
+    "pad", "subtitle_style", "subtitle_font_size", "no_zh_subtitle",
+)
+for _sleep_unused_key in _SLEEP_UNUSED_KEYS:
+    assert _sleep_unused_key in PARAM_SPEC, _sleep_unused_key
+    PARAM_SPEC[_sleep_unused_key]["modes"] = [m for m in MODES if m != "sleep"]
+
 MODE_LABELS = {
     "original": "Original (4章视频片段)",
     "original_static": "Original Static (4章静态图片)",
@@ -897,6 +921,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
     # Sleep（sleep 模式专属；其余模式忽略）
     for _sk, _sf in (("sleep_pairs", "--sleep-pairs"),
                      ("sleep_slow_rate", "--sleep-slow-rate"),
+                     ("sleep_male_rate", "--sleep-male-rate"),
                      ("sleep_gap_short", "--sleep-gap-short"),
                      ("sleep_gap_long", "--sleep-gap-long"),
                      ("sleep_pair_gap", "--sleep-pair-gap"),
