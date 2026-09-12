@@ -22,6 +22,7 @@ from .routers import (
     characters as characters_routes,
     config as config_routes,
     health as health_routes,
+    intro_videos as intro_videos_routes,
     mcp_tokens as mcp_tokens_routes,
     pages as pages_routes,
     run as run_routes,
@@ -69,6 +70,8 @@ app.include_router(characters_routes.router)
 app.include_router(story_family_routes.router)
 # 频道工坊（LLM 频道信息生成 + 收藏 + Logo/Banner 素材）
 app.include_router(channel_factory_routes.router)
+# 片头库（sleep 模式 10 秒片头生成入库 + 绑定）
+app.include_router(intro_videos_routes.router)
 app.include_router(health_routes.router)
 app.include_router(voices_qwen_routes.router)
 app.include_router(voices_kokoro_routes.router)

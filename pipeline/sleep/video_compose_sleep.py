@@ -61,6 +61,20 @@ def _build_audio_chain(block_segs: list[dict], audio_paths: dict) -> tuple[str, 
     return fg, inputs
 
 
+def _build_video_block(intro_video: str, block_segs: list[dict], out_path: str) -> None:
+    """绑定片头视频时的 intro 块：整段转码统一规格（音画随片头自带）。"""
+    block_dur = round(sum(float(seg.get("duration", 0.0)) for seg in block_segs), 3)
+    cmd = ["ffmpeg", "-y", "-i", intro_video,
+           "-vf", VF_NORM,
+           "-t", f"{block_dur:.3f}",
+           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
+           "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+           out_path]
+    r = _run_ffmpeg(cmd)
+    if r.returncode != 0 or not os.path.exists(out_path) or os.path.getsize(out_path) < 1000:
+        raise RuntimeError(f"FFmpeg intro video block failed: {(r.stderr or '')[-300:]}")
+
+
 def _build_block(card_path: str, block_segs: list[dict], audio_paths: dict,
                  out_path: str) -> None:
     """构建一个块 mp4（静态卡 + 音频链）。"""
@@ -111,6 +125,7 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
                   audio_results: dict, cards_dir: str, theme: dict,
                   channel_name: str = "English with me", badge_text: str = "EN",
                   outro_text: str = "", num_pairs: int = 0,
+                  intro_video: str = "",
                   progress_cb=None, stop_check=None) -> str:
     """合成 sleep 成片。返回最终 mp4 路径（videos/{safe}.mp4）。"""
     work = Path(work_dir)
@@ -156,21 +171,31 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
             raise RuntimeError("stopped")
         head = block_segs[0]
         t = head.get("type", "")
-        if t == "intro":
-            card = cards["intro"]
-        elif t == "outro":
-            card = cards["outro"]
-        else:
-            card = cards[str(head.get("pair", 0)).zfill(4)]
         out_path = str(tmp_dir / "blocks" / f"block_{bi:04d}.mp4")
+        # 绑定片头视频：intro 块整段转码该片（音画随片头自带 BGM/播报）
+        is_intro_video = (t == "intro" and intro_video
+                          and os.path.exists(intro_video))
+        if not is_intro_video:
+            if t == "intro":
+                card = cards["intro"]
+            elif t == "outro":
+                card = cards["outro"]
+            else:
+                card = cards[str(head.get("pair", 0)).zfill(4)]
         if not (os.path.exists(out_path) and os.path.getsize(out_path) > 1000):
             try:
-                _build_block(card, block_segs, audio_results, out_path)
+                if is_intro_video:
+                    _build_video_block(intro_video, block_segs, out_path)
+                else:
+                    _build_block(card, block_segs, audio_results, out_path)
             except RuntimeError as e:
                 if str(e) == "stopped":
                     raise
                 print(f"  [Sleep] Block {bi} failed ({e}), retry once...")
-                _build_block(card, block_segs, audio_results, out_path)
+                if is_intro_video:
+                    _build_video_block(intro_video, block_segs, out_path)
+                else:
+                    _build_block(card, block_segs, audio_results, out_path)
         block_paths.append(out_path)
         if bi % 10 == 0 or bi == total - 1:
             _cb(int(2 + bi / total * 78),

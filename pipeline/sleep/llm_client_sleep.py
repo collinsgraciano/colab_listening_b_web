@@ -78,7 +78,10 @@ def _batch_prompt(topic: str, cefr: str, count: int, start_idx: int,
   "youtube_title_en": string,
   "youtube_description": string,
   "youtube_description_en": string,
-  "youtube_tags": [string],'''
+  "youtube_tags": [string],
+  "thumb_badge": string,
+  "thumb_main": string,
+  "thumb_hook": string,'''
         meta_reqs = f'''
 - "title": short English title of the phrase collection topic (e.g. "Everyday Phrases — Cleaning the House")
 - "title_zh": Traditional Chinese short title (max 8 characters, e.g. "打掃房間")
@@ -89,7 +92,10 @@ def _batch_prompt(topic: str, cefr: str, count: int, start_idx: int,
 - "youtube_title_en": high-CTR YouTube title in PURE ENGLISH (no Chinese), under 100 chars. Mention the topic and the "listen while you sleep / no memorization" angle (e.g. "400 Everyday English Phrases While You Sleep — Cleaning the House").
 - "youtube_description": full YouTube description (max 3000 chars), ALL Chinese in Traditional Chinese (繁體中文). First line = hook with 睡前聽/不用背 keyword. Explain the AB-loop listening method (男聲常速 → 女聲慢速 → 男女連貫). End with call-to-action (點讚/訂閱/留言想學的場景) + 3 hashtags (#英文聽力 #睡前英文 #LearnEnglish). Do NOT write timestamps.
 - "youtube_description_en": same in PURE ENGLISH (no Chinese), max 3000 chars, same structure. Do NOT write timestamps.
-- "youtube_tags": 15-20 SEO tags mixing English and Traditional Chinese.'''
+- "youtube_tags": 15-20 SEO tags mixing English and Traditional Chinese.
+- "thumb_badge": YouTube thumbnail badge slogan, Traditional Chinese, AT MOST 6 characters, high-CTR hook (e.g. "不用背！" / "聽著聽著就會說").
+- "thumb_main": YouTube thumbnail MAIN title, Traditional Chinese, 2-5 characters, the series brand word matching this topic (e.g. "睡覺聽" / "聽就會").
+- "thumb_hook": YouTube thumbnail bottom banner line, Traditional Chinese, AT MOST 14 characters (e.g. "零基礎自然開口說" / "聽久自然開口說").'''
     return f"""You are an expert ESL teacher creating a "listen while you sleep" English phrase-drill video for overseas Chinese learners (zero-basics friendly, background/ASMR style).
 
 Topic: {topic}
@@ -127,13 +133,17 @@ def _meta_from_batch(batch: dict, topic: str, cefr: str, num_pairs: int) -> None
     meta = {}
     for k in ("title", "title_zh", "scene_zh", "title_quote", "cefr",
               "youtube_title", "youtube_title_en", "youtube_description",
-              "youtube_description_en", "youtube_tags"):
+              "youtube_description_en", "youtube_tags",
+              "thumb_badge", "thumb_main", "thumb_hook"):
         if k in batch:
             meta[k] = batch.pop(k)
     meta.setdefault("title", topic.upper())
     meta.setdefault("title_zh", "")
     meta.setdefault("scene_zh", "")
     meta.setdefault("title_quote", "")
+    meta.setdefault("thumb_badge", "")
+    meta.setdefault("thumb_main", "")
+    meta.setdefault("thumb_hook", "")
     meta["cefr"] = cefr
     meta.setdefault("youtube_title", "")
     meta.setdefault("youtube_title_en", "")
@@ -215,6 +225,8 @@ def generate_sleep_script(topic: str, cefr: str = "A2", num_pairs: int = 200,
     script = dict(meta)
     script["lesson_type"] = "listening"
     script["structure"] = "sleep"
+    # 缩略图集数按主题系列计数（thumbnail_gen.assign_sleep_episode 消费）
+    script["topic"] = topic
     # 朗读声部（非剧情角色）：char_a 恒男声、char_b 恒女声，voice_map 按性别映射
     script["char_a_description"] = "male narrator voice"
     script["char_b_description"] = "female narrator voice"

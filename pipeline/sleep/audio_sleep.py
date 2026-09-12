@@ -93,25 +93,11 @@ def load_sleep_audio_results(audio_dir: Path, num_pairs: int) -> dict | None:
     }
 
 
-def prepare_sleep_audio(script: dict, audio_dir: Path, num_pairs: int,
-                        tts_engine: str = "kokoro", slow_rate: float = 0.8,
-                        male_rate: float = 1.0,
-                        channel_name: str = "", outro_text: str = "",
-                        stop_check=None) -> dict:
-    """生成全部 sleep 音频（文件级续传）。返回 results dict（见 load_*）。
+def build_engine_and_voice_map(tts_engine: str, script: dict):
+    """三引擎装配（照抄 tts_pipeline 三分支）。返回 (tts, voice_map)。
 
-    slow_rate/male_rate 为速率倍率（0.8=八成速），经各引擎 synth_english
-    的 rate 参数实现（Kokoro 原生 speed 变速不变调；Qwen/MOSS 引擎内部处理）。
+    供 prepare_sleep_audio 与片头频道名播报合成（Web 层）共用。
     """
-    audio_dir = Path(audio_dir)
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    slow_rate = float(slow_rate or 0.8)
-    male_rate = min(1.5, max(0.5, float(male_rate or 1.0)))
-    male_rate_str = _rate_str(male_rate)
-    slow_rate_str = _rate_str(slow_rate)
-    _check_sleep_cache(audio_dir, _sleep_meta_sig(tts_engine, slow_rate, male_rate))
-
-    # --- 引擎装配（照抄 tts_pipeline 三分支 + kokoro 回退）---
     if tts_engine == "qwen":
         from qwen_tts_engine import QwenTTSEngine, build_qwen_voice_map
         tts = QwenTTSEngine(
@@ -135,6 +121,29 @@ def prepare_sleep_audio(script: dict, audio_dir: Path, num_pairs: int,
         from tts_engine import TTSEngine, build_voice_map
         tts = TTSEngine()
         voice_map = build_voice_map(script, "sleep")
+    return tts, voice_map
+
+
+def prepare_sleep_audio(script: dict, audio_dir: Path, num_pairs: int,
+                        tts_engine: str = "kokoro", slow_rate: float = 0.8,
+                        male_rate: float = 1.0,
+                        channel_name: str = "", outro_text: str = "",
+                        stop_check=None) -> dict:
+    """生成全部 sleep 音频（文件级续传）。返回 results dict（见 load_*）。
+
+    slow_rate/male_rate 为速率倍率（0.8=八成速），经各引擎 synth_english
+    的 rate 参数实现（Kokoro 原生 speed 变速不变调；Qwen/MOSS 引擎内部处理）。
+    """
+    audio_dir = Path(audio_dir)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    slow_rate = float(slow_rate or 0.8)
+    male_rate = min(1.5, max(0.5, float(male_rate or 1.0)))
+    male_rate_str = _rate_str(male_rate)
+    slow_rate_str = _rate_str(slow_rate)
+    _check_sleep_cache(audio_dir, _sleep_meta_sig(tts_engine, slow_rate, male_rate))
+
+    # --- 引擎装配（三分支抽至 build_engine_and_voice_map，片头播报共用）---
+    tts, voice_map = build_engine_and_voice_map(tts_engine, script)
     male_voice = voice_map.get("char_a", "am_adam")
     female_voice = voice_map.get("char_b", "af_sarah")
 

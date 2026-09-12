@@ -23,6 +23,9 @@ CHANNEL_DRAFTS_PATH = CONFIGS_DIR / "channel_drafts.json"
 CHANNEL_FAVORITES_PATH = CONFIGS_DIR / "channel_favorites.json"
 CHANNEL_ASSETS_DIR = CONFIGS_DIR / "channel_assets"
 CHANNEL_REFERENCES_PATH = CONFIGS_DIR / "channel_references.json"
+# 片头库（sleep 模式 10 秒片头：本地动画 / MCP AI 视频，Web 生成入库）
+INTRO_VIDEOS_DIR = CONFIGS_DIR / "intro_videos"
+INTRO_LIBRARY_PATH = CONFIGS_DIR / "intro_library.json"
 
 
 def ensure_pipeline_on_path() -> None:

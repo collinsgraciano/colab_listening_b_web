@@ -38,6 +38,10 @@ configs/channel_favorites.json
 configs/channel_references.json
 configs/channel_assets/
 
+# Intro video library (sleep mode 10s intros, generated assets)
+configs/intro_videos/
+configs/intro_library.json
+
 # Pipeline run outputs
 output/
 

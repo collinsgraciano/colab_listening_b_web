@@ -69,6 +69,16 @@ def main() -> int:
     from pipeline import call_tool, parse_task_id, poll_task, download_file
     from thumbnail_gen import generate_thumbnail
 
+    # sleep 缩略图：AI 分支纯 prompt 生成；Pillow 兜底卡需要 sleep 主题配色
+    sleep_theme = None
+    sleep_channel = ""
+    if structure == "sleep":
+        from sleep.sleep_cards import build_theme
+        sleep_cfg = params.get("sleep_cfg", {}) or {}
+        sleep_theme = build_theme(sleep_cfg)
+        sleep_channel = str(sleep_cfg.get("sleep_channel_name", "")
+                            or "English with me")
+
     # 场景图：仅 Pillow 兜底分支需要；AI 分支纯 prompt 生成不受影响
     if structure == "quest":
         scene_img = run_dir / "images" / "scene_0.png"
@@ -87,6 +97,8 @@ def main() -> int:
         mcp_download_file=download_file,
         structure=structure,
         char_scene_url=char_scene_url,
+        sleep_theme=sleep_theme,
+        sleep_channel=sleep_channel,
     )
     if out_path and Path(out_path).exists():
         print("=" * 60)

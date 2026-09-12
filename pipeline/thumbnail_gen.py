@@ -89,18 +89,181 @@ Clean legible text, bright studio lighting, vibrant colors, highly detailed, pro
 CRITICAL: The largest and most prominent text on the thumbnail must be the Traditional Chinese title "{title_zh_large}". The English title "{title_en}" must be noticeably smaller, serving as a subtitle below the Chinese title. The Chinese audience sees the Chinese title first — it must grab attention."""
 
 
+def assign_sleep_episode(script: dict, sleep_dir: str) -> int:
+    """缩略图集数：按主题系列自动递增（首次生成时 bump 计数文件）。
+
+    - script 已有 thumb_episode（重生成/复跑）→ 直接返回，不 bump；
+    - 计数存 {sleep_dir}/.thumb_episode.json（点前缀文件不进运行列表），
+      键 = topic（缺省 title）；参考缩略图的红色圆底 01/02 徽章。
+    """
+    try:
+        existing = int(script.get("thumb_episode", 0) or 0)
+    except (TypeError, ValueError):
+        existing = 0
+    if existing > 0:
+        return existing
+    topic = str(script.get("topic", "") or script.get("title", "") or "default").strip()
+    path = Path(sleep_dir) / ".thumb_episode.json"
+    data: dict = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    try:
+        ep = int(data.get(topic, 0) or 0) + 1
+    except (TypeError, ValueError):
+        ep = 1
+    data[topic] = ep
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError as e:
+        print(f"  [Thumbnail] WARNING: 集数计数写入失败: {e}")
+    script["thumb_episode"] = ep
+    return ep
+
+
+def _build_sleep_thumbnail_prompt(script: dict) -> str:
+    """sleep 参考同款缩略图 prompt：3D 皮克斯角色 + 超大繁中标题 + 徽章/集数。
+
+    文案来自脚本 thumb_* 字段（LLM 每期生成，旧脚本 setdefault 兜底），
+    全部引号内嵌并要求逐字渲染（AI 整图文字，同 thumbnail_gen 现有模式）。
+    """
+    dialogue = script.get("dialogue", []) or []
+    n_lines = len(dialogue)
+    num_text = f"{n_lines}句" if n_lines else "300句"
+    title_zh = str(script.get("title_zh", "") or "").strip()
+    topic_text = f"{title_zh}英文" if title_zh else "生活英文"
+    badge = str(script.get("thumb_badge", "") or "").strip() or "不用背！"
+    main = str(script.get("thumb_main", "") or "").strip() or (title_zh or "睡覺聽")
+    hook = (str(script.get("thumb_hook", "") or "").strip()
+            or str(script.get("thumbnail_subtitle", "") or "").strip()
+            or "零基礎自然開口說")
+    episode = ""
+    try:
+        ep = int(script.get("thumb_episode", 0) or 0)
+        if ep > 0:
+            episode = f"{ep:02d}"
+    except (TypeError, ValueError):
+        episode = ""
+    scene_en = str(script.get("scene", "") or script.get("title", "")
+                   or "daily life").strip()
+
+    episode_line = (f'\n  - A small red circle badge with the white bold number "{episode}"'
+                    if episode else "")
+    return f"""A vibrant professional YouTube thumbnail (16:9) for a "listen while you sleep" English learning video, in a cute cozy 3D Pixar animation movie style.
+
+LAYOUT:
+- Right half: an adorable 3D Pixar-style young woman with brown hair wearing big cream-white headphones, relaxed and cheerful with a warm smile, in a cozy {scene_en} scene, soft dreamy lighting, gentle bokeh background.
+- Left half text stack (ALL text must be Traditional Chinese rendered EXACTLY as written, no extra text, no typos):
+  - Top-left: a red brush-stroke banner with bold white text "{badge}"
+  - Below it: HUGE bold 3D yellow text "{main}" with a thick dark-blue outline — the most prominent element on the thumbnail
+  - Below it: bold black text "{num_text}{topic_text}" on a bright yellow rounded banner{episode_line}
+- Bottom-left: a rounded ribbon banner with bold white text "{hook}"
+- A small white headphone icon accent near the ribbon.
+
+Style: high contrast, bright saturated colors, soft glow, clean composition, professional YouTube CTR design, no watermark, no subtitles, no other text."""
+
+
+def _generate_sleep_thumbnail(script: dict, output_path: str,
+                              mcp_call_tool=None, mcp_parse_task_id=None,
+                              mcp_poll_task=None, mcp_download_file=None,
+                              theme: dict | None = None,
+                              channel_name: str = "") -> str:
+    """sleep 缩略图：参考同款 AI 生成（文字内嵌 prompt），失败兜底 Pillow 卡片。
+
+    Provider 优先级与通用路径一致：sensenova（配置选择）→ MCP → Pillow 兜底；
+    sensenova 失败不回退 MCP（避免用户省积分选择时被意外消耗，同通用路径）。
+    """
+    prompt = _build_sleep_thumbnail_prompt(script)
+
+    if sensenova_image.get_image_provider() == "sensenova":
+        print("  [Thumbnail] Generating sleep thumbnail via SenseNova U1.5 Lite...")
+        try:
+            url = sensenova_image.text_to_image(
+                prompt, size=sensenova_image.SIZE_MAP["landscape_16_9"],
+                output_format="jpeg")
+            if url and sensenova_image.download_image(url, output_path):
+                if os.path.getsize(output_path) // 1024 > 10:
+                    print(f"  [Thumbnail] Saved (U1.5): {output_path}")
+                    return output_path
+                print(f"  [Thumbnail] U1.5 image too small, falling back")
+            else:
+                print("  [Thumbnail] U1.5 generation returned no URL, falling back")
+        except Exception as e:
+            print(f"  [Thumbnail] U1.5 generation failed: {e}, falling back")
+    elif mcp_call_tool and mcp_parse_task_id and mcp_poll_task and mcp_download_file:
+        print("  [Thumbnail] Generating sleep thumbnail via MCP (baked-in text)...")
+        try:
+            gen_args = {
+                "prompt": prompt,
+                # frontier 高质量通道（~50 积分/张），须 confirm_cost=true 才真正建任务
+                "provider": "frontier",
+                "quality": "high",
+                "image_size": '{"width": 1280, "height": 720}',
+                "output_format": "jpeg",
+                "confirm_cost": True,
+            }
+            result = mcp_call_tool("generate_image", gen_args)
+            task_id = mcp_parse_task_id(result)
+            if task_id:
+                data = mcp_poll_task(task_id, interval=10, max_wait=300)
+                url = data.get("url", "")
+                if url and mcp_download_file(url, output_path):
+                    if os.path.getsize(output_path) // 1024 > 10:
+                        print(f"  [Thumbnail] Saved (AI baked-in): {output_path}")
+                        return output_path
+                    print("  [Thumbnail] AI image too small, falling back")
+                else:
+                    print("  [Thumbnail] AI generation returned no URL, falling back")
+            else:
+                # 不再静默：打印原始响应文本便于定位（高成本确认提示/参数错误等）
+                raw = ""
+                for item in result.get("result", {}).get("content", []):
+                    if item.get("type") == "text":
+                        raw = str(item.get("text", ""))[:300].replace("\n", " ")
+                        break
+                print(f"  [Thumbnail] MCP 未返回任务 ID（响应: {raw}），falling back")
+        except Exception as e:
+            print(f"  [Thumbnail] AI generation failed: {e}, falling back")
+    else:
+        print("  [Thumbnail] 无可用生图通道，使用 Pillow 兜底")
+
+    # Pillow 兜底：现有 sleep 卡片缩略图
+    print("  [Thumbnail] Using sleep Pillow fallback...")
+    from sleep.sleep_cards import build_theme, render_sleep_thumbnail
+    render_sleep_thumbnail(script, theme if theme is not None else build_theme({}),
+                           output_path, badge_text="EN",
+                           channel_name=channel_name or "English with me")
+    return output_path
+
+
 def generate_thumbnail(script: dict, scene_img: str, output_path: str,
                         mcp_call_tool=None, mcp_parse_task_id=None,
                         mcp_poll_task=None, mcp_download_file=None,
                         structure: str = "original",
-                        char_scene_url: str = None) -> str:
+                        char_scene_url: str = None,
+                        sleep_theme: dict | None = None,
+                        sleep_channel: str = "") -> str:
     """Generate a YouTube thumbnail with text baked into the AI prompt (one step).
 
     If char_scene_url is provided, uses it as a reference image so the thumbnail
     characters match the video's character designs.
 
-    Falls back to Pillow text overlay on scene_img if AI generation fails.
+    Falls back to Pillow text overlay on scene image if AI generation fails.
     """
+    if structure == "sleep":
+        return _generate_sleep_thumbnail(
+            script, output_path,
+            mcp_call_tool=mcp_call_tool,
+            mcp_parse_task_id=mcp_parse_task_id,
+            mcp_poll_task=mcp_poll_task,
+            mcp_download_file=mcp_download_file,
+            theme=sleep_theme, channel_name=sleep_channel)
+
     prompt = _build_thumbnail_prompt(script, structure)
 
     # If we have a char_scene reference, add instruction to match it

@@ -90,6 +90,21 @@ def _cfg_int(config: dict, key: str, default: int) -> int:
         return default
 
 
+def _resolve_sleep_intro_video(config: dict) -> str:
+    """sleep_intro_video 配置（片头库 intro_id 或 mp4 绝对路径）→ 文件路径。
+
+    绑定无效（库中已删除等）回退空串 = 默认片头（静态卡片 + 频道名播报）。
+    """
+    sel = str(config.get("sleep_intro_video", "") or "").strip()
+    if not sel:
+        return ""
+    from .intro_library import resolve_video_path
+    path = resolve_video_path(sel)
+    if not path:
+        print(f"  [SleepIntro] 片头绑定无效（库中不存在）: {sel} —— 回退默认片头")
+    return path
+
+
 def _merge_run_clip_manifest(dst_img_dir: Path, char_key: str,
                              actions: dict, fps: int = 24,
                              from_library: bool = False) -> None:
@@ -1271,6 +1286,7 @@ class PipelineService:
             upscale_timeout=int(config.get("upscale_timeout", 3600)),
             upscale_engine=str(config.get("upscale_engine", "ffmpeg")),
             matting_engine=str(config.get("matting_engine", "auto")),
+            sleep_intro_video=_resolve_sleep_intro_video(config),
             host_character=str(config.get("host_character", "") or ""),
             host_bg_prompt=str(config.get("host_bg_prompt", "") or ""),
             bgm_mix=bool(config.get("bgm_mix", False)),

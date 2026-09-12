@@ -276,6 +276,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-gap-long", type=float, default=2.0, help="sleep 模式：慢速跟读后停顿秒数（默认 2.0）")
     parser.add_argument("--sleep-pair-gap", type=float, default=3.0, help="sleep 模式：AB 连贯后切组停顿秒数（默认 3.0）")
     parser.add_argument("--sleep-channel-name", default="English with me", help="sleep 模式：卡片/片头频道名（同步作 TTS 播报）")
+    parser.add_argument("--sleep-intro-video", default="", help="sleep 模式：片头视频 mp4 路径（片头库生成后绑定；空=默认静态卡片+频道名播报）")
     parser.add_argument("--sleep-outro-text", default="Thanks for listening. See you next time!", help="sleep 模式：片尾结束语（TTS+卡片）")
     parser.add_argument("--sleep-batch-pairs", type=int, default=50, help="sleep 模式：LLM 分批生成每批组数（默认 50）")
     parser.add_argument("--sleep-show-leaves", action=argparse.BooleanOptionalAction, default=True, help="sleep 模式：卡片叶片装饰（默认开）")
@@ -915,6 +916,21 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                     print("  [Sleep] Generation stopped by user.", flush=True)
                 else:
                     raise
+        # 片头库绑定：intro 视频拷入运行目录，timeline intro 段时长随视频
+        # （intro TTS 照旧生成，音频完整性校验不变；绑定后 compose 不再消费它）
+        intro_src = str(getattr(args, "sleep_intro_video", "") or "").strip()
+        if intro_src and not tts_results.get("fatal_error"):
+            if os.path.exists(intro_src):
+                import shutil
+                intro_dst = work_dir / "intro_video.mp4"
+                if not intro_dst.exists():
+                    shutil.copy2(intro_src, intro_dst)
+                tts_results["intro_video"] = str(intro_dst)
+                tts_results["intro_dur"] = _get_audio_duration(str(intro_dst))
+                print(f"  [Sleep] Intro video bound: {intro_dst.name} "
+                      f"({tts_results['intro_dur']:.1f}s)")
+            else:
+                print(f"  [Sleep] WARNING: 片头视频不存在: {intro_src} —— 回退默认片头")
     elif resume_result is not None:
         tts_results, image_urls = resume_result
     elif qt_tts is not None:
@@ -1298,13 +1314,27 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
         _skip_why = ("no_thumbnail" if args.no_thumbnail else "quick_test")
         print(f"  [Thumbnail] 跳过缩略图生成（{_skip_why}）——仅生成 YouTube 元数据")
     elif args.structure == "sleep":
-        # sleep：Pillow 直出缩略图（不调 MCP 生图，零积分）
-        from sleep.sleep_cards import build_theme, render_sleep_thumbnail
-        render_sleep_thumbnail(script, build_theme(vars(args)), thumb_path,
-                               badge_text="EN",
-                               channel_name=str(getattr(args, "sleep_channel_name", "")
-                                                or "English with me"))
-        print(f"  [Thumbnail] sleep Pillow thumbnail saved: {thumb_path}")
+        # sleep：参考同款 AI 缩略图（3D 角色+大字标题），失败兜底 Pillow 卡片；
+        # 集数按主题系列自动递增（重生成读 script.thumb_episode 不再递增）
+        from thumbnail_gen import assign_sleep_episode
+        from sleep.sleep_cards import build_theme
+        assign_sleep_episode(script, str(work_dir.parent))
+        (work_dir / "script.json").write_text(
+            json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+        generate_thumbnail(
+            script=script,
+            scene_img="",
+            output_path=thumb_path,
+            mcp_call_tool=call_tool,
+            mcp_parse_task_id=parse_task_id,
+            mcp_poll_task=poll_task,
+            mcp_download_file=download_file,
+            structure="sleep",
+            sleep_theme=build_theme(vars(args)),
+            sleep_channel=str(getattr(args, "sleep_channel_name", "")
+                              or "English with me"),
+        )
+        print(f"  [Thumbnail] sleep thumbnail saved: {thumb_path}")
     else:
         generate_thumbnail(
             script=script,
@@ -1377,6 +1407,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             badge_text="EN",
             outro_text=str(getattr(args, "sleep_outro_text", "") or ""),
             num_pairs=int(getattr(args, "sleep_pairs", 200)),
+            intro_video=str(tts_results.get("intro_video", "") or ""),
             progress_cb=progress_cb,
             stop_check=stop_check,
         )

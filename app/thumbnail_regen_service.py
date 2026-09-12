@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-from .config_manager import MODES, load_config, find_run_dir
+from .config_manager import MODES, load_config, load_mode_config, find_run_dir
 from .paths import PIPELINE_DIR
 
 _CLI_PATH = PIPELINE_DIR / "thumbnail_regen_cli.py"
@@ -101,6 +101,10 @@ class ThumbnailRegenService:
             "style_prompt": resolve_style_prompt(style_id),
             "mcp_tokens": mcp_tokens,
         }
+        if structure == "sleep":
+            # sleep 缩略图 Pillow 兜底卡需要 sleep 主题配色/频道名（AI 分支不用）
+            payload["sleep_cfg"] = {k: v for k, v in load_mode_config("sleep").items()
+                                    if k.startswith("sleep_")}
 
         try:
             proc = subprocess.Popen(

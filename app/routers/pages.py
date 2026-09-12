@@ -457,3 +457,14 @@ async def channel_factory_page(request: Request):
 
 
 # ===========================================================================
+@router.get("/intro_videos", response_class=HTMLResponse)
+async def intro_videos_page(request: Request):
+    """片头库：sleep 模式 10 秒片头生成（本地动画 / AI 视频）+ 入库管理。"""
+    config = load_config()
+    return templates.TemplateResponse(request, "intro_videos.html", {
+        "config": config,
+        "active_page": "intro_videos",
+    })
+
+
+# ===========================================================================

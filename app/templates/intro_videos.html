@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 max-w-[1600px] mx-auto space-y-6">
+
+    <!-- Header + Generate form -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div class="flex items-center gap-3 mb-1">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🌙</span> 片头库</h2>
+            <span class="text-xs text-slate-500">10 秒片头生成 → 入库保存 → 绑定给 Sleep 模式反复使用</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">频道名（片头主文字）</label>
+                <input type="text" id="iv-channel" value="{{ config.get('sleep_channel_name', '') or 'English with me' }}"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">生成路线</label>
+                <select id="iv-route" onchange="toggleRoute()" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="local">本地动画（零积分，~1-2 分钟）</option>
+                    <option value="ai">AI 视频（MCP 耗积分，~3-10 分钟）</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">副标题（留空 = 閉上眼睛 · 輕鬆聽）</label>
+                <input type="text" id="iv-subtitle" placeholder="閉上眼睛 · 輕鬆聽"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500">
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">BGM 配乐（bgm_music 库）</label>
+                <select id="iv-bgm" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="">🎲 随机一首</option>
+                </select>
+            </div>
+            <div id="iv-scene-wrap" class="md:col-span-2 xl:col-span-4 hidden">
+                <label class="text-xs text-slate-400 block mb-1">AI 画面描述（留空 = 默认梦境夜景；画面不含文字，频道名由本地叠加保证准确）</label>
+                <textarea id="iv-scene" rows="2"
+                    placeholder="A cozy dreamy night scene: soft clouds under a starry sky, warm moonlight, slow calm camera drift, 3D Pixar animation style"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 resize-none"></textarea>
+            </div>
+            <div class="flex items-end gap-3">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" title="BGM 音量（dB，越小越轻）">BGM 音量 dB</label>
+                    <input type="number" id="iv-volume" value="-16" min="-40" max="0" step="1"
+                        class="w-24 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                </div>
+                <label class="flex items-center gap-2 text-sm text-slate-300 pb-2 cursor-pointer" title="开头 0.6s 混入频道名男声播报">
+                    <input type="checkbox" id="iv-announce" class="w-4 h-4 accent-indigo-500"> 🗣️ 播报频道名
+                </label>
+                <button onclick="startGenerate()" id="btn-generate"
+                    class="ml-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-white font-medium transition">
+                    🎬 生成片头
+                </button>
+            </div>
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+            <span id="gen-status" class="text-xs text-slate-400"></span>
+            <span class="text-[11px] text-slate-500 ml-auto">配色沿用「参数配置 → Sleep」主题色；绑定后每次运行自动用作片头。</span>
+        </div>
+    </div>
+
+    <!-- Task logs -->
+    <div id="task-panel" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <div class="text-sm font-medium text-white mb-2">⏳ 生成进度 <span id="task-status" class="text-xs text-slate-400 ml-2"></span></div>
+        <pre id="task-logs" class="text-[11px] leading-5 text-slate-400 bg-slate-900 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap"></pre>
+    </div>
+
+    <!-- Library -->
+    <section>
+        <h3 class="text-base font-bold text-white flex items-center gap-2 mb-3">🎞️ 已保存片头
+            <span id="lib-count" class="text-xs font-normal text-slate-500"></span>
+        </h3>
+        <div id="lib-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        <div id="lib-empty" class="text-center text-slate-500 text-sm py-10">
+            <div class="text-4xl mb-3">🌙</div>
+            <p>还没有片头 —— 填写频道名，点击「生成片头」，生成后点「用于 Sleep」绑定</p>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let INTROS = [];
+let _genBusy = false;
+let _genTimer = null;
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+function toggleRoute() {
+    const isAI = document.getElementById('iv-route').value === 'ai';
+    document.getElementById('iv-scene-wrap').classList.toggle('hidden', !isAI);
+}
+
+// ---------- data ----------
+async function loadAll() {
+    const d = await fetch('/api/intro_videos').then(r => r.json());
+    INTROS = d.intros || [];
+    renderGrid(d.used);
+}
+async function loadBgm() {
+    const d = await fetch('/api/intro_videos/bgm_list').then(r => r.json());
+    const sel = document.getElementById('iv-bgm');
+    sel.innerHTML = '<option value="">🎲 随机一首</option>' + (d.files || []).map(f =>
+        `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+}
+
+// ---------- render ----------
+function renderGrid(usedId) {
+    const grid = document.getElementById('lib-grid');
+    const empty = document.getElementById('lib-empty');
+    document.getElementById('lib-count').textContent = INTROS.length ? `${INTROS.length} 个` : '';
+    empty.classList.toggle('hidden', !!INTROS.length);
+    grid.innerHTML = INTROS.map(p => {
+        const video = p.exists
+            ? `<video controls preload="metadata" src="${esc(p.video_url)}"
+                   class="w-full aspect-video bg-black rounded-lg border border-slate-600"></video>`
+            : `<div class="w-full aspect-video rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-xs text-slate-500">文件缺失</div>`;
+        const srcBadge = p.source === 'ai'
+            ? '<span class="px-1.5 py-0.5 bg-purple-900/60 text-purple-300 rounded text-[10px]">AI 视频</span>'
+            : '<span class="px-1.5 py-0.5 bg-emerald-900/60 text-emerald-300 rounded text-[10px]">本地动画</span>';
+        const tags = [
+            srcBadge,
+            p.duration ? `<span class="px-1.5 py-0.5 bg-slate-700 rounded text-[10px] text-slate-300">${esc(p.duration)}s</span>` : '',
+            p.bgm ? `<span class="px-1.5 py-0.5 bg-slate-700 rounded text-[10px] text-slate-300" title="BGM">🎵 ${esc(p.bgm)}</span>` : '',
+            p.announce ? '<span class="px-1.5 py-0.5 bg-slate-700 rounded text-[10px] text-slate-300">🗣️ 播报</span>' : '',
+        ].join('');
+        const useBtn = p.used
+            ? `<button disabled class="flex-1 px-3 py-1.5 bg-emerald-600 rounded text-xs text-white cursor-default">✅ 当前使用</button>`
+            : `<button onclick="useIntro('${p.id}')" ${!p.exists ? 'disabled' : ''}
+                    class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded text-xs text-white transition">🌙 用于 Sleep</button>`;
+        return `
+        <div class="bg-slate-800 border ${p.used ? 'border-emerald-600/70' : 'border-slate-700'} rounded-xl p-3 space-y-2">
+            ${video}
+            <div class="flex items-start justify-between gap-2">
+                <div class="text-sm font-bold text-white truncate" title="${esc(p.name)}">${esc(p.name)}</div>
+                <div class="flex gap-1 shrink-0">${tags}</div>
+            </div>
+            <div class="flex gap-2 items-center">
+                ${useBtn}
+                <button onclick="deleteIntro('${p.id}')"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-red-700 rounded text-xs text-red-300 transition">🗑️</button>
+                <span class="text-[10px] text-slate-500 ml-auto">${new Date((p.created || 0) * 1000).toLocaleString('zh-CN')}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ---------- generate ----------
+async function startGenerate() {
+    if (_genBusy) return;
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+    const body = {
+        route: document.getElementById('iv-route').value,
+        channel_name: document.getElementById('iv-channel').value.trim(),
+        subtitle: document.getElementById('iv-subtitle').value.trim(),
+        bgm: document.getElementById('iv-bgm').value,
+        bgm_volume_db: parseFloat(document.getElementById('iv-volume').value) || -16,
+        announce: document.getElementById('iv-announce').checked,
+        scene_prompt: document.getElementById('iv-scene').value.trim(),
+    };
+    try {
+        const resp = await fetch('/api/intro_videos/generate', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        _genBusy = true;
+        document.getElementById('task-panel').classList.remove('hidden');
+        pollGen(Date.now());
+    } catch (e) {
+        alert('启动生成失败: ' + e.message);
+        btn.disabled = false;
+    }
+}
+function pollGen(startedAt) {
+    clearTimeout(_genTimer);
+    fetch('/api/intro_videos/status').then(r => r.json()).then(st => {
+        document.getElementById('task-logs').textContent = (st.logs || []).join('\n');
+        const logs = document.getElementById('task-logs');
+        logs.scrollTop = logs.scrollHeight;
+        const stEl = document.getElementById('task-status');
+        const el = document.getElementById('gen-status');
+        if (st.status === 'running') {
+            stEl.textContent = `⏳ ${Math.round((Date.now() - startedAt) / 1000)}s`;
+            el.textContent = '⏳ 片头生成中...';
+            _genTimer = setTimeout(pollGen, 2000, startedAt);
+        } else {
+            _genBusy = false;
+            document.getElementById('btn-generate').disabled = false;
+            document.getElementById('task-panel').classList.add('hidden');
+            if (st.status === 'done') {
+                el.textContent = '✅ 片头已生成入库';
+            } else if (st.status === 'error') {
+                el.textContent = '';
+                alert('片头生成失败: ' + (st.error || '见日志'));
+            } else {
+                el.textContent = '';
+            }
+            loadAll();
+        }
+    }).catch(() => { _genTimer = setTimeout(pollGen, 3000, startedAt); });
+}
+
+// ---------- actions ----------
+async function useIntro(id) {
+    try {
+        const resp = await fetch('/api/intro_videos/use', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        loadAll();
+    } catch (e) {
+        alert('绑定失败: ' + e.message);
+    }
+}
+async function deleteIntro(id) {
+    if (!confirm('删除该片头？（若正在使用会同时解除绑定，回退默认片头）')) return;
+    const resp = await fetch(`/api/intro_videos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!resp.ok) { alert('删除失败'); return; }
+    loadAll();
+}
+
+// ---------- init ----------
+window.addEventListener('load', async () => {
+    toggleRoute();
+    await Promise.all([loadAll(), loadBgm()]);
+    const st = await fetch('/api/intro_videos/status').then(r => r.json());
+    if (st.status === 'running') {
+        _genBusy = true;
+        document.getElementById('btn-generate').disabled = true;
+        document.getElementById('task-panel').classList.remove('hidden');
+        pollGen(Date.now());
+    }
+});
+</script>
+{% endblock %}
