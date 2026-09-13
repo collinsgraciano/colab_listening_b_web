@@ -20,7 +20,7 @@ from ..templating import templates
 import style_manager as style_lib
 import subtitle_style_manager as subtitle_style_lib
 from .ai_test import _load_ai_test_config
-from .runs import _THUMB_NAME_RE, _resolve_main_thumbnail
+from .runs import _THUMB_NAME_RE, _resolve_main_thumbnail, _resolve_video_copy_paths
 from .subtitle_styles import _current_subtitle_style_ctx
 
 router = APIRouter()
@@ -210,11 +210,15 @@ async def gallery_page(request: Request, name: str, mode: str = ""):
 
     # 画廊页操作按钮所需状态：已上传标记 + 主缩略图绝对路径（无缩略图传空串）
     thumb = _resolve_main_thumbnail(run_dir)
+    # 「一键复制 4K / 4K BGM 路径」按钮所需成片绝对路径（缺失为空串 → 按钮禁用）
+    copy_paths = _resolve_video_copy_paths(run_dir)
 
     return templates.TemplateResponse(request, "gallery.html", {
         "run_name": name,
         "uploaded": (run_dir / "uploaded.flag").exists(),
         "thumb_path": str(thumb) if thumb.exists() else "",
+        "path_4k": copy_paths["4k"],
+        "path_4k_bgm": copy_paths["4k_bgm"],
         "script": script,
         "images": images,
         "clips": clips,
@@ -247,6 +251,7 @@ async def runs_page(request: Request):
         has_4k = any(d.glob("*_4K.mp4"))
         recomposable = (no_sub.exists() and no_sub.stat().st_size >= 1_000_000
                         and meta_path.exists() and script_path.exists())
+        copy_paths = _resolve_video_copy_paths(d)
         run_info = {
             "name": d.name,
             "path": str(d),
@@ -259,6 +264,9 @@ async def runs_page(request: Request):
             "thumbnail_count": thumb_count,
             "uploaded": (d / "uploaded.flag").exists(),
             "has_4k": has_4k,
+            # 「一键复制 4K / 4K BGM 路径」所需成片绝对路径（缺失为空串 → 按钮禁用）
+            "copy_4k": copy_paths["4k"],
+            "copy_4k_bgm": copy_paths["4k_bgm"],
             "recomposable": recomposable,
             "structure": "",
         }

@@ -21,6 +21,10 @@
                 class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300">📂 打开目录</button>
             <button id="thumb-path-btn" onclick="copyThumbPath(this)" {% if not thumb_path %}disabled title="该运行没有缩略图"{% endif %}
                 class="px-4 py-2 rounded-lg text-sm {% if thumb_path %}bg-slate-700 hover:bg-slate-600 text-slate-300{% else %}bg-slate-800 text-slate-500 cursor-not-allowed{% endif %}">📋 缩略图路径</button>
+            <button onclick="copyVideoPath(this, '4k')" {% if not path_4k %}disabled title="尚未生成 4K 版本"{% endif %}
+                class="px-4 py-2 rounded-lg text-sm {% if path_4k %}bg-slate-700 hover:bg-slate-600 text-slate-300{% else %}bg-slate-800 text-slate-500 cursor-not-allowed{% endif %}">📋 4K</button>
+            <button onclick="copyVideoPath(this, '4k_bgm')" {% if not path_4k_bgm %}disabled title="尚未生成 4K BGM 版本"{% endif %}
+                class="px-4 py-2 rounded-lg text-sm {% if path_4k_bgm %}bg-slate-700 hover:bg-slate-600 text-slate-300{% else %}bg-slate-800 text-slate-500 cursor-not-allowed{% endif %}">📋 4K BGM</button>
         </div>
     </div>
 
@@ -232,6 +236,9 @@ function switchTab(tab) {
 const _runMode = new URLSearchParams(location.search).get('mode') || '';
 const _runName = {{ run_name | tojson }};
 const _thumbPath = {{ thumb_path | tojson }};
+// 「一键复制 4K / 4K BGM 成片路径」（服务端解析的绝对路径，缺失为空串 → 按钮禁用）
+const _videoPaths = {'4k': {{ path_4k | tojson }}, '4k_bgm': {{ path_4k_bgm | tojson }}};
+const _VIDEO_BTN_LABELS = {'4k': '📋 4K', '4k_bgm': '📋 4K BGM'};
 
 // 标记/取消「已上传」（切换 uploaded.flag，与运行历史页一致）
 function toggleUploaded() {
@@ -269,6 +276,21 @@ function copyThumbPath(btn) {
         navigator.clipboard.writeText(_thumbPath).then(done).catch(() => fallbackCopy(_thumbPath, done));
     } else {
         fallbackCopy(_thumbPath, done);
+    }
+}
+
+// 复制 4K / 4K BGM 成片绝对路径（与缩略图路径复制同款交互）
+function copyVideoPath(btn, kind) {
+    const p = _videoPaths[kind] || '';
+    if (!p) { alert(kind === '4k' ? '尚未生成 4K 版本' : '尚未生成 4K BGM 版本'); return; }
+    const done = () => {
+        btn.textContent = '✓ 已复制';
+        setTimeout(() => { btn.textContent = _VIDEO_BTN_LABELS[kind]; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(p).then(done).catch(() => fallbackCopy(p, done));
+    } else {
+        fallbackCopy(p, done);
     }
 }
 

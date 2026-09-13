@@ -2,7 +2,8 @@
 {% macro run_card(run) %}
 {% set gallery_url = '/runs/' ~ run.name ~ '/gallery' %}{% if run.structure %}{% set gallery_url = gallery_url ~ '?mode=' ~ run.structure %}{% endif %}
 <div class="relative bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-600 transition run-card"
-     data-run="{{ run.name }}" data-uploaded="{% if run.uploaded %}1{% else %}0{% endif %}" data-structure="{{ run.structure }}" data-has4k="{% if run.has_4k %}1{% else %}0{% endif %}">
+     data-run="{{ run.name }}" data-uploaded="{% if run.uploaded %}1{% else %}0{% endif %}" data-structure="{{ run.structure }}" data-has4k="{% if run.has_4k %}1{% else %}0{% endif %}"
+     data-path4k="{{ run.copy_4k }}" data-path4kbgm="{{ run.copy_4k_bgm }}">
     <!-- 多选框（批量操作用；叠在缩略图左上角，点击不会触发下层的画廊链接） -->
     <label class="absolute top-2 left-2 z-20 flex items-center justify-center w-7 h-7 bg-slate-900/70 hover:bg-slate-900/90 border border-slate-600 rounded-lg cursor-pointer"
         title="勾选后可批量操作">
@@ -53,7 +54,7 @@
                 class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs text-white text-center">画廊</a>
             <button id="thumb-btn-{{ run.name }}" onclick="regenThumbnail('{{ run.name }}', '{{ run.structure }}')"
                 class="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 rounded-lg text-xs text-white">＋缩略图</button>
-            <button id="upload-btn-{{ run.name }}" onclick="toggleUploaded('{{ run.name }}')"
+            <button id="upload-btn-{{ run.name }}" onclick="toggleUploaded(this)"
                 class="px-3 py-1.5 rounded-lg text-xs text-white {% if run.uploaded %}bg-emerald-600 hover:bg-emerald-500{% else %}bg-amber-600/80 hover:bg-amber-500{% endif %}">
                 {% if run.uploaded %}已上传 ✓{% else %}标记已上传{% endif %}
             </button>
@@ -70,6 +71,10 @@
             <button id="bgm4k-btn-{{ run.name }}" onclick="generateBgm('{{ run.name }}', '{{ run.structure }}', '4k')"
                 class="px-3 py-1.5 bg-rose-700 hover:bg-rose-600 rounded-lg text-xs text-white">🎵 混BGM 4K</button>
             {% endif %}
+            <button onclick="copyRunPath(this, '4k')" {% if not run.copy_4k %}disabled title="尚未生成 4K 版本"{% endif %}
+                class="px-3 py-1.5 rounded-lg text-xs {% if run.copy_4k %}bg-slate-700 hover:bg-slate-600 text-slate-300{% else %}bg-slate-800 text-slate-500 cursor-not-allowed{% endif %}">📋 4K</button>
+            <button onclick="copyRunPath(this, '4k_bgm')" {% if not run.copy_4k_bgm %}disabled title="尚未生成 4K BGM 版本"{% endif %}
+                class="px-3 py-1.5 rounded-lg text-xs {% if run.copy_4k_bgm %}bg-slate-700 hover:bg-slate-600 text-slate-300{% else %}bg-slate-800 text-slate-500 cursor-not-allowed{% endif %}">📋 4K BGM</button>
             {% endif %}
             <button onclick="openFolder('{{ run.name }}')"
                 class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300">打开目录</button>
@@ -614,7 +619,7 @@ async function batchAction(kind) {
         for (const it of items) {
             const qs = it.mode ? `?mode=${encodeURIComponent(it.mode)}` : '';
             try {
-                const r = await fetch(`/api/runs/${it.name}/mark_uploaded${qs ? `${qs}&` : '?'}state=uploaded`, {method: 'POST'});
+                const r = await fetch(`/api/runs/${encodeURIComponent(it.name)}/mark_uploaded${qs ? `${qs}&` : '?'}state=uploaded`, {method: 'POST'});
                 const data = await r.json();
                 if (data.ok) okNames.push(it.name);
                 else failList.push(`${it.name}：${data.error || '失败'}`);
@@ -643,15 +648,20 @@ async function batchAction(kind) {
     _startBatchWatch({kind, total: items.length, done: 0, current: ''});
 }
 
-function toggleUploaded(runName) {
-    fetch(`/api/runs/${runName}/mark_uploaded`, {method: 'POST'})
+// 标记/取消「已上传」：从被点按钮所在卡片就近取 name/mode——同名运行跨模式重名时
+// 标记的永远是用户点击的那一个，视觉更新也不会落到另一张同名卡上；
+// 带 mode 消歧 + URL 编码，失败明确提示（不再静默返回）
+function toggleUploaded(btn) {
+    const card = btn.closest('.run-card');
+    if (!card) return;
+    const runName = card.dataset.run;
+    const mode = card.dataset.structure || '';
+    const qs = mode ? `?mode=${encodeURIComponent(mode)}` : '';
+    fetch(`/api/runs/${encodeURIComponent(runName)}/mark_uploaded${qs}`, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
-            if (!data.ok) return;
-            const btn = document.getElementById(`upload-btn-${runName}`);
-            const badge = document.getElementById(`upload-badge-${runName}`);
-            if (!btn) return;
-            const card = document.querySelector(`.run-card[data-run="${runName}"]`);
+            if (!data.ok) { alert('标记失败: ' + (data.error || '未知错误')); return; }
+            const badge = card.querySelector('span[id^="upload-badge-"]');
             if (data.uploaded) {
                 btn.textContent = '已上传 ✓';
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-500';
@@ -661,10 +671,11 @@ function toggleUploaded(runName) {
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs text-white bg-amber-600/80 hover:bg-amber-500';
                 if (badge) badge.classList.add('hidden');
             }
-            if (card) card.dataset.uploaded = data.uploaded ? '1' : '0';
+            card.dataset.uploaded = data.uploaded ? '1' : '0';
             refreshChipCounts();
             applyFilters();
-        });
+        })
+        .catch(() => alert('标记请求失败，请确认服务是否正常'));
 }
 
 function openFolder(runName) {
@@ -686,6 +697,38 @@ function openRunFile(runName, mode, fileName) {
         .then(data => {
             if (!data.ok) alert('打开目录失败: ' + (data.error || '未知错误'));
         });
+}
+
+// ---------------------------------------------------------------------------
+// 一键复制 4K / 4K BGM 成片绝对路径（服务端解析注入卡片 data-path4k/path4kbgm，
+// 便于粘贴进上传对话框等场景；缺失版本按钮已禁用，直接点击兜底提示）
+// ---------------------------------------------------------------------------
+const _COPY_LABELS = {'4k': '📋 4K', '4k_bgm': '📋 4K BGM'};
+
+function _copyTextFallback(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动复制'); }
+    document.body.removeChild(ta);
+}
+
+function copyRunPath(btn, kind) {
+    const card = btn.closest('.run-card');
+    const p = card ? (kind === '4k' ? card.dataset.path4k : card.dataset.path4kbgm) : '';
+    if (!p) { alert(kind === '4k' ? '尚未生成 4K 版本' : '尚未生成 4K BGM 版本'); return; }
+    const done = () => {
+        btn.textContent = '✓ 已复制';
+        setTimeout(() => { btn.textContent = _COPY_LABELS[kind]; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(p).then(done).catch(() => _copyTextFallback(p, done));
+    } else {
+        _copyTextFallback(p, done);
+    }
 }
 
 function deleteRun(runName, mode) {

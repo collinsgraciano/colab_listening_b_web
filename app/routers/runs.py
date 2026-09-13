@@ -96,6 +96,19 @@ def _thumb_mtime_url(run_dir: Path, base: str, filename: str) -> str:
     return f"{base}?v={v}"
 
 
+def _resolve_video_copy_paths(run_dir: Path) -> dict[str, str]:
+    """「一键复制」用成片绝对路径：4K（{标题}_4K.mp4）与 4K BGM（{标题}_4K_bgm.mp4），
+    各取最新的一个（重渲/重混会覆盖旧文件）；不存在时返回空串，前端按钮禁用。
+    注意 _4K_bgm.mp4 不匹配 *_4K.mp4（以 _bgm.mp4 结尾），两类互不误收。"""
+    def _newest(pattern: str) -> str:
+        try:
+            cands = [p for p in run_dir.glob(pattern) if p.is_file()]
+            return str(max(cands, key=lambda p: p.stat().st_mtime).resolve()) if cands else ""
+        except OSError:
+            return ""
+    return {"4k": _newest("*_4K.mp4"), "4k_bgm": _newest("*_4K_bgm.mp4")}
+
+
 @router.get("/api/runs/{name}/thumbnail")
 async def api_get_thumbnail(name: str, mode: str = ""):
     config = load_config()
