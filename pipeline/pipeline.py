@@ -1321,6 +1321,22 @@ def _step45_thumbnail(args, checkpoint: dict, script: dict, work_dir: Path,
         assign_sleep_episode(script, str(work_dir.parent))
         (work_dir / "script.json").write_text(
             json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+        # Step 1 对 sleep 跳过了 MCP 初始化 —— AI 缩略图需要会话，按需初始化；
+        # 无 token / 初始化失败只告警（generate_thumbnail 内部回退 Pillow 卡片，
+        # 不崩掉与 MCP 无关的 sleep 运行）
+        import sensenova_image
+        if sensenova_image.get_image_provider() != "sensenova":
+            raw_tokens = args.mcp_tokens or args.mcp_token or ""
+            _toks = [t.strip() for t in raw_tokens.split(",") if t.strip()]
+            if _toks:
+                print("  [Thumbnail] sleep 缩略图 AI 生成 —— 初始化 MCP 会话...")
+                try:
+                    initialize(tokens=_toks)
+                except Exception as e:
+                    print(f"  [Thumbnail] MCP 初始化失败: {e} —— 回退 Pillow 卡片")
+            else:
+                print("  [Thumbnail] 未配置 MCP Token —— sleep 缩略图回退 Pillow 卡片"
+                      "（配置页填 mcp_tokens 或切 sensenova 后可用 AI 生成）")
         generate_thumbnail(
             script=script,
             scene_img="",

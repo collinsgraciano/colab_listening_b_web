@@ -15,7 +15,8 @@ import threading
 import time
 from pathlib import Path
 
-from .config_manager import MODES, load_config, load_mode_config, find_run_dir
+from .config_manager import (MODES, load_config, load_mode_config, find_run_dir,
+                             resolve_mcp_tokens)
 from .paths import PIPELINE_DIR
 
 _CLI_PATH = PIPELINE_DIR / "thumbnail_regen_cli.py"
@@ -85,9 +86,16 @@ class ThumbnailRegenService:
             out_name = f"thumbnail_{n}.jpg"
 
         # 生图 Provider / SenseNova key / 画面风格（style_manager 在 pipeline/ 下）
+        # 配置取运行所在模式（各模式文件 image_provider/token 独立）；
+        # token 空时经 resolve_mcp_tokens 回落 legacy default.json / 本机 CLI 检测
+        # （如 sleep 模式文件未存 token，此前直接空 token 启动子进程报
+        # "No MCP token"）
         from style_manager import resolve_style_prompt
-        style_id = str(config.get("visual_style", "pixar3d"))
-        tokens_raw = str(config.get("mcp_tokens", "") or "").strip()
+        mode_name = run_dir.parent.name if run_dir.parent.name in MODES else ""
+        cfg = load_mode_config(mode_name) if mode_name else config
+        style_id = str(cfg.get("visual_style", "pixar3d"))
+        tokens_raw = resolve_mcp_tokens(mode_name) if mode_name else \
+            str(config.get("mcp_tokens", "") or "").strip()
         mcp_tokens = [t.strip() for t in tokens_raw.split("\n") if t.strip()]
 
         payload = {
@@ -95,8 +103,8 @@ class ThumbnailRegenService:
             "structure": structure,
             "out_name": out_name,
             "ref_img": str(ref_img) if ref_img.exists() else "",
-            "provider": str(config.get("image_provider", "mcp")),
-            "sensenova_api_key": str(config.get("sensenova_api_key", "") or "").strip(),
+            "provider": str(cfg.get("image_provider", "mcp")),
+            "sensenova_api_key": str(cfg.get("sensenova_api_key", "") or "").strip(),
             "style_id": style_id,
             "style_prompt": resolve_style_prompt(style_id),
             "mcp_tokens": mcp_tokens,

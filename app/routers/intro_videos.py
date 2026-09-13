@@ -18,8 +18,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from ..config_manager import (detect_local_mcp_token, load_mode_config,
-                              save_mode_config)
+from ..config_manager import load_mode_config, save_mode_config
 from ..intro_library import (INTRO_ID_RE, INTRO_VIDEOS_DIR, load_library,
                              resolve_video_path, save_library)
 from ..page_mcp import PageMcpSession
@@ -78,15 +77,13 @@ def _resolve_bgm(bgm_choice: str) -> str:
 
 def _generate_ai_video(scene_prompt: str, dest: Path) -> None:
     """MCP generate_video 原始场景视频（无文字无音频，文字由本地叠加保证准确）。"""
-    cfg = _sleep_cfg()
-    tokens = [t.strip() for t in str(cfg.get("mcp_tokens", "") or "").splitlines()
+    # token 解析链：sleep 模式配置 → legacy default.json → 本机 CLI 检测
+    # （sleep 模式文件 mcp_tokens 可能为空）
+    from ..config_manager import resolve_mcp_tokens
+    tokens = [t.strip() for t in resolve_mcp_tokens("sleep").splitlines()
               if t.strip()]
     if not tokens:
-        local = detect_local_mcp_token()
-        if local:
-            tokens = [local]
-    if not tokens:
-        raise RuntimeError("未配置 MCP Token（模式配置 / 本地检测均为空）"
+        raise RuntimeError("未配置 MCP Token（模式配置 / default.json / 本地检测均为空）"
                            "—— AI 片头需要 MCP，或改用本地动画路线")
     session = PageMcpSession(tokens).initialize()
     prompt = (scene_prompt.strip() or _DEFAULT_AI_SCENE) + \

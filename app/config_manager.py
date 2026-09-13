@@ -747,6 +747,24 @@ def save_mode_config(mode: str, config: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def resolve_mcp_tokens(mode: str = "") -> str:
+    """MCP token 解析链：模式配置 → legacy default.json → 本机 CLI 检测。
+
+    模式文件 seed 时期不同，mcp_tokens 可能为空串（如 sleep），空值依次回落
+    legacy default.json（用户实际维护 token 的地方）与本机 Codely CLI OAuth
+    token。返回原始串（多行 token，调用方自行按行/逗号切分）。
+    """
+    cfg = load_mode_config(mode) if mode in MODES else load_config()
+    raw = str(cfg.get("mcp_tokens", "") or "").strip()
+    if raw:
+        return raw
+    legacy = _read_legacy_default() or {}
+    raw = str(legacy.get("mcp_tokens", "") or "").strip()
+    if raw:
+        return raw
+    return str(detect_local_mcp_token() or "").strip()
+
+
 def load_all_mode_configs() -> dict[str, dict[str, Any]]:
     return {mode: load_mode_config(mode) for mode in MODES}
 

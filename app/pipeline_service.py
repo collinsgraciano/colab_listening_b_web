@@ -1192,7 +1192,10 @@ class PipelineService:
         # tts_rate 为旧全局覆盖（兼容）；分项参数优先（tts_pipeline.resolve_tts_rate）
         tts_rate = config.get("tts_rate", "") or None
 
-        tokens_raw = config.get("mcp_tokens", "").strip()
+        # mcp_tokens：模式配置为空时回落 legacy default.json / 本机 CLI 检测
+        # （如 sleep 模式文件 seed 时未带 token；同 sensenova/openai key 空值回落先例）
+        from .config_manager import resolve_mcp_tokens
+        tokens_raw = resolve_mcp_tokens(mode_name)
         mcp_tokens = ",".join(
             t.strip() for t in tokens_raw.split("\n") if t.strip()
         ) if tokens_raw else ""
@@ -1501,13 +1504,16 @@ class PipelineService:
                 script = json.loads(_script_path.read_text(encoding="utf-8"))
                 self._on_log_line("  [Step Mode] Reloaded script.json (edits applied).")
 
-            # Step 1: MCP init
-            raw_tokens = args.mcp_tokens or ""
-            tokens = [t.strip() for t in raw_tokens.split(",") if t.strip()] if raw_tokens else []
-            if tokens:
-                mcp_reinit(tokens=tokens)
-            else:
-                mcp_reinit()
+            # Step 1: MCP init（sleep 主流程零 MCP：不在 Step1 强制初始化——
+            # 空 token 时 mcp_reinit() 会直接抛 "No MCP token" 崩掉与 MCP 无关的
+            # sleep 运行；缩略图 AI 生成在 Step 4.5 按需初始化）
+            if getattr(args, "structure", "") != "sleep":
+                raw_tokens = args.mcp_tokens or ""
+                tokens = [t.strip() for t in raw_tokens.split(",") if t.strip()] if raw_tokens else []
+                if tokens:
+                    mcp_reinit(tokens=tokens)
+                else:
+                    mcp_reinit()
 
             if self._stop_flag.is_set():
                 self._set_stopped()
