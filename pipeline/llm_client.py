@@ -255,6 +255,44 @@ def llm_urlopen(req, timeout: int, proxy_url: str = ""):
 _GEMINI_DEFAULT_MODEL = "models/gemini-3.8-flash"
 _GEMINI_THINKING_LEVELS = ("minimal", "low", "medium", "high")
 
+# 限流自动降级链（从新到旧；仅含免费档实际有配额的文本输出模型——Pro 系 0 配额、
+# TTS/图像/Agent 类不在列）。配置的模型是起点，受限时向更旧方向逐个降级。
+_GEMINI_FALLBACK_CHAIN = [
+    "models/gemini-3.8-flash",
+    "models/gemini-3.7-flash",
+    "models/gemini-3.6-flash",
+    "models/gemini-3.5-flash",
+    "models/gemini-3.5-flash-lite",
+    "models/gemini-3.1-flash-lite",
+    "models/gemini-3-flash",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.5-flash-lite",
+]
+# 触发降级的状态码：429 限流(RPM/TPM/RPD)、503 过载、400 参数不被该模型支持、
+# 403/404 该模型无权限或不存在。401 鉴权不降级（全局问题立即报错）；
+# 5xx 网关/网络错误不降级（对同模型退避重试）。
+_GEMINI_FALLBACK_CODES = (400, 403, 404, 429, 503)
+# 整条链全部 429 时（RPM 窗口恢复需要时间），等待后整链重试的轮数与间隔
+_GEMINI_CHAIN_RETRIES = 1
+_GEMINI_CHAIN_RETRY_WAIT = 30
+
+
+def _gemini_fallback_chain(model: str) -> list[str]:
+    """配置模型起点 + 从新到旧的降级候选链。
+
+    配置模型在链内 → 从它的下一个更旧模型接续；不在链内（如 Pro 或未来新模型）
+    → 先试配置模型，再走整条链兜底。比较时忽略 "models/" 前缀。
+    """
+    bare = model.split("/")[-1] if model else ""
+    chain = [model] if model else []
+    start = 0
+    for i, m in enumerate(_GEMINI_FALLBACK_CHAIN):
+        if m.split("/")[-1] == bare:
+            start = i + 1
+            break
+    chain.extend(_GEMINI_FALLBACK_CHAIN[start:])
+    return chain
+
 
 def _gemini_input_and_system(messages: list[dict]) -> tuple:
     """chat messages → (input, system_instruction)。
@@ -286,8 +324,10 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
     """同步调 Gemini Interactions API，返回输出文本（公开函数，Web 直连功能复用）。
 
     代理窗口覆盖 genai.Client 构造与全部请求（httpx 代理在构造时冻结）。
-    429/5xx/网络错误沿用共享退避表；空输出一次性加倍 max_tokens 重试
-    （thinking 模型可能耗尽输出预算），仍空则报错。
+    模型从新到旧自动降级：配置模型受限（429/503/400/403/404）时切换到下一个
+    更旧模型；401 鉴权立即报错；网络/网关错误对同模型退避重试；整链全部 429
+    时等待后整链重试一轮（RPM 窗口恢复）。空输出一次性加倍 max_tokens 重试
+    （thinking 模型可能耗尽输出预算），二次空输出降级下一个模型。
     """
     import time as _time
 
@@ -303,50 +343,85 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
     input_value, system_instruction = _gemini_input_and_system(messages)
     proxy_cm = (_requests_proxy_env(proxy_url) if proxy_url
                 else contextlib.nullcontext())
+    chain = _gemini_fallback_chain(model)
     _empty_retried = False
     with proxy_cm:
         client = _genai.Client(api_key=api_key)
-        for attempt in range(len(_RETRY_BACKOFFS) + 1):
-            try:
-                kwargs = {
-                    "model": model,
-                    "input": input_value,
-                    "generation_config": {
-                        "max_output_tokens": max_tokens,
-                        "thinking_level": thinking,
-                        "temperature": temperature,
-                    },
-                    "store": False,
-                    "timeout": timeout,  # create() 的 per-call 超时，单位秒
-                }
-                if system_instruction:
-                    kwargs["system_instruction"] = system_instruction
-                interaction = client.interactions.create(**kwargs)
-            except Exception as e:  # noqa: BLE001 — SDK/网络异常统一归类重试
-                code = getattr(e, "code", None)
-                if code is not None and code not in _RETRY_CODES:
-                    raise RuntimeError(f"Gemini API HTTP {code}: {e}") from e
-                if attempt < len(_RETRY_BACKOFFS):
-                    wait = _RETRY_BACKOFFS[attempt]
-                    reason = (f"HTTP {code}" if code is not None else
-                              f"网络错误 ({type(e).__name__}: {str(e)[:120]})")
-                    print(f"  [Gemini] {reason}，{wait}s 后重试 "
-                          f"({attempt + 1}/{len(_RETRY_BACKOFFS)})... Model: {model}")
-                    _time.sleep(wait)
-                    continue
-                raise RuntimeError(
-                    f"Gemini API 调用失败（重试后仍失败）: {type(e).__name__}: {e}") from e
-            text = (getattr(interaction, "output_text", None) or "").strip()
-            if text:
-                return text
-            if not _empty_retried and max_tokens < 16384:
-                new_max = min(max_tokens * 2, 16384)
-                print(f"  [Gemini] 空输出（thinking 可能耗尽输出预算），"
-                      f"以 max_tokens={new_max} 重试一次（原 {max_tokens}）...")
-                _empty_retried = True
-                max_tokens = new_max
+        for chain_round in range(_GEMINI_CHAIN_RETRIES + 1):
+            failures: list[str] = []
+            all_rate_limited = True
+            for model_idx, current_model in enumerate(chain):
+                attempt = 0
+                while True:
+                    _enforce_rate_limit()  # 共享限速槽位（与 sensenova/openai 互认）
+                    try:
+                        kwargs = {
+                            "model": current_model,
+                            "input": input_value,
+                            "generation_config": {
+                                "max_output_tokens": max_tokens,
+                                "thinking_level": thinking,
+                                "temperature": temperature,
+                            },
+                            "store": False,
+                            "timeout": timeout,  # create() 的 per-call 超时，单位秒
+                        }
+                        if system_instruction:
+                            kwargs["system_instruction"] = system_instruction
+                        interaction = client.interactions.create(**kwargs)
+                    except Exception as e:  # noqa: BLE001 — SDK/网络异常统一归类
+                        code = getattr(e, "code", None)
+                        if code in _GEMINI_FALLBACK_CODES:
+                            # 该模型受限/不可用 → 降级到下一个更旧模型
+                            failures.append(f"{current_model}: HTTP {code}")
+                            if code != 429:
+                                all_rate_limited = False
+                            nxt = chain[model_idx + 1] \
+                                if model_idx + 1 < len(chain) else None
+                            print(f"  [Gemini] {current_model} 受限（HTTP {code}）"
+                                  + (f"，降级到 {nxt}" if nxt else "，已无更旧候选"))
+                            break
+                        if code is not None and code not in _RETRY_CODES:
+                            raise RuntimeError(f"Gemini API HTTP {code}: {e}") from e
+                        if attempt < len(_RETRY_BACKOFFS):
+                            wait = _RETRY_BACKOFFS[attempt]
+                            attempt += 1
+                            reason = (f"HTTP {code}" if code is not None else
+                                      f"网络错误 ({type(e).__name__}: {str(e)[:120]})")
+                            print(f"  [Gemini] {current_model} {reason}，{wait}s 后重试 "
+                                  f"({attempt}/{len(_RETRY_BACKOFFS)})...")
+                            _time.sleep(wait)
+                            continue
+                        raise RuntimeError(
+                            f"Gemini API 调用失败（重试后仍失败）: "
+                            f"{type(e).__name__}: {e}") from e
+                    text = (getattr(interaction, "output_text", None) or "").strip()
+                    if text:
+                        if model_idx > 0:
+                            print(f"  [Gemini] 已降级使用 {current_model} 成功")
+                        return text
+                    if not _empty_retried and max_tokens < 16384:
+                        new_max = min(max_tokens * 2, 16384)
+                        print(f"  [Gemini] {current_model} 空输出（thinking 可能耗尽"
+                              f"输出预算），以 max_tokens={new_max} 重试...")
+                        _empty_retried = True
+                        max_tokens = new_max
+                        continue
+                    # 二次空输出：按模型级失败处理，降级下一个模型
+                    failures.append(f"{current_model}: 空输出")
+                    all_rate_limited = False
+                    print(f"  [Gemini] {current_model} 空输出，降级下一个模型...")
+                    break
+            if not failures:
+                break  # 防御性保护：循环内必然 return / append / raise
+            if all_rate_limited and chain_round < _GEMINI_CHAIN_RETRIES:
+                print(f"  [Gemini] 整链 {len(chain)} 个模型全部限流（429），"
+                      f"{_GEMINI_CHAIN_RETRY_WAIT}s 后整链重试一轮...")
+                _time.sleep(_GEMINI_CHAIN_RETRY_WAIT)
                 continue
-            raise RuntimeError(f"Gemini 返回空输出 (model={model})")
+            raise RuntimeError(
+                "Gemini 全部候选模型不可用（从新到旧已尝试 "
+                + str(len(chain)) + " 个）: " + "; ".join(failures))
 
 
 def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,

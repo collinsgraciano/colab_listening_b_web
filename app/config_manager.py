@@ -258,7 +258,11 @@ PARAM_SPEC = {
     "gemini_model": {"default": "models/gemini-3.8-flash", "type": "select", "group": "llm",
                     "label": "Gemini Model", "options": [
                         "models/gemini-3.8-flash", "models/gemini-3.7-flash",
-                        "models/gemini-3.1-pro-preview", "models/gemini-2.5-pro-1m"]},
+                        "models/gemini-3.6-flash", "models/gemini-3.5-flash",
+                        "models/gemini-3.5-flash-lite", "models/gemini-3.1-flash-lite",
+                        "models/gemini-3-flash", "models/gemini-2.5-flash",
+                        "models/gemini-2.5-flash-lite"],
+                    "help": "限流(429)时自动从新到旧降级到下一个更旧模型"},
     "llm_retries": {"default": 10, "type": "number", "group": "llm",
                     "label": "LLM 重试次数"},
     "llm_min_interval": {"default": 3, "type": "number", "group": "llm",
