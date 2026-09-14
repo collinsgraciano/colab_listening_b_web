@@ -1,14 +1,16 @@
-"""sleep 模式 10 秒片头：本地 Pillow 动画渲染 + MCP AI 视频标准化。
+"""sleep 模式片头（时长可设 4-15s，默认 10s）：本地 Pillow 动画渲染 + MCP AI 视频标准化。
 
 供 Web 层（app/routers/intro_videos.py）调用，产物入库供 sleep 运行绑定：
-- 本地路线 build_local_intro：Pillow 逐帧渲染（25fps × 10s）——渐变背景 +
+- 本地路线 build_local_intro：Pillow 逐帧渲染（25fps）——渐变背景 +
   叶片漂动 + 白色圆角卡 + 频道名手写体淡入 + 副题淡入 + EN 徽标；
 - AI 路线 finalize_ai_intro：调用方先用 PageMcpSession 生成/下载原始视频，
-  本函数标准化（scale/pad 1280x720 → 25fps）+ 透明文字 PNG 淡入叠加。
+  本函数标准化（scale/pad 1280x720 → 25fps，原片短于目标时长尾帧冻结补齐）
+  + 透明文字 PNG 淡入叠加。
 
-音频统一由 _audio_chain 构建：BGM（bgm_music 库选一）裁 10s 淡入淡出 +
+音频统一由 _audio_chain 构建：BGM（bgm_music 库选一）裁片头时长淡入淡出 +
 可选频道名 TTS 播报（合成由调用方完成，这里只混音）；两路线产物规格一致：
-1280x720 / 25fps / yuv420p / aac 44100 立体声 / 10s（与 sleep 块 concat 兼容）。
+1280x720 / 25fps / yuv420p / aac 44100 立体声 / 时长同参数（sleep 管线按
+片头实测时长写 intro_dur，块 concat 天然兼容）。
 """
 import math
 import os
@@ -76,7 +78,7 @@ def _audio_chain(bgm_path: str, announce_path: str, duration: float,
                  bgm_volume_db: float, start_idx: int) -> tuple[str, list[str]]:
     """块音频 filter_complex。返回 (fg 尾段字符串, ffmpeg 输入参数列表)。
 
-    主控流恒为 10s（BGM 裁剪 or anullsrc），播报 0.6s 后淡入叠加，
+    主控流恒为片头时长（BGM 裁剪 or anullsrc），播报 0.6s 后淡入叠加，
     amix duration=first 保证输出恰为片头时长（输出端仍加 -t 兜底）。
     anullsrc 必须以 -f lavfi 输入（否则被当作文件名导致整块失败）。
     """
@@ -315,7 +317,8 @@ def finalize_ai_intro(src_video: str, channel_name: str, subtitle: str,
     fg_audio, a_inputs = _audio_chain(bgm_path, announce_path, duration,
                                       bgm_volume_db, start_idx=2)
     fg = ("[0:v]scale=1280:720:force_original_aspect_ratio=decrease,"
-          "pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25[bg];"
+          "pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25,"
+          f"tpad=stop_mode=clone:stop_duration={duration + 1.0:.1f}[bg];"
           "[1:v]format=rgba,fade=t=in:st=0.5:d=0.9:alpha=1[txt];"
           "[bg][txt]overlay=0:0[v];") + fg_audio
     cmd = ["ffmpeg", "-y", "-i", src_video, "-loop", "1", "-i", text_png]

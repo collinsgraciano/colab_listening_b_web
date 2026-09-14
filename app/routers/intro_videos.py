@@ -1,24 +1,31 @@
-"""🎬 片头库 API — sleep 模式 10 秒片头生成（本地动画 / MCP AI 视频）+ 库管理。
+"""🎬 片头库 API — sleep 模式片头生成（本地动画 / MCP AI 视频，时长可设 4-15s）
++ 库管理 + LLM 随机片头提示词生成。
 
 - 本地路线：pipeline/sleep/intro_video.build_local_intro —— Pillow 逐帧渲染
   sleep 主题动画（渐变背景 + 叶片漂动 + 频道名淡入），零积分；
-- AI 路线：PageMcpSession generate_video（text_to_video / 10s / 16:9 / 720p /
-  无音频）→ 下载 → finalize_ai_intro 标准化 + 频道名文字淡入叠加；
+- AI 路线：PageMcpSession generate_video（text_to_video / 时长可设 / 16:9 /
+  720p / 无音频）→ 下载 → finalize_ai_intro 标准化 + 频道名文字淡入叠加；
+- 提示词：POST /gen_prompts 仅凭频道名让 LLM 一次生成 5 个随机片头场景
+  提示词（prompt_en + desc_zh 简体中文说明），前端点选填入 AI 画面描述；
 - 音频统一：BGM（bgm_music 库选一/随机）淡入淡出 + 可选频道名 TTS 播报
   （sleep 模式 tts_engine 合成，TTS_SYNTH_LOCK 内执行）；
 - 产物 configs/intro_videos/{id}/intro.mp4，索引 configs/intro_library.json；
 - POST /use 写入 sleep 模式配置 sleep_intro_video（pipeline_service 注入 CLI），
   空 = 回退默认片头（静态卡片 + 频道名播报）。
 """
+import json
 import shutil
 import threading
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from ..config_manager import load_mode_config, save_mode_config
+from ..config_manager import (load_config, load_mode_config, resolve_provider,
+                              save_mode_config)
 from ..intro_library import (INTRO_ID_RE, INTRO_VIDEOS_DIR, load_library,
                              resolve_video_path, save_library)
 from ..page_mcp import PageMcpSession
@@ -28,6 +35,7 @@ from ..tts_state import TTS_SYNTH_LOCK
 router = APIRouter()
 
 _gen_status: dict = {"status": "idle", "error": "", "intro_id": "", "logs": []}
+_prompt_status: dict = {"status": "idle", "prompts": [], "error": ""}
 
 _DEFAULT_AI_SCENE = (
     "A cozy dreamy night scene for a sleep English learning channel intro: "
@@ -75,7 +83,19 @@ def _resolve_bgm(bgm_choice: str) -> str:
     return resolve_bgm(bgm_dir, bgm_choice)
 
 
-def _generate_ai_video(scene_prompt: str, dest: Path) -> None:
+def _parse_duration(v) -> float:
+    """片头时长（秒）：clamp [4, 15]（MCP Seedance 2.0 默认模型上限）；空/非法回退 10。"""
+    if v is None or str(v).strip() == "":
+        return 10.0
+    try:
+        dur = float(v)
+    except (TypeError, ValueError):
+        return 10.0
+    return round(max(4.0, min(15.0, dur)), 1)
+
+
+def _generate_ai_video(scene_prompt: str, dest: Path,
+                       duration: float = 10.0) -> None:
     """MCP generate_video 原始场景视频（无文字无音频，文字由本地叠加保证准确）。"""
     # token 解析链：sleep 模式配置 → legacy default.json → 本机 CLI 检测
     # （sleep 模式文件 mcp_tokens 可能为空）
@@ -88,10 +108,10 @@ def _generate_ai_video(scene_prompt: str, dest: Path) -> None:
     session = PageMcpSession(tokens).initialize()
     prompt = (scene_prompt.strip() or _DEFAULT_AI_SCENE) + \
         " No text, no letters, no words, no watermark in the scene."
-    _log("MCP generate_video 提交中（10s / 720p / 16:9 / 无音频）...")
+    _log(f"MCP generate_video 提交中（{duration:g}s / 720p / 16:9 / 无音频）...")
     result = session.call_tool("generate_video", {
         "mode": "text_to_video", "prompt": prompt,
-        "duration": 10, "ratio": "16:9", "resolution": "720p",
+        "duration": duration, "ratio": "16:9", "resolution": "720p",
         "generate_audio": False,
     })
     task_id = session.parse_task_id(result)
@@ -122,8 +142,9 @@ def _generate_worker(params: dict) -> None:
         route = params["route"]
         channel = params["channel_name"]
         subtitle = params["subtitle"]
+        dur = _parse_duration(params.get("duration"))
         out_dir.mkdir(parents=True, exist_ok=True)
-        _log(f"生成片头（{'AI 视频' if route == 'ai' else '本地动画'}）: {channel}")
+        _log(f"生成片头（{'AI 视频' if route == 'ai' else '本地动画'}，{dur:g}s）: {channel}")
         # "none" = 用户显式不使用 BGM（成片时由 bgm_mix 统一混入，避免片头双重 BGM）；
         # resolve_bgm 对未知名本就返回 ""，这里显式短路让日志语义准确
         if str(params["bgm"]) == "none":
@@ -141,12 +162,13 @@ def _generate_worker(params: dict) -> None:
         theme = build_theme(_sleep_cfg())
         if route == "ai":
             raw_path = out_dir / "raw.mp4"
-            _generate_ai_video(params["scene_prompt"], raw_path)
+            _generate_ai_video(params["scene_prompt"], raw_path, dur)
             from sleep.intro_video import finalize_ai_intro
             finalize_ai_intro(str(raw_path), channel, subtitle, str(final_path),
                               theme, bgm_path=bgm_path,
                               bgm_volume_db=params["bgm_volume_db"],
                               announce_path=announce_path,
+                              duration=dur,
                               progress_cb=lambda p, m: _log(f"[{p}%] {m}"))
             try:
                 raw_path.unlink()
@@ -158,6 +180,7 @@ def _generate_worker(params: dict) -> None:
                               bgm_path=bgm_path,
                               bgm_volume_db=params["bgm_volume_db"],
                               announce_path=announce_path,
+                              duration=dur,
                               progress_cb=lambda p, m: _log(f"[{p}%] {m}"))
 
         from media_utils import get_duration
@@ -203,13 +226,15 @@ async def api_generate(request: Request):
         bgm_volume_db = -16.0
     announce = bool(data.get("announce", False))
     scene_prompt = str(data.get("scene_prompt", "") or "").strip()[:600]
+    duration = _parse_duration(data.get("duration"))
 
     threading.Thread(target=_generate_worker,
                      args=({"route": route, "channel_name": channel,
                             "subtitle": subtitle, "bgm": bgm,
                             "bgm_volume_db": bgm_volume_db,
                             "announce": announce,
-                            "scene_prompt": scene_prompt},),
+                            "scene_prompt": scene_prompt,
+                            "duration": duration},),
                      daemon=True).start()
     return {"ok": True, "message": "片头生成中（本地约 1-2 分钟 / AI 约 3-10 分钟）..."}
 
@@ -225,6 +250,136 @@ async def api_bgm_list():
     cfg = _sleep_cfg()
     bgm_dir = str(cfg.get("bgm_music_dir", "") or "").strip() or str(WEB_ROOT / "bgm_music")
     return {"files": list_bgm_files(bgm_dir), "dir": bgm_dir}
+
+
+# ---------------------------------------------------------------------------
+# LLM 随机片头提示词（仅凭频道名 → 5 个 prompt_en + desc_zh 中文说明）
+# ---------------------------------------------------------------------------
+
+_PROMPT_SYSTEM = (
+    "You are a creative director for cinematic AI-generated intro videos. "
+    "Output valid JSON only — no markdown, no explanations."
+)
+
+
+def _build_prompts_prompt(channel: str) -> str:
+    return f"""Create 5 clearly different ambient intro video scene concepts for a sleep-relaxation English learning YouTube channel named "{channel}". Audience: overseas Chinese ESL learners winding down before sleep.
+
+Each concept is an AI text-to-video prompt that will be rendered WITHOUT any on-screen text (the channel name is overlaid locally afterwards). Mood: calm, dreamy and peaceful — perfect for falling asleep.
+
+For each concept output:
+- "prompt_en": one rich English paragraph (60-110 words) describing ONE continuous very slow shot: the scene, lighting, color mood, art style (vary across concepts: soft 3D Pixar animation, dreamy pastel illustration, cinematic realism, watercolor, etc.), and a very slow gentle camera drift. Keep the central area of the frame visually calm and uncluttered (a title is overlaid there later). NEVER mention text, letters, words, captions, subtitles or watermarks — they are forbidden in the scene.
+- "desc_zh": 1-2 句简体中文，概括这段画面长什么样（让用户不看英文也能想象出视频的大致样子）。
+
+The 5 concepts must span clearly different scenes/moods (for example: starry night sky with drifting clouds, cozy bedroom by a rainy window, moonlit forest, calm ocean waves at night, floating lanterns or dreamy clouds) — never two similar ones.
+
+Output valid JSON only:
+{{"intros": [{{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}]}}"""
+
+
+def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
+              prompt: str, proxy_url: str = "") -> str:
+    """同步调 LLM 生成提示词，返回 content。独立函数便于测试 monkeypatch。
+
+    与 channel_factory._llm_chat 同模式：gemini 走 SDK，其余 OpenAI 兼容
+    /chat/completions（sensenova 等附 reasoning_effort=low）。
+    """
+    from llm_client import gemini_chat, llm_urlopen  # pipeline/ 已在 sys.path
+    messages = [{"role": "system", "content": _PROMPT_SYSTEM},
+                {"role": "user", "content": prompt}]
+    if p_type == "gemini":
+        return gemini_chat(api_key, model, messages, temperature=0.95,
+                           max_tokens=4096, timeout=180, proxy_url=proxy_url)
+    body = {"model": model, "messages": messages,
+            "temperature": 0.95, "max_tokens": 4096}
+    if p_type != "openai":
+        body["reasoning_effort"] = "low"
+    req = urllib.request.Request(
+        f"{base_url}/chat/completions",
+        data=json.dumps(body).encode("utf-8"), method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("User-Agent", "CodelyLLM/1.0")
+    try:
+        with llm_urlopen(req, 180, proxy_url) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError(f"LLM API HTTP {e.code}: {detail}") from e
+    choice = (result.get("choices") or [{}])[0]
+    return str(choice.get("message", {}).get("content", ""))
+
+
+def _normalize_prompts(raw_list) -> list[dict]:
+    """LLM 返回列表 → [{"prompt_en", "desc_zh"}]（无 prompt_en 的条目丢弃）。"""
+    out: list[dict] = []
+    for raw in raw_list or []:
+        if not isinstance(raw, dict):
+            continue
+        en = str(raw.get("prompt_en", "") or "").strip()
+        zh = str(raw.get("desc_zh", "") or "").strip()
+        if en:
+            out.append({"prompt_en": en[:900], "desc_zh": zh[:160]})
+    return out
+
+
+def _prompts_worker(channel: str) -> None:
+    _prompt_status.update({"status": "generating", "prompts": [], "error": ""})
+    try:
+        from llm_client import _extract_json, proxy_url_from_config  # pipeline/ 已在 sys.path
+        cfg = load_config()
+        p_type, base_url, api_key, model = resolve_provider(cfg)
+        if not api_key:
+            raise RuntimeError(f"未配置 {p_type} 的 API Key，请在参数配置页填写")
+        if not model:
+            raise RuntimeError("未指定模型（该 Provider 未配置模型列表）")
+        _log(f"LLM 生成片头提示词：{model} ({p_type})，频道「{channel}」")
+        content = _llm_chat(base_url, api_key, model, p_type,
+                            _build_prompts_prompt(channel),
+                            proxy_url=proxy_url_from_config(cfg))
+        data = _extract_json(content)
+        if isinstance(data, dict):
+            raw_list = data.get("intros")
+        elif isinstance(data, list):
+            raw_list = data
+        else:
+            raw_list = None
+        prompts = _normalize_prompts(raw_list)
+        if not prompts:
+            raise RuntimeError("LLM 返回内容中没有有效提示词，请重试或更换模型")
+        _log(f"已生成 {len(prompts)} 条提示词")
+        _prompt_status.update({"status": "done", "prompts": prompts, "error": ""})
+    except Exception as e:  # noqa: BLE001 — 错误原样落状态供前端展示
+        print(f"  [IntroLibrary] PROMPTS ERROR: {e}")
+        _log(f"ERROR: {e}")
+        _prompt_status.update({"status": "error", "prompts": [], "error": str(e)[:300]})
+
+
+@router.post("/api/intro_videos/gen_prompts")
+async def api_gen_prompts(request: Request):
+    """LLM 生成 5 个随机片头提示词（单槽 409 守卫；静态路径须在 {intro_id} 动态路由之前）。"""
+    if _prompt_status.get("status") == "generating":
+        return JSONResponse({"ok": False, "error": "提示词生成进行中，请稍候"},
+                            status_code=409)
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    cfg = _sleep_cfg()
+    channel = str(data.get("channel_name", "") or "").strip()[:60] \
+        or str(cfg.get("sleep_channel_name", "") or "").strip() \
+        or "English with me"
+    threading.Thread(target=_prompts_worker, args=(channel,), daemon=True).start()
+    return {"ok": True, "message": "提示词生成中（约 10-60 秒）..."}
+
+
+@router.get("/api/intro_videos/prompts_status")
+async def api_prompts_status():
+    return _prompt_status
 
 
 # ---------------------------------------------------------------------------

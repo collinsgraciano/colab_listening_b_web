@@ -2,7 +2,8 @@
 
 索引条目：{id, name, source(local/ai), duration, created, subtitle, bgm,
 announce}；视频文件固定为 configs/intro_videos/{id}/intro.mp4（统一规格
-1280x720 / 25fps / aac 44100 立体声 / 10s，见 pipeline/sleep/intro_video.py）。
+1280x720 / 25fps / aac 44100 立体声 / 时长 4-15s 可设（默认 10s），
+见 pipeline/sleep/intro_video.py）。
 """
 import json
 import re
