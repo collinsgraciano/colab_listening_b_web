@@ -55,18 +55,19 @@
                 </span>
                 <span class="text-slate-400 toggle-icon transition-transform">▼</span>
             </button>
-            <div class="section-content px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="section-content px-5 pb-5 {% if group_key == 'sleep' %}lg:flex lg:gap-5 lg:items-start{% else %}grid grid-cols-1 md:grid-cols-2 gap-4{% endif %}">
                 {% if group_key == 'sleep' %}
-                <div class="md:col-span-2">
+                <div class="mb-4 lg:mb-0 lg:w-[400px] lg:shrink-0 lg:sticky lg:top-4 self-start">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs text-slate-400">🖼️ 实时预览 <span class="text-slate-600">— 修改本组任意参数后自动刷新（成片卡片实际渲染效果）；背景图为按主题 AI 生成时预览不含图片，填「背景图固定路径」后可预览混合效果</span></span>
-                        <button type="button" onclick="refreshSleepPreview()" class="text-xs text-indigo-400 hover:text-indigo-300">↻ 手动刷新</button>
+                        <button type="button" onclick="refreshSleepPreview()" class="text-xs text-indigo-400 hover:text-indigo-300 shrink-0">↻ 手动刷新</button>
                     </div>
                     <div class="rounded-xl border border-slate-700 overflow-hidden bg-slate-900 relative">
                         <img id="sleep-preview-img" alt="Sleep 卡片预览" class="w-full block hidden">
                         <div id="sleep-preview-loading" class="py-16 flex items-center justify-center text-sm text-slate-500">⏳ 渲染预览中...</div>
                     </div>
                 </div>
+                <div class="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {% endif %}
                 {% for key, spec, value in params %}
                 {# 模式级过滤已由服务端完成（effective_param_spec） #}
@@ -143,6 +144,7 @@
                     {% endif %}
                 </div>
                 {% endfor %}
+                {% if group_key == 'sleep' %}</div>{% endif %}
             </div>
         </div>
         {% endfor %}
