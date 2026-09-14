@@ -285,6 +285,10 @@ def _parse_args() -> argparse.Namespace:
                         help="sleep 模式：是否生成片头（关闭=无 intro 段直接从第一组开始，片头库绑定同时失效；intro TTS 仍生成以保持缓存完整性）")
     parser.add_argument("--sleep-card-lead", type=float, default=0.3,
                         help="sleep 模式：卡片提前量秒数（每组画面先出现 N 秒再开始朗读，0=关闭，默认 0.3，clamp 0-2）")
+    parser.add_argument("--sleep-xfade", action="store_true",
+                        help="sleep 模式：相邻块边界（组与组+片头片尾衔接）画面交叉溶解过渡；仅画面、音频不动；整片多 1-2 次重编码合成变慢（默认关=硬切）")
+    parser.add_argument("--sleep-xfade-sec", type=float, default=0.5,
+                        help="sleep 模式：交叉溶解时长秒（0.2-2.0，默认 0.5；需 --sleep-xfade，调小可避免与前组首句朗读重叠）")
     parser.add_argument("--sleep-font-scale", type=int, default=100, help="sleep 模式：句子区字号缩放百分比（60-160，默认 100）")
     parser.add_argument("--sleep-line-spacing", type=int, default=14, help="sleep 模式：句子区英文行距像素@720p（0-48，默认 14）")
     parser.add_argument("--sleep-letter-spacing", type=int, default=0, help="sleep 模式：句子区字距像素@720p（0-24，默认 0，作用于英文/音标/中文）")
@@ -1487,6 +1491,8 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             intro_video=str(tts_results.get("intro_video", "") or ""),
             native_4k=bool(getattr(args, "sleep_4k_native", False)),
             card_lead=float(getattr(args, "sleep_card_lead", 0.3) or 0.0),
+            xfade_sec=(float(getattr(args, "sleep_xfade_sec", 0.5) or 0.5)
+                       if getattr(args, "sleep_xfade", False) else 0.0),
             progress_cb=progress_cb,
             stop_check=stop_check,
         )

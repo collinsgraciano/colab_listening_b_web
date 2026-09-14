@@ -812,11 +812,167 @@ def merge_dialogue_runs_xfade(segments: list[str | None],
     return merged
 
 
+# sleep 块交叉溶解：单次 ffmpeg 最多 128 输入（对话叠化实测稳定规模），
+# 超出按 128 一组宽分块先合并为中间块再合并（块间边界同样叠化，语义与
+# 单链等价），402 块（400 组 + 片头片尾）= 2 遍整片编码。
+_XFADE_MAX_INPUTS = 128
+_XFADE_MERGE_TIMEOUT = 7200
+
+
+def _blocks_xfade_graph(n: int, video_durs: list[float],
+                        grid_durs: list[float], xfade: float) -> tuple[str, str]:
+    """构建块 xfade 链的纯视频 filter 图。返回 (图文本, 末视频流标签)。
+
+    与 _xfade_graph 的差异：偏移与 tpad 冻结量按网格时长（max 视频流/音频
+    流，与 concat demuxer 推进一致）计算——卡片块视频流帧量化向上时若用
+    视频流时长，输出总长会短于音频网格总和、累积漂移（e14708a 同源问题）。
+    每块 tpad = 网格差（补齐音>视的块）+（非本链末块再加 xfade 供叠化）；
+    末块补齐到网格保证分块中间产物时长 = Σ成员网格（下一层偏移正确）。
+    """
+    parts = []
+    labels = []
+    for k in range(n):
+        stop = grid_durs[k] - video_durs[k] + (xfade if k < n - 1 else 0.0)
+        if stop > 0.0005:
+            parts.append(
+                f"[{k}:v]tpad=stop_mode=clone:stop_duration={stop:.3f}[v{k}]")
+            labels.append(f"v{k}")
+        else:
+            labels.append(f"{k}:v")
+    prev = labels[0]
+    offset = 0.0
+    for k in range(1, n):
+        offset += grid_durs[k - 1]
+        label = f"x{k}"
+        parts.append(
+            f"[{prev}][{labels[k]}]xfade=transition=fade:duration={xfade:.3f}:"
+            f"offset={offset:.3f}[{label}]")
+        prev = label
+    return ";".join(parts), prev
+
+
+def _run_xfade_merge_video(seg_paths: list[str], out_path: str,
+                           xfade: float, fps: int, timeout: int) -> bool:
+    """单次 ffmpeg 调用完成纯视频 xfade 合并（音频由调用方网格拼接）。
+
+    图写脚本文件经 -filter_complex_script 传入（不占命令行）；输出 -an，
+    编码参数与 _run_xfade_merge 一致。失败/超时删产物返回 False。
+    """
+    n = len(seg_paths)
+    video_durs, grid_durs = [], []
+    for p in seg_paths:
+        vd = _probe_video_duration(p)
+        if not vd or vd <= 0:
+            return False
+        gd = _segment_grid_duration(p)
+        video_durs.append(vd)
+        grid_durs.append(max(gd, vd) if gd and gd > 0 else vd)
+    if min(grid_durs) < xfade * 2:
+        return False
+    graph, vlabel = _blocks_xfade_graph(n, video_durs, grid_durs, xfade)
+    script_path = out_path + ".filter.txt"
+    cmd = ["ffmpeg", "-y"]
+    for p in seg_paths:
+        cmd += ["-i", p]
+    cmd += [
+        "-filter_complex_script", script_path,
+        "-map", f"[{vlabel}]", "-an",
+        "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(fps),
+        "-t", f"{sum(grid_durs):.3f}",
+        out_path,
+    ]
+    ok = False
+    try:
+        with open(script_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(graph)
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            print("  [Xfade] 块交叉溶解合并超时 — 保持硬切")
+            return False
+        if r.returncode == 0 and os.path.exists(out_path) \
+                and os.path.getsize(out_path) > 1000:
+            ok = True
+        else:
+            print(f"  [Xfade] 块交叉溶解合并失败 — 保持硬切 "
+                  f"({r.stderr.decode(errors='replace')[-300:] if r.stderr else ''})")
+            try:
+                os.remove(out_path)
+            except OSError:
+                pass
+    finally:
+        try:
+            os.remove(script_path)
+        except OSError:
+            pass
+    return ok
+
+
+def merge_blocks_xfade(block_paths: list[str], out_path: str,
+                       xfade: float, fps: int = 25,
+                       max_inputs: int = _XFADE_MAX_INPUTS,
+                       timeout: int = _XFADE_MERGE_TIMEOUT) -> str | None:
+    """把相邻块合并为带交叉溶解（crossfade）的单条纯视频流。
+
+    sleep 组间/片头片尾边界硬切观感生硬；处理方式与对话叠化（
+    _merge_dialogue_xfade）同源：
+    - 除最后一块外每块视频尾帧 tpad=stop_mode=clone 冻结延展（补齐
+      video→网格差值 + xfade 秒）；
+    - xfade 链 offset_k = 前面各块网格时长之和 → 输出总长 = Σ网格时长，
+      与 concat_segments 音频 PCM 网格拼接严格同格，各块内容起点不变；
+    - 仅画面过渡：输出 -an 纯视频，音频由调用方按原网格拼接（块内语音
+      完全不受影响）。
+
+    块数超 max_inputs 时宽分块合并。任一步失败返回 None（fail-open，
+    调用方回退硬切 concat）。
+    """
+    paths = [p for p in block_paths if p and os.path.exists(p)]
+    if len(paths) < 2 or xfade <= 0 or len(paths) != len(block_paths):
+        return None
+    parent = Path(out_path).parent
+    parent.mkdir(parents=True, exist_ok=True)
+    stem = Path(out_path).stem
+    cur = list(paths)
+    try:
+        level = 0
+        while len(cur) > max_inputs:
+            nxt = []
+            for ci in range(0, len(cur), max_inputs):
+                chunk = cur[ci:ci + max_inputs]
+                if len(chunk) < 2:
+                    nxt.append(chunk[0])
+                    continue
+                mid = str(parent / f"{stem}_m{level}_{ci // max_inputs:03d}.mp4")
+                print(f"  [Xfade] 分组合并 {ci // max_inputs + 1} "
+                      f"（{len(chunk)} 块，第 {level + 1} 轮）...")
+                if not _run_xfade_merge_video(chunk, mid, xfade, fps, timeout):
+                    return None
+                nxt.append(mid)
+            cur = nxt
+            level += 1
+        if len(cur) < 2:
+            return None
+        if not _run_xfade_merge_video(cur, out_path, xfade, fps, timeout):
+            return None
+        return out_path
+    finally:
+        # 清理分块中间产物（out_path 本身不带 _m 不误删）
+        for f in parent.glob(f"{stem}_m*.mp4"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+
 def concat_segments(segment_paths: list[str], output_path: str,
-                    tmp_dir: str | Path = None) -> str:
+                    tmp_dir: str | Path = None,
+                    video_source: str | None = None) -> str:
     """Concatenate segment files (video stream copy + audio filter re-encode).
 
     All segments must have uniform format (libx264/yuv420p/25fps/aac/44100Hz/stereo).
+    video_source：外部预合成纯视频流（如 merge_blocks_xfade 产物）。提供且
+    存在时跳过视频 concat 通道、直接以其为 mux 视频源（不删除该文件）；
+    音频仍按段网格拼接，与视频总长严格同格。
 
     为什么不能直接 concat demuxer + -c copy：段的 AAC 轨道含 encoder priming
     （约 46ms），MP4 edit list 把展示时长裁剪到内容时长，但 demuxer copy 拼接
@@ -847,8 +1003,14 @@ def concat_segments(segment_paths: list[str], output_path: str,
 
     v_only = tmp_dir / "concat_video_only.mp4"
     a_only = tmp_dir / "concat_audio_only.m4a"
-    _run(["-f", "concat", "-safe", "0", "-i", str(concat_list),
-          "-c:v", "copy", "-an", v_only], "video pass")
+    own_video = not (video_source and os.path.exists(video_source))
+    if own_video:
+        _run(["-f", "concat", "-safe", "0", "-i", str(concat_list),
+              "-c:v", "copy", "-an", v_only], "video pass")
+    else:
+        # 外部预合成的纯视频流（如 sleep 块 xfade 合并）：跳过 concat
+        # 视频通道，音频仍按原段网格拼接（与视频总长严格同格）
+        v_only = Path(video_source)
 
     # 音频：逐段解码 → 按容器时长裁掉 AAC 帧尾补齐 → 拼 PCM → 一次编码
     _SR, _CH, _SW = 44100, 2, 2  # s16le stereo 每样本帧 4 字节
@@ -898,7 +1060,7 @@ def concat_segments(segment_paths: list[str], output_path: str,
     _run(["-i", v_only, "-i", a_only,
           "-c", "copy", "-map", "0:v:0", "-map", "1:a:0",
           output_path], "mux pass")
-    for t in (v_only, a_only):
+    for t in ((v_only,) if own_video else ()) + (a_only,):
         try:
             os.remove(t)
         except OSError:

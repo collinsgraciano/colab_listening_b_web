@@ -206,6 +206,14 @@ PARAM_SPEC = {
                         "modes": ["sleep"],
                         "label": "卡片提前量(秒)",
                         "help": "每组画面先出现 N 秒再开始朗读（0-2，默认 0.3，0=出现即出声）；TTS 音频自带约 0.3 秒前导静音，实际停顿略长"},
+    "sleep_xfade": {"default": False, "type": "checkbox", "group": "sleep",
+                    "modes": ["sleep"],
+                    "label": "组间交叉溶解",
+                    "help": "开启后相邻块边界（组与组、片头/片尾衔接）画面交叉溶解过渡；仅画面、音频不动。整片多 1-2 次视频重编码，合成耗时明显增加"},
+    "sleep_xfade_sec": {"default": 0.5, "type": "number", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "溶解时长(秒)",
+                        "help": "交叉溶解过渡时长（0.2-2.0，默认 0.5）；需开启「组间交叉溶解」，调小可避免与前组首句朗读重叠"},
     "sleep_font_scale": {"default": 100, "type": "number", "group": "sleep",
                          "modes": ["sleep"],
                          "label": "句子字号缩放(%)",
@@ -1079,6 +1087,7 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
                      ("sleep_bg_image_path", "--sleep-bg-image-path"),
                      ("sleep_bg_opacity", "--sleep-bg-opacity"),
                      ("sleep_card_lead", "--sleep-card-lead"),
+                     ("sleep_xfade_sec", "--sleep-xfade-sec"),
                      ("sleep_font_scale", "--sleep-font-scale"),
                      ("sleep_line_spacing", "--sleep-line-spacing"),
                      ("sleep_letter_spacing", "--sleep-letter-spacing"),
@@ -1096,6 +1105,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args.append("--sleep-bg-image")
     if config.get("sleep_4k_native"):
         args.append("--sleep-4k-native")
+    if config.get("sleep_xfade"):
+        args.append("--sleep-xfade")
 
     # LLM
     provider = config.get("llm_provider", "sensenova")

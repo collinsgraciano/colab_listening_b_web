@@ -1225,6 +1225,15 @@ class PipelineService:
         except (TypeError, ValueError):
             sleep_card_lead = 0.3
 
+        # sleep 组间交叉溶解（默认关=原硬切行为；开启时 clamp 0.2-2.0，
+        # 折叠为单一 xfade_sec 值，0=关闭）
+        sleep_xfade_sec = 0.0
+        if config.get("sleep_xfade"):
+            try:
+                sleep_xfade_sec = min(2.0, max(0.2, float(config.get("sleep_xfade_sec", 0.5) or 0.5)))
+            except (TypeError, ValueError):
+                sleep_xfade_sec = 0.5
+
         # mcp_tokens：模式配置为空时回落 legacy default.json / 本机 CLI 检测
         # （如 sleep 模式文件 seed 时未带 token；同 sensenova/openai key 空值回落先例）
         from .config_manager import resolve_mcp_tokens
@@ -1296,6 +1305,8 @@ class PipelineService:
             sleep_4k_native=bool(config.get("sleep_4k_native", False)),
             sleep_intro=bool(config.get("sleep_intro", True)),
             sleep_card_lead=sleep_card_lead,
+            sleep_xfade=bool(config.get("sleep_xfade", False)),
+            sleep_xfade_sec=sleep_xfade_sec,
             sleep_font_scale=_cfg_int(config, "sleep_font_scale", 100, 60, 160),
             sleep_line_spacing=_cfg_int(config, "sleep_line_spacing", 14, 0, 48),
             sleep_letter_spacing=_cfg_int(config, "sleep_letter_spacing", 0, 0, 24),

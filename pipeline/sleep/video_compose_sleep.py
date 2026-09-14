@@ -3,6 +3,8 @@
 每块 = 一张静态卡片（-loop 1）+ 该组音频链（朗读段 + anullsrc 静音气口，
 filter_complex 内统一 aresample/立体声后 concat 单编码 aac）→ 200+ 个均匀
 块（libx264/yuv420p/25fps/aac 44100 立体声）走 media_utils.concat_segments。
+xfade_sec>0 时相邻块先交叉溶解合并为纯视频流（仅画面、音频仍走网格拼接），
+失败自动回退硬切。
 文字全部预渲染进卡片 → 无字幕烧录步骤；末尾 apply_final_loudnorm 原地归一。
 
 native_4k=True 时卡片按 3840x2160 原生渲染、块直接编码 4K（文字像素级
@@ -14,7 +16,8 @@ import subprocess
 from pathlib import Path
 
 from media_utils import (TARGET_H, TARGET_W, apply_final_loudnorm,
-                         concat_segments, get_duration, safe_filename)
+                         concat_segments, get_duration, merge_blocks_xfade,
+                         safe_filename)
 from sleep.sleep_cards import (render_intro_card, render_outro_card,
                                render_pair_card)
 
@@ -151,12 +154,14 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
                   channel_name: str = "English with me", badge_text: str = "EN",
                   outro_text: str = "", num_pairs: int = 0,
                   intro_video: str = "", native_4k: bool = False,
-                  card_lead: float = 0.0,
+                  card_lead: float = 0.0, xfade_sec: float = 0.0,
                   progress_cb=None, stop_check=None) -> str:
     """合成 sleep 成片。返回最终 mp4 路径（videos/{safe}.mp4）。
 
     native_4k=True：卡片原生 3840x2160 渲染 + 块编码 4K（成片即 4K，
     下游 Step 6 检测已 4K 自动硬链接跳过放大）。
+    xfade_sec>0：相邻块边界（组间 + 片头/片尾衔接）画面交叉溶解过渡
+    （0.2-2.0s；仅画面，音频不动；整片多 1-2 次视频重编码）。0=硬切。
     """
     out_w, out_h = (3840, 2160) if native_4k else (TARGET_W, TARGET_H)
     vf = _output_vf(out_w, out_h)
@@ -236,9 +241,19 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
             _cb(int(2 + bi / total * 78),
                 f"Block {bi + 1}/{total} ({t}, {head.get('pair', '')})".strip())
 
+    merged_video = None
+    if xfade_sec > 0 and len(block_paths) >= 2:
+        if native_4k:
+            print("  [Sleep] 4K 原生 + 交叉溶解：整片重编码耗时较长，请耐心等待")
+        _cb(80, f"Crossfading {len(block_paths)} blocks ({xfade_sec:.2f}s)...")
+        merged_video = merge_blocks_xfade(
+            block_paths, str(tmp_dir / "xfade_merged.mp4"), xfade_sec)
+        if merged_video is None:
+            print("  [Sleep] 交叉溶解合并失败 — 回退硬切拼接")
     _cb(82, "Concatenating blocks...")
     no_sub = str(vid_dir / "final_no_sub.mp4")
-    concat_segments(block_paths, no_sub, tmp_dir=str(tmp_dir))
+    concat_segments(block_paths, no_sub, tmp_dir=str(tmp_dir),
+                    video_source=merged_video)
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
