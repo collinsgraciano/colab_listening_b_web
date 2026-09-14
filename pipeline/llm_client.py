@@ -3,11 +3,13 @@
 Uses SenseNova DeepSeek V4 Flash (OpenAI-compatible API).
 No external project imports.
 """
+import contextlib
 import json
 import re
 import os
 import sys
 import threading
+import urllib.parse
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -143,13 +145,218 @@ def _diagnose_response(result: dict) -> str:
     return "; ".join(parts) if parts else "no diagnostic fields found"
 
 
+# HTTP 层可重试状态码与退避表（_chat 与 gemini_chat 共用）
+_RETRY_CODES = [429, 502, 503, 504, 524]
+_RETRY_BACKOFFS = [15, 30, 60, 90, 120]
+
+# ---------------------------------------------------------------------------
+# LLM 代理支持（全部 Provider 通用）：llm_proxy_enabled + llm_proxy_url。
+# 支持 http(s):// 与 socks5://、socks5h://（socks 系列 DNS 一律经代理解析，
+# 防本地 DNS 污染）。仅作用于 LLM API 调用窗口；MCP 生图/视频、SenseNova 生图、
+# TTS、模型下载等其他流量不受影响。
+# ---------------------------------------------------------------------------
+
+_SOCKS_SCHEMES = ("socks5h", "socks5", "socks4")
+_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
+
+
+def _proxy_scheme(proxy_url: str) -> str:
+    return urllib.parse.urlparse(proxy_url).scheme.lower()
+
+
+def _llm_proxy_url() -> str:
+    """env 版代理读取（线程局部 override 优先），仅 llm_proxy_enabled 时非空。"""
+    if not _env_flag("LLM_PROXY_ENABLED"):
+        return ""
+    return _env_get("LLM_PROXY_URL", "").strip()
+
+
+def proxy_url_from_config(config: dict) -> str:
+    """config dict 版代理读取，供 Web 直连调用方（topics_ai 等）使用。"""
+    if not config.get("llm_proxy_enabled"):
+        return ""
+    return str(config.get("llm_proxy_url") or "").strip()
+
+
+@contextlib.contextmanager
+def _socks_socket_window(proxy_url: str):
+    """urllib + SOCKS 代理窗口：PySocks 临时接管 socket.socket，结束即恢复。
+
+    urllib 没有 per-opener 的 socks 钩子，PySocks 官方用法即临时替换
+    socket.socket；rdns=True 让 DNS 经代理解析（防本地 DNS 污染）。
+    """
+    import socket as _socket
+    import socks
+    u = urllib.parse.urlparse(proxy_url)
+    ptype = {"socks5": socks.SOCKS5, "socks5h": socks.SOCKS5,
+             "socks4": socks.SOCKS4}.get(_proxy_scheme(proxy_url), socks.SOCKS5)
+    socks.set_default_proxy(ptype, u.hostname, u.port or 1080, rdns=True,
+                            username=u.username, password=u.password)
+    saved = _socket.socket
+    _socket.socket = socks.socksocket
+    try:
+        yield
+    finally:
+        _socket.socket = saved
+
+
+@contextlib.contextmanager
+def _requests_proxy_env(proxy_url: str):
+    """httpx/requests（google-genai SDK）代理窗口：临时设 HTTP(S)_PROXY。
+
+    SDK 在 genai.Client 构造时一次性创建 httpx.Client 并冻结代理（读 env），
+    故窗口必须覆盖 Client 构造与全部请求；socks5:// 归一为 socks5h://，
+    与 urllib 侧 rdns=True 的远端 DNS 行为保持一致。
+    """
+    if not proxy_url:
+        yield
+        return
+    if _proxy_scheme(proxy_url) == "socks5":
+        proxy_url = "socks5h://" + proxy_url.split("://", 1)[1]
+    saved = {k: os.environ.get(k) for k in _PROXY_ENV_KEYS}
+    for k in _PROXY_ENV_KEYS:
+        os.environ[k] = proxy_url
+    try:
+        yield
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def llm_urlopen(req, timeout: int, proxy_url: str = ""):
+    """urllib.urlopen 的 LLM 代理感知版。
+
+    无代理→urlopen；socks→PySocks 窗口内 urlopen；http(s)→显式 ProxyHandler
+    opener（urllib 全局 opener 会缓存首次 getproxies() 的结果，env 窗口对
+    长驻 Web 进程不可靠，必须逐请求显式建 opener）。
+    """
+    if not proxy_url:
+        return urllib.request.urlopen(req, timeout=timeout)
+    if _proxy_scheme(proxy_url) in _SOCKS_SCHEMES:
+        with _socks_socket_window(proxy_url):
+            return urllib.request.urlopen(req, timeout=timeout)
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+    return opener.open(req, timeout=timeout)
+
+
+# ---------------------------------------------------------------------------
+# Gemini（google-genai SDK，Interactions API）：llm_provider="gemini"
+# 参考 https://ai.google.dev/gemini-api/docs/interactions-overview
+# input 支持 string（单轮）或 array(Step)（无状态多轮，user_input/model_output）；
+# system_instruction 独立参数；generation_config 含 max_output_tokens /
+# thinking_level(minimal|low|medium|high) / temperature；interaction.output_text
+# 为 SDK 拼接的最后一轮模型文本。
+# ---------------------------------------------------------------------------
+
+_GEMINI_DEFAULT_MODEL = "models/gemini-3.8-flash"
+_GEMINI_THINKING_LEVELS = ("minimal", "low", "medium", "high")
+
+
+def _gemini_input_and_system(messages: list[dict]) -> tuple:
+    """chat messages → (input, system_instruction)。
+
+    单轮：input 用字符串（官方示例形式）；多轮：input 用 array(Step)
+    无状态全历史（assistant → model_output step，其余 → user_input step）。
+    """
+    system_parts = [str(m.get("content") or "") for m in messages
+                    if m.get("role") == "system"]
+    system_instruction = "\n\n".join(p for p in system_parts if p.strip())
+    turns = [m for m in messages if m.get("role") != "system"]
+    if len(turns) <= 1:
+        text = str(turns[0].get("content") or "") if turns else ""
+        return text, system_instruction
+    steps = []
+    for m in turns:
+        step_type = "model_output" if m.get("role") == "assistant" else "user_input"
+        steps.append({
+            "type": step_type,
+            "content": [{"type": "text", "text": str(m.get("content") or "")}],
+        })
+    return steps, system_instruction
+
+
+def gemini_chat(api_key: str, model: str, messages: list[dict], *,
+                temperature: float = 0.8, timeout: int = 600,
+                max_tokens: int = 8192, reasoning_effort: str = "low",
+                proxy_url: str = "") -> str:
+    """同步调 Gemini Interactions API，返回输出文本（公开函数，Web 直连功能复用）。
+
+    代理窗口覆盖 genai.Client 构造与全部请求（httpx 代理在构造时冻结）。
+    429/5xx/网络错误沿用共享退避表；空输出一次性加倍 max_tokens 重试
+    （thinking 模型可能耗尽输出预算），仍空则报错。
+    """
+    import time as _time
+
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not set")
+    try:
+        from google import genai as _genai
+    except ImportError as e:
+        raise RuntimeError(
+            "未安装 google-genai SDK，请先执行：pip install google-genai") from e
+
+    thinking = reasoning_effort if reasoning_effort in _GEMINI_THINKING_LEVELS else "low"
+    input_value, system_instruction = _gemini_input_and_system(messages)
+    proxy_cm = (_requests_proxy_env(proxy_url) if proxy_url
+                else contextlib.nullcontext())
+    _empty_retried = False
+    with proxy_cm:
+        client = _genai.Client(api_key=api_key)
+        for attempt in range(len(_RETRY_BACKOFFS) + 1):
+            try:
+                kwargs = {
+                    "model": model,
+                    "input": input_value,
+                    "generation_config": {
+                        "max_output_tokens": max_tokens,
+                        "thinking_level": thinking,
+                        "temperature": temperature,
+                    },
+                    "store": False,
+                    "timeout": timeout,  # create() 的 per-call 超时，单位秒
+                }
+                if system_instruction:
+                    kwargs["system_instruction"] = system_instruction
+                interaction = client.interactions.create(**kwargs)
+            except Exception as e:  # noqa: BLE001 — SDK/网络异常统一归类重试
+                code = getattr(e, "code", None)
+                if code is not None and code not in _RETRY_CODES:
+                    raise RuntimeError(f"Gemini API HTTP {code}: {e}") from e
+                if attempt < len(_RETRY_BACKOFFS):
+                    wait = _RETRY_BACKOFFS[attempt]
+                    reason = (f"HTTP {code}" if code is not None else
+                              f"网络错误 ({type(e).__name__}: {str(e)[:120]})")
+                    print(f"  [Gemini] {reason}，{wait}s 后重试 "
+                          f"({attempt + 1}/{len(_RETRY_BACKOFFS)})... Model: {model}")
+                    _time.sleep(wait)
+                    continue
+                raise RuntimeError(
+                    f"Gemini API 调用失败（重试后仍失败）: {type(e).__name__}: {e}") from e
+            text = (getattr(interaction, "output_text", None) or "").strip()
+            if text:
+                return text
+            if not _empty_retried and max_tokens < 16384:
+                new_max = min(max_tokens * 2, 16384)
+                print(f"  [Gemini] 空输出（thinking 可能耗尽输出预算），"
+                      f"以 max_tokens={new_max} 重试一次（原 {max_tokens}）...")
+                _empty_retried = True
+                max_tokens = new_max
+                continue
+            raise RuntimeError(f"Gemini 返回空输出 (model={model})")
+
+
 def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
           max_tokens: int = 8192, reasoning_effort: str = "low") -> str:
-    """Call LLM chat completion (SenseNova or OpenAI-compatible), return content string.
+    """Call LLM chat completion (SenseNova / OpenAI-compatible / Gemini), return content string.
 
     Dispatches based on LLM_PROVIDER env var:
     - "sensenova" (default): SenseNova DeepSeek V4 Flash / glm-5.2
     - "openai": any OpenAI-compatible endpoint (x666.me, etc.)
+    - "gemini": Google Gemini via google-genai SDK (Interactions API)
 
     Retries on HTTP 429 (rate limit) with exponential backoff.
     Enforces a minimum interval between calls to avoid triggering rate limits.
@@ -157,6 +364,20 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
     import time as _time
 
     provider = _env_get("LLM_PROVIDER", "sensenova")
+
+    if provider == "gemini":
+        return gemini_chat(
+            _env_get("GEMINI_API_KEY", ""),
+            _env_get("GEMINI_MODEL", _GEMINI_DEFAULT_MODEL),
+            messages,
+            temperature=temperature,
+            timeout=max(timeout, 600),  # SDK per-call 超时（秒），不短于默认 600s
+            max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
+            proxy_url=_llm_proxy_url())
+
+    # 全 Provider 共用的 LLM 代理（llm_proxy_enabled + llm_proxy_url）
+    proxy_url = _llm_proxy_url()
 
     if provider == "openai":
         model = _env_get("OPENAI_MODEL", "grok-4.6")
@@ -168,8 +389,6 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
         base_url = _env_get("SENSENOVA_BASE", "https://token.sensenova.cn/v1")
 
     # Retry on 429 (rate limit), 502/503/504 (gateway), 524 (Cloudflare timeout)
-    _RETRY_CODES = [429, 502, 503, 504, 524]
-    _RETRY_BACKOFFS = [15, 30, 60, 90, 120]
     # One-shot rescue for finish_reason=length empty content (reasoning burn)
     _length_retried = False
 
@@ -195,7 +414,7 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
         # Cloudflare-protected endpoints (e.g. x666.me) block default Python User-Agent with 403
         req.add_header("User-Agent", "CodelyLLM/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with llm_urlopen(req, timeout, proxy_url) as resp:
                 raw = resp.read().decode("utf-8")
                 if not raw.strip():
                     raise RuntimeError("LLM returned empty response body (HTTP 200, 0 bytes)")

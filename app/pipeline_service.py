@@ -301,6 +301,10 @@ class PipelineService:
                 os.environ["SENSENOVA_API_KEY"] = p_api_key
             if p_model:
                 os.environ["SENSENOVA_MODEL"] = p_model
+        elif p_type == "gemini":
+            if p_api_key:
+                os.environ["GEMINI_API_KEY"] = p_api_key
+            os.environ["GEMINI_MODEL"] = str(p_model or "models/gemini-3.8-flash")
         else:
             if p_base_url:
                 os.environ["OPENAI_BASE_URL"] = p_base_url
@@ -308,6 +312,9 @@ class PipelineService:
                 os.environ["OPENAI_API_KEY"] = p_api_key
             if p_model:
                 os.environ["OPENAI_MODEL"] = p_model
+        # LLM 代理（全部 Provider 生效；代理窗口在 llm_client 侧按调用实现）
+        os.environ["LLM_PROXY_ENABLED"] = "1" if config.get("llm_proxy_enabled") else ""
+        os.environ["LLM_PROXY_URL"] = str(config.get("llm_proxy_url") or "").strip()
 
         if sys.platform == "win32" and "HF_ENDPOINT" not in os.environ:
             os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
@@ -1237,6 +1244,10 @@ class PipelineService:
             openai_base_url=p_base_url if p_type == "openai" else "",
             openai_api_key=p_api_key if p_type == "openai" else "",
             openai_model=p_model if p_type == "openai" else "grok-4.6",
+            gemini_api_key=p_api_key if p_type == "gemini" else "",
+            gemini_model=p_model if p_type == "gemini" else "models/gemini-3.8-flash",
+            llm_proxy_url=(str(config.get("llm_proxy_url") or "").strip()
+                           if config.get("llm_proxy_enabled") else None),
             llm_retries=int(config.get("llm_retries", 10)),
             mcp_tokens=mcp_tokens or None,
             mcp_token=None,

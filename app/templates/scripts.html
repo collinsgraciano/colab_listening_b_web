@@ -229,6 +229,8 @@ function onProviderChange(skipSave) {
     let models = [];
     if (provider === 'sensenova') {
         models = FORM.sensenova_models || [];
+    } else if (provider === 'gemini') {
+        models = FORM.gemini_models || [];
     } else if (provider.startsWith('custom:')) {
         const cp = (FORM.custom_providers || []).find(p => 'custom:' + p.id === provider);
         models = cp ? cp.models : [];
@@ -245,7 +247,8 @@ function onProviderChange(skipSave) {
     if (lastM && models.includes(lastM)) {
         sel.value = lastM;
     } else if (FORM.current) {
-        const saved = provider === 'sensenova' ? FORM.current.sensenova_model : FORM.current.openai_model;
+        const saved = provider === 'sensenova' ? FORM.current.sensenova_model
+            : provider === 'gemini' ? FORM.current.gemini_model : FORM.current.openai_model;
         if (saved && models.includes(saved)) sel.value = saved;
     }
     if (!skipSave) saveFormMemory();

@@ -194,13 +194,16 @@ function toggleSection(btn) {
 }
 
 function toggleLLMFields(provider) {
-    const showOpenAI = provider !== 'sensenova';
+    const showOpenAI = provider !== 'sensenova' && provider !== 'gemini';
     document.querySelectorAll('.config-field').forEach(f => {
         const field = f.querySelector('[data-field]');
         if (!field) return;
         const key = field.getAttribute('data-field');
         if (key.startsWith('sensenova_')) {
             f.style.display = provider === 'sensenova' ? '' : 'none';
+        }
+        if (key.startsWith('gemini_')) {
+            f.style.display = provider === 'gemini' ? '' : 'none';
         }
         if (key.startsWith('openai_')) {
             f.style.display = showOpenAI ? '' : 'none';

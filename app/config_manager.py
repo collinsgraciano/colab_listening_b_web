@@ -199,6 +199,7 @@ PARAM_SPEC = {
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
                      "label": "LLM Provider", "options": {
                          "sensenova": "SenseNova",
+                         "gemini": "Gemini",
                          "openai": "OpenAI Compatible"}},
     "sensenova_api_key": {"default": "", "type": "password", "group": "llm",
                           "label": "SenseNova API Key",
@@ -213,10 +214,23 @@ PARAM_SPEC = {
                     "label": "OpenAI Model", "options": [
                         "grok-4.6", "grok-4.5", "gemini-3.1-pro-preview",
                         "gemini-3.7-flash", "claude-sonnet-5", "gemini-2.5-pro-1m"]},
+    "gemini_api_key": {"default": "", "type": "password", "group": "llm",
+                      "label": "Gemini API Key",
+                      "help": "llm_provider=gemini 时使用（google-genai SDK 直连 Google API）"},
+    "gemini_model": {"default": "models/gemini-3.8-flash", "type": "select", "group": "llm",
+                    "label": "Gemini Model", "options": [
+                        "models/gemini-3.8-flash", "models/gemini-3.7-flash",
+                        "models/gemini-3.1-pro-preview", "models/gemini-2.5-pro-1m"]},
     "llm_retries": {"default": 10, "type": "number", "group": "llm",
                     "label": "LLM 重试次数"},
     "llm_min_interval": {"default": 3, "type": "number", "group": "llm",
                          "label": "LLM 最小间隔(秒)"},
+    "llm_proxy_enabled": {"default": False, "type": "checkbox", "group": "llm",
+                          "label": "LLM API 走代理",
+                          "help": "开启后当前 LLM Provider 的全部 API 调用走代理（Gemini/SenseNova/OpenAI 均生效）；MCP 生图/视频、TTS 等不受影响"},
+    "llm_proxy_url": {"default": "http://127.0.0.1:7890", "type": "text", "group": "llm",
+                     "label": "LLM 代理地址",
+                     "help": "支持 http:// 与 socks5://、socks5h://（socks 系列 DNS 经代理解析）；例 http://127.0.0.1:7890 或 socks5://127.0.0.1:10308"},
     "quest_beat_lines": {"default": 10, "type": "number", "group": "llm",
                          "modes": ["quest", "quest_sprite", "story", "story_sprite"],
                          "label": "节拍行数", "help": "节拍表每拍的行数预算 (默认10；story 模式共用此参数)"},
@@ -903,6 +917,7 @@ def get_provider_options() -> dict[str, str]:
     """Return all LLM provider options (static + custom) as {value: label}."""
     options = {
         "sensenova": "SenseNova",
+        "gemini": "Gemini（google-genai）",
         "openai": "OpenAI Compatible (内置)",
     }
     custom = load_llm_providers()
@@ -924,6 +939,13 @@ def resolve_provider(config: dict[str, Any]) -> tuple[str, str, str, str]:
             "https://token.sensenova.cn/v1",
             config.get("sensenova_api_key", ""),
             config.get("sensenova_model", "deepseek-v4-flash"),
+        )
+    elif provider == "gemini":
+        return (
+            "gemini",
+            "",
+            config.get("gemini_api_key", ""),
+            config.get("gemini_model", "models/gemini-3.8-flash"),
         )
     elif provider.startswith("custom:"):
         custom_id = provider.split(":", 1)[1]
@@ -1044,12 +1066,21 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         if p_api_key:
             args += ["--api-key", p_api_key]
         args += ["--model", str(p_model or "deepseek-v4-flash")]
+    elif p_type == "gemini":
+        if p_api_key:
+            args += ["--gemini-api-key", p_api_key]
+        args += ["--gemini-model", str(p_model or "models/gemini-3.8-flash")]
     else:
         if p_base_url:
             args += ["--openai-base-url", p_base_url]
         if p_api_key:
             args += ["--openai-api-key", p_api_key]
         args += ["--openai-model", str(p_model or "grok-4.6")]
+    # LLM 代理（全部 Provider 生效；--llm-proxy-url 传入即启用）
+    if config.get("llm_proxy_enabled"):
+        _llm_proxy = str(config.get("llm_proxy_url") or "").strip()
+        if _llm_proxy:
+            args += ["--llm-proxy-url", _llm_proxy]
     args += ["--llm-retries", str(config.get("llm_retries", 10))]
     if config.get("llm_min_interval"):
         os.environ["LLM_MIN_INTERVAL"] = str(config["llm_min_interval"])

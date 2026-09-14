@@ -731,33 +731,41 @@ Requirements:
 Output valid JSON only (no markdown, no explanations):
 {{"characters": [{{"name": "...", "gender": "female", "role": "...", "description": "...", "scenarios": ["..."]}}]}}"""
 
-        from llm_client import _extract_json  # pipeline/ 已在 sys.path
+        from llm_client import (  # pipeline/ 已在 sys.path
+            _extract_json, gemini_chat, llm_urlopen, proxy_url_from_config,
+        )
+        _llm_proxy = proxy_url_from_config(load_config())
 
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system",
-                 "content": "You are an expert character designer. Output valid JSON only — no markdown, no explanations."},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.9,
-            "max_tokens": 4096,
-        }
-        if p_type != "openai":
-            body["reasoning_effort"] = "low"
+        messages = [
+            {"role": "system",
+             "content": "You are an expert character designer. Output valid JSON only — no markdown, no explanations."},
+            {"role": "user", "content": prompt},
+        ]
 
         print(f"  [CharAI] Requesting {count} generic characters from {model} ({p_type})...")
-        req = urllib.request.Request(
-            f"{base_url}/chat/completions",
-            data=json.dumps(body).encode("utf-8"),
-            method="POST",
-        )
-        req.add_header("Authorization", f"Bearer {api_key}")
-        req.add_header("Content-Type", "application/json")
-        req.add_header("User-Agent", "CodelyLLM/1.0")
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-        content = result["choices"][0]["message"]["content"]
+        if p_type == "gemini":
+            content = gemini_chat(api_key, model, messages, temperature=0.9,
+                                  max_tokens=4096, proxy_url=_llm_proxy)
+        else:
+            body = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.9,
+                "max_tokens": 4096,
+            }
+            if p_type != "openai":
+                body["reasoning_effort"] = "low"
+            req = urllib.request.Request(
+                f"{base_url}/chat/completions",
+                data=json.dumps(body).encode("utf-8"),
+                method="POST",
+            )
+            req.add_header("Authorization", f"Bearer {api_key}")
+            req.add_header("Content-Type", "application/json")
+            req.add_header("User-Agent", "CodelyLLM/1.0")
+            with llm_urlopen(req, 180, _llm_proxy) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            content = result["choices"][0]["message"]["content"]
         chars = _extract_json(content).get("characters") or []
         print(f"  [CharAI] LLM returned {len(chars)} candidates")
 

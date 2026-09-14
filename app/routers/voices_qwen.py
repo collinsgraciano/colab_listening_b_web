@@ -311,10 +311,17 @@ def _build_voice_llm_override() -> dict:
     if p_type == "sensenova":
         ov["SENSENOVA_API_KEY"] = api_key
         ov["SENSENOVA_MODEL"] = model or "deepseek-v4-flash"
+    elif p_type == "gemini":
+        ov["GEMINI_API_KEY"] = api_key
+        ov["GEMINI_MODEL"] = model or "models/gemini-3.8-flash"
     else:
         ov["OPENAI_BASE_URL"] = base_url
         ov["OPENAI_API_KEY"] = api_key
         ov["OPENAI_MODEL"] = model or "grok-4.6"
+    # LLM 代理（全部 Provider 生效；线程局部 override 隔离）
+    if cfg.get("llm_proxy_enabled"):
+        ov["LLM_PROXY_ENABLED"] = "1"
+        ov["LLM_PROXY_URL"] = str(cfg.get("llm_proxy_url") or "").strip()
     if cfg.get("llm_min_interval"):
         ov["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
     return ov

@@ -361,6 +361,8 @@ def _resolve_batch_provider(provider_id: str, model: str, structure: str):
         p_type0, _, _, _ = resolve_provider(cfg)
         if p_type0 == "sensenova":
             cfg["sensenova_model"] = model
+        elif p_type0 == "gemini":
+            cfg["gemini_model"] = model
         else:
             cfg["openai_model"] = model
     return resolve_provider(cfg), cfg
@@ -392,10 +394,17 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
     if p_type == "sensenova":
         ov["SENSENOVA_API_KEY"] = api_key
         ov["SENSENOVA_MODEL"] = resolved_model or "deepseek-v4-flash"
+    elif p_type == "gemini":
+        ov["GEMINI_API_KEY"] = api_key
+        ov["GEMINI_MODEL"] = resolved_model or "models/gemini-3.8-flash"
     else:
         ov["OPENAI_BASE_URL"] = base_url
         ov["OPENAI_API_KEY"] = api_key
         ov["OPENAI_MODEL"] = resolved_model or "grok-4.6"
+    # LLM 代理（全部 Provider 生效；线程局部 override 隔离，不影响运行中 pipeline）
+    if cfg.get("llm_proxy_enabled"):
+        ov["LLM_PROXY_ENABLED"] = "1"
+        ov["LLM_PROXY_URL"] = str(cfg.get("llm_proxy_url") or "").strip()
     if cfg.get("llm_min_interval"):
         ov["LLM_MIN_INTERVAL"] = str(cfg["llm_min_interval"])
     # QA 轮数全模式生效（quest 读 QUEST_QA_MAX_ROUNDS，original* 读 LISTENING_QA_MAX_ROUNDS）

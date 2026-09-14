@@ -147,13 +147,24 @@ _gen_status: dict = {"status": "idle", "error": "", "count": 0}
 
 
 def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
-              prompt: str, temperature: float = 0.9) -> tuple[str, str]:
+              prompt: str, temperature: float = 0.9,
+              proxy_url: str = "") -> tuple[str, str]:
     """同步调 LLM chat/completions，返回 (content, finish_reason)。
 
     max_tokens 优先 16384（5 套长简介易顶到 8192 被截断）；Provider 拒绝该上限
     （HTTP 400 报文提到 max_tokens）时回退 8192 重试一次。
     独立小函数，便于测试 monkeypatch。
     """
+    from llm_client import gemini_chat, llm_urlopen  # pipeline/ 已在 sys.path
+    if p_type == "gemini":
+        content = gemini_chat(api_key, model, [
+            {"role": "system",
+             "content": "You are an expert YouTube channel strategist and brand "
+                        "designer. Output valid JSON only — no markdown, no explanations."},
+            {"role": "user", "content": prompt},
+        ], temperature=temperature, max_tokens=16384, timeout=300,
+            proxy_url=proxy_url)
+        return content, ""
     body = {
         "model": model,
         "messages": [
@@ -179,7 +190,7 @@ def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
         req.add_header("Content-Type", "application/json")
         req.add_header("User-Agent", "CodelyLLM/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
+            with llm_urlopen(req, 300, proxy_url) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             detail = ""
@@ -404,7 +415,9 @@ def _generate_batch_worker(direction: str, reference_ids: list | None = None,
     """
     _gen_status.update({"status": "generating", "error": "", "count": 0})
     try:
-        p_type, base_url, api_key, model = resolve_provider(load_config())
+        from llm_client import proxy_url_from_config  # pipeline/ 已在 sys.path
+        _cfg = load_config()
+        p_type, base_url, api_key, model = resolve_provider(_cfg)
         if not api_key:
             raise RuntimeError(f"未配置 {p_type} 的 API Key，请在参数配置页面填写")
         if not model:
@@ -421,8 +434,9 @@ def _generate_batch_worker(direction: str, reference_ids: list | None = None,
         print(f"  [ChannelFactory] Requesting 5 channel concepts from {model} ({p_type})...")
         # 相似度越高温度越低：high 紧贴参考需要稳定的模仿输出
         temperature = {"light": 0.9, "medium": 0.8, "high": 0.6}.get(similarity, 0.9)
-        content, finish_reason = _llm_chat(base_url, api_key, model, p_type, prompt,
-                                           temperature)
+        content, finish_reason = _llm_chat(
+            base_url, api_key, model, p_type, prompt, temperature,
+            proxy_url=proxy_url_from_config(_cfg))
         if finish_reason == "length":
             print("  [ChannelFactory] WARNING: LLM 输出被 max_tokens 截断"
                   "（finish_reason=length），将尝试修复/兜底提取")

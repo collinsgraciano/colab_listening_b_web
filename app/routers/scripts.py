@@ -52,6 +52,7 @@ async def api_scripts_form_options():
         "providers": get_provider_options(),
         "sensenova_models": PARAM_SPEC["sensenova_model"]["options"],
         "openai_models": PARAM_SPEC["openai_model"]["options"],
+        "gemini_models": PARAM_SPEC["gemini_model"]["options"],
         "custom_providers": load_llm_providers(),
         "topics_data": _load_topics_data(config),
         "used_topics": _load_used_topic_names(config),
@@ -63,6 +64,7 @@ async def api_scripts_form_options():
             "provider": config.get("llm_provider", "sensenova"),
             "sensenova_model": config.get("sensenova_model", ""),
             "openai_model": config.get("openai_model", ""),
+            "gemini_model": config.get("gemini_model", ""),
             "cefr": config.get("cefr", "A2"),
         },
     }

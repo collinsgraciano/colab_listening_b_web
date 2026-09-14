@@ -261,11 +261,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key", default=None, help="SenseNova API key (or set SENSENOVA_API_KEY env var)")
     parser.add_argument("--model", default=None,
                         help="LLM model name. SenseNova: 'deepseek-v4-flash' (default) or 'glm-5.2'. OpenAI-compatible: 'grok-4.6' (default), 'gemini-3.1-pro-preview', 'claude-sonnet-5', etc.")
-    parser.add_argument("--llm-provider", default="sensenova", choices=["sensenova", "openai"],
-                        help="LLM provider: 'sensenova' (default) or 'openai' (OpenAI-compatible endpoint)")
+    parser.add_argument("--llm-provider", default="sensenova", choices=["sensenova", "openai", "gemini"],
+                        help="LLM provider: 'sensenova' (default), 'openai' (OpenAI-compatible endpoint) or 'gemini' (google-genai SDK, Interactions API)")
     parser.add_argument("--openai-base-url", default=None, help="OpenAI-compatible API base URL (default: https://x666.me/v1)")
     parser.add_argument("--openai-api-key", default=None, help="OpenAI-compatible API key (or set OPENAI_API_KEY env var)")
     parser.add_argument("--openai-model", default=None, help="OpenAI-compatible model name (default: grok-4.6). Available: grok-4.6, grok-4.5, gemini-3.1-pro-preview, gemini-3.7-flash, claude-sonnet-5, gemini-2.5-pro-1m")
+    parser.add_argument("--gemini-api-key", default=None, help="Gemini API key (or set GEMINI_API_KEY env var)")
+    parser.add_argument("--gemini-model", default=None, help="Gemini model name (default: models/gemini-3.8-flash)")
+    parser.add_argument("--llm-proxy-url", default=None, help="HTTP(S)/SOCKS5 proxy URL for ALL LLM API calls, any provider (e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:10308). Only affects LLM traffic, not MCP/image/TTS.")
     parser.add_argument("--llm-retries", type=int, default=10, help="Max retries per LLM round (default 10). Set higher for unreliable endpoints.")
     parser.add_argument("--structure", default="original", choices=["original", "original_static", "quest", "original_cutout", "story", "story_sprite", "sleep"],
                         help="Video structure: 'original' (4-chapter, video clips), 'original_static' (4-chapter, static images, no video clips), 'quest' (task-hook listening), 'original_cutout' (original 4-chapter + quest-style character cutout animation), 'story' (同款家庭故事：冷开场剧情/双人对话/独白，无主持人无跟读), 'story_sprite' (story + 游戏式序列帧动画), 'sleep' (睡觉听·AB短句循环，纯静态卡片零积分)")
@@ -653,6 +656,9 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
     if _llm_provider == "openai":
         _llm_model = os.environ.get("OPENAI_MODEL", "grok-4.6")
         print(f"Step 0: Generating script via LLM (OpenAI-compatible: {_llm_model})...")
+    elif _llm_provider == "gemini":
+        _llm_model = os.environ.get("GEMINI_MODEL", "models/gemini-3.8-flash")
+        print(f"Step 0: Generating script via LLM (Gemini {_llm_model})...")
     else:
         _llm_model = os.environ.get("SENSENOVA_MODEL", "deepseek-v4-flash")
         print(f"Step 0: Generating script via LLM (SenseNova {_llm_model})...")
@@ -1963,6 +1969,16 @@ def main():
         if not os.environ.get("OPENAI_API_KEY"):
             print("ERROR: OPENAI_API_KEY not set. Pass --openai-api-key or set env var.")
             sys.exit(1)
+    elif args.llm_provider == "gemini":
+        os.environ["LLM_PROVIDER"] = "gemini"
+        if args.gemini_api_key:
+            os.environ["GEMINI_API_KEY"] = args.gemini_api_key
+        if args.gemini_model:
+            os.environ["GEMINI_MODEL"] = args.gemini_model
+        os.environ.setdefault("GEMINI_MODEL", "models/gemini-3.8-flash")
+        if not os.environ.get("GEMINI_API_KEY"):
+            print("ERROR: GEMINI_API_KEY not set. Pass --gemini-api-key or set env var.")
+            sys.exit(1)
     else:
         os.environ["LLM_PROVIDER"] = "sensenova"
         if args.model:
@@ -1970,6 +1986,12 @@ def main():
         if not os.environ.get("SENSENOVA_API_KEY"):
             print("ERROR: SENSENOVA_API_KEY not set. Pass --api-key or set env var.")
             sys.exit(1)
+
+    # LLM 代理（全部 Provider 生效；--llm-proxy-url 传入即启用；仅 LLM 流量，
+    # 不影响 MCP/生图/TTS——代理窗口在 llm_client 内按调用实现）
+    if args.llm_proxy_url:
+        os.environ["LLM_PROXY_ENABLED"] = "1"
+        os.environ["LLM_PROXY_URL"] = args.llm_proxy_url
 
     # 生图 Provider：mcp（默认）或 sensenova（U1.5 Lite，读 IMAGE_PROVIDER env）
     os.environ["IMAGE_PROVIDER"] = args.image_provider

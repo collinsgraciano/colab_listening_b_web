@@ -202,6 +202,9 @@ async def api_ai_test_chat(request: Request):
     req.add_header("Authorization", f"Bearer {api_key}")
     req.add_header("Content-Type", "application/json")
     req.add_header("User-Agent", "CodelyLLM/1.0")
+    # LLM 代理（全部 Provider 生效；SSE 流式读取行为不变）
+    from llm_client import llm_urlopen, proxy_url_from_config  # pipeline/ 已在 sys.path
+    llm_proxy = proxy_url_from_config(load_config())
 
     import queue as _queue
 
@@ -215,7 +218,7 @@ async def api_ai_test_chat(request: Request):
         t0 = _time.time()
         usage_data = None
         try:
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            with llm_urlopen(req, 180, llm_proxy) as resp:
                 for raw_line in resp:
                     line = raw_line.decode("utf-8", errors="replace").strip()
                     if not line or not line.startswith("data: "):

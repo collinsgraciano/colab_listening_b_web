@@ -17,7 +17,10 @@ from .paths import ensure_pipeline_on_path
 
 # Reuse pipeline's robust JSON extraction (markdown fences + truncation repair)
 ensure_pipeline_on_path()
-from llm_client import _enforce_rate_limit, _extract_json  # noqa: E402
+from llm_client import (  # noqa: E402
+    _enforce_rate_limit, _extract_json, gemini_chat, llm_urlopen,
+    proxy_url_from_config,
+)
 
 _REVIEW_BATCH_SIZE = 50
 _ISSUE_TYPES = {"duplicate", "similar", "grammar", "too_vague", "unsuitable", "other"}
@@ -48,6 +51,7 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
         raise RuntimeError(
             "未配置 LLM API Key — 请先在「参数配置」页面填写 SenseNova 或 OpenAI 兼容提供商的 API Key")
     min_interval = float(config.get("llm_min_interval") or 3)
+    proxy_url = proxy_url_from_config(config)
 
     backoffs = [15, 30, 60]
     http_attempt = 0      # HTTP 429/网关/网络错误重试额度
@@ -70,7 +74,21 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
         req.add_header("Content-Type", "application/json")
         req.add_header("User-Agent", "CodelyLLM/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            if p_type == "gemini":
+                # Gemini 走 google-genai SDK（自带 429/网络退避）；空/坏 JSON
+                # 复用下方内容重试预算
+                content = gemini_chat(api_key, model, messages,
+                                      temperature=temperature,
+                                      max_tokens=max_tokens, timeout=180,
+                                      proxy_url=proxy_url)
+                if not content.strip():
+                    raise _RetryableError("LLM 返回了空内容")
+                try:
+                    return _extract_json(content)
+                except json.JSONDecodeError as e:
+                    raise _RetryableError(
+                        f"LLM 输出不是有效 JSON（前 200 字符）: {content[:200]}") from e
+            with llm_urlopen(req, 180, proxy_url) as resp:
                 raw = resp.read().decode("utf-8")
             try:
                 result = json.loads(raw)
