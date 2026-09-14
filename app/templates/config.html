@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="p-6 max-w-5xl mx-auto">
+<div class="p-6 {% if mode == 'sleep' %}max-w-7xl{% else %}max-w-5xl{% endif %} mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
         <div>
@@ -46,9 +46,9 @@
         <!-- 结构由当前 Tab 决定，隐藏域保证保存值正确 -->
         <input type="hidden" data-field="structure" value="{{ mode }}">
         {% for group_key, params in grouped %}
-        <div id="group-card-{{ group_key }}" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div id="group-card-{{ group_key }}" class="bg-slate-800 rounded-xl border border-slate-700 {% if group_key != 'sleep' %}overflow-hidden{% endif %}">
             <button type="button" onclick="toggleSection(this)"
-                class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-750 transition">
+                class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-750 transition {% if group_key == 'sleep' %}rounded-t-xl{% endif %}">
                 <span class="flex items-center gap-2 text-sm font-semibold text-white">
                     <span class="text-lg">{{ group_meta[group_key].icon }}</span>
                     {{ group_meta[group_key].label }}
@@ -57,10 +57,22 @@
             </button>
             <div class="section-content px-5 pb-5 {% if group_key == 'sleep' %}lg:flex lg:gap-5 lg:items-start{% else %}grid grid-cols-1 md:grid-cols-2 gap-4{% endif %}">
                 {% if group_key == 'sleep' %}
-                <div class="mb-4 lg:mb-0 lg:w-[400px] lg:shrink-0 lg:sticky lg:top-4 self-start">
+                <div class="mb-4 lg:mb-0 lg:w-[600px] lg:shrink-0 lg:sticky lg:top-4 self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs text-slate-400">🖼️ 实时预览 <span class="text-slate-600">— 修改本组任意参数后自动刷新（成片卡片实际渲染效果）；背景图为按主题 AI 生成时预览不含图片，填「背景图固定路径」后可预览混合效果</span></span>
                         <button type="button" onclick="refreshSleepPreview()" class="text-xs text-indigo-400 hover:text-indigo-300 shrink-0">↻ 手动刷新</button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                        <button type="button" onclick="randomSleepPalette()"
+                            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs text-white font-medium">🎲 随机配色</button>
+                        <button type="button" onclick="saveSleepColorCombo()"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-200">💾 保存配色</button>
+                        <select id="sleep-color-combo-select" onchange="applySleepColorComboFromSelect(this)"
+                            class="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white max-w-[180px]">
+                            <option value="">载入配色...</option>
+                        </select>
+                        <button type="button" onclick="deleteSleepColorCombo()"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-200" title="删除当前选中的配色组合">🗑</button>
                     </div>
                     <div class="rounded-xl border border-slate-700 overflow-hidden bg-slate-900 relative">
                         <img id="sleep-preview-img" alt="Sleep 卡片预览" class="w-full block hidden">
@@ -403,6 +415,150 @@ function resetSleepColor(key) {
     scheduleSleepPreview();
 }
 
+// --- Sleep 随机配色 / 配色组合（configs/sleep_color_presets/，后端只存取） ---
+const SLEEP_COLOR_KEYS = Object.keys(SLEEP_COLOR_DEFAULTS);
+
+function _hslToHex(h, s, l) {  // h:0-360, s/l:0-100 → '#rrggbb'
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const to255 = x => Math.round(255 * x).toString(16).padStart(2, '0');
+    return '#' + to255(f(0)) + to255(f(8)) + to255(f(4));
+}
+
+const _rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+
+// 完全随机：约一半浅色系（柔和底+白卡）、一半深色系（深底+亮字）；
+// 同族槽位共享基础色相，点缀槽位（en_b/num/badge_bg）跳色相撞色，保证可读性对比度
+function _randomSleepPalette() {
+    const dark = Math.random() < 0.5;
+    const h = _rnd(0, 360);
+    const acc = (h + (Math.random() < 0.5 ? _rnd(120, 180) : -_rnd(120, 180)) + 360) % 360;
+    const leaf = (h + _rnd(-40, 40) + 360) % 360;
+    if (dark) {
+        return {
+            sleep_color_bg_top: _hslToHex(h, _rnd(35, 65), _rnd(9, 13)),
+            sleep_color_bg_bottom: _hslToHex(h, _rnd(40, 70), _rnd(13, 18)),
+            sleep_color_card: _hslToHex(h, _rnd(25, 45), _rnd(11, 16)),
+            sleep_color_card_border: _hslToHex(h, _rnd(35, 60), _rnd(38, 50)),
+            sleep_color_en_a: _hslToHex(h, _rnd(55, 80), _rnd(82, 90)),
+            sleep_color_en_b: _hslToHex(acc, _rnd(70, 90), _rnd(68, 78)),
+            sleep_color_phonetic: _hslToHex(h, _rnd(25, 40), _rnd(62, 72)),
+            sleep_color_zh: _hslToHex(h, _rnd(10, 25), _rnd(78, 86)),
+            sleep_color_num: _hslToHex(acc, _rnd(75, 95), _rnd(70, 80)),
+            sleep_color_badge_bg: _hslToHex(acc, _rnd(65, 90), _rnd(45, 58)),
+            sleep_color_badge_text: _hslToHex(h, _rnd(10, 25), _rnd(92, 97)),
+            sleep_color_channel: _hslToHex(leaf, _rnd(40, 60), _rnd(68, 78)),
+            sleep_color_leaf: _hslToHex(leaf, _rnd(35, 55), _rnd(55, 65)),
+        };
+    }
+    return {
+        sleep_color_bg_top: _hslToHex(h, _rnd(45, 70), _rnd(88, 93)),
+        sleep_color_bg_bottom: _hslToHex(h, _rnd(50, 75), _rnd(82, 87)),
+        sleep_color_card: _hslToHex(h, _rnd(15, 35), _rnd(97, 99)),
+        sleep_color_card_border: _hslToHex(h, _rnd(30, 50), _rnd(62, 72)),
+        sleep_color_en_a: _hslToHex(h, _rnd(45, 75), _rnd(14, 22)),
+        sleep_color_en_b: _hslToHex(acc, _rnd(75, 95), _rnd(42, 52)),
+        sleep_color_phonetic: _hslToHex(h, _rnd(35, 55), _rnd(42, 52)),
+        sleep_color_zh: _hslToHex(h, _rnd(8, 20), _rnd(20, 30)),
+        sleep_color_num: _hslToHex(acc, _rnd(80, 100), _rnd(58, 68)),
+        sleep_color_badge_bg: _hslToHex(acc, _rnd(65, 90), _rnd(75, 84)),
+        sleep_color_badge_text: '#ffffff',
+        sleep_color_channel: _hslToHex(leaf, _rnd(30, 50), _rnd(28, 40)),
+        sleep_color_leaf: _hslToHex(leaf, _rnd(45, 70), _rnd(82, 90)),
+    };
+}
+
+// 填字段 + 同步色盘 + 触发 change（走现有 1s 防抖自动保存）+ 刷新预览
+function _applySleepColors(colors) {
+    Object.entries(colors).forEach(([key, val]) => {
+        if (!SLEEP_COLOR_KEYS.includes(key)) return;
+        const txt = document.querySelector('[data-field="' + key + '"]');
+        if (!txt) return;
+        txt.value = String(val);
+        txt.dispatchEvent(new Event('change', {bubbles: true}));
+        const sw = document.querySelector('[data-colorof="' + key + '"]');
+        if (sw && _isValidHex(txt.value)) sw.value = txt.value.trim();
+    });
+    scheduleSleepPreview();
+}
+
+function randomSleepPalette() {
+    _applySleepColors(_randomSleepPalette());
+}
+
+let _sleepColorCombos = [];
+
+function loadSleepColorCombos() {
+    return fetch('/api/config/sleep_colors')
+        .then(r => r.json())
+        .then(data => {
+            _sleepColorCombos = data.combos || [];
+            const sel = document.getElementById('sleep-color-combo-select');
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = '载入配色...';
+            sel.appendChild(opt0);
+            _sleepColorCombos.forEach(c => {
+                const o = document.createElement('option');
+                o.value = c.name;
+                o.textContent = c.name;
+                sel.appendChild(o);
+            });
+            if (_sleepColorCombos.some(c => c.name === cur)) sel.value = cur;
+        }).catch(() => {});
+}
+
+function _collectSleepColors() {
+    const colors = {};
+    SLEEP_COLOR_KEYS.forEach(k => {
+        const el = document.querySelector('[data-field="' + k + '"]');
+        if (el && (el.value || '').trim()) colors[k] = el.value.trim();
+    });
+    return colors;
+}
+
+function saveSleepColorCombo() {
+    const colors = _collectSleepColors();
+    if (!Object.keys(colors).length) {
+        alert('当前没有已填写的配色（全部为内置默认），先随机或手动填色后再保存');
+        return;
+    }
+    const name = prompt('配色组合名称:');
+    if (!name) return;
+    if (_sleepColorCombos.some(c => c.name === name) && !confirm('配色「' + name + '」已存在，覆盖?')) return;
+    fetch('/api/config/sleep_colors', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, colors})
+    }).then(r => r.json()).then(data => {
+        if (data.ok) loadSleepColorCombos();
+        else alert(data.error || '保存失败');
+    }).catch(() => alert('保存失败'));
+}
+
+function applySleepColorComboFromSelect(sel) {
+    if (!sel.value) return;
+    const combo = _sleepColorCombos.find(c => c.name === sel.value);
+    if (!combo) return;
+    _applySleepColors(combo.colors || {});
+}
+
+function deleteSleepColorCombo() {
+    const sel = document.getElementById('sleep-color-combo-select');
+    if (!sel || !sel.value) { alert('先在下拉中选中要删除的配色组合'); return; }
+    const combo = _sleepColorCombos.find(c => c.name === sel.value);
+    if (!combo) return;
+    if (!confirm('删除配色「' + combo.name + '」?')) return;
+    fetch('/api/config/sleep_colors/' + encodeURIComponent(combo.name), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(() => loadSleepColorCombos());
+}
+
 let _sleepPreviewTimer = null;
 let _sleepPreviewBusy = false;
 let _sleepPreviewDirty = false;
@@ -476,6 +632,7 @@ window.addEventListener('load', function() {
     toggleTTSFields(config.tts_engine || 'kokoro');
     toggleBGMGroups(config.bgm_ducking_mode || 'sidechain');
     initSleepColorInputs();
+    loadSleepColorCombos();
     refreshSleepPreview();
 });
 

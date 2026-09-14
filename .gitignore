@@ -42,6 +42,9 @@ configs/channel_assets/
 configs/intro_videos/
 configs/intro_library.json
 
+# Sleep color combo presets (config page random palette saves)
+configs/sleep_color_presets/
+
 # Pipeline run outputs
 output/
 

@@ -14,6 +14,7 @@ from ..config_manager import (
     get_active_mode, set_active_mode,
     get_default_config,
     list_presets, save_preset, load_preset, delete_preset,
+    list_sleep_color_presets, save_sleep_color_preset, delete_sleep_color_preset,
 )
 
 router = APIRouter()
@@ -177,3 +178,28 @@ async def api_sleep_preview_post(request: Request):
            if isinstance(k, str) and k.startswith("sleep_")}
     png = await asyncio.to_thread(_render_sleep_preview_png, cfg)
     return Response(content=png, media_type="image/png")
+
+
+# --- Sleep 配色组合（配置页「🎲 随机配色」的保存/载入/删除）---
+
+@router.get("/api/config/sleep_colors")
+async def api_sleep_colors_list():
+    return {"combos": list_sleep_color_presets()}
+
+
+@router.post("/api/config/sleep_colors")
+async def api_sleep_colors_save(request: Request):
+    data = await request.json()
+    name = str(data.get("name", "") or "").strip()
+    colors = data.get("colors")
+    if not name:
+        return JSONResponse({"ok": False, "error": "名称不能为空"}, status_code=400)
+    if not isinstance(colors, dict):
+        return JSONResponse({"ok": False, "error": "colors 需为对象"}, status_code=400)
+    safe = save_sleep_color_preset(name, colors)
+    return {"ok": True, "name": safe}
+
+
+@router.delete("/api/config/sleep_colors/{name}")
+async def api_sleep_colors_delete(name: str):
+    return {"ok": delete_sleep_color_preset(name)}

@@ -828,6 +828,54 @@ def delete_preset(name: str) -> None:
         path.unlink()
 
 
+# --- Sleep 配色组合（配置页 😴 Sleep 组「随机配色/保存配色」）---
+
+SLEEP_COLORS_DIR = CONFIGS_DIR / "sleep_color_presets"
+
+
+def _sanitize_combo_name(name: str) -> str:
+    return "".join(c for c in name if c.isalnum() or c in "-_") or "combo"
+
+
+def list_sleep_color_presets() -> list[dict[str, Any]]:
+    """全部配色组合 [{name, colors}]，按名称排序；单文件损坏跳过。"""
+    if not SLEEP_COLORS_DIR.exists():
+        return []
+    out = []
+    for f in sorted(SLEEP_COLORS_DIR.glob("*.json"), key=lambda p: p.stem):
+        try:
+            colors = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(colors, dict):
+            out.append({"name": f.stem, "colors": colors})
+    return out
+
+
+def save_sleep_color_preset(name: str, colors: dict[str, str]) -> str:
+    """保存/覆盖一个配色组合（颜色键→hex），返回落盘名称。"""
+    SLEEP_COLORS_DIR.mkdir(parents=True, exist_ok=True)
+    safe = _sanitize_combo_name(name)
+    (SLEEP_COLORS_DIR / f"{safe}.json").write_text(
+        json.dumps(colors, ensure_ascii=False, indent=2), encoding="utf-8")
+    return safe
+
+
+def load_sleep_color_preset(name: str) -> dict[str, str]:
+    path = SLEEP_COLORS_DIR / f"{_sanitize_combo_name(name)}.json"
+    if not path.exists():
+        raise FileNotFoundError(f"Sleep color preset '{name}' not found")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def delete_sleep_color_preset(name: str) -> bool:
+    path = SLEEP_COLORS_DIR / f"{_sanitize_combo_name(name)}.json"
+    if path.exists():
+        path.unlink()
+        return True
+    return False
+
+
 # --- Custom LLM Providers ---
 
 LLM_PROVIDERS_PATH = CONFIGS_DIR / "llm_providers.json"
