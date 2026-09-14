@@ -455,6 +455,14 @@ def _sleep_batch_pairs() -> int:
         return 50
 
 
+def _sleep_use_cache() -> bool:
+    """sleep 模式批次缓存开关：读 sleep 模式配置，默认开（复用已落盘批次）。"""
+    try:
+        return bool(load_mode_config("sleep").get("sleep_use_cache", True))
+    except (AttributeError, TypeError, ValueError):
+        return True
+
+
 def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
                   lessons_dir: str | None, max_attempts: int = 3):
     """Generate + validate a single script with retries. Returns (script, attempts)."""
@@ -469,7 +477,8 @@ def _generate_one(topic: str, cefr: str, structure: str, num_lines: int,
                 from sleep.llm_client_sleep import generate_sleep_script
                 script = generate_sleep_script(
                     topic, cefr, num_pairs=max(10, num_lines // 2),
-                    batch_pairs=_sleep_batch_pairs(), lessons_dir=lessons_dir)
+                    batch_pairs=_sleep_batch_pairs(), lessons_dir=lessons_dir,
+                    use_cache=_sleep_use_cache())
             elif story:
                 from story.llm_client_story import generate_story_script
                 script = generate_story_script(

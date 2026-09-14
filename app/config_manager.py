@@ -135,6 +135,10 @@ PARAM_SPEC = {
                           "modes": ["sleep"],
                           "label": "LLM 分批组数",
                           "help": "每批生成的对话组数（默认 50，批间落盘可断点续传）"},
+    "sleep_use_cache": {"default": True, "type": "checkbox", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "复用批次缓存",
+                        "help": "同主题+同 CEFR+同组数重跑时复用已生成批次（秒级出稿、中断续传）；关闭=每次现场重新生成新内容"},
     "sleep_channel_name": {"default": "English with me", "type": "text", "group": "sleep",
                            "modes": ["sleep"],
                            "label": "频道名",
@@ -1084,6 +1088,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
             args += [_sf, str(_sv)]
     if config.get("sleep_show_leaves") is False:
         args.append("--no-sleep-show-leaves")
+    if config.get("sleep_use_cache") is False:
+        args.append("--no-sleep-use-cache")
     if config.get("sleep_intro") is False:
         args.append("--no-sleep-intro")
     if config.get("sleep_bg_image"):

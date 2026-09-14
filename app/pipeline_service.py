@@ -1272,6 +1272,7 @@ class PipelineService:
             sleep_gap_long=float(config.get("sleep_gap_long", 2.0) or 2.0),
             sleep_pair_gap=float(config.get("sleep_pair_gap", 3.0) or 3.0),
             sleep_batch_pairs=_cfg_int(config, "sleep_batch_pairs", 50, 10, 80),
+            sleep_use_cache=bool(config.get("sleep_use_cache", True)),
             sleep_channel_name=str(config.get("sleep_channel_name", "") or ""),
             sleep_outro_text=str(config.get("sleep_outro_text", "") or ""),
             sleep_show_leaves=bool(config.get("sleep_show_leaves", True)),

@@ -163,7 +163,7 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                                 story=False, family_file=None,
                                 story_kind=None,
                                 sleep=False, sleep_pairs=0, sleep_batch=50,
-                                sleep_cache_dir=None,
+                                sleep_cache_dir=None, sleep_use_cache=True,
                                 max_attempts=5) -> dict:
     """Generate and validate script, retrying on failure."""
     for attempt in range(max_attempts):
@@ -175,7 +175,8 @@ def _generate_script_with_retry(topic, cefr, lessons_dir, num_lines,
                                                num_pairs=int(sleep_pairs or num_lines // 2),
                                                batch_pairs=int(sleep_batch),
                                                lessons_dir=lessons_dir,
-                                               cache_dir=sleep_cache_dir)
+                                               cache_dir=sleep_cache_dir,
+                                               use_cache=bool(sleep_use_cache))
             elif story:
                 from story.llm_client_story import generate_story_script
                 script = generate_story_script(topic, cefr, lessons_dir=lessons_dir,
@@ -290,6 +291,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-bg-layer", default="bottom", help="sleep 模式：背景图层级 bottom=底层衬底（默认，渐变之上白卡之下）/ top=第二级（盖过白卡/边框/叶片，文字角标序号仍在最上层）")
     parser.add_argument("--sleep-outro-text", default="Thanks for listening. See you next time!", help="sleep 模式：片尾结束语（TTS+卡片）")
     parser.add_argument("--sleep-batch-pairs", type=int, default=50, help="sleep 模式：LLM 分批生成每批组数（默认 50）")
+    parser.add_argument("--sleep-use-cache", action=argparse.BooleanOptionalAction, default=True, help="sleep 模式：复用已落盘批次缓存（同主题+同 CEFR+同组数重跑秒级出稿、中断续传；关闭=每次现场重新生成新内容，默认开）")
     parser.add_argument("--sleep-show-leaves", action=argparse.BooleanOptionalAction, default=True, help="sleep 模式：卡片叶片装饰（默认开）")
     parser.add_argument("--sleep-handwrite-font", default="", help="sleep 模式：手写体字体文件路径（缺省 Inkfree→Segoe Script→msyhbd）")
     parser.add_argument("--sleep-color-bg-top", default="", help="sleep 模式：背景渐变顶部 hex（空=内置默认）")
@@ -748,7 +750,8 @@ def _step0_script(args, checkpoint: dict, topic: str, parent_dir: Path,
                 sleep=(args.structure == "sleep"),
                 sleep_pairs=int(getattr(args, "sleep_pairs", 200)),
                 sleep_batch=int(getattr(args, "sleep_batch_pairs", 50)),
-                sleep_cache_dir=str(parent_dir / ".sleep_cache"))
+                sleep_cache_dir=str(parent_dir / ".sleep_cache"),
+                sleep_use_cache=bool(getattr(args, "sleep_use_cache", True)))
             yt_title = script.get("youtube_title", script.get("title", topic))
             safe_title = _safe_dirname(yt_title, topic)
             work_dir = parent_dir / safe_title

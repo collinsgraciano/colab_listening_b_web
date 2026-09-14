@@ -184,11 +184,13 @@ def _generate_batch(topic, cefr, count, start_idx, total_pairs, max_words,
 
 def generate_sleep_script(topic: str, cefr: str = "A2", num_pairs: int = 200,
                           batch_pairs: int = 50, lessons_dir: str = None,
-                          cache_dir: str = None) -> dict:
+                          cache_dir: str = None,
+                          use_cache: bool = True) -> dict:
     """分批生成 sleep 脚本，返回 listening 兼容 script dict。
 
     批间落盘 cache_dir（默认 lessons_dir 或系统临时目录）——中断后重跑同
-    topic/cefr/num_pairs 自动复用已成功批次。
+    topic/cefr/num_pairs 自动复用已成功批次；use_cache=False 跳过读取，
+    每批现场重新生成（落盘写入保留，便于之后重新开启复用）。
     """
     num_pairs = max(10, min(400, int(num_pairs)))
     batch_pairs = max(10, min(80, int(batch_pairs)))
@@ -205,11 +207,13 @@ def generate_sleep_script(topic: str, cefr: str = "A2", num_pairs: int = 200,
     while start < num_pairs:
         count = min(batch_pairs, num_pairs - start)
         batch_file = cdir / f"sleep_{ck}_{start:04d}.json"
-        if batch_file.exists():
+        if use_cache and batch_file.exists():
             print(f"  [Sleep] Batch cache hit: {batch_file.name}")
             data = json.loads(batch_file.read_text(encoding="utf-8"))
             batch, pairs = data.get("batch", {}), data.get("pairs", [])
         else:
+            if not use_cache and start == 0:
+                print("  [Sleep] Batch cache disabled — regenerating fresh content")
             batch, pairs = _generate_batch(topic, cefr, count, start, num_pairs,
                                            max_words, with_meta=(start == 0),
                                            temperature=0.85)
