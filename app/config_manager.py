@@ -190,6 +190,10 @@ PARAM_SPEC = {
                          "modes": ["sleep"],
                          "label": "背景图不透明度(%)",
                          "help": "0-100，默认 20=图片以 20% 不透明度衬在渐变背景上；建议 10-35 保持文字可读"},
+    "sleep_4k_native": {"default": False, "type": "checkbox", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "原生 4K 渲染",
+                        "help": "开启后卡片直接按 3840x2160 渲染、成片即 4K（文字像素级清晰，跳过 Step6 放大）；默认关=720p 合成后放大。开启会显著增加编码耗时"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -981,6 +985,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
         args.append("--no-sleep-show-leaves")
     if config.get("sleep_bg_image"):
         args.append("--sleep-bg-image")
+    if config.get("sleep_4k_native"):
+        args.append("--sleep-4k-native")
 
     # LLM
     provider = config.get("llm_provider", "sensenova")

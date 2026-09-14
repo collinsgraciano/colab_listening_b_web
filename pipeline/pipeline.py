@@ -297,6 +297,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-bg-image", action="store_true", help="sleep 模式：开启背景图片（低透明度叠加在渐变背景上）")
     parser.add_argument("--sleep-bg-image-path", default="", help="sleep 模式：背景图固定本地路径（填了共用；空=按本期主题 AI 生成）")
     parser.add_argument("--sleep-bg-opacity", type=int, default=20, help="sleep 模式：背景图不透明度百分比（0-100，默认 20）")
+    parser.add_argument("--sleep-4k-native", action="store_true", help="sleep 模式：卡片原生 3840x2160 渲染（成片即 4K，文字像素级清晰；默认关=720p 合成后 Step6 放大）")
     parser.add_argument("--host-character", default="", choices=["", "char_a", "char_b"],
                         help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
     parser.add_argument("--host-bg-prompt", default="",
@@ -1463,6 +1464,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             outro_text=str(getattr(args, "sleep_outro_text", "") or ""),
             num_pairs=int(getattr(args, "sleep_pairs", 200)),
             intro_video=str(tts_results.get("intro_video", "") or ""),
+            native_4k=bool(getattr(args, "sleep_4k_native", False)),
             progress_cb=progress_cb,
             stop_check=stop_check,
         )
@@ -1757,6 +1759,22 @@ def _step6_4k(args, checkpoint: dict, work_dir: Path, final_path: str,
     if _step_done(checkpoint, "step6_4k") and final_4k_path.exists():
         print("  [Resume] 4K video already exists, skipping...")
         return final_4k_path
+    # 已 4K 守卫（sleep 原生 4K 模式成片即 4K）：硬链接产出 _4K 文件，
+    # 零重编码且保持运行页「复制 4K 路径 / 混BGM 4K」等下游语义不变
+    try:
+        from media_utils import probe_resolution
+        _w, _h = probe_resolution(str(final_path))
+        if _w >= 3800:
+            print(f"  [4K] 源视频已是 {_w}x{_h} —— 链接产出 _4K 文件（跳过放大）")
+            try:
+                os.link(final_path, final_4k_path)
+            except OSError:
+                import shutil as _sh
+                _sh.copy2(final_path, final_4k_path)
+            _save_checkpoint(work_dir, "step6_4k")
+            return final_4k_path
+    except Exception:
+        pass  # 探测/链接失败 → 落回常规放大路径
     try:
         # 新增引擎选项：ai = Real-ESRGAN animevideov3 本地超分（默认 ffmpeg 原路径不变）
         engine = str(getattr(args, "upscale_engine", "ffmpeg") or "ffmpeg")

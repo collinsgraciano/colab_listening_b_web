@@ -1275,6 +1275,7 @@ class PipelineService:
             sleep_bg_image=bool(config.get("sleep_bg_image", False)),
             sleep_bg_image_path=str(config.get("sleep_bg_image_path", "") or ""),
             sleep_bg_opacity=_cfg_int(config, "sleep_bg_opacity", 20, 0, 100),
+            sleep_4k_native=bool(config.get("sleep_4k_native", False)),
             ch3_en_repeats=_cfg_int(config, "ch3_en_repeats", 3),
             ch3_zh_repeats=_cfg_int(config, "ch3_zh_repeats", 1),
             ch3_zh_always=bool(config.get("ch3_zh_always", True)),
@@ -1818,6 +1819,24 @@ class PipelineService:
             print("=" * 60)
             print(f"Generate4K: {run_dir.name}")
             print(f"  源视频: {Path(final_path).name}")
+            # 已 4K 守卫（sleep 原生 4K 成片即 4K）：直接链接产出，零重编码
+            try:
+                from media_utils import probe_resolution
+                _w, _h = probe_resolution(str(final_path))
+                if _w >= 3800:
+                    print(f"  [4K] 源视频已是 {_w}x{_h} —— 链接产出 _4K 文件（跳过放大）")
+                    try:
+                        os.link(final_path, four_k_path)
+                    except OSError:
+                        import shutil as _sh
+                        _sh.copy2(final_path, four_k_path)
+                    with self._lock:
+                        self.status = "done"
+                        self.finished_at = time.time()
+                    print(f"Generate4K DONE! {four_k_path.name} (linked, 0s)")
+                    return
+            except Exception:
+                pass  # 探测失败 → 落回常规放大
             tmp_path.unlink(missing_ok=True)
             r = None
             ai_done = False

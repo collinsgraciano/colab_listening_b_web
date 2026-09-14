@@ -4,18 +4,27 @@
 filter_complex 内统一 aresample/立体声后 concat 单编码 aac）→ 200+ 个均匀
 块（libx264/yuv420p/25fps/aac 44100 立体声）走 media_utils.concat_segments。
 文字全部预渲染进卡片 → 无字幕烧录步骤；末尾 apply_final_loudnorm 原地归一。
+
+native_4k=True 时卡片按 3840x2160 原生渲染、块直接编码 4K（文字像素级
+清晰，跳过 Step 6 lanczos 放大）；False 输出与历史版本逐字节一致（720p）。
 """
 import os
 import shutil
 import subprocess
 from pathlib import Path
 
-from media_utils import (VF_NORM, apply_final_loudnorm, concat_segments,
-                         get_duration, safe_filename)
+from media_utils import (TARGET_H, TARGET_W, apply_final_loudnorm,
+                         concat_segments, get_duration, safe_filename)
 from sleep.sleep_cards import (render_intro_card, render_outro_card,
                                render_pair_card)
 
 BLOCK_TIMEOUT = 600
+
+
+def _output_vf(out_w: int, out_h: int) -> str:
+    """按输出分辨率构造 scale/pad（720p 时与 media_utils.VF_NORM 一致）。"""
+    return (f"scale={out_w}:{out_h}:force_original_aspect_ratio=decrease,"
+            f"pad={out_w}:{out_h}:(ow-iw)/2:(oh-ih)/2")
 
 
 def _run_ffmpeg(cmd: list[str]) -> subprocess.CompletedProcess:
@@ -61,11 +70,12 @@ def _build_audio_chain(block_segs: list[dict], audio_paths: dict) -> tuple[str, 
     return fg, inputs
 
 
-def _build_video_block(intro_video: str, block_segs: list[dict], out_path: str) -> None:
+def _build_video_block(intro_video: str, block_segs: list[dict], out_path: str,
+                       vf: str) -> None:
     """绑定片头视频时的 intro 块：整段转码统一规格（音画随片头自带）。"""
     block_dur = round(sum(float(seg.get("duration", 0.0)) for seg in block_segs), 3)
     cmd = ["ffmpeg", "-y", "-i", intro_video,
-           "-vf", VF_NORM,
+           "-vf", vf,
            "-t", f"{block_dur:.3f}",
            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -76,7 +86,7 @@ def _build_video_block(intro_video: str, block_segs: list[dict], out_path: str) 
 
 
 def _build_block(card_path: str, block_segs: list[dict], audio_paths: dict,
-                 out_path: str) -> None:
+                 out_path: str, vf: str) -> None:
     """构建一个块 mp4（静态卡 + 音频链）。"""
     block_dur = round(sum(float(seg.get("duration", 0.0)) for seg in block_segs), 3)
     fg, inputs = _build_audio_chain(block_segs, audio_paths)
@@ -85,7 +95,7 @@ def _build_block(card_path: str, block_segs: list[dict], audio_paths: dict,
     cmd += ["-filter_complex", fg,
             "-map", "0:v:0", "-map", "[aout]",
             "-t", f"{block_dur:.3f}",
-            "-vf", VF_NORM,
+            "-vf", vf,
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25",
             "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
             out_path]
@@ -97,26 +107,33 @@ def _build_block(card_path: str, block_segs: list[dict], audio_paths: dict,
 
 def _ensure_cards(timeline: list[dict], script: dict, cards_dir: Path,
                   theme: dict, channel_name: str, badge_text: str,
-                  outro_text: str, num_pairs: int) -> dict:
-    """文件级续传渲染卡片。返回 {card_key: path}，key: intro/0001../outro。"""
+                  outro_text: str, num_pairs: int,
+                  w: int = TARGET_W, h: int = TARGET_H) -> dict:
+    """文件级续传渲染卡片。返回 {card_key: path}，key: intro/0001../outro。
+
+    4K 卡片文件名带 _4k 后缀，避免误复用历史 720p 卡片（跨尺寸续传错尺寸）。
+    """
     cards_dir.mkdir(parents=True, exist_ok=True)
+    suffix = "_4k" if w != TARGET_W else ""
     cards: dict[str, str] = {}
-    intro_path = str(cards_dir / "intro_card.png")
+    intro_path = str(cards_dir / f"intro_card{suffix}.png")
     if not os.path.exists(intro_path):
-        render_intro_card(theme, intro_path, channel_name, badge_text)
+        render_intro_card(theme, intro_path, channel_name, badge_text, w=w, h=h)
     cards["intro"] = intro_path
     dialogue = script.get("dialogue", [])
     rows_a, rows_b = dialogue[0::2], dialogue[1::2]
     for i in range(1, num_pairs + 1):
-        path = str(cards_dir / f"card_{i:04d}.png")
+        path = str(cards_dir / f"card_{i:04d}{suffix}.png")
         if not os.path.exists(path):
             a = rows_a[i - 1] if i <= len(rows_a) else {}
             b = rows_b[i - 1] if i <= len(rows_b) else {}
-            render_pair_card(a, b, i, theme, path, channel_name, badge_text)
+            render_pair_card(a, b, i, theme, path, channel_name, badge_text,
+                             w=w, h=h)
         cards[str(i).zfill(4)] = path
-    outro_path = str(cards_dir / "outro_card.png")
+    outro_path = str(cards_dir / f"outro_card{suffix}.png")
     if not os.path.exists(outro_path):
-        render_outro_card(theme, outro_path, outro_text, channel_name, badge_text)
+        render_outro_card(theme, outro_path, outro_text, channel_name, badge_text,
+                          w=w, h=h)
     cards["outro"] = outro_path
     return cards
 
@@ -125,9 +142,15 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
                   audio_results: dict, cards_dir: str, theme: dict,
                   channel_name: str = "English with me", badge_text: str = "EN",
                   outro_text: str = "", num_pairs: int = 0,
-                  intro_video: str = "",
+                  intro_video: str = "", native_4k: bool = False,
                   progress_cb=None, stop_check=None) -> str:
-    """合成 sleep 成片。返回最终 mp4 路径（videos/{safe}.mp4）。"""
+    """合成 sleep 成片。返回最终 mp4 路径（videos/{safe}.mp4）。
+
+    native_4k=True：卡片原生 3840x2160 渲染 + 块编码 4K（成片即 4K，
+    下游 Step 6 检测已 4K 自动硬链接跳过放大）。
+    """
+    out_w, out_h = (3840, 2160) if native_4k else (TARGET_W, TARGET_H)
+    vf = _output_vf(out_w, out_h)
     work = Path(work_dir)
     vid_dir = work / "videos"
     vid_dir.mkdir(parents=True, exist_ok=True)
@@ -141,9 +164,10 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
 
     pairs_in_tl = [seg for seg in timeline if seg.get("type") == "pair"]
     max_pair = max((int(seg.get("pair", 0)) for seg in pairs_in_tl), default=0)
-    _cb(2, f"Rendering cards (pairs={max_pair})...")
+    _cb(2, f"Rendering cards (pairs={max_pair}, {out_w}x{out_h})...")
     cards = _ensure_cards(timeline, script, Path(cards_dir), theme,
-                          channel_name, badge_text, outro_text, max_pair)
+                          channel_name, badge_text, outro_text, max_pair,
+                          w=out_w, h=out_h)
 
     # --- 时间轴 → 块序列：intro | [5 pair + 5 gap]* | outro ---
     blocks: list[list[dict]] = []
@@ -185,17 +209,17 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
         if not (os.path.exists(out_path) and os.path.getsize(out_path) > 1000):
             try:
                 if is_intro_video:
-                    _build_video_block(intro_video, block_segs, out_path)
+                    _build_video_block(intro_video, block_segs, out_path, vf)
                 else:
-                    _build_block(card, block_segs, audio_results, out_path)
+                    _build_block(card, block_segs, audio_results, out_path, vf)
             except RuntimeError as e:
                 if str(e) == "stopped":
                     raise
                 print(f"  [Sleep] Block {bi} failed ({e}), retry once...")
                 if is_intro_video:
-                    _build_video_block(intro_video, block_segs, out_path)
+                    _build_video_block(intro_video, block_segs, out_path, vf)
                 else:
-                    _build_block(card, block_segs, audio_results, out_path)
+                    _build_block(card, block_segs, audio_results, out_path, vf)
         block_paths.append(out_path)
         if bi % 10 == 0 or bi == total - 1:
             _cb(int(2 + bi / total * 78),
