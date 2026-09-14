@@ -178,6 +178,18 @@ PARAM_SPEC = {
                             "modes": ["sleep"], "label": "频道名颜色", "help": "hex"},
     "sleep_color_leaf": {"default": "", "type": "color", "group": "sleep",
                          "modes": ["sleep"], "label": "叶片颜色", "help": "hex"},
+    "sleep_bg_image": {"default": False, "type": "checkbox", "group": "sleep",
+                       "modes": ["sleep"],
+                       "label": "背景图片",
+                       "help": "开启后在渐变背景上低透明度叠加主题相关图片；无固定图时按本期主题 AI 生成 1 张（走「🎨MCP/图片」生图 Provider 通道）"},
+    "sleep_bg_image_path": {"default": "", "type": "text", "group": "sleep",
+                            "modes": ["sleep"],
+                            "label": "背景图固定路径",
+                            "help": "本地图片绝对路径；开启背景图后填了=所有视频共用该固定图，留空=按本期主题 AI 生成"},
+    "sleep_bg_opacity": {"default": 20, "type": "number", "group": "sleep",
+                         "modes": ["sleep"],
+                         "label": "背景图不透明度(%)",
+                         "help": "0-100，默认 20=图片以 20% 不透明度衬在渐变背景上；建议 10-35 保持文字可读"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -959,12 +971,16 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
                      ("sleep_color_badge_bg", "--sleep-color-badge-bg"),
                      ("sleep_color_badge_text", "--sleep-color-badge-text"),
                      ("sleep_color_channel", "--sleep-color-channel"),
-                     ("sleep_color_leaf", "--sleep-color-leaf")):
+                     ("sleep_color_leaf", "--sleep-color-leaf"),
+                     ("sleep_bg_image_path", "--sleep-bg-image-path"),
+                     ("sleep_bg_opacity", "--sleep-bg-opacity")):
         _sv = config.get(_sk)
         if _sv not in (None, ""):
             args += [_sf, str(_sv)]
     if config.get("sleep_show_leaves") is False:
         args.append("--no-sleep-show-leaves")
+    if config.get("sleep_bg_image"):
+        args.append("--sleep-bg-image")
 
     # LLM
     provider = config.get("llm_provider", "sensenova")

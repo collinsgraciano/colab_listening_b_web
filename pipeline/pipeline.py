@@ -294,6 +294,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-color-badge-text", default="", help="sleep 模式：角标文字色 hex")
     parser.add_argument("--sleep-color-channel", default="", help="sleep 模式：频道名颜色 hex")
     parser.add_argument("--sleep-color-leaf", default="", help="sleep 模式：叶片颜色 hex")
+    parser.add_argument("--sleep-bg-image", action="store_true", help="sleep 模式：开启背景图片（低透明度叠加在渐变背景上）")
+    parser.add_argument("--sleep-bg-image-path", default="", help="sleep 模式：背景图固定本地路径（填了共用；空=按本期主题 AI 生成）")
+    parser.add_argument("--sleep-bg-opacity", type=int, default=20, help="sleep 模式：背景图不透明度百分比（0-100，默认 20）")
     parser.add_argument("--host-character", default="", choices=["", "char_a", "char_b"],
                         help="Original Cutout only: bind the host appearance/voice to a dialogue character for intro/outro segments (''= generate a separate host)")
     parser.add_argument("--host-bg-prompt", default="",
@@ -832,7 +835,8 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
 
     image_prompts = []
     if is_sleep:
-        # sleep：零生图（画面全部 Pillow 卡片渲染），TTS 是 Step 2 唯一产物
+        # sleep：画面全部 Pillow 卡片渲染，常规图集/场景零生图（可选背景图
+        # 在下方 sleep TTS 块内生成，走 sleep.bg_image 独立通道）
         pass
     elif is_story:
         # story：画面 = 姿势图集（按出场角色）+ 多场景 atlas；无 char_scene/host_bg
@@ -931,6 +935,35 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
                       f"({tts_results['intro_dur']:.1f}s)")
             else:
                 print(f"  [Sleep] WARNING: 片头视频不存在: {intro_src} —— 回退默认片头")
+        # 背景图（增强功能，失败不中断运行）：固定路径优先，留空按主题 AI 生成；
+        # 产物 images/sleep_bg.png，Step 5 build_theme 注入后卡片低透明度混入
+        if getattr(args, "sleep_bg_image", False) and not quick_test \
+                and not tts_results.get("fatal_error"):
+            _fixed_bg = str(getattr(args, "sleep_bg_image_path", "") or "").strip()
+            if _fixed_bg and os.path.exists(_fixed_bg):
+                print(f"  [SleepBG] 使用固定背景图: {_fixed_bg}")
+            else:
+                if _fixed_bg:
+                    print(f"  [SleepBG] WARNING: 固定背景图不存在: {_fixed_bg}"
+                          " —— 回退按主题 AI 生成")
+                import sensenova_image
+                if sensenova_image.get_image_provider() != "sensenova":
+                    # Step 1 对 sleep 跳过了 MCP 初始化 —— 按需初始化（照缩略图先例）
+                    raw_tokens = args.mcp_tokens or args.mcp_token or ""
+                    _toks = [t.strip() for t in raw_tokens.split(",") if t.strip()]
+                    if _toks:
+                        try:
+                            initialize(tokens=_toks)
+                        except Exception as e:
+                            print(f"  [SleepBG] MCP 初始化失败: {e} —— 回退纯渐变")
+                    else:
+                        print("  [SleepBG] 未配置 MCP Token —— 跳过 AI 背景图"
+                              "（配置页填 mcp_tokens 或切 sensenova 后可用）")
+                from sleep.bg_image import ensure_sleep_bg_image
+                ensure_sleep_bg_image(
+                    str(img_dir), scene, style_prompt,
+                    mcp_call_tool=call_tool, mcp_parse_task_id=parse_task_id,
+                    mcp_poll_task=poll_task, mcp_download_file=download_file)
     elif resume_result is not None:
         tts_results, image_urls = resume_result
     elif qt_tts is not None:
@@ -1411,13 +1444,19 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
     if args.structure == "sleep":
         from sleep.sleep_cards import build_theme
         from sleep.video_compose_sleep import compose_sleep
+        _theme = build_theme(vars(args))
+        if getattr(args, "sleep_bg_image", False) and not _theme.get("bg_image_path"):
+            # 自动模式：Step 2 生成的 images/sleep_bg.png 注入主题（存在才生效）
+            _auto_bg = str(work_dir / "images" / "sleep_bg.png")
+            if os.path.exists(_auto_bg):
+                _theme["bg_image_path"] = _auto_bg
         final_path = compose_sleep(
             work_dir=str(work_dir),
             timeline=timeline,
             script=script,
             audio_results=tts_results,
             cards_dir=str(work_dir / "cards"),
-            theme=build_theme(vars(args)),
+            theme=_theme,
             channel_name=str(getattr(args, "sleep_channel_name", "")
                              or "English with me"),
             badge_text="EN",

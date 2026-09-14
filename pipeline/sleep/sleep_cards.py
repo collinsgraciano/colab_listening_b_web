@@ -68,7 +68,7 @@ def color_defaults() -> dict[str, str]:
 
 
 def build_theme(cfg: dict) -> dict:
-    """配置 dict（含 sleep_color_* / sleep_show_leaves 键）→ 渲染主题 dict。"""
+    """配置 dict（含 sleep_color_* / sleep_show_leaves / 背景图键）→ 渲染主题 dict。"""
     cfg = cfg or {}
     theme = dict(DEFAULT_THEME)
     for ck, tk in CONFIG_COLOR_KEYS.items():
@@ -77,6 +77,13 @@ def build_theme(cfg: dict) -> dict:
             theme[tk] = v
     theme["show_leaves"] = bool(cfg.get("sleep_show_leaves", True))
     theme["handwrite_font"] = str(cfg.get("sleep_handwrite_font", "") or "").strip()
+    # 背景图（低透明度衬底）：开关 + 固定路径 + 不透明度（渲染时路径无效自动忽略）
+    theme["bg_image"] = bool(cfg.get("sleep_bg_image", False))
+    theme["bg_image_path"] = str(cfg.get("sleep_bg_image_path", "") or "").strip()
+    try:
+        theme["bg_opacity"] = max(0.0, min(1.0, float(cfg.get("sleep_bg_opacity", 20) or 0) / 100.0))
+    except (TypeError, ValueError):
+        theme["bg_opacity"] = 0.2
     return theme
 
 
@@ -177,6 +184,37 @@ def _draw_leaves(base: Image.Image, theme: dict) -> None:
     base.paste(layer, (0, 0), layer)
 
 
+def _blend_bg_image(base: Image.Image, theme: dict) -> Image.Image:
+    """背景图低透明度混合：cover 铺满 → 按 bg_opacity 叠在渐变之上。
+
+    路径无效/开启失败静默回退原底（背景图是增强功能）。
+    """
+    path = str(theme.get("bg_image_path", "") or "")
+    opacity = float(theme.get("bg_opacity", 0.2))
+    if not path or opacity <= 0:
+        return base
+    if not os.path.exists(path):
+        print(f"  [SleepCards] 背景图不存在，忽略: {path}")
+        return base
+    try:
+        img = Image.open(path).convert("RGB")
+        scale = max(base.width / img.width, base.height / img.height)
+        nw = max(1, int(img.width * scale + 0.5))
+        nh = max(1, int(img.height * scale + 0.5))
+        img = img.resize((nw, nh), Image.LANCZOS)
+        x = (nw - base.width) // 2
+        y = (nh - base.height) // 2
+        img = img.crop((x, y, x + base.width, y + base.height))
+        overlay = img.convert("RGBA")
+        overlay.putalpha(int(255 * min(1.0, opacity)))
+        out = base.convert("RGBA")
+        out.alpha_composite(overlay)
+        return out.convert("RGB")
+    except Exception as e:  # noqa: BLE001 — 任何图片问题都回退纯渐变
+        print(f"  [SleepCards] WARNING: 背景图混合失败（忽略）: {e}")
+        return base
+
+
 def _draw_background(w: int, h: int, theme: dict) -> Image.Image:
     top = _hex_rgb(theme["bg_top"], (234, 244, 226))
     bottom = _hex_rgb(theme["bg_bottom"], (217, 237, 207))
@@ -185,6 +223,8 @@ def _draw_background(w: int, h: int, theme: dict) -> Image.Image:
         t = y / max(1, h - 1)
         base.paste(tuple(int(top[c] + (bottom[c] - top[c]) * t) for c in range(3)),
                    [0, y, w, y + 1])
+    if theme.get("bg_image"):
+        base = _blend_bg_image(base, theme)
     _draw_leaves(base, theme)
     return base
 
