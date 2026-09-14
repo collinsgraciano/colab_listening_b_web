@@ -82,12 +82,32 @@ class _LineBuffer(io.StringIO):
         pass
 
 
-def _cfg_int(config: dict, key: str, default: int) -> int:
-    """配置值安全转 int（空串/非法值回退默认），并 clamp 到 0-10。"""
+def _cfg_int(config: dict, key: str, default: int, lo: int = 0, hi: int = 10) -> int:
+    """配置值安全转 int（空串/非法值回退默认），并 clamp 到 [lo, hi]。
+
+    默认边界 0-10 供小整数（QA 轮数/重复次数等）沿用；大数值参数
+    （sleep_pairs/sleep_batch_pairs/max_line_words 等）必须显式传边界，
+    否则会被默认钳制成 10（曾致 sleep_pairs=200 实际只生成 10 组）。
+    """
     try:
-        return max(0, min(10, int(config.get(key, default))))
+        return max(lo, min(hi, int(config.get(key, default))))
     except (TypeError, ValueError):
         return default
+
+
+def _cfg_line_words(config: dict) -> int:
+    """max_line_words 配置解析：空/0/缺省 → 默认 10，非 0 值 clamp [4, 20]。
+
+    语义与 llm_client.resolve_max_line_words 对齐（0=用默认而非钳到下限）。
+    """
+    raw = config.get("max_line_words", 10)
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return 10
+    if v <= 0:
+        return 10
+    return max(4, min(20, v))
 
 
 def _resolve_sleep_intro_video(config: dict) -> str:
@@ -1167,7 +1187,7 @@ class PipelineService:
         if num_lines is None:
             if structure == "sleep":
                 # 行数 = 组数×2（与 pipeline.main() 双处一致；--num-lines 对 sleep 不生效）
-                num_lines = max(10, min(400, _cfg_int(config, "sleep_pairs", 200))) * 2
+                num_lines = _cfg_int(config, "sleep_pairs", 200, 10, 400) * 2
             else:
                 num_lines = (150 if mode_name in ("story", "story_sprite") else 48) \
                     if structure == "quest" else 18
@@ -1204,7 +1224,7 @@ class PipelineService:
             topic=config.get("topic", "") or None,
             cefr=config.get("cefr", "A2"),
             num_lines=num_lines,
-            max_line_words=_cfg_int(config, "max_line_words", 10),
+            max_line_words=_cfg_line_words(config),
             structure=structure,
             mode_name=mode_name,
             animation=animation,
@@ -1228,13 +1248,13 @@ class PipelineService:
             used_topics_file=config.get("used_topics_file", "") or None,
             lessons_dir=config.get("lessons_dir", "") or None,
             practice_duration=float(config.get("practice_duration", 3.0)),
-            sleep_pairs=max(10, min(400, _cfg_int(config, "sleep_pairs", 200))),
+            sleep_pairs=_cfg_int(config, "sleep_pairs", 200, 10, 400),
             sleep_slow_rate=float(config.get("sleep_slow_rate", 0.8) or 0.8),
             sleep_male_rate=float(config.get("sleep_male_rate", 1.0) or 1.0),
             sleep_gap_short=float(config.get("sleep_gap_short", 1.0) or 1.0),
             sleep_gap_long=float(config.get("sleep_gap_long", 2.0) or 2.0),
             sleep_pair_gap=float(config.get("sleep_pair_gap", 3.0) or 3.0),
-            sleep_batch_pairs=_cfg_int(config, "sleep_batch_pairs", 50),
+            sleep_batch_pairs=_cfg_int(config, "sleep_batch_pairs", 50, 10, 80),
             sleep_channel_name=str(config.get("sleep_channel_name", "") or ""),
             sleep_outro_text=str(config.get("sleep_outro_text", "") or ""),
             sleep_show_leaves=bool(config.get("sleep_show_leaves", True)),
