@@ -14,17 +14,23 @@ SLEEP_SEG_TYPES = ("intro", "pair", "gap", "outro")
 
 def build_sleep_timeline(script: dict, audio: dict, num_pairs: int,
                          gap_short: float = 1.0, gap_long: float = 2.0,
-                         pair_gap: float = 3.0) -> list[dict]:
+                         pair_gap: float = 3.0, include_intro: bool = True,
+                         card_lead: float = 0.0) -> list[dict]:
     """由 prepare_sleep_audio 结果构建线性时间轴。
 
     每组段序（gap 与参考视频一致）：
     a_m → g_short → a_slow → g_long → b_m → g_short → b_slow → g_long
     → combo → pair_gap。
+
+    include_intro=False 时不生成 intro 段（片头开关）；
+    card_lead>0 时每组首段 a_m 的 duration = 卡片提前量 + 音频时长
+    （画面先于朗读出现，compose 在该段音频链前插等长静音）。
     """
     timeline: list[dict] = []
-    intro_dur = float(audio.get("intro_dur", 0.0))
-    timeline.append({"type": "intro", "duration": round(intro_dur, 3),
-                     "subtitle_en": "", "subtitle_zh": "", "pair": 0, "step": ""})
+    if include_intro:
+        intro_dur = float(audio.get("intro_dur", 0.0))
+        timeline.append({"type": "intro", "duration": round(intro_dur, 3),
+                         "subtitle_en": "", "subtitle_zh": "", "pair": 0, "step": ""})
 
     pair_durs = audio.get("pair_durs", {})
     dialogue = script.get("dialogue", [])
@@ -41,9 +47,12 @@ def build_sleep_timeline(script: dict, audio: dict, num_pairs: int,
                       "b_m": (text_b, zh_b), "b_slow": (text_b, zh_b),
                       "combo": (f"{text_a} {text_b}", f"{zh_a} {zh_b}")}
         for si, step in enumerate(PAIR_STEPS):
+            dur = float(durs[step])
+            if step == "a_m" and card_lead > 0:
+                dur += float(card_lead)
             timeline.append({
                 "type": "pair", "step": step, "pair": i,
-                "duration": round(float(durs[step]), 3),
+                "duration": round(dur, 3),
                 "subtitle_en": step_texts[step][0],
                 "subtitle_zh": step_texts[step][1],
             })

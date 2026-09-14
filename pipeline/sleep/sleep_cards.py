@@ -88,6 +88,25 @@ def build_theme(cfg: dict) -> dict:
         theme["bg_opacity"] = max(0.0, min(1.0, float(cfg.get("sleep_bg_opacity", 20) or 0) / 100.0))
     except (TypeError, ValueError):
         theme["bg_opacity"] = 0.2
+    # 背景图层级：bottom=底层衬底（渐变之上、白卡之下，现状）；
+    # top=第二级（整幅盖过白卡/边框/叶片，文字/角标/序号仍绘制在最上层）
+    theme["bg_layer"] = ("top" if str(cfg.get("sleep_bg_layer", "") or "")
+                         .strip().lower() == "top" else "bottom")
+    # 句子区排版：font_scale=字号缩放（100=原大，clamp 60-160）；
+    # line_spacing=英文行距 px@720p（默认 14，clamp 0-48）；
+    # letter_spacing=字距 px@720p（默认 0，clamp 0-24，作用于英文/音标/中文）
+    try:
+        theme["font_scale"] = min(1.6, max(0.6, float(cfg.get("sleep_font_scale", 100) or 100) / 100.0))
+    except (TypeError, ValueError):
+        theme["font_scale"] = 1.0
+    try:
+        theme["line_spacing"] = min(48, max(0, int(cfg.get("sleep_line_spacing", 14))))
+    except (TypeError, ValueError):
+        theme["line_spacing"] = 14
+    try:
+        theme["letter_spacing"] = min(24, max(0, int(cfg.get("sleep_letter_spacing", 0))))
+    except (TypeError, ValueError):
+        theme["letter_spacing"] = 0
     return theme
 
 
@@ -101,27 +120,49 @@ def _handwrite_path(theme: dict) -> str:
     return FONT_EN
 
 
+def _tracked_bbox_w(draw: ImageDraw.ImageDraw, text: str, font,
+                    spacing: float) -> float:
+    """带字距的文本显示宽度（textbbox 宽 + 字符间隔；spacing<=0 与原一致）。"""
+    box = draw.textbbox((0, 0), text, font=font)
+    w = box[2] - box[0]
+    if spacing and len(text) > 1:
+        w += spacing * (len(text) - 1)
+    return w
+
+
+def _draw_tracked(draw: ImageDraw.ImageDraw, xy: tuple, text: str, font,
+                  fill, spacing: float) -> None:
+    """带字距绘制：逐字符推进 x；spacing<=0 走整串 draw.text 保持像素一致。"""
+    x, y = xy
+    if not spacing or len(text) <= 1:
+        draw.text((x, y), text, font=font, fill=fill)
+        return
+    for ch in text:
+        draw.text((x, y), ch, font=font, fill=fill)
+        x += draw.textlength(ch, font=font) + spacing
+
+
 def _fit_font(draw: ImageDraw.ImageDraw, text: str, font_path: str,
-              start_size: int, min_size: int, max_w: int) -> ImageFont.FreeTypeFont:
+              start_size: int, min_size: int, max_w: int,
+              spacing: float = 0.0) -> ImageFont.FreeTypeFont:
     size = start_size
     while size > min_size:
         font = ImageFont.truetype(font_path, size)
-        box = draw.textbbox((0, 0), text, font=font)
-        if box[2] - box[0] <= max_w:
+        if _tracked_bbox_w(draw, text, font, spacing) <= max_w:
             return font
         size -= 4
     return ImageFont.truetype(font_path, min_size)
 
 
-def _wrap_words(draw: ImageDraw.ImageDraw, text: str, font, max_w: int) -> list[str]:
+def _wrap_words(draw: ImageDraw.ImageDraw, text: str, font, max_w: int,
+                spacing: float = 0.0) -> list[str]:
     words = text.split()
     if not words:
         return [""]
     lines, cur = [], words[0]
     for wd in words[1:]:
         trial = f"{cur} {wd}"
-        box = draw.textbbox((0, 0), trial, font=font)
-        if box[2] - box[0] <= max_w:
+        if _tracked_bbox_w(draw, trial, font, spacing) <= max_w:
             cur = trial
         else:
             lines.append(cur)
@@ -133,30 +174,38 @@ def _wrap_words(draw: ImageDraw.ImageDraw, text: str, font, max_w: int) -> list[
 def _draw_text_block(img: Image.Image, draw: ImageDraw.ImageDraw, en: str,
                      phonetic: str, zh: str, cy: int, en_color, theme: dict,
                      en_start: int = 72, s: float = 1.0) -> None:
-    """居中一块：EN 大字 → IPA（cambria）→ 繁中。s = 分辨率缩放系数。"""
+    """居中一块：EN 大字 → IPA（cambria）→ 繁中。s = 分辨率缩放系数。
+
+    排版来自 theme：font_scale（字号缩放，1.0=原大）、line_spacing（英文
+    行距 px@720p，默认 14）、letter_spacing（字距 px@720p，默认 0，>0 时
+    逐字符绘制，作用于英文/音标/中文）。默认值与历史渲染逐像素一致。
+    """
     w = img.width
+    fs = float(theme.get("font_scale", 1.0) or 1.0)
+    sp = float(theme.get("letter_spacing", 0) or 0) * s
     max_w = w - int(240 * s)
-    en_font = _fit_font(draw, en, _FONT_EN_CARD, int(en_start * s), int(30 * s), max_w)
-    en_lines = _wrap_words(draw, en, en_font, max_w)
-    line_h = en_font.size + int(14 * s)
-    ph_font = ImageFont.truetype(FONT_PH, int(34 * s))
-    zh_font = ImageFont.truetype(FONT_ZH, int(42 * s))
+    en_font = _fit_font(draw, en, _FONT_EN_CARD, int(en_start * s * fs),
+                        int(30 * s), max_w, spacing=sp)
+    en_lines = _wrap_words(draw, en, en_font, max_w, spacing=sp)
+    line_h = en_font.size + int(theme.get("line_spacing", 14) * s)
+    ph_font = ImageFont.truetype(FONT_PH, int(34 * s * fs))
+    zh_font = ImageFont.truetype(FONT_ZH, int(42 * s * fs))
     ph_h = (ph_font.size + int(10 * s)) if phonetic else 0
     zh_h = (zh_font.size + int(12 * s)) if zh else 0
     y = cy - (len(en_lines) * line_h + ph_h + zh_h) / 2
     for ln in en_lines:
-        box = draw.textbbox((0, 0), ln, font=en_font)
-        draw.text(((w - (box[2] - box[0])) / 2, y), ln, font=en_font, fill=en_color)
+        tw = _tracked_bbox_w(draw, ln, en_font, sp)
+        _draw_tracked(draw, ((w - tw) / 2, y), ln, en_font, en_color, sp)
         y += line_h
     if phonetic:
-        box = draw.textbbox((0, 0), phonetic, font=ph_font)
-        draw.text(((w - (box[2] - box[0])) / 2, y), phonetic, font=ph_font,
-                  fill=_hex_rgb(theme["phonetic"], (125, 140, 30)))
+        tw = _tracked_bbox_w(draw, phonetic, ph_font, sp)
+        _draw_tracked(draw, ((w - tw) / 2, y), phonetic, ph_font,
+                      _hex_rgb(theme["phonetic"], (125, 140, 30)), sp)
         y += ph_h
     if zh:
-        box = draw.textbbox((0, 0), zh, font=zh_font)
-        draw.text(((w - (box[2] - box[0])) / 2, y), zh, font=zh_font,
-                  fill=_hex_rgb(theme["zh_text"], (58, 58, 58)))
+        tw = _tracked_bbox_w(draw, zh, zh_font, sp)
+        _draw_tracked(draw, ((w - tw) / 2, y), zh, zh_font,
+                      _hex_rgb(theme["zh_text"], (58, 58, 58)), sp)
 
 
 def _draw_leaf(base: Image.Image, cx: int, cy: int, lw: int, lh: int,
@@ -189,18 +238,11 @@ def _draw_leaves(base: Image.Image, theme: dict, s: float = 1.0) -> None:
     base.paste(layer, (0, 0), layer)
 
 
-def _blend_bg_image(base: Image.Image, theme: dict) -> Image.Image:
-    """背景图低透明度混合：cover 铺满 → 按 bg_opacity 叠在渐变之上。
-
-    路径无效/开启失败静默回退原底（背景图是增强功能）。
-    """
-    path = str(theme.get("bg_image_path", "") or "")
-    opacity = float(theme.get("bg_opacity", 0.2))
-    if not path or opacity <= 0:
-        return base
-    if not os.path.exists(path):
+def _bg_cover_rgba(base: Image.Image, path: str) -> Image.Image | None:
+    """载入背景图并 cover 缩放居中裁剪到 base 尺寸，返回 RGBA（失败 None）。"""
+    if not path or not os.path.exists(path):
         print(f"  [SleepCards] 背景图不存在，忽略: {path}")
-        return base
+        return None
     try:
         img = Image.open(path).convert("RGB")
         scale = max(base.width / img.width, base.height / img.height)
@@ -210,14 +252,45 @@ def _blend_bg_image(base: Image.Image, theme: dict) -> Image.Image:
         x = (nw - base.width) // 2
         y = (nh - base.height) // 2
         img = img.crop((x, y, x + base.width, y + base.height))
-        overlay = img.convert("RGBA")
-        overlay.putalpha(int(255 * min(1.0, opacity)))
-        out = base.convert("RGBA")
-        out.alpha_composite(overlay)
-        return out.convert("RGB")
+        return img.convert("RGBA")
     except Exception as e:  # noqa: BLE001 — 任何图片问题都回退纯渐变
-        print(f"  [SleepCards] WARNING: 背景图混合失败（忽略）: {e}")
+        print(f"  [SleepCards] WARNING: 背景图加载失败（忽略）: {e}")
+        return None
+
+
+def _blend_bg_image(base: Image.Image, theme: dict) -> Image.Image:
+    """背景图低透明度混合（bottom 层级）：cover 铺满 → 按 bg_opacity 叠在渐变之上。
+
+    路径无效/开启失败静默回退原底（背景图是增强功能）。
+    """
+    path = str(theme.get("bg_image_path", "") or "")
+    opacity = float(theme.get("bg_opacity", 0.2))
+    if not path or opacity <= 0:
         return base
+    overlay = _bg_cover_rgba(base, path)
+    if overlay is None:
+        return base
+    overlay.putalpha(int(255 * min(1.0, opacity)))
+    out = base.convert("RGBA")
+    out.alpha_composite(overlay)
+    return out.convert("RGB")
+
+
+def _overlay_bg_image(img: Image.Image, theme: dict) -> None:
+    """背景图第二级（top 层级）：整幅叠在白卡/边框/叶片之上。
+
+    文字/角标/序号在调用方随后绘制，仍处于最上层。不透明度沿用
+    sleep_bg_opacity（第二级建议 40-100 才有「整幅背景」效果）。
+    """
+    path = str(theme.get("bg_image_path", "") or "")
+    opacity = float(theme.get("bg_opacity", 0.2))
+    if not path or opacity <= 0:
+        return
+    cover = _bg_cover_rgba(img, path)
+    if cover is None:
+        return
+    cover.putalpha(int(255 * min(1.0, opacity)))
+    img.alpha_composite(cover)
 
 
 def _draw_background(w: int, h: int, theme: dict, s: float = 1.0) -> Image.Image:
@@ -228,7 +301,7 @@ def _draw_background(w: int, h: int, theme: dict, s: float = 1.0) -> Image.Image
         t = y / max(1, h - 1)
         base.paste(tuple(int(top[c] + (bottom[c] - top[c]) * t) for c in range(3)),
                    [0, y, w, y + 1])
-    if theme.get("bg_image"):
+    if theme.get("bg_image") and theme.get("bg_layer", "bottom") != "top":
         base = _blend_bg_image(base, theme)
     _draw_leaves(base, theme, s)
     return base
@@ -244,6 +317,9 @@ def _draw_card_base(theme: dict, w: int, h: int,
                            radius=int(36 * s), fill=_hex_rgb(theme["card"], (255, 255, 255)),
                            outline=_hex_rgb(theme["card_border"], (143, 176, 201)),
                            width=max(1, int(2 * s)))
+    if theme.get("bg_image") and theme.get("bg_layer") == "top":
+        # 第二级：白卡绘制后整幅叠加背景图，后续文字元素仍在其上
+        _overlay_bg_image(img, theme)
     return img, draw, card
 
 

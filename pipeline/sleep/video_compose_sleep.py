@@ -33,13 +33,15 @@ def _run_ffmpeg(cmd: list[str]) -> subprocess.CompletedProcess:
                           timeout=BLOCK_TIMEOUT)
 
 
-def _build_audio_chain(block_segs: list[dict], audio_paths: dict) -> tuple[str, list[str]]:
+def _build_audio_chain(block_segs: list[dict], audio_paths: dict,
+                       lead: float = 0.0) -> tuple[str, list[str]]:
     """块内音频 filter_complex：朗读文件 + 静音气口统一 44100 立体声 concat。
 
     返回 (filter_complex 字符串, ffmpeg 输入参数列表)。段音频按段类型查：
     pair → pair_paths[(pair, step)]；intro/outro → audio_paths["intro"/"outro"]；
     无音频段（gap）生成等长静音（anullsrc 须以 -f lavfi 输入，否则被当作
-    文件名导致整块失败）。
+    文件名导致整块失败）。lead>0 时组首段（a_m）朗读前先补 lead 秒静音
+    （卡片提前量：画面先出现、稍后出声；该段 timeline duration 已含 lead）。
     """
     inputs: list[str] = []
     chains: list[str] = []
@@ -58,6 +60,11 @@ def _build_audio_chain(block_segs: list[dict], audio_paths: dict) -> tuple[str, 
         elif seg_type == "outro":
             path = audio_paths.get("outro", "")
         if path and os.path.exists(path):
+            if seg_type == "pair" and seg.get("step") == "a_m" and lead > 0:
+                inputs += ["-f", "lavfi", "-i",
+                           f"anullsrc=r=44100:cl=stereo:d={lead:.3f}"]
+                concat_refs.append(f"[{n_in}:a]")
+                n_in += 1
             inputs += ["-i", path]
             chains.append(f"[{n_in}:a]aresample=44100,aformat=channel_layouts=stereo[a{n_in}]")
             concat_refs.append(f"[a{n_in}]")
@@ -86,10 +93,10 @@ def _build_video_block(intro_video: str, block_segs: list[dict], out_path: str,
 
 
 def _build_block(card_path: str, block_segs: list[dict], audio_paths: dict,
-                 out_path: str, vf: str) -> None:
+                 out_path: str, vf: str, lead: float = 0.0) -> None:
     """构建一个块 mp4（静态卡 + 音频链）。"""
     block_dur = round(sum(float(seg.get("duration", 0.0)) for seg in block_segs), 3)
-    fg, inputs = _build_audio_chain(block_segs, audio_paths)
+    fg, inputs = _build_audio_chain(block_segs, audio_paths, lead=lead)
     cmd = ["ffmpeg", "-y", "-loop", "1", "-i", card_path]
     cmd += inputs  # 已含 "-i <file>" 与 "-f lavfi -i anullsrc=..." 完整参数片段
     cmd += ["-filter_complex", fg,
@@ -116,10 +123,11 @@ def _ensure_cards(timeline: list[dict], script: dict, cards_dir: Path,
     cards_dir.mkdir(parents=True, exist_ok=True)
     suffix = "_4k" if w != TARGET_W else ""
     cards: dict[str, str] = {}
-    intro_path = str(cards_dir / f"intro_card{suffix}.png")
-    if not os.path.exists(intro_path):
-        render_intro_card(theme, intro_path, channel_name, badge_text, w=w, h=h)
-    cards["intro"] = intro_path
+    if any(seg.get("type") == "intro" for seg in timeline):
+        intro_path = str(cards_dir / f"intro_card{suffix}.png")
+        if not os.path.exists(intro_path):
+            render_intro_card(theme, intro_path, channel_name, badge_text, w=w, h=h)
+        cards["intro"] = intro_path
     dialogue = script.get("dialogue", [])
     rows_a, rows_b = dialogue[0::2], dialogue[1::2]
     for i in range(1, num_pairs + 1):
@@ -143,6 +151,7 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
                   channel_name: str = "English with me", badge_text: str = "EN",
                   outro_text: str = "", num_pairs: int = 0,
                   intro_video: str = "", native_4k: bool = False,
+                  card_lead: float = 0.0,
                   progress_cb=None, stop_check=None) -> str:
     """合成 sleep 成片。返回最终 mp4 路径（videos/{safe}.mp4）。
 
@@ -211,7 +220,8 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
                 if is_intro_video:
                     _build_video_block(intro_video, block_segs, out_path, vf)
                 else:
-                    _build_block(card, block_segs, audio_results, out_path, vf)
+                    _build_block(card, block_segs, audio_results, out_path, vf,
+                                 lead=card_lead)
             except RuntimeError as e:
                 if str(e) == "stopped":
                     raise
@@ -219,7 +229,8 @@ def compose_sleep(work_dir: str, timeline: list[dict], script: dict,
                 if is_intro_video:
                     _build_video_block(intro_video, block_segs, out_path, vf)
                 else:
-                    _build_block(card, block_segs, audio_results, out_path, vf)
+                    _build_block(card, block_segs, audio_results, out_path, vf,
+                                 lead=card_lead)
         block_paths.append(out_path)
         if bi % 10 == 0 or bi == total - 1:
             _cb(int(2 + bi / total * 78),

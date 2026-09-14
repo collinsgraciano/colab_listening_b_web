@@ -592,6 +592,22 @@ def _probe_video_duration(path: str) -> float | None:
         return None
 
 
+def _segment_grid_duration(path: str) -> float | None:
+    """段网格时长 = max(视频流时长, 音频流时长)——concat demuxer 的推进依据。
+
+    demuxer 按每文件各流时长的最大值推进下一段起点（实测视频流帧量化向上
+    时切点=max 流时长）。音频 PCM 必须按同一网格裁尾/补齐，否则：视频流
+    （ceil 到帧边界）> 音频流（mp3 解码短于容器时长 − AAC priming），每段
+    音频网格比视频网格短数十 ms，数百段累积秒级（sleep 静态卡片块 1000 块
+    实测音频比视频短 55s，语音大幅先于卡片出现）。
+    """
+    durs = [d for d in (_probe_video_duration(path), _probe_audio_duration(path))
+            if d is not None and d > 0]
+    if durs:
+        return max(durs)
+    return get_duration(path)
+
+
 # 对话段交叉溶解时长（8 帧 @25fps）。original_sprite 恒开；其余模式经
 # dialogue_xfade 配置开启（PARAM_SPEC video 组）。
 DIALOGUE_XFADE_SEC = 0.32
@@ -806,11 +822,12 @@ def concat_segments(segment_paths: list[str], output_path: str,
     （约 46ms），MP4 edit list 把展示时长裁剪到内容时长，但 demuxer copy 拼接
     推进下一段时按轨道原始时长计算 → 每段边界音频多推进约 40ms，几百段后累积
     2 秒以上，字幕（按 timeline 计划时间烧录）相对音频越来越提前。
-    因此音频走逐段解码路径（起点 priming 由 edit list 生效裁掉），再按容器
-    时长字节级裁尾后拼接 PCM 一次编码；视频流无此问题，仍 demuxer 纯 copy
-    零重编码。注意仅解码重编码不够：edit list 不裁尾部，解码会保留编码器
-    补齐到 AAC 帧边界的静音样本（平均 ~11ms/段，数百段仍累积秒级），且
-    atrim 等 filter 裁剪是整帧粒度裁不掉，必须在 PCM 字节层裁剪。
+    因此音频走逐段解码路径（起点 priming 由 edit list 生效裁掉），再按段网格
+    时长（max 视频流/音频流，与 demuxer 推进一致）字节级裁尾/补静音后拼接
+    PCM 一次编码；视频流无此问题，仍 demuxer 纯 copy 零重编码。注意仅解码
+    重编码不够：edit list 不裁尾部，解码会保留编码器补齐到 AAC 帧边界的
+    静音样本，且 atrim 等 filter 裁剪是整帧粒度裁不掉，必须在 PCM 字节层
+    裁剪/补齐。
 
     Returns the output path on success, raises RuntimeError on failure.
     """
@@ -849,13 +866,14 @@ def concat_segments(segment_paths: list[str], output_path: str,
                     audio_ok = False
                     break
                 data = r.stdout
-                seg_dur = _probe_audio_duration(str(s))
+                seg_dur = _segment_grid_duration(str(s))
                 if seg_dur is not None and seg_dur > 0:
                     want = int(round(seg_dur * _SR)) * _CH * _SW
                     if want < len(data):
                         data = data[:want]
                     elif want > len(data):
-                        # 解码短于容器时长（罕见）：补静音保持段网格对齐
+                        # 解码短于网格时长（常态：mp3 解码差 + 帧量化）：
+                        # 补静音保持音频网格与视频网格严格同格推进
                         data += b"\x00" * (want - len(data))
                 out_f.write(data)
         if audio_ok:

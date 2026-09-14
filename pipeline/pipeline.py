@@ -280,6 +280,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-pair-gap", type=float, default=3.0, help="sleep 模式：AB 连贯后切组停顿秒数（默认 3.0）")
     parser.add_argument("--sleep-channel-name", default="English with me", help="sleep 模式：卡片/片头频道名（同步作 TTS 播报）")
     parser.add_argument("--sleep-intro-video", default="", help="sleep 模式：片头视频 mp4 路径（片头库生成后绑定；空=默认静态卡片+频道名播报）")
+    parser.add_argument("--sleep-intro", action=argparse.BooleanOptionalAction, default=True,
+                        help="sleep 模式：是否生成片头（关闭=无 intro 段直接从第一组开始，片头库绑定同时失效；intro TTS 仍生成以保持缓存完整性）")
+    parser.add_argument("--sleep-card-lead", type=float, default=0.3,
+                        help="sleep 模式：卡片提前量秒数（每组画面先出现 N 秒再开始朗读，0=关闭，默认 0.3，clamp 0-2）")
+    parser.add_argument("--sleep-font-scale", type=int, default=100, help="sleep 模式：句子区字号缩放百分比（60-160，默认 100）")
+    parser.add_argument("--sleep-line-spacing", type=int, default=14, help="sleep 模式：句子区英文行距像素@720p（0-48，默认 14）")
+    parser.add_argument("--sleep-letter-spacing", type=int, default=0, help="sleep 模式：句子区字距像素@720p（0-24，默认 0，作用于英文/音标/中文）")
+    parser.add_argument("--sleep-bg-layer", default="bottom", help="sleep 模式：背景图层级 bottom=底层衬底（默认，渐变之上白卡之下）/ top=第二级（盖过白卡/边框/叶片，文字角标序号仍在最上层）")
     parser.add_argument("--sleep-outro-text", default="Thanks for listening. See you next time!", help="sleep 模式：片尾结束语（TTS+卡片）")
     parser.add_argument("--sleep-batch-pairs", type=int, default=50, help="sleep 模式：LLM 分批生成每批组数（默认 50）")
     parser.add_argument("--sleep-show-leaves", action=argparse.BooleanOptionalAction, default=True, help="sleep 模式：卡片叶片装饰（默认开）")
@@ -930,7 +938,9 @@ def _step2_images_tts(args, checkpoint: dict, script: dict, work_dir: Path, dirs
         # 片头库绑定：intro 视频拷入运行目录，timeline intro 段时长随视频
         # （intro TTS 照旧生成，音频完整性校验不变；绑定后 compose 不再消费它）
         intro_src = str(getattr(args, "sleep_intro_video", "") or "").strip()
-        if intro_src and not tts_results.get("fatal_error"):
+        if intro_src and not getattr(args, "sleep_intro", True):
+            print("  [Sleep] 片头已关闭（sleep_intro=False）—— 跳过片头视频绑定")
+        elif intro_src and not tts_results.get("fatal_error"):
             if os.path.exists(intro_src):
                 import shutil
                 intro_dst = work_dir / "intro_video.mp4"
@@ -1280,7 +1290,9 @@ def _step4_timeline(args, checkpoint: dict, script: dict, work_dir: Path,
             script, tts_results, int(getattr(args, "sleep_pairs", 200)),
             gap_short=float(getattr(args, "sleep_gap_short", 1.0)),
             gap_long=float(getattr(args, "sleep_gap_long", 2.0)),
-            pair_gap=float(getattr(args, "sleep_pair_gap", 3.0)))
+            pair_gap=float(getattr(args, "sleep_pair_gap", 3.0)),
+            include_intro=bool(getattr(args, "sleep_intro", True)),
+            card_lead=float(getattr(args, "sleep_card_lead", 0.3) or 0.0))
         # 字幕不上屏（文字预渲染进卡片）；SRT 仅作 sidecar 闭源字幕文件
         srt = build_sleep_srt(timeline)
     elif args.structure == "quest":
@@ -1471,6 +1483,7 @@ def _step5_compose(args, checkpoint: dict, script: dict, work_dir: Path, dirs: d
             num_pairs=int(getattr(args, "sleep_pairs", 200)),
             intro_video=str(tts_results.get("intro_video", "") or ""),
             native_4k=bool(getattr(args, "sleep_4k_native", False)),
+            card_lead=float(getattr(args, "sleep_card_lead", 0.3) or 0.0),
             progress_cb=progress_cb,
             stop_check=stop_check,
         )

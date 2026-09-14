@@ -1219,6 +1219,12 @@ class PipelineService:
         # tts_rate 为旧全局覆盖（兼容）；分项参数优先（tts_pipeline.resolve_tts_rate）
         tts_rate = config.get("tts_rate", "") or None
 
+        # sleep 卡片提前量（秒，0-2；空串/非法回退默认 0.3，0=出现即出声）
+        try:
+            sleep_card_lead = min(2.0, max(0.0, float(config.get("sleep_card_lead", 0.3))))
+        except (TypeError, ValueError):
+            sleep_card_lead = 0.3
+
         # mcp_tokens：模式配置为空时回落 legacy default.json / 本机 CLI 检测
         # （如 sleep 模式文件 seed 时未带 token；同 sensenova/openai key 空值回落先例）
         from .config_manager import resolve_mcp_tokens
@@ -1287,6 +1293,12 @@ class PipelineService:
             sleep_bg_image_path=str(config.get("sleep_bg_image_path", "") or ""),
             sleep_bg_opacity=_cfg_int(config, "sleep_bg_opacity", 20, 0, 100),
             sleep_4k_native=bool(config.get("sleep_4k_native", False)),
+            sleep_intro=bool(config.get("sleep_intro", True)),
+            sleep_card_lead=sleep_card_lead,
+            sleep_font_scale=_cfg_int(config, "sleep_font_scale", 100, 60, 160),
+            sleep_line_spacing=_cfg_int(config, "sleep_line_spacing", 14, 0, 48),
+            sleep_letter_spacing=_cfg_int(config, "sleep_letter_spacing", 0, 0, 24),
+            sleep_bg_layer=str(config.get("sleep_bg_layer", "") or "bottom"),
             ch3_en_repeats=_cfg_int(config, "ch3_en_repeats", 3),
             ch3_zh_repeats=_cfg_int(config, "ch3_zh_repeats", 1),
             ch3_zh_always=bool(config.get("ch3_zh_always", True)),

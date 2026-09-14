@@ -194,6 +194,32 @@ PARAM_SPEC = {
                         "modes": ["sleep"],
                         "label": "原生 4K 渲染",
                         "help": "开启后卡片直接按 3840x2160 渲染、成片即 4K（文字像素级清晰，跳过 Step6 放大）；默认关=720p 合成后放大。开启会显著增加编码耗时"},
+    "sleep_intro": {"default": True, "type": "checkbox", "group": "sleep",
+                    "modes": ["sleep"],
+                    "label": "片头",
+                    "help": "开启=片头（频道名卡片或片头库视频+播报）开头；关闭=无 intro 段直接从第一组开始，片头库绑定同时失效（YouTube 章节同步去掉 Intro）"},
+    "sleep_card_lead": {"default": 0.3, "type": "number", "group": "sleep",
+                        "modes": ["sleep"],
+                        "label": "卡片提前量(秒)",
+                        "help": "每组画面先出现 N 秒再开始朗读（0-2，默认 0.3，0=出现即出声）；TTS 音频自带约 0.3 秒前导静音，实际停顿略长"},
+    "sleep_font_scale": {"default": 100, "type": "number", "group": "sleep",
+                         "modes": ["sleep"],
+                         "label": "句子字号缩放(%)",
+                         "help": "A/B 句英文/音标/中文整体缩放（60-160，默认 100=原大）"},
+    "sleep_line_spacing": {"default": 14, "type": "number", "group": "sleep",
+                           "modes": ["sleep"],
+                           "label": "句子行距(px)",
+                           "help": "英文多行之间的行距（0-48，默认 14，@720p 基准，高分辨率等比缩放）"},
+    "sleep_letter_spacing": {"default": 0, "type": "number", "group": "sleep",
+                             "modes": ["sleep"],
+                             "label": "句子字距(px)",
+                             "help": "英文字符间距（0-24，默认 0；同样作用于音标与中文）"},
+    "sleep_bg_layer": {"default": "bottom", "type": "select", "group": "sleep",
+                       "modes": ["sleep"],
+                       "options": {"bottom": "底层衬底（默认：渐变之上、白卡之下）",
+                                   "top": "第二级（盖过白卡/边框/叶片，文字仍在最上层）"},
+                       "label": "背景图层级",
+                       "help": "需开启「背景图片」；第二级建议不透明度 40-100 才有整幅背景效果，A/B 句、频道名、角标、序号始终绘制在背景图之上"},
 
     # --- LLM ---
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
@@ -1047,12 +1073,19 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
                      ("sleep_color_channel", "--sleep-color-channel"),
                      ("sleep_color_leaf", "--sleep-color-leaf"),
                      ("sleep_bg_image_path", "--sleep-bg-image-path"),
-                     ("sleep_bg_opacity", "--sleep-bg-opacity")):
+                     ("sleep_bg_opacity", "--sleep-bg-opacity"),
+                     ("sleep_card_lead", "--sleep-card-lead"),
+                     ("sleep_font_scale", "--sleep-font-scale"),
+                     ("sleep_line_spacing", "--sleep-line-spacing"),
+                     ("sleep_letter_spacing", "--sleep-letter-spacing"),
+                     ("sleep_bg_layer", "--sleep-bg-layer")):
         _sv = config.get(_sk)
         if _sv not in (None, ""):
             args += [_sf, str(_sv)]
     if config.get("sleep_show_leaves") is False:
         args.append("--no-sleep-show-leaves")
+    if config.get("sleep_intro") is False:
+        args.append("--no-sleep-intro")
     if config.get("sleep_bg_image"):
         args.append("--sleep-bg-image")
     if config.get("sleep_4k_native"):
