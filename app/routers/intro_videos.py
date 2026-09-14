@@ -124,8 +124,14 @@ def _generate_worker(params: dict) -> None:
         subtitle = params["subtitle"]
         out_dir.mkdir(parents=True, exist_ok=True)
         _log(f"生成片头（{'AI 视频' if route == 'ai' else '本地动画'}）: {channel}")
-        bgm_path = _resolve_bgm(params["bgm"])
-        _log(f"BGM: {Path(bgm_path).name}" if bgm_path else "BGM: 无可用音乐（静音）")
+        # "none" = 用户显式不使用 BGM（成片时由 bgm_mix 统一混入，避免片头双重 BGM）；
+        # resolve_bgm 对未知名本就返回 ""，这里显式短路让日志语义准确
+        if str(params["bgm"]) == "none":
+            bgm_path = ""
+            _log("BGM: 不使用（成片生成时由 bgm_mix 统一混入）")
+        else:
+            bgm_path = _resolve_bgm(params["bgm"])
+            _log(f"BGM: {Path(bgm_path).name}" if bgm_path else "BGM: 无可用音乐（静音）")
         announce_path = ""
         if params["announce"]:
             _log("合成频道名播报 TTS ...")

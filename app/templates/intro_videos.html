@@ -27,8 +27,9 @@
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500">
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">BGM 配乐（bgm_music 库）</label>
+                <label class="text-xs text-slate-400 block mb-1">BGM 配乐（留空片头无声，成片时由 bgm_mix 统一混入）</label>
                 <select id="iv-bgm" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="none">🚫 不使用 BGM（成片时统一混入）</option>
                     <option value="">🎲 随机一首</option>
                 </select>
             </div>
@@ -104,8 +105,10 @@ async function loadAll() {
 async function loadBgm() {
     const d = await fetch('/api/intro_videos/bgm_list').then(r => r.json());
     const sel = document.getElementById('iv-bgm');
-    sel.innerHTML = '<option value="">🎲 随机一首</option>' + (d.files || []).map(f =>
-        `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+    sel.innerHTML = '<option value="none">🚫 不使用 BGM（成片时统一混入）</option>'
+        + '<option value="">🎲 随机一首</option>'
+        + (d.files || []).map(f =>
+            `<option value="${esc(f)}">${esc(f)}</option>`).join('');
 }
 
 // ---------- render ----------
