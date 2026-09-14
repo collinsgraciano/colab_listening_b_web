@@ -4,9 +4,11 @@
 - 本地路线：pipeline/sleep/intro_video.build_local_intro —— Pillow 逐帧渲染
   sleep 主题动画（渐变背景 + 叶片漂动 + 频道名淡入），零积分；
 - AI 路线：PageMcpSession generate_video（text_to_video / 时长可设 / 16:9 /
-  720p / 无音频）→ 下载 → finalize_ai_intro 标准化 + 频道名文字淡入叠加；
+  720p / 无音频）→ 下载 → finalize_ai_intro 标准化（频道名由 AI 画进画面，
+  本地不再叠加文字防重复）；
 - 提示词：POST /gen_prompts 仅凭频道名让 LLM 一次生成 5 个随机片头场景
-  提示词（prompt_en + desc_zh 简体中文说明），前端点选填入 AI 画面描述；
+  提示词（prompt_en 含频道名入画 title moment + desc_zh 简体中文说明），
+  前端点选填入 AI 画面描述；
 - 音频统一：BGM（bgm_music 库选一/随机）淡入淡出 + 可选频道名 TTS 播报
   （sleep 模式 tts_engine 合成，TTS_SYNTH_LOCK 内执行）；
 - 产物 configs/intro_videos/{id}/intro.mp4，索引 configs/intro_library.json；
@@ -94,9 +96,18 @@ def _parse_duration(v) -> float:
     return round(max(4.0, min(15.0, dur)), 1)
 
 
+def _build_ai_prompt(scene_prompt: str, channel: str) -> str:
+    """场景提示词 + 频道名入画约束（AI 画字需逐字母强调拼写，且为画面唯一文字）。"""
+    base = scene_prompt.strip() or _DEFAULT_AI_SCENE
+    name = (channel or "").strip() or "English with me"
+    return (base + f' The channel name "{name}" appears in the scene, spelled '
+            f'EXACTLY "{name}" letter-for-letter — it is the ONLY text allowed; '
+            "no other text, no captions, no watermarks.")
+
+
 def _generate_ai_video(scene_prompt: str, dest: Path,
-                       duration: float = 10.0) -> None:
-    """MCP generate_video 原始场景视频（无文字无音频，文字由本地叠加保证准确）。"""
+                       duration: float = 10.0, channel: str = "") -> None:
+    """MCP generate_video 原始场景视频（频道名由 AI 画进画面，无音频，播报本地混）。"""
     # token 解析链：sleep 模式配置 → legacy default.json → 本机 CLI 检测
     # （sleep 模式文件 mcp_tokens 可能为空）
     from ..config_manager import resolve_mcp_tokens
@@ -106,8 +117,7 @@ def _generate_ai_video(scene_prompt: str, dest: Path,
         raise RuntimeError("未配置 MCP Token（模式配置 / default.json / 本地检测均为空）"
                            "—— AI 片头需要 MCP，或改用本地动画路线")
     session = PageMcpSession(tokens).initialize()
-    prompt = (scene_prompt.strip() or _DEFAULT_AI_SCENE) + \
-        " No text, no letters, no words, no watermark in the scene."
+    prompt = _build_ai_prompt(scene_prompt, channel)
     _log(f"MCP generate_video 提交中（{duration:g}s / 720p / 16:9 / 无音频）...")
     result = session.call_tool("generate_video", {
         "mode": "text_to_video", "prompt": prompt,
@@ -162,13 +172,14 @@ def _generate_worker(params: dict) -> None:
         theme = build_theme(_sleep_cfg())
         if route == "ai":
             raw_path = out_dir / "raw.mp4"
-            _generate_ai_video(params["scene_prompt"], raw_path, dur)
+            _generate_ai_video(params["scene_prompt"], raw_path, dur, channel)
             from sleep.intro_video import finalize_ai_intro
             finalize_ai_intro(str(raw_path), channel, subtitle, str(final_path),
                               theme, bgm_path=bgm_path,
                               bgm_volume_db=params["bgm_volume_db"],
                               announce_path=announce_path,
                               duration=dur,
+                              overlay_text=False,
                               progress_cb=lambda p, m: _log(f"[{p}%] {m}"))
             try:
                 raw_path.unlink()
@@ -224,7 +235,7 @@ async def api_generate(request: Request):
         bgm_volume_db = max(-40.0, min(0.0, float(data.get("bgm_volume_db", -16))))
     except (TypeError, ValueError):
         bgm_volume_db = -16.0
-    announce = bool(data.get("announce", False))
+    announce = bool(data.get("announce", True))
     scene_prompt = str(data.get("scene_prompt", "") or "").strip()[:600]
     duration = _parse_duration(data.get("duration"))
 
@@ -263,13 +274,14 @@ _PROMPT_SYSTEM = (
 
 
 def _build_prompts_prompt(channel: str) -> str:
-    return f"""Create 5 clearly different ambient intro video scene concepts for a sleep-relaxation English learning YouTube channel named "{channel}". Audience: overseas Chinese ESL learners winding down before sleep.
+    name = (channel or "").strip() or "English with me"
+    return f"""Create 5 clearly different ambient intro video scene concepts for a sleep-relaxation English learning YouTube channel named "{name}". Audience: overseas Chinese ESL learners winding down before sleep.
 
-Each concept is an AI text-to-video prompt that will be rendered WITHOUT any on-screen text (the channel name is overlaid locally afterwards). Mood: calm, dreamy and peaceful — perfect for falling asleep.
+Each concept is an AI text-to-video prompt. Mood: calm, dreamy and peaceful — perfect for falling asleep. Every concept MUST feature ONE title moment: the channel name "{name}" appears in the scene, spelled EXACTLY "{name}".
 
 For each concept output:
-- "prompt_en": one rich English paragraph (60-110 words) describing ONE continuous very slow shot: the scene, lighting, color mood, art style (vary across concepts: soft 3D Pixar animation, dreamy pastel illustration, cinematic realism, watercolor, etc.), and a very slow gentle camera drift. Keep the central area of the frame visually calm and uncluttered (a title is overlaid there later). NEVER mention text, letters, words, captions, subtitles or watermarks — they are forbidden in the scene.
-- "desc_zh": 1-2 句简体中文，概括这段画面长什么样（让用户不看英文也能想象出视频的大致样子）。
+- "prompt_en": one rich English paragraph (70-120 words) describing ONE continuous very slow shot: the scene, lighting, color mood, art style (vary across concepts: soft 3D Pixar animation, dreamy pastel illustration, cinematic realism, watercolor, etc.), and a very slow gentle camera drift. Include the title moment: the channel name "{name}" appears within the first two seconds and stays visible — describe how it materializes and its lettering style (e.g. elegant glowing handwritten script traced by fireflies, soft 3D golden letters drifting out of the clouds, starlight gathering into letters). The channel name "{name}" is the ONLY text in the scene, spelled EXACTLY letter-for-letter — never any other words, letters, captions, subtitles or watermarks.
+- "desc_zh": 1-2 句简体中文，概括这段画面长什么样（含频道名如何出现，让用户不看英文也能想象出视频的大致样子）。
 
 The 5 concepts must span clearly different scenes/moods (for example: starry night sky with drifting clouds, cozy bedroom by a rainy window, moonlit forest, calm ocean waves at night, floating lanterns or dreamy clouds) — never two similar ones.
 

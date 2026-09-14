@@ -5,7 +5,8 @@
   叶片漂动 + 白色圆角卡 + 频道名手写体淡入 + 副题淡入 + EN 徽标；
 - AI 路线 finalize_ai_intro：调用方先用 PageMcpSession 生成/下载原始视频，
   本函数标准化（scale/pad 1280x720 → 25fps，原片短于目标时长尾帧冻结补齐）
-  + 透明文字 PNG 淡入叠加。
+  + 可选透明文字 PNG 淡入叠加（AI 路线频道名已画进画面时 overlay_text=False
+  防止出现两个频道名）。
 
 音频统一由 _audio_chain 构建：BGM（bgm_music 库选一）裁片头时长淡入淡出 +
 可选频道名 TTS 播报（合成由调用方完成，这里只混音）；两路线产物规格一致：
@@ -307,21 +308,34 @@ def finalize_ai_intro(src_video: str, channel_name: str, subtitle: str,
                       out_path: str, theme: dict, bgm_path: str = "",
                       bgm_volume_db: float = -16.0, announce_path: str = "",
                       duration: float = INTRO_DURATION,
+                      overlay_text: bool = True,
                       progress_cb=None) -> str:
-    """AI 原始视频 → 统一规格 + 频道名文字淡入叠加 + 音频。返回 out_path。"""
+    """AI 原始视频 → 统一规格 + 可选本地文字叠加 + 音频。返回 out_path。
+
+    overlay_text=False（AI 路线频道名已由画面内绘制）时跳过本地文字层，
+    避免与画面内文字重复出现两个频道名。
+    """
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    theme = dict(theme)
-    theme["_tmp_dir"] = str(out.parent)
-    text_png = _render_overlay_text(channel_name, subtitle, theme)
+    text_png = ""
+    if overlay_text:
+        theme = dict(theme)
+        theme["_tmp_dir"] = str(out.parent)
+        text_png = _render_overlay_text(channel_name, subtitle, theme)
     fg_audio, a_inputs = _audio_chain(bgm_path, announce_path, duration,
-                                      bgm_volume_db, start_idx=2)
-    fg = ("[0:v]scale=1280:720:force_original_aspect_ratio=decrease,"
+                                      bgm_volume_db,
+                                      start_idx=2 if text_png else 1)
+    bg = ("[0:v]scale=1280:720:force_original_aspect_ratio=decrease,"
           "pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25,"
-          f"tpad=stop_mode=clone:stop_duration={duration + 1.0:.1f}[bg];"
-          "[1:v]format=rgba,fade=t=in:st=0.5:d=0.9:alpha=1[txt];"
-          "[bg][txt]overlay=0:0[v];") + fg_audio
-    cmd = ["ffmpeg", "-y", "-i", src_video, "-loop", "1", "-i", text_png]
+          f"tpad=stop_mode=clone:stop_duration={duration + 1.0:.1f}")
+    if text_png:
+        fg = (bg + "[bg];"
+              "[1:v]format=rgba,fade=t=in:st=0.5:d=0.9:alpha=1[txt];"
+              "[bg][txt]overlay=0:0[v];") + fg_audio
+        cmd = ["ffmpeg", "-y", "-i", src_video, "-loop", "1", "-i", text_png]
+    else:
+        fg = bg + "[v];" + fg_audio
+        cmd = ["ffmpeg", "-y", "-i", src_video]
     cmd += a_inputs
     cmd += ["-filter_complex", fg, "-map", "[v]", "-map", "[aout]",
             "-t", f"{duration:.3f}",
@@ -330,10 +344,11 @@ def finalize_ai_intro(src_video: str, channel_name: str, subtitle: str,
             str(out)]
     _log("Standardizing AI intro video...", progress_cb, 80)
     r = _run_ffmpeg(cmd)
-    try:
-        os.remove(text_png)
-    except OSError:
-        pass
+    if text_png:
+        try:
+            os.remove(text_png)
+        except OSError:
+            pass
     if r.returncode != 0:
         raise RuntimeError(f"FFmpeg intro finalize failed: {(r.stderr or '')[-300:]}")
     _verify_intro(str(out), duration)
