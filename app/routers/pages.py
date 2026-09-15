@@ -437,6 +437,11 @@ async def ai_test_page(request: Request):
         "config": config,
         "active_page": "ai_test",
         "system_prompt": ai_cfg.get("system_prompt", ""),
+        # Provider / 模型清单唯一数据源（与 PARAM_SPEC 同步，避免前端硬编码漂移）
+        "provider_options": get_provider_options(),
+        "sensenova_models": PARAM_SPEC["sensenova_model"]["options"],
+        "openai_models": PARAM_SPEC["openai_model"]["options"],
+        "gemini_models": PARAM_SPEC["gemini_model"]["options"],
     })
 
 

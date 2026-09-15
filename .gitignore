@@ -29,6 +29,9 @@ configs/style_previews/
 # Batch queue runtime state (console batch video generation)
 configs/batch_queue.json
 
+# AI test playground state (system prompt)
+configs/ai_test_config.json
+
 # Quick-config panel field selection per mode (console user preference)
 configs/quick_config.json
 

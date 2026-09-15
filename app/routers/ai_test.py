@@ -15,6 +15,33 @@ from ..paths import AI_TEST_CONFIG_PATH
 router = APIRouter()
 
 
+def _mask_key(key: str) -> str:
+    """API Key 掩码（GET 一律不发明文）：保留前 3 / 后 4 位。"""
+    k = (key or "").strip()
+    if not k:
+        return ""
+    if len(k) <= 8:
+        return "*" * len(k)
+    return f"{k[:3]}***{k[-4:]}"
+
+
+def _mask_provider(provider: dict) -> dict:
+    """单个 Provider 的去敏视图：移除 api_key，补 api_key_masked / has_api_key。
+
+    编辑表单不回填明文 Key（留空 = 保留原值），故前端无需拿到原始 Key。
+    """
+    item = dict(provider)
+    raw = str(item.pop("api_key", "") or "")
+    item["api_key_masked"] = _mask_key(raw)
+    item["has_api_key"] = bool(raw.strip())
+    return item
+
+
+def _public_providers() -> list[dict]:
+    """Provider 列表的去敏视图（GET /providers、GET /config 共用）。"""
+    return [_mask_provider(p) for p in load_llm_providers()]
+
+
 def _load_ai_test_config() -> dict:
     defaults = {"system_prompt": ""}
     if AI_TEST_CONFIG_PATH.exists():
@@ -30,8 +57,10 @@ def _load_ai_test_config() -> dict:
 
 def _save_ai_test_config(cfg: dict) -> None:
     AI_TEST_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    AI_TEST_CONFIG_PATH.write_text(
+    tmp = AI_TEST_CONFIG_PATH.with_suffix(".json.tmp")
+    tmp.write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(AI_TEST_CONFIG_PATH)
 
 
 @router.get("/api/ai_test/config")
@@ -42,9 +71,10 @@ async def api_ai_test_config_get():
         "llm_provider": config.get("llm_provider", "sensenova"),
         "sensenova_model": config.get("sensenova_model", "deepseek-v4-flash"),
         "openai_model": config.get("openai_model", "grok-4.6"),
+        "gemini_model": config.get("gemini_model", "models/gemini-3.8-flash"),
         "openai_base_url": config.get("openai_base_url", ""),
         "system_prompt": ai_cfg.get("system_prompt", ""),
-        "custom_providers": load_llm_providers(),
+        "custom_providers": _public_providers(),
     }
 
 
@@ -62,7 +92,7 @@ async def api_ai_test_config_put(request: Request):
 
 @router.get("/api/ai_test/providers")
 async def api_providers_list():
-    return {"providers": load_llm_providers()}
+    return {"providers": _public_providers()}
 
 
 @router.post("/api/ai_test/providers")
@@ -85,7 +115,7 @@ async def api_providers_create(request: Request):
     }
     providers.append(provider)
     save_llm_providers(providers)
-    return {"ok": True, "provider": provider}
+    return {"ok": True, "provider": _mask_provider(provider)}
 
 
 @router.put("/api/ai_test/providers/{provider_id}")
@@ -108,14 +138,17 @@ async def api_providers_update(provider_id: str, request: Request):
     if "base_url" in data:
         target["base_url"] = data["base_url"].strip()
     if "api_key" in data:
-        target["api_key"] = data["api_key"].strip()
+        new_key = str(data["api_key"] or "").strip()
+        # 前端只回传掩码（或留空）= 用户未改动 → 保留原值
+        if new_key and new_key != _mask_key(target.get("api_key", "")):
+            target["api_key"] = new_key
     if "models" in data:
         if isinstance(data["models"], str):
             target["models"] = [m.strip() for m in data["models"].split(",") if m.strip()]
         else:
             target["models"] = data["models"]
     save_llm_providers(providers)
-    return {"ok": True, "provider": target}
+    return {"ok": True, "provider": _mask_provider(target)}
 
 
 @router.delete("/api/ai_test/providers/{provider_id}")
@@ -128,15 +161,19 @@ async def api_providers_delete(provider_id: str):
 
 @router.post("/api/ai_test/chat")
 async def api_ai_test_chat(request: Request):
-    """SSE streaming chat completion endpoint.
+    """Chat completion endpoint（与管线同一套 Provider 解析）。
 
-    Reads config for API keys, supports SenseNova and OpenAI-compatible providers.
-    Returns text/event-stream with token-level streaming.
+    SenseNova / OpenAI 兼容 / 自定义：SSE token 级流式。
+    Gemini：走 google-genai SDK（无流式接口 + 自带 429 模型降级链），
+    整段一次性作为单个 token 事件下发。
     """
     import urllib.request
     import urllib.error
 
-    data = await request.json()
+    try:
+        data = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        return JSONResponse({"error": "请求体不是合法 JSON"}, status_code=400)
     messages = [m for m in data.get("messages", [])
                 if isinstance(m, dict) and m.get("role")]
     system_prompt = data.get("system_prompt", "")
@@ -164,7 +201,7 @@ async def api_ai_test_chat(request: Request):
     if model:
         resolved_model = model
     model = resolved_model
-    # p_type is "sensenova" or "openai" (custom → openai)
+    # p_type is "sensenova" / "openai" (custom → openai) / "gemini"
     provider = p_type
 
     if not api_key:
@@ -175,6 +212,10 @@ async def api_ai_test_chat(request: Request):
         return JSONResponse(
             {"error": "未指定模型（该 Provider 未配置模型列表，请在自定义 Provider 中添加）"},
             status_code=400)
+    if provider != "gemini" and not base_url:
+        return JSONResponse(
+            {"error": f"Provider {provider} 未配置 Base URL，请在参数配置页面填写"},
+            status_code=400)
 
     # Build messages with system prompt
     full_messages = []
@@ -182,42 +223,63 @@ async def api_ai_test_chat(request: Request):
         full_messages.append({"role": "system", "content": system_prompt})
     full_messages.extend(messages)
 
-    body = {
-        "model": model,
-        "messages": full_messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": True,
-        "stream_options": {"include_usage": True},
-    }
-    if provider != "openai":
-        body["reasoning_effort"] = reasoning_effort
-
-    body_bytes = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=body_bytes,
-        method="POST",
+    # LLM 代理（全部 Provider 生效，含 Gemini）与共享限速槽位
+    from llm_client import (  # pipeline/ 已在 sys.path
+        _enforce_rate_limit, gemini_chat, llm_urlopen, proxy_url_from_config,
     )
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("User-Agent", "CodelyLLM/1.0")
-    # LLM 代理（全部 Provider 生效；SSE 流式读取行为不变）
-    from llm_client import llm_urlopen, proxy_url_from_config  # pipeline/ 已在 sys.path
     llm_proxy = proxy_url_from_config(load_config())
+    min_interval = float(config.get("llm_min_interval") or 3)
+
+    # Gemini 无 /chat/completions 端点（也不支持 SSE），走 SDK 分支
+    req = None
+    if provider != "gemini":
+        body = {
+            "model": model,
+            "messages": full_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        if provider != "openai":
+            body["reasoning_effort"] = reasoning_effort
+
+        body_bytes = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url}/chat/completions",
+            data=body_bytes,
+            method="POST",
+        )
+        req.add_header("Authorization", f"Bearer {api_key}")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", "CodelyLLM/1.0")
 
     import queue as _queue
 
     def _produce(q: "_queue.Queue") -> None:
-        """工作线程：阻塞读取上游 SSE 流。
+        """工作线程：阻塞读取上游流。
 
-        urllib 是同步 I/O，直接在 async generator（事件循环）里读会阻塞
+        urllib / SDK 都是同步 I/O，直接在 async generator（事件循环）里读会阻塞
         整个 Web 服务（包括运行中 pipeline 的日志 SSE），故移到线程中转。
         """
         import time as _time
         t0 = _time.time()
         usage_data = None
         try:
+            # 共享限速槽位（与 pipeline / 批量任务互认，避免并发打同一 Provider 触发 429）
+            _enforce_rate_limit(min_interval)
+            if provider == "gemini":
+                # SDK 无流式接口 → 整段一次性下发（前端 marked 渲染等价）
+                text = gemini_chat(
+                    api_key, model, full_messages,
+                    temperature=temperature, max_tokens=max_tokens,
+                    reasoning_effort=reasoning_effort, timeout=600,
+                    proxy_url=llm_proxy)
+                if text:
+                    q.put(("token", text))
+                q.put(("done", {"elapsed": round(_time.time() - t0, 2),
+                                "usage": None}))
+                return
             with llm_urlopen(req, 180, llm_proxy) as resp:
                 for raw_line in resp:
                     line = raw_line.decode("utf-8", errors="replace").strip()
