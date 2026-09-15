@@ -371,6 +371,11 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                         interaction = client.interactions.create(**kwargs)
                     except Exception as e:  # noqa: BLE001 — SDK/网络异常统一归类
                         code = getattr(e, "code", None)
+                        if code is None:
+                            # google-genai ≥2.23 interactions 兼容错误类
+                            # （RateLimitError 等）只带 status_code 不带 code，
+                            # 旧版 ClientError 仍带 code，两种都兼容
+                            code = getattr(e, "status_code", None)
                         if code in _GEMINI_FALLBACK_CODES:
                             # 该模型受限/不可用 → 降级到下一个更旧模型
                             failures.append(f"{current_model}: HTTP {code}")
