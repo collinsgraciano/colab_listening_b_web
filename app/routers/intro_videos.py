@@ -1,5 +1,5 @@
 """🎬 片头库 API — sleep 模式片头生成（本地动画 / MCP AI 视频，时长可设 4-15s）
-+ 库管理 + LLM 随机片头提示词生成。
++ 自定义片头上传 + 库管理 + LLM 随机片头提示词生成。
 
 - 本地路线：pipeline/sleep/intro_video.build_local_intro —— Pillow 逐帧渲染
   sleep 主题动画（渐变背景 + 叶片漂动 + 频道名淡入），零积分；
@@ -9,6 +9,8 @@
 - 提示词：POST /gen_prompts 仅凭频道名让 LLM 一次生成 5 个随机片头场景
   提示词（prompt_en 含频道名入画 title moment + desc_zh 简体中文说明），
   前端点选填入 AI 画面描述；
+- 上传：POST /upload 自带视频 → standardize_upload_intro 规格统一（保留
+  原声与原时长，无音轨补静音）→ source=upload 入库；
 - 音频统一：BGM（bgm_music 库选一/随机）淡入淡出 + 可选频道名 TTS 播报
   （sleep 模式 tts_engine 合成，TTS_SYNTH_LOCK 内执行）；
 - 产物 configs/intro_videos/{id}/intro.mp4，索引 configs/intro_library.json；
@@ -23,7 +25,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..config_manager import (load_config, load_mode_config, resolve_provider,
@@ -429,6 +431,58 @@ async def api_use(request: Request):
     cfg["sleep_intro_video"] = iid
     save_mode_config("sleep", cfg)
     return {"ok": True, "used": iid}
+
+
+_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
+_UPLOAD_EXTS = (".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi")
+
+
+@router.post("/api/intro_videos/upload")
+async def api_upload(video: UploadFile = File(...), name: str = Form("")):
+    """上传自定义片头 → 规格标准化入库（source=upload，保留原声与原时长）。
+
+    纯本地 ffmpeg 处理，与生成槽/MCP 互斥无关，同步返回。
+    """
+    filename = (video.filename or "").lower()
+    if not filename.endswith(_UPLOAD_EXTS):
+        return JSONResponse({"ok": False,
+                             "error": "仅支持 mp4/mov/webm/mkv/m4v/avi 视频文件"},
+                            status_code=400)
+    content = await video.read()
+    if len(content) < 10240:
+        return JSONResponse({"ok": False, "error": "视频文件过小"}, status_code=400)
+    if len(content) > _UPLOAD_MAX_BYTES:
+        return JSONResponse({"ok": False, "error": "视频过大（上限 200MB）"},
+                            status_code=400)
+    display = str(name or "").strip()[:60] \
+        or Path(filename).stem.strip()[:60] or "自定义片头"
+    intro_id = f"intro_{int(time.time() * 1000)}"
+    out_dir = INTRO_VIDEOS_DIR / intro_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = out_dir / f"_raw{Path(filename).suffix or '.mp4'}"
+    final_path = out_dir / "intro.mp4"
+    try:
+        raw_path.write_bytes(content)
+        from sleep.intro_video import standardize_upload_intro
+        dur = standardize_upload_intro(str(raw_path), str(final_path))
+    except Exception as e:  # noqa: BLE001 — 清理后原样返回错误
+        shutil.rmtree(out_dir, ignore_errors=True)
+        print(f"  [IntroLibrary] UPLOAD ERROR: {e}")
+        return JSONResponse({"ok": False,
+                             "error": f"片头标准化失败: {str(e)[:200]}"},
+                            status_code=500)
+    finally:
+        try:
+            raw_path.unlink()
+        except OSError:
+            pass
+    entry = {"id": intro_id, "name": display, "source": "upload",
+             "duration": round(dur, 2), "created": time.time()}
+    lib = load_library()
+    lib.insert(0, entry)
+    save_library(lib)
+    print(f"  [IntroLibrary] 片头上传入库: {intro_id} ({display}, {dur:.1f}s)")
+    return {"ok": True, "id": intro_id, "duration": round(dur, 2)}
 
 
 @router.delete("/api/intro_videos/{intro_id}")

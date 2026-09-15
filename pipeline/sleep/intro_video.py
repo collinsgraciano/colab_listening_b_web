@@ -6,7 +6,9 @@
 - AI 路线 finalize_ai_intro：调用方先用 PageMcpSession 生成/下载原始视频，
   本函数标准化（scale/pad 1280x720 → 25fps，原片短于目标时长尾帧冻结补齐）
   + 可选透明文字 PNG 淡入叠加（AI 路线频道名已画进画面时 overlay_text=False
-  防止出现两个频道名）。
+  防止出现两个频道名）；
+- 上传路线 standardize_upload_intro：用户自带视频 → 规格统一（保留原声
+  与原时长，无音轨补静音），source=upload 入库。
 
 音频统一由 _audio_chain 构建：BGM（bgm_music 库选一）裁片头时长淡入淡出 +
 可选频道名 TTS 播报（合成由调用方完成，这里只混音）；两路线产物规格一致：
@@ -22,7 +24,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from media_utils import FONT_ZH, TARGET_H, TARGET_W, VF_NORM, get_duration
+from media_utils import (FONT_ZH, TARGET_H, TARGET_W, VF_NORM, get_duration,
+                         has_audio)
 from sleep.sleep_cards import _draw_badge, _fit_font, _handwrite_path, _hex_rgb
 
 INTRO_DURATION = 10.0
@@ -356,5 +359,44 @@ def finalize_ai_intro(src_video: str, channel_name: str, subtitle: str,
     return str(out)
 
 
+def standardize_upload_intro(src_video: str, out_path: str,
+                             progress_cb=None) -> float:
+    """用户上传的自定义片头 → 统一规格。返回标准化后的时长（秒）。
+
+    保留原视频时长与原声（无音轨则补静音，sleep 块 concat 需要 aac 音轨），
+    不裁时长、不叠加文字、不混 BGM——用户上传什么就呈现什么，只统一规格：
+    1280x720 / 25fps / yuv420p / aac 44100 立体声。
+    """
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    vf = ("scale=1280:720:force_original_aspect_ratio=decrease,"
+          "pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25")
+    if has_audio(src_video):
+        fg = f"[0:v]{vf}[v];[0:a]aresample=44100,aformat=channel_layouts=stereo[aout]"
+        cmd = ["ffmpeg", "-y", "-i", src_video]
+    else:
+        # 补有限静音源（aevalsrc 自带 d=时长）：anullsrc 是无限源，
+        # 与 filter_complex 组合时 -shortest 不可靠会导致 ffmpeg 永不结束
+        dur_src = get_duration(src_video)
+        fg = f"[0:v]{vf}[v];[1:a]anull[aout]"
+        cmd = ["ffmpeg", "-y", "-i", src_video,
+               "-f", "lavfi", "-i",
+               f"aevalsrc=0:c=stereo:s=44100:d={max(0.1, dur_src):.3f}"]
+    cmd += ["-filter_complex", fg, "-map", "[v]", "-map", "[aout]",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(INTRO_FPS),
+            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+            str(out)]
+    _log("Standardizing uploaded intro...", progress_cb, 40)
+    r = _run_ffmpeg(cmd)
+    if r.returncode != 0:
+        raise RuntimeError(f"FFmpeg upload standardize failed: {(r.stderr or '')[-300:]}")
+    dur = get_duration(str(out))
+    if not os.path.exists(str(out)) or dur <= 0.3:
+        raise RuntimeError(f"标准化后的片头无效（时长 {dur:.2f}s）")
+    _log(f"Uploaded intro saved: {out.name} ({dur:.1f}s)", progress_cb, 100)
+    return dur
+
+
 __all__ = ["INTRO_DURATION", "INTRO_FPS", "build_local_intro",
-           "finalize_ai_intro", "list_bgm_files", "resolve_bgm"]
+           "finalize_ai_intro", "list_bgm_files", "resolve_bgm",
+           "standardize_upload_intro"]

@@ -6,7 +6,7 @@
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
         <div class="flex items-center gap-3 mb-1">
             <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🌙</span> 片头库</h2>
-            <span class="text-xs text-slate-500">片头生成（4-15 秒可设）→ 入库保存 → 绑定给 Sleep 模式反复使用</span>
+            <span class="text-xs text-slate-500">片头生成（4-15 秒可设）/ 上传自定义视频 → 入库保存 → 绑定给 Sleep 模式反复使用</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
             <div>
@@ -79,6 +79,29 @@
         <div id="prompts-hint" class="text-xs text-slate-500 mt-2 hidden">点选任意卡片 → 自动填入上方「AI 画面描述」并切到 AI 视频路线（生成前仍可手动微调文字）</div>
     </div>
 
+    <!-- ⬆️ 上传自定义片头 -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div class="flex items-center gap-3 flex-wrap">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">⬆️ 上传自定义片头
+                <span class="text-xs font-normal text-slate-500 hidden sm:inline">支持 mp4/mov/webm/mkv/m4v/avi（≤200MB），自动标准化 1280x720/25fps 并保留原声与原时长</span>
+            </h3>
+        </div>
+        <div class="flex items-end gap-3 mt-3 flex-wrap">
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">片头名称（留空用文件名）</label>
+                <input type="text" id="up-name" placeholder="例如：夜间星空版"
+                    class="w-56 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500">
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">视频文件</label>
+                <input type="file" id="up-file" accept=".mp4,.mov,.webm,.mkv,.m4v,.avi,video/mp4,video/quicktime,video/webm"
+                    class="text-sm text-slate-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-700 file:text-slate-200 file:cursor-pointer hover:file:bg-slate-600">
+            </div>
+            <button onclick="uploadIntro()" id="btn-upload"
+                class="px-5 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-white font-medium transition">⬆️ 上传入库</button>
+        </div>
+    </div>
+
     <!-- Task logs -->
     <div id="task-panel" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-4">
         <div class="text-sm font-medium text-white mb-2">⏳ 生成进度 <span id="task-status" class="text-xs text-slate-400 ml-2"></span></div>
@@ -108,6 +131,7 @@ let PROMPTS = [];
 let _promptsBusy = false;
 let _promptsTimer = null;
 let _selPrompt = -1;
+let _upBusy = false;
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -147,7 +171,9 @@ function renderGrid(usedId) {
             : `<div class="w-full aspect-video rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-xs text-slate-500">文件缺失</div>`;
         const srcBadge = p.source === 'ai'
             ? '<span class="px-1.5 py-0.5 bg-purple-900/60 text-purple-300 rounded text-[10px]">AI 视频</span>'
-            : '<span class="px-1.5 py-0.5 bg-emerald-900/60 text-emerald-300 rounded text-[10px]">本地动画</span>';
+            : (p.source === 'upload'
+                ? '<span class="px-1.5 py-0.5 bg-sky-900/60 text-sky-300 rounded text-[10px]">上传</span>'
+                : '<span class="px-1.5 py-0.5 bg-emerald-900/60 text-emerald-300 rounded text-[10px]">本地动画</span>');
         const tags = [
             srcBadge,
             p.duration ? `<span class="px-1.5 py-0.5 bg-slate-700 rounded text-[10px] text-slate-300">${esc(p.duration)}s</span>` : '',
@@ -308,6 +334,37 @@ function selectPrompt(i) {
     document.getElementById('iv-route').value = 'ai';
     toggleRoute();
     renderPrompts();
+}
+
+// ---------- upload ----------
+async function uploadIntro() {
+    if (_upBusy) return;
+    const fileInput = document.getElementById('up-file');
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) { alert('请先选择视频文件'); return; }
+    const btn = document.getElementById('btn-upload');
+    btn.disabled = true;
+    _upBusy = true;
+    btn.textContent = '⏳ 上传标准化中...';
+    try {
+        const fd = new FormData();
+        fd.append('video', f);
+        fd.append('name', document.getElementById('up-name').value.trim());
+        const resp = await fetch('/api/intro_videos/upload', { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        await loadAll();
+        fileInput.value = '';
+        document.getElementById('up-name').value = '';
+        btn.textContent = '✅ 已入库';
+        setTimeout(() => { btn.textContent = '⬆️ 上传入库'; }, 2500);
+    } catch (e) {
+        alert('上传失败: ' + e.message);
+        btn.textContent = '⬆️ 上传入库';
+    } finally {
+        _upBusy = false;
+        btn.disabled = false;
+    }
 }
 
 // ---------- actions ----------
