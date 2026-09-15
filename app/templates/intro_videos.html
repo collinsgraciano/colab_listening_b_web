@@ -69,14 +69,14 @@
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
         <div class="flex items-center gap-3 flex-wrap">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">✨ AI 画面提示词
-                <span class="text-xs font-normal text-slate-500 hidden sm:inline">只填频道名即可，LLM 生成 5 个随机片头创意：频道名画进画面 + 简中说明（英文短名拼写更稳）</span>
+                <span class="text-xs font-normal text-slate-500 hidden sm:inline">只填频道名即可，LLM 生成 10 个随机片头创意：频道名画进画面 + 简中说明（英文短名拼写更稳）</span>
             </h3>
             <button onclick="genPrompts()" id="btn-prompts"
-                class="ml-auto px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs text-white font-medium transition">✨ 生成 5 个提示词</button>
+                class="ml-auto px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs text-white font-medium transition">✨ 生成 10 个提示词</button>
             <span id="prompts-status" class="text-xs text-slate-400"></span>
         </div>
         <div id="prompts-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3 hidden"></div>
-        <div id="prompts-hint" class="text-xs text-slate-500 mt-2 hidden">点选任意卡片 → 自动填入上方「AI 画面描述」并切到 AI 视频路线（生成前仍可手动微调文字）</div>
+        <div id="prompts-hint" class="text-xs text-slate-500 mt-2 hidden">点选任意卡片 → 自动填入上方「AI 画面描述」并切到 AI 视频路线（生成前仍可手动微调文字）；点「📋 复制」→ 复制提示词原文，可粘贴到外部 AI 工具</div>
     </div>
 
     <!-- ⬆️ 上传自定义片头 -->
@@ -137,6 +137,29 @@ function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
+}
+function copyText(text, btn) {
+    const done = () => {
+        if (!btn) return;
+        const old = btn.textContent;
+        btn.textContent = '✅ 已复制';
+        setTimeout(() => { btn.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => _copyFallback(text, done));
+    } else {
+        _copyFallback(text, done);
+    }
+}
+function _copyFallback(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选择文本复制'); }
+    document.body.removeChild(ta);
 }
 function toggleRoute() {
     const isAI = document.getElementById('iv-route').value === 'ai';
@@ -311,7 +334,7 @@ function renderPrompts() {
     if (!PROMPTS.length) {
         grid.classList.add('hidden');
         hint.classList.add('hidden');
-        btn.textContent = '✨ 生成 5 个提示词';
+        btn.textContent = '✨ 生成 10 个提示词';
         return;
     }
     btn.textContent = '🔄 换一批';
@@ -322,7 +345,12 @@ function renderPrompts() {
             class="cursor-pointer rounded-lg border p-3 space-y-2 transition ${_selPrompt === i ? 'border-indigo-500 bg-indigo-900/20' : 'border-slate-600 bg-slate-900/60 hover:border-purple-500'}">
             <div class="flex items-start justify-between gap-2">
                 <div class="text-xs text-slate-200 leading-5">${esc(p.desc_zh || '（无中文说明）')}</div>
-                ${_selPrompt === i ? '<span class="shrink-0 px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] text-white">✓ 已选</span>' : ''}
+                <div class="flex items-start gap-1 shrink-0">
+                    <button onclick="event.stopPropagation(); copyText(PROMPTS[${i}].prompt_en, this)"
+                        title="复制英文提示词（可粘贴到外部 AI 工具）"
+                        class="px-1.5 py-0.5 bg-slate-700 hover:bg-teal-700 rounded text-[10px] text-slate-300 transition">📋 复制</button>
+                    ${_selPrompt === i ? '<span class="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] text-white">✓ 已选</span>' : ''}
+                </div>
             </div>
             <div class="text-[11px] leading-4 text-slate-400 max-h-24 overflow-y-auto font-mono bg-slate-950/60 rounded p-2">${esc(p.prompt_en)}</div>
         </div>`).join('');

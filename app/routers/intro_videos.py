@@ -6,7 +6,7 @@
 - AI 路线：PageMcpSession generate_video（text_to_video / 时长可设 / 16:9 /
   720p / 无音频）→ 下载 → finalize_ai_intro 标准化（频道名由 AI 画进画面，
   本地不再叠加文字防重复）；
-- 提示词：POST /gen_prompts 仅凭频道名让 LLM 一次生成 5 个随机片头场景
+- 提示词：POST /gen_prompts 仅凭频道名让 LLM 一次生成 10 个随机片头场景
   提示词（prompt_en 含频道名入画 title moment + desc_zh 简体中文说明），
   前端点选填入 AI 画面描述；
 - 上传：POST /upload 自带视频 → standardize_upload_intro 规格统一（保留
@@ -266,7 +266,7 @@ async def api_bgm_list():
 
 
 # ---------------------------------------------------------------------------
-# LLM 随机片头提示词（仅凭频道名 → 5 个 prompt_en + desc_zh 中文说明）
+# LLM 随机片头提示词（仅凭频道名 → 10 个 prompt_en + desc_zh 中文说明）
 # ---------------------------------------------------------------------------
 
 _PROMPT_SYSTEM = (
@@ -277,7 +277,7 @@ _PROMPT_SYSTEM = (
 
 def _build_prompts_prompt(channel: str) -> str:
     name = (channel or "").strip() or "English with me"
-    return f"""Create 5 clearly different ambient intro video scene concepts for a sleep-relaxation English learning YouTube channel named "{name}". Audience: overseas Chinese ESL learners winding down before sleep.
+    return f"""Create 10 clearly different ambient intro video scene concepts for a sleep-relaxation English learning YouTube channel named "{name}". Audience: overseas Chinese ESL learners winding down before sleep.
 
 Each concept is an AI text-to-video prompt. Mood: calm, dreamy and peaceful — perfect for falling asleep. Every concept MUST feature ONE title moment: the channel name "{name}" appears in the scene, spelled EXACTLY "{name}".
 
@@ -285,10 +285,10 @@ For each concept output:
 - "prompt_en": one rich English paragraph (70-120 words) describing ONE continuous very slow shot: the scene, lighting, color mood, art style (vary across concepts: soft 3D Pixar animation, dreamy pastel illustration, cinematic realism, watercolor, etc.), and a very slow gentle camera drift. Include the title moment: the channel name "{name}" appears within the first two seconds and stays visible — describe how it materializes and its lettering style (e.g. elegant glowing handwritten script traced by fireflies, soft 3D golden letters drifting out of the clouds, starlight gathering into letters). The channel name "{name}" is the ONLY text in the scene, spelled EXACTLY letter-for-letter — never any other words, letters, captions, subtitles or watermarks.
 - "desc_zh": 1-2 句简体中文，概括这段画面长什么样（含频道名如何出现，让用户不看英文也能想象出视频的大致样子）。
 
-The 5 concepts must span clearly different scenes/moods (for example: starry night sky with drifting clouds, cozy bedroom by a rainy window, moonlit forest, calm ocean waves at night, floating lanterns or dreamy clouds) — never two similar ones.
+The 10 concepts must span clearly different scenes/moods (for example: starry night sky with drifting clouds, cozy bedroom by a rainy window, moonlit forest, calm ocean waves at night, floating lanterns or dreamy clouds, snowy mountain cabin at dusk, sailboat gliding under moonlight, midnight garden full of fireflies) — never two similar ones.
 
 Output valid JSON only:
-{{"intros": [{{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}]}}"""
+{{"intros": [{{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}, {{"prompt_en": "...", "desc_zh": "..."}}]}}"""
 
 
 def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
@@ -303,9 +303,9 @@ def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
                 {"role": "user", "content": prompt}]
     if p_type == "gemini":
         return gemini_chat(api_key, model, messages, temperature=0.95,
-                           max_tokens=4096, timeout=180, proxy_url=proxy_url)
+                           max_tokens=8192, timeout=180, proxy_url=proxy_url)
     body = {"model": model, "messages": messages,
-            "temperature": 0.95, "max_tokens": 4096}
+            "temperature": 0.95, "max_tokens": 8192}
     if p_type != "openai":
         body["reasoning_effort"] = "low"
     req = urllib.request.Request(
@@ -375,7 +375,7 @@ def _prompts_worker(channel: str) -> None:
 
 @router.post("/api/intro_videos/gen_prompts")
 async def api_gen_prompts(request: Request):
-    """LLM 生成 5 个随机片头提示词（单槽 409 守卫；静态路径须在 {intro_id} 动态路由之前）。"""
+    """LLM 生成 10 个随机片头提示词（单槽 409 守卫；静态路径须在 {intro_id} 动态路由之前）。"""
     if _prompt_status.get("status") == "generating":
         return JSONResponse({"ok": False, "error": "提示词生成进行中，请稍候"},
                             status_code=409)
