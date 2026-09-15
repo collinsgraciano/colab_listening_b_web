@@ -20,6 +20,7 @@ import shutil
 import tempfile
 import random
 import threading
+import time
 from pathlib import Path
 
 _PARENT = str(Path(__file__).parent.parent.resolve())
@@ -351,15 +352,45 @@ def _build_clip_schedule(clips: dict, total_frames: int, fps: float,
     return schedule
 
 
+# 姿势缓存按目标文件粒度加锁：多 worker 线程共用同一套姿势图时，
+# 串行化「查缓存→读→处理→写」，避免读句柄未关时 os.replace 报
+# WinError 5（拒绝访问），同时消除重复的 remove_bg/normalize 运算
+_POSE_LOCKS_GUARD = threading.Lock()
+_POSE_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _pose_cache_lock(key: str) -> threading.Lock:
+    with _POSE_LOCKS_GUARD:
+        lock = _POSE_LOCKS.get(key)
+        if lock is None:
+            lock = _POSE_LOCKS.setdefault(key, threading.Lock())
+        return lock
+
+
 def _atomic_save(img, target: Path) -> None:
     """原子写 PNG 缓存：先写进程/线程唯一的 .tmp 再 os.replace。
 
     防止并发 worker 线程在读缓存时读到写到一半的半截文件
     （曾导致某句对白整段渲染失败、成片插入无声背景占位段）。
+    Windows 上目标文件被占用（读线程句柄未关/杀软扫描）时
+    os.replace 报 WinError 5，短退避重试即可恢复。
     """
     tmp = target.with_name(f"{target.stem}.{os.getpid()}_{threading.get_ident()}.tmp.png")
     img.save(str(tmp))
-    os.replace(str(tmp), str(target))
+    delay = 0.05
+    for attempt in range(5):
+        try:
+            os.replace(str(tmp), str(target))
+            return
+        except PermissionError:
+            if attempt == 4:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                raise
+            time.sleep(delay)
+            delay *= 2
 
 
 def _render_sm_segment(
@@ -442,26 +473,32 @@ def _render_sm_segment_inner(
                 continue
             cache_path = cache_dir / f"cutout_{Path(p_path).stem}.png"
             norm = None
-            if cache_path.exists():
-                try:
-                    norm = PILImage.open(cache_path).convert("RGBA")
-                except Exception:
-                    # 缓存可能损坏或被并发线程写到一半：删掉后走重新处理
+            # 按缓存文件加锁：拿锁后二次检查命中可直接复用前线程成果
+            with _pose_cache_lock(str(cache_path)):
+                if cache_path.exists():
                     try:
-                        cache_path.unlink(missing_ok=True)
+                        norm = PILImage.open(cache_path).convert("RGBA")
                     except Exception:
-                        pass
-                    norm = None
-            if norm is None:
-                try:
-                    raw = PILImage.open(p_path)
-                    alpha = remove_bg(raw)
-                    norm = normalize_pose(alpha)
-                    _atomic_save(norm, cache_path)
-                except Exception as e:
-                    print(f"  [Quest] pose process error for {p_path}: {e}")
-                    continue
-            processed.append(norm)
+                        # 缓存可能损坏或被并发线程写到一半：删掉后走重新处理
+                        try:
+                            cache_path.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                        norm = None
+                if norm is None:
+                    try:
+                        raw = PILImage.open(p_path)
+                        alpha = remove_bg(raw)
+                        norm = normalize_pose(alpha)
+                    except Exception as e:
+                        print(f"  [Quest] pose process error for {p_path}: {e}")
+                        continue
+                    try:
+                        _atomic_save(norm, cache_path)
+                    except Exception as e:
+                        # 缓存写失败不影响本次渲染（norm 已在内存），仅告警
+                        print(f"  [Quest] pose cache save warning for {p_path}: {e}")
+                processed.append(norm)
         if not processed:
             processed = [PILImage.new("RGBA", (1280, 720), (0, 0, 0, 0))]
         # 序列帧 clips（sprite_sequence 模式）：生成期已统一 remove_bg+归一化，
