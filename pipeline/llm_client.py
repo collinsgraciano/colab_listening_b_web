@@ -276,6 +276,59 @@ _GEMINI_FALLBACK_CODES = (400, 403, 404, 429, 503)
 _GEMINI_CHAIN_RETRIES = 1
 _GEMINI_CHAIN_RETRY_WAIT = 30
 
+# Gemini 专用退避（比共享 _RETRY_BACKOFFS 短）：代理抖动/网关错误不干等
+# 15s+；仅 gemini_chat 使用，sensenova/openai 的 urllib 路径退避不变。
+_GEMINI_RETRY_BACKOFFS = [5, 10, 20, 40]
+
+# 降级记忆：降级后成功的模型在 24h 内作为后续调用的链起点（不再从头试
+# 配置模型），超时自动释放回配置模型。仅进程内存，重启即失效。
+_GEMINI_FALLBACK_TTL = 24 * 3600
+_GEMINI_LAST_FALLBACK: dict[str, float] = {}  # {bare_model: 记录时刻}
+_GEMINI_FALLBACK_LOCK = threading.Lock()
+
+# Client 连接复用：httpx 连接池按 Client 实例隔离，每次新建要重付代理
+# 握手 + TLS 建连；按 (api_key, proxy_url) 缓存复用，代理在构造时冻结。
+_GEMINI_CLIENTS: dict[str, object] = {}
+_GEMINI_CLIENTS_LOCK = threading.Lock()
+
+
+def _gemini_remember_fallback(model: str) -> None:
+    """记录降级成功的模型（单槽，仅保留最近一次）。"""
+    import time as _time
+    bare = (model or "").split("/")[-1]
+    if not bare:
+        return
+    with _GEMINI_FALLBACK_LOCK:
+        _GEMINI_LAST_FALLBACK.clear()
+        _GEMINI_LAST_FALLBACK[bare] = _time.time()
+
+
+def _gemini_recent_fallback() -> str:
+    """24h 内降级成功的模型 bare 名；过期清除并返回空串。"""
+    import time as _time
+    with _GEMINI_FALLBACK_LOCK:
+        for bare, ts in list(_GEMINI_LAST_FALLBACK.items()):
+            if _time.time() - ts > _GEMINI_FALLBACK_TTL:
+                _GEMINI_LAST_FALLBACK.pop(bare, None)
+                return ""
+        return next(iter(_GEMINI_LAST_FALLBACK), "")
+
+
+def _get_gemini_client(api_key: str, proxy_url: str):
+    """按 (api_key, proxy_url) 缓存复用 genai.Client（构造需覆盖代理 env 窗口）。"""
+    from google import genai as _genai
+    cache_key = f"{api_key}|{proxy_url}"
+    with _GEMINI_CLIENTS_LOCK:
+        cached = _GEMINI_CLIENTS.get(cache_key)
+    if cached is not None:
+        return cached
+    proxy_cm = (_requests_proxy_env(proxy_url) if proxy_url
+                else contextlib.nullcontext())
+    with proxy_cm:
+        client = _genai.Client(api_key=api_key)
+    with _GEMINI_CLIENTS_LOCK:
+        return _GEMINI_CLIENTS.setdefault(cache_key, client)
+
 
 def _gemini_fallback_chain(model: str) -> list[str]:
     """配置模型起点 + 从新到旧的降级候选链。
@@ -328,6 +381,8 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
     更旧模型；401 鉴权立即报错；网络/网关错误对同模型退避重试；整链全部 429
     时等待后整链重试一轮（RPM 窗口恢复）。空输出一次性加倍 max_tokens 重试
     （thinking 模型可能耗尽输出预算），二次空输出降级下一个模型。
+    Client 按 (api_key, 代理) 缓存复用连接；降级成功的模型 24h 内直接作为
+    后续调用的链起点（不再从头试配置模型）。
     """
     import time as _time
 
@@ -344,9 +399,18 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
     proxy_cm = (_requests_proxy_env(proxy_url) if proxy_url
                 else contextlib.nullcontext())
     chain = _gemini_fallback_chain(model)
+    recent = _gemini_recent_fallback()
+    if recent:
+        for _idx, _m in enumerate(chain):
+            if _m.split("/")[-1] == recent:
+                if _idx > 0:
+                    chain = chain[_idx:]
+                    print(f"  [Gemini] 使用 24h 内降级记忆 {_m} 作为起点"
+                          "（跳过已限流的更早候选）")
+                break
     _empty_retried = False
     with proxy_cm:
-        client = _genai.Client(api_key=api_key)
+        client = _get_gemini_client(api_key, proxy_url)
         for chain_round in range(_GEMINI_CHAIN_RETRIES + 1):
             failures: list[str] = []
             all_rate_limited = True
@@ -388,13 +452,13 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                             break
                         if code is not None and code not in _RETRY_CODES:
                             raise RuntimeError(f"Gemini API HTTP {code}: {e}") from e
-                        if attempt < len(_RETRY_BACKOFFS):
-                            wait = _RETRY_BACKOFFS[attempt]
+                        if attempt < len(_GEMINI_RETRY_BACKOFFS):
+                            wait = _GEMINI_RETRY_BACKOFFS[attempt]
                             attempt += 1
                             reason = (f"HTTP {code}" if code is not None else
                                       f"网络错误 ({type(e).__name__}: {str(e)[:120]})")
                             print(f"  [Gemini] {current_model} {reason}，{wait}s 后重试 "
-                                  f"({attempt}/{len(_RETRY_BACKOFFS)})...")
+                                  f"({attempt}/{len(_GEMINI_RETRY_BACKOFFS)})...")
                             _time.sleep(wait)
                             continue
                         raise RuntimeError(
@@ -404,6 +468,7 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                     if text:
                         if model_idx > 0:
                             print(f"  [Gemini] 已降级使用 {current_model} 成功")
+                            _gemini_remember_fallback(current_model)
                         return text
                     if not _empty_retried and max_tokens < 16384:
                         new_max = min(max_tokens * 2, 16384)
