@@ -104,6 +104,8 @@ def _build_ai_prompt(scene_prompt: str, channel: str) -> str:
     name = (channel or "").strip() or "English with me"
     return (base + f' The channel name "{name}" appears in the scene, spelled '
             f'EXACTLY "{name}" letter-for-letter — it is the ONLY text allowed; '
+            "once it appears, it stays continuously visible in the frame until "
+            "the very end and never disappears; "
             "no other text, no captions, no watermarks.")
 
 
@@ -279,10 +281,10 @@ def _build_prompts_prompt(channel: str) -> str:
     name = (channel or "").strip() or "English with me"
     return f"""Create 10 clearly different ambient intro video scene concepts for a sleep-relaxation English learning YouTube channel named "{name}". Audience: overseas Chinese ESL learners winding down before sleep.
 
-Each concept is an AI text-to-video prompt. Mood: calm, dreamy and peaceful — perfect for falling asleep. Every concept MUST feature ONE title moment: the channel name "{name}" appears in the scene, spelled EXACTLY "{name}".
+Each concept is an AI text-to-video prompt. Mood: calm, dreamy and peaceful — perfect for falling asleep. Every concept MUST feature ONE title moment: the channel name "{name}" appears in the scene, spelled EXACTLY "{name}", and once it appears it stays in the frame continuously until the end.
 
 For each concept output:
-- "prompt_en": one rich English paragraph (70-120 words) describing ONE continuous very slow shot: the scene, lighting, color mood, art style (vary across concepts: soft 3D Pixar animation, dreamy pastel illustration, cinematic realism, watercolor, etc.), and a very slow gentle camera drift. Include the title moment: the channel name "{name}" appears within the first two seconds and stays visible — describe how it materializes and its lettering style (e.g. elegant glowing handwritten script traced by fireflies, soft 3D golden letters drifting out of the clouds, starlight gathering into letters). The channel name "{name}" is the ONLY text in the scene, spelled EXACTLY letter-for-letter — never any other words, letters, captions, subtitles or watermarks.
+- "prompt_en": one rich English paragraph (70-120 words) describing ONE continuous very slow shot: the scene, lighting, color mood, art style (vary across concepts: soft 3D Pixar animation, dreamy pastel illustration, cinematic realism, watercolor, etc.), and a very slow gentle camera drift. Include the title moment: the channel name "{name}" appears within the first two seconds and then remains continuously visible in the frame for the ENTIRE rest of the video — once it is visible it must NEVER disappear (no fading out, no drifting out of frame, no vanishing and re-appearing) — describe how it materializes and its lettering style (e.g. elegant glowing handwritten script traced by fireflies, soft 3D golden letters drifting out of the clouds, starlight gathering into letters). The channel name "{name}" is the ONLY text in the scene, spelled EXACTLY letter-for-letter — never any other words, letters, captions, subtitles or watermarks.
 - "desc_zh": 1-2 句简体中文，概括这段画面长什么样（含频道名如何出现，让用户不看英文也能想象出视频的大致样子）。
 
 The 10 concepts must span clearly different scenes/moods (for example: starry night sky with drifting clouds, cozy bedroom by a rainy window, moonlit forest, calm ocean waves at night, floating lanterns or dreamy clouds, snowy mountain cabin at dusk, sailboat gliding under moonlight, midnight garden full of fireflies) — never two similar ones.

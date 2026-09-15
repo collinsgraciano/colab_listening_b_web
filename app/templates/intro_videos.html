@@ -10,9 +10,10 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
             <div>
-                <label class="text-xs text-slate-400 block mb-1">频道名（片头主文字）</label>
-                <input type="text" id="iv-channel" value="{{ config.get('sleep_channel_name', '') or 'English with me' }}"
+                <label class="text-xs text-slate-400 block mb-1">频道名（片头主文字，自动记住填过的名字）</label>
+                <input type="text" id="iv-channel" list="channel-history" value="{{ config.get('sleep_channel_name', '') or 'English with me' }}"
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <datalist id="channel-history"></datalist>
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">生成路线</label>
@@ -161,6 +162,24 @@ function _copyFallback(text, done) {
     try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选择文本复制'); }
     document.body.removeChild(ta);
 }
+
+// ---------- 频道名历史（localStorage 记住填过的名字，最新在前，最多 20 条） ----------
+const CHAN_HIST_KEY = 'intro_channel_history';
+function loadChannelHistory() {
+    try { return JSON.parse(localStorage.getItem(CHAN_HIST_KEY) || '[]'); } catch (e) { return []; }
+}
+function renderChannelHistory() {
+    document.getElementById('channel-history').innerHTML =
+        loadChannelHistory().map(n => `<option value="${esc(n)}"></option>`).join('');
+}
+function rememberChannel(name) {
+    name = (name || '').trim();
+    if (!name) return;
+    const hist = loadChannelHistory().filter(x => x !== name);
+    hist.unshift(name);
+    try { localStorage.setItem(CHAN_HIST_KEY, JSON.stringify(hist.slice(0, 20))); } catch (e) {}
+    renderChannelHistory();
+}
 function toggleRoute() {
     const isAI = document.getElementById('iv-route').value === 'ai';
     document.getElementById('iv-scene-wrap').classList.toggle('hidden', !isAI);
@@ -239,6 +258,7 @@ async function startGenerate() {
         scene_prompt: document.getElementById('iv-scene').value.trim(),
         duration: parseFloat(document.getElementById('iv-duration').value) || 10,
     };
+    rememberChannel(body.channel_name);
     try {
         const resp = await fetch('/api/intro_videos/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -288,10 +308,12 @@ async function genPrompts() {
     if (_promptsBusy) return;
     const btn = document.getElementById('btn-prompts');
     btn.disabled = true;
+    const channelName = document.getElementById('iv-channel').value.trim();
+    rememberChannel(channelName);
     try {
         const resp = await fetch('/api/intro_videos/gen_prompts', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channel_name: document.getElementById('iv-channel').value.trim() }),
+            body: JSON.stringify({ channel_name: channelName }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -419,6 +441,7 @@ async function deleteIntro(id) {
 // ---------- init ----------
 window.addEventListener('load', async () => {
     toggleRoute();
+    renderChannelHistory();
     await Promise.all([loadAll(), loadBgm()]);
     const st = await fetch('/api/intro_videos/status').then(r => r.json());
     if (st.status === 'running') {
