@@ -344,9 +344,16 @@ def _normalize_prompts(raw_list) -> list[dict]:
     return out
 
 
+# 提示词生成重试：LLM 偶发返回非法/残缺 JSON（如 "Expecting ',' delimiter"，
+# 截断修复救不回的畸形输出），解析失败或无有效条目时整体重新生成。
+_PROMPTS_MAX_ATTEMPTS = 3
+_PROMPTS_RETRY_WAIT = 2
+
+
 def _prompts_worker(channel: str) -> None:
     _prompt_status.update({"status": "generating", "prompts": [], "error": ""})
     try:
+        import time as _time
         from llm_client import _extract_json, proxy_url_from_config  # pipeline/ 已在 sys.path
         cfg = load_config()
         p_type, base_url, api_key, model = resolve_provider(cfg)
@@ -354,20 +361,35 @@ def _prompts_worker(channel: str) -> None:
             raise RuntimeError(f"未配置 {p_type} 的 API Key，请在参数配置页填写")
         if not model:
             raise RuntimeError("未指定模型（该 Provider 未配置模型列表）")
-        _log(f"LLM 生成片头提示词：{model} ({p_type})，频道「{channel}」")
-        content = _llm_chat(base_url, api_key, model, p_type,
-                            _build_prompts_prompt(channel),
-                            proxy_url=proxy_url_from_config(cfg))
-        data = _extract_json(content)
-        if isinstance(data, dict):
-            raw_list = data.get("intros")
-        elif isinstance(data, list):
-            raw_list = data
-        else:
-            raw_list = None
-        prompts = _normalize_prompts(raw_list)
+        prompt_text = _build_prompts_prompt(channel)
+        proxy_url = proxy_url_from_config(cfg)
+        prompts: list[dict] = []
+        last_err: Exception | None = None
+        for attempt in range(1, _PROMPTS_MAX_ATTEMPTS + 1):
+            _log(f"LLM 生成片头提示词：{model} ({p_type})，频道「{channel}」"
+                 + (f"（第 {attempt}/{_PROMPTS_MAX_ATTEMPTS} 次）" if attempt > 1 else ""))
+            try:
+                content = _llm_chat(base_url, api_key, model, p_type,
+                                    prompt_text, proxy_url=proxy_url)
+                data = _extract_json(content)
+                if isinstance(data, dict):
+                    raw_list = data.get("intros")
+                elif isinstance(data, list):
+                    raw_list = data
+                else:
+                    raw_list = None
+                prompts = _normalize_prompts(raw_list)
+                if prompts:
+                    break
+                raise ValueError("LLM 返回内容中没有有效提示词")
+            except Exception as e:  # noqa: BLE001 — 调用/解析失败重试
+                last_err = e
+                prompts = []
+                if attempt < _PROMPTS_MAX_ATTEMPTS:
+                    print(f"  [IntroLibrary] 第 {attempt} 次生成失败（{e}），重试...")
+                    _time.sleep(_PROMPTS_RETRY_WAIT)
         if not prompts:
-            raise RuntimeError("LLM 返回内容中没有有效提示词，请重试或更换模型")
+            raise RuntimeError(f"生成失败（已尝试 {_PROMPTS_MAX_ATTEMPTS} 次）：{last_err}")
         _log(f"已生成 {len(prompts)} 条提示词")
         _prompt_status.update({"status": "done", "prompts": prompts, "error": ""})
     except Exception as e:  # noqa: BLE001 — 错误原样落状态供前端展示
