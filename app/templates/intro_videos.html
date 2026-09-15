@@ -180,6 +180,46 @@ function rememberChannel(name) {
     try { localStorage.setItem(CHAN_HIST_KEY, JSON.stringify(hist.slice(0, 20))); } catch (e) {}
     renderChannelHistory();
 }
+
+// ---------- 记住上次使用的设置（localStorage，生成时与更改时都存，进页自动还原） ----------
+const SETTINGS_KEY = 'intro_last_settings';
+const SETTINGS_FIELDS = [
+    { id: 'iv-channel', type: 'value' },
+    { id: 'iv-route', type: 'value' },
+    { id: 'iv-subtitle', type: 'value' },
+    { id: 'iv-bgm', type: 'value' },
+    { id: 'iv-duration', type: 'value' },
+    { id: 'iv-volume', type: 'value' },
+    { id: 'iv-announce', type: 'checked' },
+    { id: 'iv-scene', type: 'value' },
+];
+function saveIntroSettings() {
+    const data = {};
+    for (const f of SETTINGS_FIELDS) {
+        const el = document.getElementById(f.id);
+        if (!el) continue;
+        data[f.id] = f.type === 'checked' ? el.checked : el.value;
+    }
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function restoreIntroSettings() {
+    let data;
+    try { data = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch (e) { return; }
+    if (!data || typeof data !== 'object') return;
+    for (const f of SETTINGS_FIELDS) {
+        if (!(f.id in data)) continue;
+        const el = document.getElementById(f.id);
+        if (!el) continue;
+        if (f.type === 'checked') {
+            el.checked = !!data[f.id];
+        } else {
+            const v = String(data[f.id] ?? '');
+            if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === v)) continue;
+            el.value = v;
+        }
+    }
+    toggleRoute();
+}
 function toggleRoute() {
     const isAI = document.getElementById('iv-route').value === 'ai';
     document.getElementById('iv-scene-wrap').classList.toggle('hidden', !isAI);
@@ -259,6 +299,7 @@ async function startGenerate() {
         duration: parseFloat(document.getElementById('iv-duration').value) || 10,
     };
     rememberChannel(body.channel_name);
+    saveIntroSettings();
     try {
         const resp = await fetch('/api/intro_videos/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -443,6 +484,11 @@ window.addEventListener('load', async () => {
     toggleRoute();
     renderChannelHistory();
     await Promise.all([loadAll(), loadBgm()]);
+    restoreIntroSettings();
+    SETTINGS_FIELDS.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (el) el.addEventListener('change', saveIntroSettings);
+    });
     const st = await fetch('/api/intro_videos/status').then(r => r.json());
     if (st.status === 'running') {
         _genBusy = true;
