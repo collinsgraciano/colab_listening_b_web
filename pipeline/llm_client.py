@@ -208,6 +208,60 @@ def _diagnose_response(result: dict) -> str:
 _RETRY_CODES = [429, 502, 503, 504, 524]
 _RETRY_BACKOFFS = [15, 30, 60, 90, 120]
 
+
+class _OpenaiStreamError(Exception):
+    """openai 通道流式响应中途失败（流内 error 块 / 空内容 / 无 [DONE] 截断）。"""
+
+
+def _parse_plain_chat_json(raw: str, model: str) -> str:
+    """解析非流式 chat/completions JSON 响应并返回 content（诊断打印同旧逻辑）。"""
+    if not raw.strip():
+        raise RuntimeError("LLM returned empty response body (HTTP 200, 0 bytes)")
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        dbg = _dump_raw_debug(raw, model, "non_json")
+        print(f"  [LLM] Non-JSON response (model={model}). "
+              f"Full raw response ({len(raw)} chars)"
+              f"{' saved to ' + dbg if dbg else ''}:")
+        print(raw)
+        print("  [LLM] End raw response")
+        raise RuntimeError(
+            f"LLM returned non-JSON response (model={model}). "
+            f"Full raw ({len(raw)} chars)"
+            f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
+        ) from None
+    if "choices" not in result or not result["choices"]:
+        diag = _diagnose_response(result)
+        dbg = _dump_raw_debug(raw, model, "no_choices")
+        print(f"  [LLM] Response has no 'choices' (model={model}). {diag}")
+        print(f"  [LLM] Full raw response ({len(raw)} chars)"
+              f"{' saved to ' + dbg if dbg else ''}:")
+        print(raw)
+        print("  [LLM] End raw response")
+        raise RuntimeError(
+            f"LLM response has no 'choices' field (model={model}). {diag}. "
+            f"Full raw ({len(raw)} chars)"
+            f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
+        )
+    content = result["choices"][0]["message"]["content"]
+    if not content or not content.strip():
+        # 空响应（HTTP 200）：max_tokens 已恒拉满 16384，无翻倍爬升
+        # 余地 — 直接报错交由外层重试（reasoning 烧尽已诊断在 diag）
+        diag = _diagnose_response(result)
+        dbg = _dump_raw_debug(raw, model, "empty_content")
+        print(f"  [LLM] Empty content (HTTP 200, model={model}). {diag}")
+        print(f"  [LLM] Full raw response ({len(raw)} chars)"
+              f"{' saved to ' + dbg if dbg else ''}:")
+        print(raw)
+        print("  [LLM] End raw response")
+        raise RuntimeError(
+            f"LLM returned empty content (HTTP 200, model={model}). {diag}. "
+            f"Full raw ({len(raw)} chars)"
+            f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
+        )
+    return content
+
 # ---------------------------------------------------------------------------
 # LLM 代理支持（全部 Provider 通用）：llm_proxy_enabled + llm_proxy_url。
 # 支持 http(s):// 与 socks5://、socks5h://（socks 系列 DNS 一律经代理解析，
@@ -609,6 +663,12 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
         # reasoning_effort is SenseNova-specific; OpenAI-compatible APIs don't support it
         if provider != "openai":
             body["reasoning_effort"] = reasoning_effort
+        # openai 通道走流式：部分中转（如 WorkBuddy）对非流式请求有 ~120s
+        # 上游硬超时，长输出必然 502；流式首字几秒内回传保活，之后边生成
+        # 边收。端点不认 stream 参数时按普通 JSON 回退解析。
+        use_stream = provider == "openai"
+        if use_stream:
+            body["stream"] = True
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
             f"{base_url}/chat/completions",
@@ -621,55 +681,68 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
         req.add_header("User-Agent", "CodelyLLM/1.0")
         try:
             with llm_urlopen(req, timeout, proxy_url) as resp:
-                raw = resp.read().decode("utf-8")
-                if not raw.strip():
-                    raise RuntimeError("LLM returned empty response body (HTTP 200, 0 bytes)")
-                try:
-                    result = json.loads(raw)
-                except json.JSONDecodeError:
-                    dbg = _dump_raw_debug(raw, model, "non_json")
-                    print(f"  [LLM] Non-JSON response (model={model}). "
-                          f"Full raw response ({len(raw)} chars)"
-                          f"{' saved to ' + dbg if dbg else ''}:")
-                    print(raw)
-                    print("  [LLM] End raw response")
-                    raise RuntimeError(
-                        f"LLM returned non-JSON response (model={model}). "
-                        f"Full raw ({len(raw)} chars)"
-                        f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
-                    ) from None
-                if "choices" not in result or not result["choices"]:
-                    diag = _diagnose_response(result)
-                    dbg = _dump_raw_debug(raw, model, "no_choices")
-                    print(f"  [LLM] Response has no 'choices' (model={model}). {diag}")
-                    print(f"  [LLM] Full raw response ({len(raw)} chars)"
-                          f"{' saved to ' + dbg if dbg else ''}:")
-                    print(raw)
-                    print("  [LLM] End raw response")
-                    raise RuntimeError(
-                        f"LLM response has no 'choices' field (model={model}). {diag}. "
-                        f"Full raw ({len(raw)} chars)"
-                        f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
-                    )
-                content = result["choices"][0]["message"]["content"]
-                if not content or not content.strip():
-                    # 空响应（HTTP 200）：max_tokens 已恒拉满 16384，无翻倍爬升
-                    # 余地 — 直接报错交由外层重试（reasoning 烧尽已诊断在 diag）
-                    diag = _diagnose_response(result)
-                    dbg = _dump_raw_debug(raw, model, "empty_content")
-                    print(f"  [LLM] Empty content (HTTP 200, model={model}). {diag}")
-                    print(f"  [LLM] Full raw response ({len(raw)} chars)"
-                          f"{' saved to ' + dbg if dbg else ''}:")
-                    print(raw)
-                    print("  [LLM] End raw response")
-                    raise RuntimeError(
-                        f"LLM returned empty content (HTTP 200, model={model}). {diag}. "
-                        f"Full raw ({len(raw)} chars)"
-                        f"{' saved to ' + dbg if dbg else ''} shown above: {raw}"
-                    )
-                # 限速槽位已在 _enforce_rate_limit 中预约（start-to-start 间隔），
-                # 无需在响应后再次记录时间。
+                if not use_stream:
+                    raw = resp.read().decode("utf-8")
+                    # 限速槽位已在 _enforce_rate_limit 中预约（start-to-start
+                    # 间隔），无需在响应后再次记录时间。
+                    return _parse_plain_chat_json(raw, model)
+                content = ""
+                usage_info: dict | None = None
+                finished = False
+                saw_sse = False
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line:
+                        continue
+                    if not line.startswith("data: "):
+                        if not saw_sse and line[0] in "{[":
+                            # 端点无视 stream 参数回了普通 JSON 包体 → 按非流式解析
+                            raw = line
+                            for extra in resp:
+                                raw += extra.decode("utf-8", errors="replace")
+                            result = _parse_plain_chat_json(raw, model)
+                            return result
+                        continue
+                    saw_sse = True
+                    payload = line[6:].strip()
+                    if payload == "[DONE]":
+                        finished = True
+                        break
+                    try:
+                        chunk = json.loads(payload)
+                    except json.JSONDecodeError:
+                        continue
+                    if chunk.get("error"):
+                        raise _OpenaiStreamError(
+                            f"stream error block: {chunk['error']}")
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        # 尾部 usage 块（stream_options include_usage）
+                        if chunk.get("usage"):
+                            usage_info = chunk["usage"]
+                        continue
+                    content += choices[0].get("delta", {}).get("content", "") or ""
+                if not finished:
+                    dbg = _dump_raw_debug(content, model, "openai_stream_truncated")
+                    print(f"  [LLM] openai stream ended without [DONE] "
+                          f"(model={model}, {len(content)} chars so far)"
+                          f"{' saved to ' + dbg if dbg else ''}")
+                    raise _OpenaiStreamError(
+                        "stream ended without [DONE] (upstream truncation)")
+                if not content.strip():
+                    raise _OpenaiStreamError(
+                        f"empty content from stream (usage={usage_info})")
                 return content
+        except _OpenaiStreamError as e:
+            if _retry_attempt < len(_RETRY_BACKOFFS):
+                wait = _RETRY_BACKOFFS[_retry_attempt]
+                print(f"  [LLM] openai stream failure ({e}), "
+                      f"waiting {wait}s before retry "
+                      f"({_retry_attempt+1}/{len(_RETRY_BACKOFFS)})... "
+                      f"Model: {model}")
+                _sleep_interruptible(wait)
+                continue
+            raise RuntimeError(f"LLM stream failure after retries: {e}") from e
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")
             if (e.code == 400 and not _mt_fallback_done
