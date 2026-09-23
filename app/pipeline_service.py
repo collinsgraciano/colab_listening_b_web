@@ -30,6 +30,7 @@ if str(PIPELINE_DIR) not in sys.path:
 from mcp_client import reinitialize as mcp_reinit
 from topic_manager import pick_random_topic
 from media_utils import safe_filename as _safe_dirname
+from llm_client import LLMStoppedError, set_llm_stop_hook
 from checkpoint import (
     save_checkpoint as _save_checkpoint,
     load_checkpoint as _load_checkpoint,
@@ -1445,11 +1446,15 @@ class PipelineService:
 
     def _run(self, config: dict, resume: bool):
         """Main pipeline execution in background thread."""
+        # 用户停止即时生效：注册线程局部停止探测，本线程内所有 LLM 调用
+        # 的等待/退避/重试循环逐 0.5s 检查 _stop_flag（Web 线程不受影响）。
+        set_llm_stop_hook(self._stop_flag.is_set)
         # 无论 _run 主体在哪一步抛异常（含 try 块之前的 env/args 构建），
         # 都必须释放互斥锁，否则模式测试/下次启动会被永久阻塞
         try:
             self._run_inner(config, resume)
         finally:
+            set_llm_stop_hook(None)
             run_mutex.release("pipeline")
 
     def _run_inner(self, config: dict, resume: bool):
@@ -1680,6 +1685,11 @@ class PipelineService:
             if final_4k_path and Path(final_4k_path).exists():
                 self._on_log_line(f"4K video: {final_4k_path}")
 
+        except LLMStoppedError:
+            # 用户点击「停止运行」→ LLM 等待/重试循环即时中止（BaseException
+            # 穿透脚本生成的全部 except Exception 重试层直达此处）。
+            # 标记 stopped 而非 error；此时 stdout 仍指向日志缓冲，行可进前端。
+            self._set_stopped()
         except SystemExit as e:
             # pipeline 模块用 sys.exit(1) 中止（图片缺失 / MCP token 耗尽 /
             # 质检门禁 exit=2 等）。SystemExit 不是 Exception 子类，

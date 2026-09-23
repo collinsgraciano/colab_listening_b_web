@@ -60,6 +60,51 @@ def _env_flag(name: str) -> bool:
     return _env_get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
+# ---------------------------------------------------------------------------
+# 用户停止（「停止运行」按钮即时生效）：线程局部 stop hook + 可中断 sleep。
+# LLMStoppedError 继承 BaseException（非 Exception），穿透脚本生成的全部
+# except Exception 重试层（Attempt×N / retry×M），由 pipeline_service
+# 的 _run_inner 显式捕获并标记 stopped。仅 pipeline 工作线程注册 hook，
+# Web 端其他线程的 LLM 调用（topics AI / 脚本库 / ai_test）行为不变。
+# ---------------------------------------------------------------------------
+
+class LLMStoppedError(BaseException):
+    """用户请求停止：LLM 等待/重试循环探测到 stop hook 后抛出。"""
+
+
+def set_llm_stop_hook(hook) -> None:
+    """设置当前线程的停止探测（传 None 清除）。hook() → True 即中止。
+
+    线程局部（复用 _LLM_ENV_TLS）：仅影响注册它的线程。
+    """
+    _LLM_ENV_TLS.stop_hook = hook
+
+
+def _stop_requested() -> bool:
+    hook = getattr(_LLM_ENV_TLS, "stop_hook", None)
+    return bool(hook and hook())
+
+
+def _check_stop() -> None:
+    """停止探测：命中即抛 LLMStoppedError（穿透所有 except Exception 层）。"""
+    if _stop_requested():
+        raise LLMStoppedError("stopped by user")
+
+
+def _sleep_interruptible(sec: float) -> None:
+    """可中断 sleep：每 0.5s 探测一次用户停止，命中抛 LLMStoppedError。
+
+    LLM 重试退避最长单轮 315s（15+30+60+90+120）——不可中断的 sleep
+    曾导致点「停止运行」后要等十几分钟才真正停。
+    """
+    import time as _time
+    remaining = float(sec)
+    while remaining > 0:
+        _check_stop()
+        _time.sleep(min(0.5, remaining))
+        remaining -= 0.5
+
+
 # Rate limiting: enforce minimum interval between LLM API calls to avoid HTTP 429.
 # glm-5.2 is especially aggressive about "request rate increased too quickly".
 _LAST_CALL_TIME = 0.0  # 最近一次调用的开始时刻（预约槽位）
@@ -87,7 +132,7 @@ def _enforce_rate_limit(min_interval: float | None = None):
         start_at = max(now, _LAST_CALL_TIME + interval)
         _LAST_CALL_TIME = start_at  # 预约本次调用的开始槽位
     if start_at > now:
-        _time.sleep(start_at - now)
+        _sleep_interruptible(start_at - now)
 
 
 def _dump_raw_debug(raw: str, model: str, kind: str) -> str | None:
@@ -379,13 +424,11 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
     代理窗口覆盖 genai.Client 构造与全部请求（httpx 代理在构造时冻结）。
     模型从新到旧自动降级：配置模型受限（429/503/400/403/404）时切换到下一个
     更旧模型；401 鉴权立即报错；网络/网关错误对同模型退避重试；整链全部 429
-    时等待后整链重试一轮（RPM 窗口恢复）。空输出一次性加倍 max_tokens 重试
-    （thinking 模型可能耗尽输出预算），二次空输出降级下一个模型。
+    时等待后整链重试一轮（RPM 窗口恢复）。max_tokens 恒拉满 16384（推理模型
+    不再烧尽预算出空响应）；空输出直接降级下一个模型。
     Client 按 (api_key, 代理) 缓存复用连接；降级成功的模型 24h 内直接作为
     后续调用的链起点（不再从头试配置模型）。
     """
-    import time as _time
-
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set")
     try:
@@ -393,6 +436,10 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
     except ImportError as e:
         raise RuntimeError(
             "未安装 google-genai SDK，请先执行：pip install google-genai") from e
+
+    # max_tokens 直接拉满（用户需求：不再从 2048/8192 起步逐级翻倍爬升）
+    if max_tokens < 16384:
+        max_tokens = 16384
 
     thinking = reasoning_effort if reasoning_effort in _GEMINI_THINKING_LEVELS else "low"
     input_value, system_instruction = _gemini_input_and_system(messages)
@@ -408,7 +455,6 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                     print(f"  [Gemini] 使用 24h 内降级记忆 {_m} 作为起点"
                           "（跳过已限流的更早候选）")
                 break
-    _empty_retried = False
     with proxy_cm:
         client = _get_gemini_client(api_key, proxy_url)
         for chain_round in range(_GEMINI_CHAIN_RETRIES + 1):
@@ -417,6 +463,7 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
             for model_idx, current_model in enumerate(chain):
                 attempt = 0
                 while True:
+                    _check_stop()  # 用户停止即时生效（穿透 BaseException）
                     _enforce_rate_limit()  # 共享限速槽位（与 sensenova/openai 互认）
                     try:
                         kwargs = {
@@ -459,7 +506,7 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                                       f"网络错误 ({type(e).__name__}: {str(e)[:120]})")
                             print(f"  [Gemini] {current_model} {reason}，{wait}s 后重试 "
                                   f"({attempt}/{len(_GEMINI_RETRY_BACKOFFS)})...")
-                            _time.sleep(wait)
+                            _sleep_interruptible(wait)
                             continue
                         raise RuntimeError(
                             f"Gemini API 调用失败（重试后仍失败）: "
@@ -470,14 +517,7 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                             print(f"  [Gemini] 已降级使用 {current_model} 成功")
                             _gemini_remember_fallback(current_model)
                         return text
-                    if not _empty_retried and max_tokens < 16384:
-                        new_max = min(max_tokens * 2, 16384)
-                        print(f"  [Gemini] {current_model} 空输出（thinking 可能耗尽"
-                              f"输出预算），以 max_tokens={new_max} 重试...")
-                        _empty_retried = True
-                        max_tokens = new_max
-                        continue
-                    # 二次空输出：按模型级失败处理，降级下一个模型
+                    # 空输出：按模型级失败处理，降级下一个模型
                     failures.append(f"{current_model}: 空输出")
                     all_rate_limited = False
                     print(f"  [Gemini] {current_model} 空输出，降级下一个模型...")
@@ -487,7 +527,7 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
             if all_rate_limited and chain_round < _GEMINI_CHAIN_RETRIES:
                 print(f"  [Gemini] 整链 {len(chain)} 个模型全部限流（429），"
                       f"{_GEMINI_CHAIN_RETRY_WAIT}s 后整链重试一轮...")
-                _time.sleep(_GEMINI_CHAIN_RETRY_WAIT)
+                _sleep_interruptible(_GEMINI_CHAIN_RETRY_WAIT)
                 continue
             raise RuntimeError(
                 "Gemini 全部候选模型不可用（从新到旧已尝试 "
@@ -503,10 +543,13 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
     - "openai": any OpenAI-compatible endpoint (x666.me, etc.)
     - "gemini": Google Gemini via google-genai SDK (Interactions API)
 
+    max_tokens is always raised to 16384 (reasoning models burn small budgets).
     Retries on HTTP 429 (rate limit) with exponential backoff.
     Enforces a minimum interval between calls to avoid triggering rate limits.
     """
-    import time as _time
+    # max_tokens 直接拉满（用户需求：不再从 2048/8192 起步逐级翻倍爬升）
+    if max_tokens < 16384:
+        max_tokens = 16384
 
     provider = _env_get("LLM_PROVIDER", "sensenova")
 
@@ -534,10 +577,12 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
         base_url = _env_get("SENSENOVA_BASE", "https://token.sensenova.cn/v1")
 
     # Retry on 429 (rate limit), 502/503/504 (gateway), 524 (Cloudflare timeout)
-    # One-shot rescue for finish_reason=length empty content (reasoning burn)
-    _length_retried = False
+    # _mt_fallback_done: 个别 Provider 拒绝 16384 上限（HTTP 400 报文提到
+    # max_tokens）时回退 8192 重试一次（channel_factory 同款先例）
+    _mt_fallback_done = False
 
     for _retry_attempt in range(len(_RETRY_BACKOFFS) + 1):
+        _check_stop()  # 用户停止即时生效（穿透 BaseException）
         _enforce_rate_limit()
         body = {
             "model": model,
@@ -592,22 +637,8 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
                     )
                 content = result["choices"][0]["message"]["content"]
                 if not content or not content.strip():
-                    # Reasoning models can burn the whole token budget on
-                    # reasoning (finish_reason=length, content empty). Retry
-                    # once with a doubled budget before surfacing the error.
-                    choice0 = result["choices"][0]
-                    finish = choice0.get("finish_reason") or ""
-                    has_reasoning = bool(
-                        (choice0.get("message") or {}).get("reasoning_content"))
-                    if (finish == "length" and has_reasoning
-                            and not _length_retried and max_tokens < 16384):
-                        new_max = min(max_tokens * 2, 16384)
-                        print(f"  [LLM] Empty content with finish_reason=length "
-                              f"(reasoning consumed the token budget); "
-                              f"retrying with max_tokens={new_max} (was {max_tokens})...")
-                        max_tokens = new_max
-                        _length_retried = True
-                        continue
+                    # 空响应（HTTP 200）：max_tokens 已恒拉满 16384，无翻倍爬升
+                    # 余地 — 直接报错交由外层重试（reasoning 烧尽已诊断在 diag）
                     diag = _diagnose_response(result)
                     dbg = _dump_raw_debug(raw, model, "empty_content")
                     print(f"  [LLM] Empty content (HTTP 200, model={model}). {diag}")
@@ -625,6 +656,14 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
                 return content
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", errors="replace")
+            if (e.code == 400 and not _mt_fallback_done
+                    and "max_tokens" in err.lower()):
+                # 个别 Provider 拒绝 16384 上限 → 回退 8192 重试一次
+                _mt_fallback_done = True
+                max_tokens = 8192
+                print(f"  [LLM] Provider rejected max_tokens=16384, "
+                      f"retrying with 8192... Model: {model}")
+                continue
             if e.code in _RETRY_CODES and _retry_attempt < len(_RETRY_BACKOFFS):
                 wait = _RETRY_BACKOFFS[_retry_attempt]
                 reason = ("rate limited" if e.code == 429
@@ -634,7 +673,7 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
                       f"waiting {wait}s before retry "
                       f"({_retry_attempt+1}/{len(_RETRY_BACKOFFS)})... "
                       f"Model: {model}")
-                _time.sleep(wait)
+                _sleep_interruptible(wait)
                 continue
             raise RuntimeError(f"LLM HTTP {e.code}: {err}") from e
         except OSError as e:
@@ -647,7 +686,7 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
                       f"waiting {wait}s before retry "
                       f"({_retry_attempt+1}/{len(_RETRY_BACKOFFS)})... "
                       f"Model: {model}")
-                _time.sleep(wait)
+                _sleep_interruptible(wait)
                 continue
             raise RuntimeError(
                 f"LLM network error after retries: {type(e).__name__}: {e}") from e
