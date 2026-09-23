@@ -955,7 +955,8 @@ def _build_listening_prompt(topic: str, cefr: str, used_dialogues: list[str] = N
                             structure: str = "original",
                             style_boost: bool = False,
                             outline: dict | None = None,
-                            devices: list[str] | None = None) -> str:
+                            devices: list[str] | None = None,
+                            line_count_directive: str | None = None) -> str:
     """Build prompt for listening-practice lesson (num_lines + IPA + 繁中).
 
     structure 决定行级视觉 prompt 字段（其余模式不需要的字段不再要求生成）：
@@ -1055,7 +1056,7 @@ Output: a JSON object ONLY (no markdown, no explanation).
 TECHNICAL REQUIREMENTS:
 - Exactly 2 speakers with natural American English
 - Each speaker MUST have a clearly defined ROLE in the story (e.g. "customer" vs "waiter", "passenger" vs "check-in agent"). The role must be appropriate for the topic.
-- Exactly {num_lines} dialogue lines (each AT MOST {mw} words — HARD LIMIT, so on-screen subtitles never exceed 2 lines)
+- {line_count_directive if line_count_directive else f"Exactly {num_lines} dialogue lines (each AT MOST {mw} words — HARD LIMIT, so on-screen subtitles never exceed 2 lines)"}
 - The dialogue must flow as a continuous, coherent story (not disconnected Q&A)
 - Every dialogue line MUST include:
   - "text": the English sentence
@@ -1256,44 +1257,211 @@ def generate_story_outline(topic: str, cefr: str, devices: list[str],
     return None
 
 
-def _generate_listening_raw(topic: str, cefr: str, used_summaries: list[str],
-                            num_lines: int, structure: str, style_boost: bool,
-                            devices: list[str], outline: dict | None,
-                            temp_start: float = 0.8) -> dict:
-    """单次生成 + 字段兜底（不含 QA 循环），供 generate_listening_script 调用。"""
-    prompt = _build_listening_prompt(topic, cefr, used_dialogues=used_summaries,
-                                     num_lines=num_lines, structure=structure,
-                                     style_boost=style_boost, outline=outline,
-                                     devices=devices)
+# flash 类模型单请求写长对话会数不准（要求 60 行实发 24-36 行），超过此值
+# 分批续写；每批行数控制在可靠计数范围内
+_LISTENING_SINGLE_SHOT_MAX = 30
+_LISTENING_BATCH_LINES = 20
 
-    # Retry up to 3 times on JSON parse errors (LLM may truncate or produce invalid JSON)
+
+def _chat_json_with_retry(messages: list[dict], *, temp_start: float,
+                          attempts: int = 3, label: str = "script generation"):
+    """_chat + _extract_json 带 3 次重试（温度衰减 / 打印 / 5s 退避，语义与
+    原 _generate_listening_raw 内联循环一致）。"""
     last_error = None
-    for attempt in range(3):
+    for attempt in range(attempts):
         try:
             content = _chat(
-                [
-                    {"role": "system", "content": "You are an expert ESL teacher creating English listening practice content for overseas Chinese learners. Output valid JSON only — no markdown, no explanations."},
-                    {"role": "user", "content": prompt},
-                ],
+                messages,
                 temperature=round(temp_start if attempt == 0 else temp_start - 0.1, 2),
                 max_tokens=8192,
             )
-            script = _extract_json(content)
-            break
+            return _extract_json(content)
         except (json.JSONDecodeError, RuntimeError) as e:
             last_error = e
             err_str = str(e)
             # Log raw content on JSON parse errors for debugging
             if isinstance(e, json.JSONDecodeError):
-                print(f"  [LLM retry {attempt+1}/3] JSONDecodeError: {err_str[:200]}")
+                print(f"  [LLM retry {attempt+1}/{attempts}] JSONDecodeError: {err_str[:200]}")
                 print(f"  [LLM] Raw content (first 300 chars): {content[:300] if 'content' in dir() else 'N/A'}")
             else:
-                print(f"  [LLM retry {attempt+1}/3] {type(e).__name__}: {err_str[:200]}")
-            if attempt < 2:
+                print(f"  [LLM retry {attempt+1}/{attempts}] {type(e).__name__}: {err_str[:200]}")
+            if attempt < attempts - 1:
                 import time
                 time.sleep(5)
+    raise RuntimeError(f"LLM {label} failed after {attempts} retries: {last_error}")
+
+
+def _generate_listening_batched(topic: str, cefr: str, used_summaries: list[str],
+                                num_lines: int, structure: str, style_boost: bool,
+                                devices: list[str], outline: dict | None,
+                                temp_start: float = 0.8) -> dict:
+    """大行数分批生成：part 1 标准产出全部元数据 + 首批行，后续批续写 dialogue。
+
+    续写批携带大纲四节拍做节奏指导（中间批发展 obstacle、末批强制落地
+    twist/resolution）+ 尾部上下文 + 下一说话人提示；超产裁剪，不足最多
+    补写 2 轮，仍不足 raise 交外层 attempt 重试。
+    """
+    system = ("You are an expert ESL teacher creating English listening practice "
+              "content for overseas Chinese learners. Output valid JSON only — "
+              "no markdown, no explanations.")
+    bounds = []
+    s = 0
+    while s < num_lines:
+        e = min(s + _LISTENING_BATCH_LINES, num_lines) - 1
+        bounds.append((s, e))
+        s = e + 1
+    total_parts = len(bounds)
+    print(f"  [LLM] {num_lines} lines > single-shot limit "
+          f"{_LISTENING_SINGLE_SHOT_MAX}: generating in {total_parts} parts "
+          f"({_LISTENING_BATCH_LINES} lines/part)")
+
+    f_s, f_e = bounds[0]
+    p1_prompt = _build_listening_prompt(
+        topic, cefr, used_dialogues=used_summaries, num_lines=num_lines,
+        structure=structure, style_boost=style_boost, outline=outline,
+        devices=devices,
+        line_count_directive=(
+            f"Write ONLY dialogue lines {f_s}-{f_e} of this {num_lines}-line "
+            f"dialogue (part 1 of {total_parts}). Later parts are generated "
+            f"separately and will continue the SAME story in the SAME scene — "
+            f"do NOT rush the arc; this part establishes the setting and the goal."))
+    script = _chat_json_with_retry(
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": p1_prompt},
+        ],
+        temp_start=temp_start, label="script generation (part 1)")
+    if not isinstance(script, dict):
+        raise RuntimeError("LLM part 1 returned non-dict JSON")
+    dialogue = script.get("dialogue", [])
+    if not isinstance(dialogue, list) or not dialogue:
+        raise RuntimeError("LLM part 1 returned no dialogue array")
+
+    ca_role = script.get("char_a_role", "speaker 1")
+    cb_role = script.get("char_b_role", "speaker 2")
+    ca_gender = script.get("char_a_gender", "")
+    cb_gender = script.get("char_b_gender", "")
+    ca_desc = str(script.get("char_a_description", "")).strip()
+    cb_desc = str(script.get("char_b_description", "")).strip()
+    scene = str(script.get("scene", "")).strip() or topic
+    pf = structure if structure in ("original", "original_static") else ""
+    style_prompt = str(get_active_style_prompt() or "").strip() if pf else ""
+    fields_req = ""
+    if pf:
+        fname = "video_prompt" if pf == "original" else "image_prompt"
+        fields_req = (f', "{fname}" (FULL physical description of the speaker + '
+                      f'their role + the {scene} location + action matching the text')
+        if style_prompt:
+            fields_req += f' + this EXACT style phrase verbatim: "{style_prompt}"'
+        fields_req += ")"
+
+    ol = outline or {}
+    goal = str(ol.get("goal", "")).strip()
+    obstacle = str(ol.get("obstacle", "")).strip()
+    twist = str(ol.get("twist", "")).strip()
+    resolution = str(ol.get("resolution", "")).strip()
+    mw = resolve_max_line_words()
+
+    def _continue_part(label: str, s0: int, e0: int, final: bool) -> list[dict]:
+        k = e0 - s0 + 1
+        ctx = dialogue[-4:]
+        ctx_lines = "\n".join(
+            f'  {l.get("speaker", "?")}: {l.get("text", "")}' for l in ctx)
+        last_sp = str(ctx[-1].get("speaker", "char_b")) if ctx else "char_b"
+        nxt = "char_b" if last_sp == "char_a" else "char_a"
+        if final:
+            pacing = (f"PACING (FINAL part): land the twist "
+                      f"({twist or 'the unexpected moment'}) and the resolution "
+                      f"({resolution or 'wrap up the goal'}) — end the "
+                      f"conversation naturally.")
+        else:
+            pacing = (f"PACING (part {label}): develop the obstacle "
+                      f"({obstacle or 'the problem'}) — do NOT resolve the story yet.")
+        cont = f"""Continue this ESL listening-practice dialogue at the {scene} (one continuous scene, the SAME two characters).
+
+Story outline (MANDATORY arc):
+- Goal: {goal}
+- Obstacle: {obstacle}
+- Twist: {twist}
+- Resolution: {resolution}
+
+Characters:
+- char_a = {ca_role} ({ca_gender}) — {ca_desc}
+- char_b = {cb_role} ({cb_gender}) — {cb_desc}
+
+CEFR {cefr}: natural conversational English, contractions, fillers ("well", "um", "you know"); each line AT MOST {mw} words (HARD LIMIT — subtitles must fit 2 lines).
+
+Lines so far (context, do NOT rewrite):
+{ctx_lines}
+
+Write the NEXT {k} lines (planned lines {s0}-{e0} of {num_lines}) continuing the story seamlessly:
+- The first new line is spoken by "{nxt}".
+- {pacing}
+- Keep the SAME scene and the SAME story facts (names, prices, quantities) — do not contradict earlier lines, do not repeat earlier lines.
+- Every line MUST include: "text", "phonetic" (IPA in /slashes/), "zh" (Traditional Chinese 繁體中文){fields_req}.
+
+Output: JSON array of exactly {k} objects. JSON ONLY."""
+        part = _chat_json_with_retry(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": cont},
+            ],
+            temp_start=0.7, label=label)
+        if isinstance(part, dict):
+            part = part.get("dialogue", [])
+        if not isinstance(part, list):
+            part = []
+        part = [l for l in part if isinstance(l, dict)][:k]
+        return part
+
+    for pi, (s0, e0) in enumerate(bounds[1:], start=2):
+        part = _continue_part(f"dialogue part {pi}/{total_parts}", s0, e0,
+                              final=(pi == total_parts))
+        dialogue.extend(part)
+        print(f"  [LLM] part {pi}/{total_parts}: +{len(part)} lines "
+              f"(total {len(dialogue)}/{num_lines})")
+
+    # 不足补写（最多 2 轮）：模型偶发少写，末批节奏强制收尾
+    for t in range(2):
+        if len(dialogue) >= num_lines:
+            break
+        part = _continue_part(f"top-up {t + 1}", len(dialogue), num_lines - 1,
+                              final=True)
+        dialogue.extend(part)
+        print(f"  [LLM] top-up {t + 1}: +{len(part)} lines "
+              f"(total {len(dialogue)}/{num_lines})")
+
+    if len(dialogue) < num_lines:
+        raise RuntimeError(f"LLM returned {len(dialogue)} dialogue lines "
+                           f"< {num_lines} required (batched generation)")
+    script["dialogue"] = dialogue[:num_lines]
+    return script
+
+
+def _generate_listening_raw(topic: str, cefr: str, used_summaries: list[str],
+                            num_lines: int, structure: str, style_boost: bool,
+                            devices: list[str], outline: dict | None,
+                            temp_start: float = 0.8) -> dict:
+    """生成 + 字段兜底（不含 QA 循环），供 generate_listening_script 调用。
+
+    num_lines > _LISTENING_SINGLE_SHOT_MAX 时走分批续写（flash 单请求
+    写长对话数不准，60 行实发 24-36 行）。
+    """
+    if num_lines > _LISTENING_SINGLE_SHOT_MAX:
+        script = _generate_listening_batched(topic, cefr, used_summaries,
+                                             num_lines, structure, style_boost,
+                                             devices, outline, temp_start)
     else:
-        raise RuntimeError(f"LLM script generation failed after 3 retries: {last_error}")
+        prompt = _build_listening_prompt(topic, cefr, used_dialogues=used_summaries,
+                                         num_lines=num_lines, structure=structure,
+                                         style_boost=style_boost, outline=outline,
+                                         devices=devices)
+        script = _chat_json_with_retry(
+            [
+                {"role": "system", "content": "You are an expert ESL teacher creating English listening practice content for overseas Chinese learners. Output valid JSON only — no markdown, no explanations."},
+                {"role": "user", "content": prompt},
+            ],
+            temp_start=temp_start, label="script generation")
 
     # Ensure lesson_type marker
     script["lesson_type"] = "listening"
