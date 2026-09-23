@@ -117,7 +117,37 @@ def _gate_issues_digest(report: dict) -> str:
     return "\n".join(lines[:60]) or "(none)"
 
 
-def _build_judge_prompt(kind: str, script: dict, report: dict) -> str:
+# 三个评审角色的 task 文案（原文与旧版逐字一致，仅从 _build_judge_prompt
+# 提出为 dict 以支持单请求多角色合并评审）
+_JUDGE_TASKS = {
+    "story": """You are a STORY COHERENCE judge for an ESL slow-listening video script (a real-life scene dialogue for listening practice).
+Find ONLY story-level problems the machine checks above cannot detect:
+1. Topic regression: a later line re-introduces a topic/question already settled earlier (as if new).
+2. Facts contradict across lines (prices, names, times, quantities, places).
+3. The story arc is incomplete or abrupt: no clear beginning/development/resolution, or an ending that feels cut off.
+4. Scene drift in the STORY itself (actions imply a different location than the stated scene).
+5. Character role confusion: a speaker acts contrary to their role (e.g. the customer gives the waiter's lines).
+Report each problem as a line range [start, end] (0-indexed, inclusive).""",
+    "engagement": """You are an ENGAGEMENT judge for an ESL slow-listening video script (audience: overseas Chinese learners who want vivid, natural conversation).
+The script may be technically correct but DULL. Find the DULLEST stretches (2-6 consecutive lines) that feel like a flat transaction or textbook Q&A, and say how to make them vivid:
+- add a genuine human reaction (amusement, surprise, relief, mild annoyance)
+- add a light joke, a personal remark, or a back-channel ("oh really?", "that makes sense")
+- raise a small conflict or unexpected beat if the story has none
+- replace textbook phrasing with the way people actually talk (contractions, fragments)
+- vary line length (very short reactions vs fuller sentences)
+Rules: do NOT break story coherence, do NOT exceed the per-line word limit, do NOT change the scene or the facts. Report each dull stretch as a line range [start, end] (0-indexed, inclusive).""",
+    "language": """You are a LANGUAGE QUALITY judge for an ESL slow-listening video script (target: overseas Chinese beginners).
+Find ONLY language-level problems the machine checks above cannot detect:
+1. Robotic stretches: 3+ consecutive lines with flat Q&A rhythm or identical sentence structure.
+2. Unnatural English: textbook phrasing no native speaker would say; register above the CEFR level (hard words/grammar).
+3. zh translation errors: mistranslation, wrong meaning, stiff machine-like 繁體中文, inconsistent terminology for the same English term.
+4. Repetitive openers or verbal tics the machine didn't flag.
+Report each problem as a line range [start, end] (0-indexed, inclusive).""",
+}
+
+
+def _build_judge_prompt(kinds: list[str], script: dict, report: dict) -> str:
+    """单请求多角色评审 prompt：kinds 依序输出为分段 task + 三段式 JSON schema。"""
     dialogue_json = _dialogue_compact(script)
     meta_block = f"""Title: {script.get('title', '')}
 Scene: {script.get('scene', '')} ({script.get('scene_zh', '')})
@@ -128,43 +158,24 @@ char_b: {script.get('char_b_role', '')} — {script.get('char_b_description', ''
     machine = f"""Machine checks already found (do NOT repeat these):
 {_gate_issues_digest(report)}
 """
-    if kind == "story":
-        task = """You are a STORY COHERENCE judge for an ESL slow-listening video script (a real-life scene dialogue for listening practice).
-Find ONLY story-level problems the machine checks above cannot detect:
-1. Topic regression: a later line re-introduces a topic/question already settled earlier (as if new).
-2. Facts contradict across lines (prices, names, times, quantities, places).
-3. The story arc is incomplete or abrupt: no clear beginning/development/resolution, or an ending that feels cut off.
-4. Scene drift in the STORY itself (actions imply a different location than the stated scene).
-5. Character role confusion: a speaker acts contrary to their role (e.g. the customer gives the waiter's lines).
-Report each problem as a line range [start, end] (0-indexed, inclusive)."""
-    elif kind == "engagement":
-        task = """You are an ENGAGEMENT judge for an ESL slow-listening video script (audience: overseas Chinese learners who want vivid, natural conversation).
-The script may be technically correct but DULL. Find the DULLEST stretches (2-6 consecutive lines) that feel like a flat transaction or textbook Q&A, and say how to make them vivid:
-- add a genuine human reaction (amusement, surprise, relief, mild annoyance)
-- add a light joke, a personal remark, or a back-channel ("oh really?", "that makes sense")
-- raise a small conflict or unexpected beat if the story has none
-- replace textbook phrasing with the way people actually talk (contractions, fragments)
-- vary line length (very short reactions vs fuller sentences)
-Rules: do NOT break story coherence, do NOT exceed the per-line word limit, do NOT change the scene or the facts. Report each dull stretch as a line range [start, end] (0-indexed, inclusive)."""
-    else:
-        task = """You are a LANGUAGE QUALITY judge for an ESL slow-listening video script (target: overseas Chinese beginners).
-Find ONLY language-level problems the machine checks above cannot detect:
-1. Robotic stretches: 3+ consecutive lines with flat Q&A rhythm or identical sentence structure.
-2. Unnatural English: textbook phrasing no native speaker would say; register above the CEFR level (hard words/grammar).
-3. zh translation errors: mistranslation, wrong meaning, stiff machine-like 繁體中文, inconsistent terminology for the same English term.
-4. Repetitive openers or verbal tics the machine didn't flag.
-Report each problem as a line range [start, end] (0-indexed, inclusive)."""
+    tasks = "\n\n".join(
+        f"SECTION {idx + 1} ({kind}):\n{_JUDGE_TASKS[kind]}"
+        for idx, kind in enumerate(kinds))
+    keys = ", ".join(f'"{k}": []' for k in kinds)
 
     return f"""{meta_block}{machine}
-{task}
+Act as {len(kinds)} independent judges reviewing the SAME dialogue. Perform EACH section below separately and strictly.
+
+{tasks}
 
 Dialogue (compact JSON, i = line index, s = speaker, t = English text, z = Traditional Chinese):
 {dialogue_json}
 
-Output JSON ONLY:
-{{"issues": [{{"type": "...", "lines": [start, end], "problem": "...", "fix_hint": "how to fix"}}]}}
+Output JSON ONLY with one key per section:
+{{{keys}}}
+Each value is a list of issues: {{"type": "...", "lines": [start, end], "problem": "...", "fix_hint": "how to fix"}}
 
-If everything is fine, output {{"issues": []}}. Max 10 issues, most important first."""
+If a section finds nothing, output an empty list for it. Max 10 issues per section, most important first."""
 
 
 def _parse_judge_issues(raw, n_lines: int) -> list[dict]:
@@ -202,26 +213,35 @@ def _engagement_qa_enabled() -> bool:
 
 
 def _critique_listening(script: dict, report: dict) -> list[dict]:
-    """Run story judge + language judge (+engagement judge if enabled)."""
+    """Run story/language (+engagement if enabled) judges in ONE LLM request.
+
+    单请求输出三段评审结果（每轮 3 次调用 → 1 次）；失败时本轮 judge
+    issues 为空（与旧版单 judge 失败时的行为一致）。
+    """
     kinds = ["story", "language"]
     if _engagement_qa_enabled():
         kinds.append("engagement")
     combined = []
+    try:
+        content = _chat(
+            [{"role": "system",
+              "content": "You are a strict script quality judge for ESL videos. "
+                         "Output valid JSON only."},
+             {"role": "user",
+              "content": _build_judge_prompt(kinds, script, report)}],
+            temperature=0.3, max_tokens=8192, reasoning_effort="low")
+        result = _extract_json(content)
+    except (RuntimeError, json.JSONDecodeError, ValueError) as e:
+        print(f"  [QA] judge call failed: {e}")
+        return combined
+    if not isinstance(result, dict):
+        print("  [QA] judge call failed: non-dict JSON")
+        return combined
+    # 防御：模型忽略三段式输出扁平 issues 时按 language 处理
+    if all(k not in result for k in kinds) and "issues" in result:
+        result = {"language": result["issues"]}
     for kind in kinds:
-        try:
-            content = _chat(
-                [{"role": "system",
-                  "content": "You are a strict script quality judge for ESL videos. "
-                             "Output valid JSON only."},
-                 {"role": "user",
-                  "content": _build_judge_prompt(kind, script, report)}],
-                temperature=0.3, max_tokens=8192, reasoning_effort="low")
-            result = _extract_json(content)
-        except (RuntimeError, json.JSONDecodeError, ValueError) as e:
-            print(f"  [QA] {kind} judge failed: {e}")
-            continue
-        raw = (result.get("issues", []) if isinstance(result, dict)
-               else (result if isinstance(result, list) else []))
+        raw = result.get(kind, [])
         found = _parse_judge_issues(raw, len(script.get("dialogue", [])))
         if kind == "engagement":
             found = found[:3]  # 张力重写每轮最多 3 段，控制成本与重写抖动
@@ -268,6 +288,20 @@ def _merge_patches(report: dict, judge_issues: list[dict],
                 spans.append((l, l,
                               "Gender words conflict in this line's prompts — make all "
                               "pronouns/appearance words match the speaker's gender."))
+        elif "超长" in issue["detail"]:
+            # 超长 error 之前没有映射 → 没有任何 patch 会去缩短它，QA 空转
+            # 到硬上限（judge 又被要求"不要重复机器检查"）；cap 与门禁同源
+            cap = resolve_max_line_words()
+            for l in ls:
+                spans.append((l, l,
+                              f"Line exceeds the {cap}-word limit — shorten it "
+                              f"(subtitles must fit 2 lines)."))
+        else:
+            # 通用兜底（story 同款）：未映射的带行 error 直接把机器检查
+            # 文本当修复提示交给重写
+            s, e = ls[0], ls[-1]
+            spans.append((max(0, min(s, e)), min(n - 1, max(s, e)),
+                          issue["detail"]))
 
     for issue in judge_issues:
         s, e = issue["lines"]
@@ -474,14 +508,35 @@ Output: JSON array of exactly {k} objects. JSON ONLY."""
 # 主入口：轮次循环
 # ---------------------------------------------------------------------------
 
+def _error_fingerprint(report: dict) -> frozenset:
+    """门禁 error 指纹（check+detail+lines），用于识别"修了但原样未动"的空转。"""
+    return frozenset(
+        (i["check"], i["detail"], tuple(i.get("lines") or []))
+        for i in report.get("issues", []) if i["severity"] == "error")
+
+
+def _print_error_details(report: dict, limit: int = 5):
+    """逐轮打印 error 明细——让用户直接看到哪个 error 顽固（旧版只打数量）。"""
+    for i in report.get("issues", []):
+        if i["severity"] != "error":
+            continue
+        print(f"    [E] {i['check']}: {i['detail']}"
+              + (f"  lines={i['lines']}" if i.get("lines") else ""))
+        limit -= 1
+        if limit <= 0:
+            break
+
+
 def run_listening_qa(script: dict, num_lines: int,
                      structure: str = "original") -> dict:
     """Gate + critique/repair loop. Mutates script in place, stores script["_qa"].
 
-    轮次语义：跑满 qa_rounds 轮（每轮必跑双评审，发现问题即修复）；轮满仍有
+    轮次语义：跑满 qa_rounds 轮（每轮必跑评审，发现问题即修复）；轮满仍有
     error 则继续修到 0 error，硬上限 _QA_HARD_CAP 轮；有 error 但无可行动
     patch 时提前接受 best effort（脚本未变，再循环结果相同）。
+    止损：轮满后若剩余 error 指纹与上轮完全相同（修过却原样未动），不再续轮。
     """
+    from llm_client import get_llm_call_count
     qa_rounds = _env_int("LISTENING_QA_MAX_ROUNDS", 3)
     if qa_rounds <= 0:
         return script
@@ -493,12 +548,14 @@ def run_listening_qa(script: dict, num_lines: int,
           f"error-repair up to {hard_cap} rounds")
     _apply_fixes(script)
     rounds_log = []
+    prev_errors: frozenset = frozenset()
     for rnd in range(1, hard_cap + 1):
         report = run_listening_quality_gate(script, num_lines,
                                             structure=structure,
                                             max_line_words=cap)
         print(f"  [QA] Round {rnd}: gate errors={report['n_errors']} "
               f"warnings={report['n_warnings']}, running LLM judges...")
+        _print_error_details(report)
         judge_issues = _critique_listening(script, report)
         rounds_log.append({
             "round": rnd,
@@ -513,8 +570,18 @@ def run_listening_qa(script: dict, num_lines: int,
             _repair_patches(script, patches, script.get("cefr", "A2"),
                             structure=structure)
             _apply_fixes(script)
-        if rnd >= qa_rounds and report["n_errors"] == 0:
-            print(f"  [QA] Round {rnd}: done (0 errors, {rnd} rounds run)")
+        print(f"  [QA] LLM calls so far: {get_llm_call_count()}")
+        error_fp = _error_fingerprint(report)
+        # error 指纹与上轮完全相同 → 本轮修复对它们无效（修不动的 error）
+        stuck = error_fp & prev_errors
+        remaining = error_fp - stuck
+        prev_errors = error_fp
+        if rnd >= qa_rounds and not remaining:
+            if stuck:
+                print(f"  [QA] Round {rnd}: {len(stuck)} error(s) unchanged "
+                      f"after repair, accepting best effort")
+            else:
+                print(f"  [QA] Round {rnd}: done (0 errors, {rnd} rounds run)")
             break
         if report["n_errors"] > 0 and not patches:
             print(f"  [QA] Round {rnd}: errors remain but no actionable "

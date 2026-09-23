@@ -40,7 +40,7 @@ _LINES = [
      "/noʊ ˈprɑbləm/", "沒問題。一共是四塊五。"),
     ("char_a", "Here you go. Um, can I get a receipt?",
      "/hɪr ju ɡoʊ/", "給你。嗯，可以給我一張收據嗎？"),
-    ("char_b", "Of course, one second. Oh, our pastry case just came out fresh.",
+    ("char_b", "Of course, one second. Our pastry case is fresh out.",
      "/əv kɔrs/", "當然，等一下。哦，我們的點心剛出爐。"),
     ("char_a", "Wow, that croissant smells amazing, I might add one.",
      "/waʊ/", "哇，那個可頌聞起來好香，我可能加一個。"),
@@ -138,8 +138,10 @@ class TestDefectFixture(unittest.TestCase):
 
     def test_line_count(self):
         report = run_listening_quality_gate(_clean_script(), 19)
-        found = _find_issues(report, "structure", "error", "总行数")
-        self.assertTrue(found, "line-count mismatch should be an error")
+        # 2026-09-23 行数不符降级为 warning（patch 恒保行数，error 会令
+        # QA 空转到硬上限；下游全按实际行数走，多行无害）
+        found = _find_issues(report, "structure", "warning", "总行数")
+        self.assertTrue(found, "line-count mismatch should be a warning")
 
     def test_duplicate_line(self):
         def mutate(s):

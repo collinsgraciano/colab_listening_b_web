@@ -149,8 +149,11 @@ def run_listening_quality_gate(script: dict, num_lines: int | None = None,
     cefr = (script.get("cefr") or "A2").upper()
 
     # ── 1. 结构 ──────────────────────────────────────────────────────
+    # 行数不符降为 warning：patch 恒保行数，error 级会让 QA 空转到硬上限；
+    # 多行无害（下游 TTS/时间轴/合成全按实际行数走），与 _validate_script
+    # 只拦截"行数不足"的语义对齐
     if len(dialogue) != num_lines:
-        add("structure", "error",
+        add("structure", "warning",
             f"总行数 {len(dialogue)} != 要求 {num_lines}")
     bad_speakers = [i for i, l in enumerate(dialogue)
                     if l.get("speaker", "") not in ("char_a", "char_b")]

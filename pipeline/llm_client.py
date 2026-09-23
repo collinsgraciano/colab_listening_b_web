@@ -110,6 +110,20 @@ def _sleep_interruptible(sec: float) -> None:
 _LAST_CALL_TIME = 0.0  # 最近一次调用的开始时刻（预约槽位）
 _RATE_LOCK = threading.Lock()
 
+# LLM 实际 HTTP 调用计数（_chat / gemini_chat 共用，含重试）；QA 循环
+# 用它打印累计成本，用户可在后台对照请求数
+_LLM_CALL_COUNT = 0
+
+
+def get_llm_call_count() -> int:
+    """进程内累计 LLM HTTP 调用次数（含重试）。"""
+    return _LLM_CALL_COUNT
+
+
+def _count_llm_call():
+    global _LLM_CALL_COUNT
+    _LLM_CALL_COUNT += 1
+
 
 def _get_min_call_interval() -> float:
     """Read LLM_MIN_INTERVAL per-call (thread-local override first)."""
@@ -479,6 +493,7 @@ def gemini_chat(api_key: str, model: str, messages: list[dict], *,
                         }
                         if system_instruction:
                             kwargs["system_instruction"] = system_instruction
+                        _count_llm_call()
                         interaction = client.interactions.create(**kwargs)
                     except Exception as e:  # noqa: BLE001 — SDK/网络异常统一归类
                         code = getattr(e, "code", None)
@@ -584,6 +599,7 @@ def _chat(messages: list[dict], temperature: float = 0.8, timeout: int = 180,
     for _retry_attempt in range(len(_RETRY_BACKOFFS) + 1):
         _check_stop()  # 用户停止即时生效（穿透 BaseException）
         _enforce_rate_limit()
+        _count_llm_call()
         body = {
             "model": model,
             "messages": messages,
@@ -1399,6 +1415,13 @@ def generate_listening_script(topic: str, cefr: str = "A2",
     else:
         script = _generate_listening_raw(topic, cefr, used_summaries, num_lines,
                                          structure, style_boost, devices, outline)
+
+    # 行数不足在 QA 前直接失败（attempt 级重试重新生成）——行数无法被
+    # patch 修复（patch 恒保行数），带病进 QA 只会烧完 10 轮再被外层拒收
+    if len(script.get("dialogue", [])) < num_lines:
+        raise RuntimeError(
+            f"LLM returned {len(script.get('dialogue', []))} dialogue lines "
+            f"< {num_lines} required")
 
     # QA: programmatic gate + LLM critique/repair loop (mirrors quest Phase D+E)
     from llm_review import run_listening_qa
