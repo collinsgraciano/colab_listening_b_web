@@ -19,7 +19,7 @@ from .paths import ensure_pipeline_on_path
 ensure_pipeline_on_path()
 from llm_client import (  # noqa: E402
     _enforce_rate_limit, _extract_json, gemini_chat, llm_urlopen,
-    proxy_url_from_config,
+    proxy_url_from_config, wbk_thinking_for,
 )
 
 _REVIEW_BATCH_SIZE = 50
@@ -64,7 +64,11 @@ def _chat_json(messages: list[dict], temperature: float = 0.7,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        if p_type != "openai":
+        if p_type == "wbk":
+            _effort = wbk_thinking_for(model, config.get("wbk_thinking", "default"))
+            if _effort:
+                body["reasoning_effort"] = _effort
+        elif p_type != "openai":
             body["reasoning_effort"] = "low"
         req = urllib.request.Request(
             f"{base_url}/chat/completions",

@@ -72,6 +72,7 @@ async def api_ai_test_config_get():
         "sensenova_model": config.get("sensenova_model", "deepseek-v4-flash"),
         "openai_model": config.get("openai_model", "grok-4.6"),
         "gemini_model": config.get("gemini_model", "models/gemini-3.8-flash"),
+        "wbk_model": config.get("wbk_model", "cn:auto"),
         "openai_base_url": config.get("openai_base_url", ""),
         "system_prompt": ai_cfg.get("system_prompt", ""),
         "custom_providers": _public_providers(),
@@ -201,8 +202,12 @@ async def api_ai_test_chat(request: Request):
     if model:
         resolved_model = model
     model = resolved_model
-    # p_type is "sensenova" / "openai" (custom → openai) / "gemini"
+    # p_type is "sensenova" / "wbk" / "openai" (custom → openai) / "gemini"
     provider = p_type
+    if provider == "wbk":
+        # resolve_provider 对 wbk 不回 base_url（端点常量在 llm_client）
+        from llm_client import WBK_BASE_URL  # pipeline/ 已在 sys.path
+        base_url = WBK_BASE_URL
 
     if not api_key:
         return JSONResponse(
@@ -241,7 +246,13 @@ async def api_ai_test_chat(request: Request):
             "stream": True,
             "stream_options": {"include_usage": True},
         }
-        if provider != "openai":
+        if provider == "wbk":
+            # 思考强度按模型规格表裁剪；弹窗传 "default"（或未识别档位）→ 不发送
+            from llm_client import wbk_thinking_for  # pipeline/ 已在 sys.path
+            _effort = wbk_thinking_for(model, reasoning_effort)
+            if _effort:
+                body["reasoning_effort"] = _effort
+        elif provider != "openai":
             body["reasoning_effort"] = reasoning_effort
 
         body_bytes = json.dumps(body).encode("utf-8")

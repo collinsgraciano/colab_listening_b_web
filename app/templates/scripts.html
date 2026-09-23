@@ -231,6 +231,8 @@ function onProviderChange(skipSave) {
         models = FORM.sensenova_models || [];
     } else if (provider === 'gemini') {
         models = FORM.gemini_models || [];
+    } else if (provider === 'wbk') {
+        models = FORM.wbk_models || [];
     } else if (provider.startsWith('custom:')) {
         const cp = (FORM.custom_providers || []).find(p => 'custom:' + p.id === provider);
         models = cp ? cp.models : [];
@@ -248,7 +250,8 @@ function onProviderChange(skipSave) {
         sel.value = lastM;
     } else if (FORM.current) {
         const saved = provider === 'sensenova' ? FORM.current.sensenova_model
-            : provider === 'gemini' ? FORM.current.gemini_model : FORM.current.openai_model;
+            : provider === 'gemini' ? FORM.current.gemini_model
+            : provider === 'wbk' ? FORM.current.wbk_model : FORM.current.openai_model;
         if (saved && models.includes(saved)) sel.value = saved;
     }
     if (!skipSave) saveFormMemory();

@@ -148,14 +148,15 @@ _gen_status: dict = {"status": "idle", "error": "", "count": 0}
 
 def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
               prompt: str, temperature: float = 0.9,
-              proxy_url: str = "") -> tuple[str, str]:
+              proxy_url: str = "", wbk_effort: str = "default") -> tuple[str, str]:
     """同步调 LLM chat/completions，返回 (content, finish_reason)。
 
     max_tokens 优先 16384（5 套长简介易顶到 8192 被截断）；Provider 拒绝该上限
-    （HTTP 400 报文提到 max_tokens）时回退 8192 重试一次。
+    （HTTP 400 报文提到 max_tokens）时回退 8192 重试一次。wbk 按模型规格表
+    决定 reasoning_effort（default=不发送）。
     独立小函数，便于测试 monkeypatch。
     """
-    from llm_client import gemini_chat, llm_urlopen  # pipeline/ 已在 sys.path
+    from llm_client import gemini_chat, llm_urlopen, wbk_thinking_for  # pipeline/ 已在 sys.path
     if p_type == "gemini":
         content = gemini_chat(api_key, model, [
             {"role": "system",
@@ -176,7 +177,11 @@ def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
         "temperature": temperature,
         "max_tokens": 16384,
     }
-    if p_type != "openai":
+    if p_type == "wbk":
+        _effort = wbk_thinking_for(model, wbk_effort)
+        if _effort:
+            body["reasoning_effort"] = _effort
+    elif p_type != "openai":
         body["reasoning_effort"] = "low"
     last_err: Exception | None = None
     for max_tokens in (16384, 8192):
@@ -436,7 +441,8 @@ def _generate_batch_worker(direction: str, reference_ids: list | None = None,
         temperature = {"light": 0.9, "medium": 0.8, "high": 0.6}.get(similarity, 0.9)
         content, finish_reason = _llm_chat(
             base_url, api_key, model, p_type, prompt, temperature,
-            proxy_url=proxy_url_from_config(_cfg))
+            proxy_url=proxy_url_from_config(_cfg),
+            wbk_effort=str(_cfg.get("wbk_thinking") or "default"))
         if finish_reason == "length":
             print("  [ChannelFactory] WARNING: LLM 输出被 max_tokens 截断"
                   "（finish_reason=length），将尝试修复/兜底提取")

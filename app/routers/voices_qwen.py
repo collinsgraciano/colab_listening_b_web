@@ -314,6 +314,10 @@ def _build_voice_llm_override() -> dict:
     elif p_type == "gemini":
         ov["GEMINI_API_KEY"] = api_key
         ov["GEMINI_MODEL"] = model or "models/gemini-3.8-flash"
+    elif p_type == "wbk":
+        ov["WBK_API_KEY"] = api_key
+        ov["WBK_MODEL"] = model or "cn:auto"
+        ov["WBK_THINKING"] = str(cfg.get("wbk_thinking") or "default")
     else:
         ov["OPENAI_BASE_URL"] = base_url
         ov["OPENAI_API_KEY"] = api_key

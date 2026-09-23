@@ -178,6 +178,7 @@ const PROVIDER_OPTIONS = {{ provider_options | tojson }};
 const SENSENOVA_MODELS = {{ sensenova_models | tojson }};
 const OPENAI_MODELS = {{ openai_models | tojson }};
 const GEMINI_MODELS = {{ gemini_models | tojson }};
+const WBK_MODELS = {{ wbk_models | tojson }};
 
 function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g,
@@ -207,14 +208,16 @@ function loadConfig() {
             const known = [...selP.options].some(o => o.value === configured);
             selP.value = known ? configured : 'sensenova';
             onProviderChange();
-            // 回显保存的模型：sensenova / gemini 允许追加缺失项；其余 Provider 仅在列表中存在时回显，避免污染
+            // 回显保存的模型：sensenova / gemini / wbk 允许追加缺失项；其余 Provider 仅在列表中存在时回显，避免污染
             const sel = document.getElementById('st-model');
             const savedModel = selP.value === 'sensenova' ? cfg.sensenova_model
-                : selP.value === 'gemini' ? cfg.gemini_model : cfg.openai_model;
+                : selP.value === 'gemini' ? cfg.gemini_model
+                : selP.value === 'wbk' ? cfg.wbk_model : cfg.openai_model;
             if (savedModel) {
                 if ([...sel.options].some(o => o.value === savedModel)) {
                     sel.value = savedModel;
-                } else if (selP.value === 'sensenova' || selP.value === 'gemini') {
+                } else if (selP.value === 'sensenova' || selP.value === 'gemini'
+                           || selP.value === 'wbk') {
                     addModelOption(savedModel);
                     sel.value = savedModel;
                 }
@@ -268,6 +271,8 @@ function onProviderChange() {
         models = SENSENOVA_MODELS;
     } else if (provider === 'gemini') {
         models = GEMINI_MODELS;
+    } else if (provider === 'wbk') {
+        models = WBK_MODELS;
     } else if (provider.startsWith('custom:')) {
         const pid = provider.split(':')[1];
         const cp = CUSTOM_PROVIDERS.find(p => p.id === pid);
@@ -277,17 +282,19 @@ function onProviderChange() {
     }
     sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
 
-    // 推理档位：SenseNova=reasoning_effort，Gemini=thinking_level（多一个 minimal）
-    const withThinking = provider === 'sensenova' || provider === 'gemini';
+    // 推理档位：SenseNova=reasoning_effort，Gemini=thinking_level（多一个 minimal），
+    // WBK 按模型规格表裁剪（default=端点默认）
+    const withThinking = provider === 'sensenova' || provider === 'gemini' || provider === 'wbk';
     document.getElementById('st-reasoning-wrap').style.display = withThinking ? '' : 'none';
     document.getElementById('st-reasoning-label').textContent =
         provider === 'gemini' ? 'Thinking Level' : 'Reasoning Effort';
     const selR = document.getElementById('st-reasoning');
     const prevLevel = selR.value;
     const levels = provider === 'gemini'
-        ? ['minimal', 'low', 'medium', 'high'] : ['low', 'medium', 'high'];
+        ? ['minimal', 'low', 'medium', 'high'] : ['default', 'low', 'medium', 'high', 'xhigh', 'max'];
     selR.innerHTML = levels.map(v => `<option value="${v}">${v[0].toUpperCase() + v.slice(1)}</option>`).join('');
-    selR.value = levels.includes(prevLevel) ? prevLevel : 'low';
+    selR.value = levels.includes(prevLevel) ? prevLevel
+        : (provider === 'wbk' ? 'default' : 'low');
     updateModelBadge();
 }
 

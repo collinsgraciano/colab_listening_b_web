@@ -302,6 +302,11 @@ class PipelineService:
                 os.environ["SENSENOVA_API_KEY"] = p_api_key
             if p_model:
                 os.environ["SENSENOVA_MODEL"] = p_model
+        elif p_type == "wbk":
+            if p_api_key:
+                os.environ["WBK_API_KEY"] = p_api_key
+            os.environ["WBK_MODEL"] = str(p_model or "cn:auto")
+            os.environ["WBK_THINKING"] = str(config.get("wbk_thinking") or "default")
         elif p_type == "gemini":
             if p_api_key:
                 os.environ["GEMINI_API_KEY"] = p_api_key
@@ -1262,6 +1267,9 @@ class PipelineService:
             openai_model=p_model if p_type == "openai" else "grok-4.6",
             gemini_api_key=p_api_key if p_type == "gemini" else "",
             gemini_model=p_model if p_type == "gemini" else "models/gemini-3.8-flash",
+            wbk_api_key=p_api_key if p_type == "wbk" else "",
+            wbk_model=p_model if p_type == "wbk" else "cn:auto",
+            wbk_thinking=str(config.get("wbk_thinking") or "default"),
             llm_proxy_url=(str(config.get("llm_proxy_url") or "").strip()
                            if config.get("llm_proxy_enabled") else None),
             llm_retries=int(config.get("llm_retries", 10)),

@@ -237,6 +237,7 @@ PARAM_SPEC = {
     "llm_provider": {"default": "sensenova", "type": "select", "group": "llm",
                      "label": "LLM Provider", "options": {
                          "sensenova": "SenseNova",
+                         "wbk": "WBK (WorkBuddy)",
                          "gemini": "Gemini",
                          "openai": "OpenAI Compatible"}},
     "sensenova_api_key": {"default": "", "type": "password", "group": "llm",
@@ -263,6 +264,40 @@ PARAM_SPEC = {
                         "models/gemini-3-flash", "models/gemini-2.5-flash",
                         "models/gemini-2.5-flash-lite"],
                     "help": "限流(429)时自动从新到旧降级到下一个更旧模型"},
+    "wbk_api_key": {"default": "", "type": "password", "group": "llm",
+                    "label": "WBK API Key",
+                    "help": "llm_provider=wbk 时使用（WorkBuddy 聚合端点，OpenAI 兼容协议）"},
+    "wbk_model": {"default": "cn:auto", "type": "select", "group": "llm",
+                  "label": "WBK Model",
+                  "options": {
+                      "cn:auto": "Auto（自动选择）",
+                      "cn:fast-model": "快速",
+                      "cn:balanced-model": "均衡",
+                      "cn:deep-model": "深度",
+                      "cn:hy4-preview-f": "Hy4 preview (fast)",
+                      "cn:hy4-preview": "Hy4 preview",
+                      "cn:hy3": "Hy3（腾讯混元）",
+                      "cn:hy3-x": "Hy3-x（腾讯混元）",
+                      "cn:deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
+                      "cn:glm-5.3": "GLM-5.3（智谱）",
+                      "cn:glm-5.3-flash": "GLM-5.3 Flash（智谱）",
+                      "cn:glm-5.2": "GLM-5.2（智谱）",
+                      "cn:glm-5.1": "GLM-5.1（智谱）",
+                      "cn:glm-5v-turbo": "GLM-5v-Turbo（智谱）",
+                      "cn:minimax-m3": "MiniMax-M3",
+                      "cn:kimi-k3-1": "Kimi-K3",
+                      "cn:kimi-k2.8-preview": "Kimi-K2.8 Preview",
+                      "cn:kimi-k2.7": "Kimi-K2.7-Code",
+                      "cn:kimi-k2.6": "Kimi-K2.6",
+                      "cn:deepseek-v4-pro": "DeepSeek V4 Pro"},
+                  "help": "思考强度/输出上限按模型规格表自动裁剪（llm_client.WBK_MODEL_SPECS）"},
+    "wbk_thinking": {"default": "default", "type": "select", "group": "llm",
+                     "label": "WBK 思考强度",
+                     "options": {
+                         "default": "default（端点默认，推荐）",
+                         "low": "low", "medium": "medium", "high": "high",
+                         "xhigh": "xhigh", "max": "max"},
+                     "help": "按模型支持档位自动裁剪：模型不支持的档位回退端点默认（如 Hy3 仅 low/high，GLM-5.2 仅 high/xhigh）；default=不发送该参数"},
     "llm_retries": {"default": 10, "type": "number", "group": "llm",
                     "label": "LLM 重试次数"},
     "llm_min_interval": {"default": 3, "type": "number", "group": "llm",
@@ -959,6 +994,7 @@ def get_provider_options() -> dict[str, str]:
     """Return all LLM provider options (static + custom) as {value: label}."""
     options = {
         "sensenova": "SenseNova",
+        "wbk": "WBK (WorkBuddy)",
         "gemini": "Gemini（google-genai）",
         "openai": "OpenAI Compatible (内置)",
     }
@@ -972,7 +1008,7 @@ def resolve_provider(config: dict[str, Any]) -> tuple[str, str, str, str]:
     """Resolve LLM provider config → (provider_type, base_url, api_key, model).
 
     For custom:* providers, reads from llm_providers.json.
-    Returns provider_type as 'sensenova' or 'openai' (custom always → openai).
+    Returns provider_type as 'sensenova' / 'wbk' or 'openai' (custom always → openai).
     """
     provider = config.get("llm_provider", "sensenova")
     if provider == "sensenova":
@@ -981,6 +1017,13 @@ def resolve_provider(config: dict[str, Any]) -> tuple[str, str, str, str]:
             "https://token.sensenova.cn/v1",
             config.get("sensenova_api_key", ""),
             config.get("sensenova_model", "deepseek-v4-flash"),
+        )
+    elif provider == "wbk":
+        return (
+            "wbk",
+            "",
+            config.get("wbk_api_key", ""),
+            config.get("wbk_model", "cn:auto"),
         )
     elif provider == "gemini":
         return (

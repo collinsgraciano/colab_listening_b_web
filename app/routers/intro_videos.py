@@ -295,13 +295,14 @@ Output valid JSON only:
 
 
 def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
-              prompt: str, proxy_url: str = "") -> str:
+              prompt: str, proxy_url: str = "",
+              wbk_effort: str = "default") -> str:
     """同步调 LLM 生成提示词，返回 content。独立函数便于测试 monkeypatch。
 
     与 channel_factory._llm_chat 同模式：gemini 走 SDK，其余 OpenAI 兼容
-    /chat/completions（sensenova 等附 reasoning_effort=low）。
+    /chat/completions（sensenova 等附 reasoning_effort=low；wbk 按模型规格表）。
     """
-    from llm_client import gemini_chat, llm_urlopen  # pipeline/ 已在 sys.path
+    from llm_client import gemini_chat, llm_urlopen, wbk_thinking_for  # pipeline/ 已在 sys.path
     messages = [{"role": "system", "content": _PROMPT_SYSTEM},
                 {"role": "user", "content": prompt}]
     if p_type == "gemini":
@@ -309,7 +310,11 @@ def _llm_chat(base_url: str, api_key: str, model: str, p_type: str,
                            max_tokens=8192, timeout=180, proxy_url=proxy_url)
     body = {"model": model, "messages": messages,
             "temperature": 0.95, "max_tokens": 8192}
-    if p_type != "openai":
+    if p_type == "wbk":
+        _effort = wbk_thinking_for(model, wbk_effort)
+        if _effort:
+            body["reasoning_effort"] = _effort
+    elif p_type != "openai":
         body["reasoning_effort"] = "low"
     req = urllib.request.Request(
         f"{base_url}/chat/completions",
@@ -370,7 +375,8 @@ def _prompts_worker(channel: str) -> None:
                  + (f"（第 {attempt}/{_PROMPTS_MAX_ATTEMPTS} 次）" if attempt > 1 else ""))
             try:
                 content = _llm_chat(base_url, api_key, model, p_type,
-                                    prompt_text, proxy_url=proxy_url)
+                                    prompt_text, proxy_url=proxy_url,
+                                    wbk_effort=str(cfg.get("wbk_thinking") or "default"))
                 data = _extract_json(content)
                 if isinstance(data, dict):
                     raw_list = data.get("intros")

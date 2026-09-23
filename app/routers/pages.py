@@ -442,6 +442,7 @@ async def ai_test_page(request: Request):
         "sensenova_models": PARAM_SPEC["sensenova_model"]["options"],
         "openai_models": PARAM_SPEC["openai_model"]["options"],
         "gemini_models": PARAM_SPEC["gemini_model"]["options"],
+        "wbk_models": PARAM_SPEC["wbk_model"]["options"],
     })
 
 
