@@ -1,0 +1,199 @@
+{
+  "id": "script_cut_ice-cream-sampling",
+  "topic": "Sampling Flavors at an Ice-Cream Shop",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000007.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "SAMPLING ICE CREAM",
+    "title_zh": "試吃冰淇淋",
+    "scene_zh": "冰店 · 試吃選味",
+    "story_hook": "Choosing ice cream takes the whole afternoon.",
+    "intro_zh": "選冰淇淋，常常一選就是一個下午。",
+    "welcome_en": "Hello friends! Today we're sampling ice cream flavors.",
+    "welcome_zh": "嗨朋友們！今天來冰淇淋店試吃、挑口味。",
+    "outro": "Sweet choices, easy English. Go on, treat yourself!",
+    "outro_zh": "甜美選擇、輕鬆英文。去犒賞自己一下吧！",
+    "practice_intro_en": "Ready to repeat? Let's hear your voice.",
+    "practice_intro_zh": "準備好跟讀了嗎？讓我在這裡聽見你。",
+    "char_a_description": "a round-faced woman in her mid sixties with soft silver curls and reading glasses on a chain, wearing a floral cardigan over a beige blouse, holding a toddler's hand",
+    "char_b_description": "a cheerful young man in his early twenties with a bushy red beard and freckles, wearing a mint-green ice-cream shop apron over a striped long-sleeve tee, a sampling spoon peeking from his pocket",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "clerk",
+    "youtube_title": "【🍦🍨冰店試吃英文】「甜筒還是杯子」怎麼挑？帶小孩選口味必學的 18 句｜🎧Ice Cream Shop English",
+    "youtube_title_en": "\"Cone or Cup?\" — Sampling Flavors at an Ice-Cream Shop",
+    "youtube_description": "面對一整排冰淇淋口味完全選不下去？這集 18 句冰店對話陪你從要試吃勺、問口味規則，到決定甜筒還是杯子、找座位享用。自然美式口語搭配繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽一遍就能自在點冰淇淋。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Frozen in front of the freezer case? This 18-line ice-cream shop scene covers asking for samples, learning the shop rules, choosing between cone and cup, and settling in with your kid. Natural American English with IPA transcription plus a repeat-after-me section to make the phrases yours.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "ordering ice cream English",
+      "ice cream shop conversation",
+      "flavor sampling English",
+      "cone or cup",
+      "ESL dialogue",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "ordering with kids English",
+      "dessert shop English",
+      "冰淇淋店英文",
+      "試吃英文",
+      "聽力練習",
+      "日常英語",
+      "美式口語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🍦冰店英文｜要試吃勺・問口味規則・甜筒或杯｜聽完就會點冰｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n櫃檯前排著幾十種口味，一句都說不出口？\n帶著小朋友，甜筒和杯子又該怎麼選？\n\n這一集帶大家走進一個陽光下午的冰淇淋店，跟著奶奶和店員從要試吃、問規則，到選杯子、加淋醬、找座位，全程都是自然的美式英語。\n\n你會聽到：\n🥄 要試吃：例如「can we sample a few flavors?」、「two tiny spoons for you.」\n🍦 做決定：例如「Cone or cup?」、「Two cups then, one for each of us.」\n💳 結賬與座位：例如「That'll be nine fifty.」、「Where can my kid sit down?」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下一個甜甜下午，就用英文開心開口吧！",
+    "scene": "ice-cream shop",
+    "thumbnail_expression": "deep in delicious thought",
+    "thumbnail_action": "holding a tiny tasting spoon over a caramel scoop",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Sample Spoons",
+        "zh": "試吃勺"
+      },
+      {
+        "en": "Cone or Cup",
+        "zh": "甜筒或杯"
+      },
+      {
+        "en": "Salted Caramel",
+        "zh": "鹹焦糖"
+      },
+      {
+        "en": "Pistachio",
+        "zh": "開心果"
+      },
+      {
+        "en": "Chocolate Dip",
+        "zh": "巧克力淋醬"
+      }
+    ],
+    "title_quote": "Cone or cup",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi! Can we sample a few flavors before choosing?",
+        "phonetic": "/haɪ kæn wi ˈsæmpəl ə ˈfjuː ˈfleɪvərz bɪˈfɔr ˈtʃuzɪŋ/",
+        "zh": "嗨！可以先試吃幾個口味再決定嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course! Three samples per person, that's the rule.",
+        "phonetic": "/ʌv ˈkɔrs θri ˈsæmpəlz pər ˈpɜrsən ðæts ðə rul/",
+        "zh": "當然！規則是每人可以試吃三勺。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, my helper here can't decide at all.",
+        "phonetic": "/ˈpərfɪkt maɪ ˈhɛlpər hɪr kænt dɪˈsaɪd ət ɔl/",
+        "zh": "太好了，我身邊這位小幫手完全選不下。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "They look serious! Which ones are we trying?",
+        "phonetic": "/ðeɪ lʊk ˈsɪriəz wɪtʃ wʌnz ər wi ˈtraɪɪŋ/",
+        "zh": "看起來好認真！想先試哪幾種？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Salted caramel first, then the cookies and cream.",
+        "phonetic": "/ˈsɔltɪd ˈkɑrəməl fɜrst ðɛn ðə ˈkʊkɪz ænd krim/",
+        "zh": "先試鹹焦糖，然後是曲奇奶油口味。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Coming right up, two tiny spoons for you.",
+        "phonetic": "/ˈkʌmɪŋ raɪt ʌp tu ˈtaɪi spunz fɔr ju/",
+        "zh": "馬上來，給您兩支小試吃勺。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And one sample of pistachio, for the grown-up.",
+        "phonetic": "/ænd wʌn ˈsæmpəl ʌv pɪsˈtæʃioʊ fɔr ðə ˈɡroʊn ˈʌp/",
+        "zh": "再來一勺開心果，是給我的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. So how are you eating this today?",
+        "phonetic": "/ɡɑt ɪt soʊ haʊ ər ju ˈitɪŋ ðɪs təˈdeɪ/",
+        "zh": "了解。那今天想怎麼吃呢？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cone or cup? That's the big question, um...",
+        "phonetic": "/koʊn ɔr kʌp ðæts ðə bɪɡ ˈkwɛstʃən ʌm/",
+        "zh": "甜筒還是杯子？這是個大問題，呃……"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Cone crunchies melt fast with a little kid.",
+        "phonetic": "/koʊn ˈkrʌnʧiz mɛlt fæst wɪð ə ˈlɪtəl kɪd/",
+        "zh": "帶小孩子的話，甜筒的脆餅化得特別快。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "True! Two cups then, one for each of us.",
+        "phonetic": "/tru tu kʌps ðɛn wʌn fɔr itʃ ʌv ʌs/",
+        "zh": "說得對！那就兩杯，一人一杯。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Smart. Want the chocolate dip on top?",
+        "phonetic": "/smɑrt wɑnt ðə ˈtʃɑklət dɪp ɑn tɑp/",
+        "zh": "聰明。上面要加巧克力淋醬嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh my, yes. The caramel one, not the kids'.",
+        "phonetic": "/oʊ maɪ jɛz ðə ˈkɑrəməl wʌn nɑt ðə kɪdz/",
+        "zh": "噢當然要！焦糖那款，小朋友那份就不用了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're a pro. That'll be nine fifty total.",
+        "phonetic": "/jʊr ə proʊ ðætəl bi naɪn ˈfɪfti ˈtoʊtəl/",
+        "zh": "您是常客了。總共九塊五。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Worth every cent. Where can my kid sit down?",
+        "phonetic": "/wɜrθ ˈɛvri sɛnt wɛr kæn maɪ kɪd sɪt daʊn/",
+        "zh": "每一分都值得。我家寶貝可以坐哪裡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two stools at the window, right this way.",
+        "phonetic": "/tu stulz æt ðə ˈwɪndoʊ raɪt ðɪs weɪ/",
+        "zh": "窗邊有兩張高腳凳，這邊請。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You made our afternoon, thank you so much.",
+        "phonetic": "/ju meɪd ˈaʊər ˈæftərˌnun θæŋk ju su mʌtʃ/",
+        "zh": "你讓我們一下午都好開心，太謝謝了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sweet! Enjoy the samples... I mean the scoops.",
+        "phonetic": "/swit ɛnˈdʒɔɪ ðə ˈsæmpəlz aɪ min ðə skups/",
+        "zh": "慢慢享用你們的試吃……我是說冰淇淋球！"
+      }
+    ]
+  }
+}

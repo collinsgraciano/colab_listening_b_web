@@ -1,0 +1,199 @@
+{
+  "id": "script_cut_bakery-cake-pickup",
+  "topic": "Picking Up a Custom Birthday Cake",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000008.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "THE BIRTHDAY CAKE PICKUP",
+    "title_zh": "取生日蛋糕",
+    "scene_zh": "烘焙坊 · 取蛋糕",
+    "story_hook": "A pickup, a pink box, one letter out of place.",
+    "intro_zh": "取蛋糕、粉盒子，卻少了一個正確的字母。",
+    "welcome_en": "Hi everyone! Today we pick up a custom birthday cake.",
+    "welcome_zh": "大家好！今天到烘焙坊領取客製生日蛋糕。",
+    "outro": "Birthdays saved by a little English. Practice away!",
+    "outro_zh": "一點英文就能救回一場生日派對，快去練習吧！",
+    "practice_intro_en": "Now let's say it all together, line by line.",
+    "practice_intro_zh": "現在我們一起，一行一行說出來。",
+    "char_a_description": "an enthusiastic man in his late thirties with a shaved head and warm brown skin, wearing an olive field jacket over a graphic tee, scrolling his phone for the order email",
+    "char_b_description": "a flour-dusted woman in her fifties with silver-streaked black hair under a white bandana, wearing a blush-pink bakery apron over a striped dress, a piping bag in hand",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "customer",
+    "char_b_role": "baker",
+    "youtube_title": "【🎂🕯️蛋糕店取貨實境英文】名字寫錯怎麼辦？改單、要蠟燭、確認付款 18 句全學會｜🎧Bakery English",
+    "youtube_title_en": "\"Save the Whole Birthday\" — Picking Up a Custom Birthday Cake",
+    "youtube_description": "預定的生日蛋糕要去取了，名字卻拼錯怎麼辦？這集 18 句烘焙坊對話教你報訂單名字、確認取件時間、請店家改名、索要蠟燭與檢查付款狀態。自然美式口語搭配繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽一遍就能安心把蛋糕帶回家。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Your custom cake is ready, but the name on top is wrong! In this 18-line bakery scene you'll learn to give your pickup name, ask about timing, get the lettering fixed on the spot, find the candles, and confirm the payment. Everyday American English with IPA, plus a repeat-after-me section so you can order with confidence.\nRepeat every line in the second half and lock it in.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "bakery English",
+      "birthday cake order",
+      "custom cake pickup",
+      "misspelled name fix",
+      "ESL conversation",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "ordering a cake",
+      "pickup confirmation English",
+      "蛋糕店英文",
+      "取蛋糕英文",
+      "聽力練習",
+      "日常英語",
+      "美式口語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎂蛋糕店英文｜報取件名・修正拼字・確認付款｜聽完就會取蛋糕｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n預定的生日蛋糕，取貨時發現名字拼錯了？\n派對就要開始，該怎麼請店家緊急修正？\n\n這一集帶大家走進香氣四溢的烘焙坊，跟著顧客從報上取件名、發現拼字錯誤、請店家現場改名，到確認蠟燭與付款，全程都是自然的美式英語。\n\n你會聽到：\n🎂 報取件名：例如「I'm here for a cake pickup under Alvarez.」\n✏️ 修正錯誤：例如「It says Leo, but you ordered Leah.」、「I'll re-pipe the name right now.」\n🕯️ 收尾確認：例如「Did that come with candles?」、「It's prepaid.」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下次取蛋糕，安心把最美的驚喜帶回家！",
+    "scene": "bakery counter",
+    "thumbnail_expression": "wide-eyed surprise at a cake box",
+    "thumbnail_action": "pointing at the misspelled name on a pink cake",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Birthday Cake",
+        "zh": "生日蛋糕"
+      },
+      {
+        "en": "Piping Bag",
+        "zh": "擠花袋"
+      },
+      {
+        "en": "Name Lettering",
+        "zh": "名字字樣"
+      },
+      {
+        "en": "Candle Box",
+        "zh": "蠟燭盒"
+      },
+      {
+        "en": "Cake Box",
+        "zh": "蛋糕盒"
+      }
+    ],
+    "title_quote": "save the whole birthday",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, I'm here for a cake pickup under Alvarez.",
+        "phonetic": "/haɪ aɪm hɪr fɔr ə keɪk ˈpɪkˌʌp ˈʌndər ælˈvɑrɛz/",
+        "zh": "嗨，我來領取下單在 Alvarez 名下的蛋糕。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let me check... the chocolate funfetti, right?",
+        "phonetic": "/lɛt mi tʃɛk ðə ˈtʃɑklət fʌnˈfɛti raɪt/",
+        "zh": "讓我查一下……巧克力糖針蛋糕，對吧？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes! Can we take it now? We're a bit early.",
+        "phonetic": "/jɛs kæn wi teɪk ɪt naʊ wɪr ə bɪt ˈɜrli/",
+        "zh": "對！我們現在可以拿走嗎？我們來得有點早。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Almost done, the lettering needs ten more minutes.",
+        "phonetic": "/ˈɔlˌmoʊst dʌn ðə ˈlɛtərɪŋ nidz tɛn mɔr ˈmɪnɪts/",
+        "zh": "快好了，字樣還需要十分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, that's okay, we can wait in the car.",
+        "phonetic": "/oʊ ðæts oʊˈkeɪ wi kæn weɪt ɪn ðə kɑr/",
+        "zh": "噢沒關係，我們可以在車上等。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Actually, one thing here looks off to me.",
+        "phonetic": "/ˈæktʃuəli wʌn θɪŋ hɪr lʊks ɔf tə mi/",
+        "zh": "老實說，這裡有一個地方不對。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Off? What do you mean, is it the colors?",
+        "phonetic": "/ɔf wʌt du ju min ɪz ɪt ðə ˈkʌlərz/",
+        "zh": "不對？你是說顏色有問題嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The name, it says Leo, but you ordered Leah.",
+        "phonetic": "/ðə neɪm ɪt sɛz ˈlioʊ bʌt ju ˈɔrdərd li/",
+        "zh": "是名字：上面寫 Leo，但您訂的是 Leah。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh no, my daughter will notice that instantly.",
+        "phonetic": "/oʊ noʊ maɪ ˈdɔtər wɪl ˈnoʊtɪs ðæt ˈɪnstəntli/",
+        "zh": "噢不，我家寶貝一定馬上就會發現。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Easy fix, I'll re-pipe the name right now.",
+        "phonetic": "/ˈizi fɪks aɪl ri paɪp ðə neɪm raɪt naʊ/",
+        "zh": "很好修，我馬上重新擠上名字。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Really? That would save the whole birthday, honestly.",
+        "phonetic": "/ˈrɪli ðæt wʊd seɪv ðə hoʊl ˈbɜrθˌdeɪ ˈɑnəstli/",
+        "zh": "真的嗎？那簡直救了整個生日派對。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Done. There's Leah, spelled just right.",
+        "phonetic": "/dʌn ðɛrz li spɛld dʒʌst raɪt/",
+        "zh": "好了。Leah，拼得一毫不差。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You are a hero. Did that come with candles?",
+        "phonetic": "/ju ɑr ə ˈhɪroʊ dɪd ðæt kʌm wɪð ˈkændəlz/",
+        "zh": "你真是大功臣。蛋糕附有蠟燭嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, a box of seven, inside the bag there.",
+        "phonetic": "/jɛs ə bɑks ʌv ˈsɛvən ɪnˈsaɪd ðə bæɡ ðɛr/",
+        "zh": "有的，一盒七支，就在袋子裡面。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. Do I need to show a confirmation?",
+        "phonetic": "/ˈpɜrfɪkt du aɪ nid tə ʃoʊ ə ˌkɑnfərˈmeɪʃən/",
+        "zh": "太好了。我需要出示訂單確認信嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Not needed, it's prepaid. Drive careful, okay?",
+        "phonetic": "/nɑt ˈnidəd ɪts ˈpriˈpeɪd draɪ ˈkɛrfəl oʊˈkeɪ/",
+        "zh": "不用，已經付過款了。開車慢一點好嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you so much, happy baking to you!",
+        "phonetic": "/θæŋk ju su mʌtʃ ˈhæpi ˈbeɪkɪŋ tə ju/",
+        "zh": "太謝謝你了，祝你烘焙愉快！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Happy birthday to Leah! Enjoy the party.",
+        "phonetic": "/ˈhæpi ˈbɜrθˌdeɪ tə li ɛnˈdʒɔɪ ðə ˈpɑrti/",
+        "zh": "祝 Leah 生日快樂！派對盡興。"
+      }
+    ]
+  }
+}

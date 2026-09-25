@@ -1,0 +1,198 @@
+{
+  "id": "script_cut_splitting-the-check",
+  "topic": "Splitting the Check at a Diner",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000004.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "SPLITTING THE CHECK",
+    "title_zh": "分賬",
+    "scene_zh": "餐館 · 分賬",
+    "story_hook": "Two friends, one check, and a dessert-shaped problem.",
+    "intro_zh": "兩個朋友、一張單，還有一份甜點引起的小麻煩。",
+    "welcome_en": "Hi everyone! Today we're splitting a diner check.",
+    "welcome_zh": "大家好！今天來練習在餐館怎麼分賬。",
+    "outro": "No more awkward bill moments. Practice those lines!",
+    "outro_zh": "結賬不再尷尬，趕快把這些句子練起來！",
+    "practice_intro_en": "Now your turn. Repeat each line aloud.",
+    "practice_intro_zh": "換你了，大聲跟著每一句唸。",
+    "char_a_description": "an easygoing college guy in his early twenties with a blond mop under a backwards baseball cap, wearing a varsity jacket over a band tee, jangling coins in his palm",
+    "char_b_description": "a no-nonsense woman in her fifties with a silver-gray pixie cut, wearing a pink retro diner apron over a denim shirt, clicking her pen against a check folder",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "friend",
+    "char_b_role": "waiter",
+    "youtube_title": "【💵🧾餐廳分賬實用英文】「總共多少錢」居然不問 how much？跟著服務生學最道地分賬句｜🎧Split The Bill English",
+    "youtube_title_en": "\"What's the Damage?\" — Splitting the Check at a Diner",
+    "youtube_description": "朋友一起吃飯，結賬時最怕尷尬冷場？這集 18 句餐館對話一次教好：分開結賬、不均分怎麼說、現金刷卡、小費比例。自然美式口語搭配繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽一遍下次結賬就能直接用。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Dreading that awkward bill moment with friends? This 18-line diner scene handles it end to end: asking for separate checks, splitting unevenly, cash versus card, and tipping without confusion. Natural American English with IPA and Traditional Chinese, then a repeat-after-me section to lock it in.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "splitting the check",
+      "restaurant bill English",
+      "paying at a diner",
+      "tip etiquette English",
+      "ESL conversation",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "cash or card English",
+      "separate checks",
+      "餐廳分賬英文",
+      "結賬英文",
+      "聽力練習",
+      "日常英語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】💵分賬英文｜分開結賬・現金刷卡・小費比例｜聽完就會結賬｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n朋友團吃完飯，誰付多少該怎麼開口？\n不對等分賬、現金找零、小費比例，英文全不會怎麼辦？\n\n這一集帶大家走進一家復古美式餐館，跟著兩位朋友與服務生從要單、分單、改小費到找零道別，全程都是自然的美式英語。\n\n你會聽到：\n🧾 要單與分賬：例如「could we get the check, please?」、「not exactly fifty-fifty.」\n💳 現金與刷卡：例如「Cash or card for her?」、「I'll grab change at the register.」\n💰 小費與收尾：例如「You can change it.」、「Let's do twenty percent.」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下次結賬，你會是桌上最從容的那一個！",
+    "scene": "retro diner",
+    "thumbnail_expression": "half smiling, holding up two dollar bills",
+    "thumbnail_action": "handing the check folder across the booth table",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Paper Check",
+        "zh": "紙本帳單"
+      },
+      {
+        "en": "Cash",
+        "zh": "現金"
+      },
+      {
+        "en": "Card Terminal",
+        "zh": "刷卡機"
+      },
+      {
+        "en": "Tip",
+        "zh": "小費"
+      },
+      {
+        "en": "Change",
+        "zh": "找零"
+      }
+    ],
+    "title_quote": "What's the damage",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse us, could we get the check, please?",
+        "phonetic": "/ɪkˈskjuːz ʌs kʊd wi ɡɛt ðə tʃɛk pliz/",
+        "zh": "不好意思，可以讓我們結賬嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Coming right up. Splitting it today?",
+        "phonetic": "/ˈkʌmɪŋ raɪt ʌp ˈsplɪtɪŋ ɪt təˈdeɪ/",
+        "zh": "馬上來。今天要分開結嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, but um, not exactly fifty-fifty.",
+        "phonetic": "/jɛs bʌt ʌm nɑt ɪɡˈzæktli ˈfɪfti ˈfɪfti/",
+        "zh": "要的，但呃……不用剛好對半分。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Totally fine. How do you want to split?",
+        "phonetic": "/ˈtoʊtli faɪn haʊ du ju wɑnt tə splɪt/",
+        "zh": "完全沒問題。想怎麼分？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My friend ordered dessert; I skipped mine.",
+        "phonetic": "/maɪ frɛnd ˈɔrdərd dɪˈzərt aɪ skɪpt maɪn/",
+        "zh": "我朋友點了甜點，我沒點。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Easy. I'll move the dessert to her side.",
+        "phonetic": "/ˈizi aɪl muv ðə dɪˈzərt tə hɜr saɪd/",
+        "zh": "簡單，我把甜點挪到她那邊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. What's the damage on my side?",
+        "phonetic": "/ˈpərfɪkt wʌts ðə ˈdæmɪdʒ ɑn maɪ saɪd/",
+        "zh": "太好了。我這邊總共多少？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yours is thirty-one forty, with tax.",
+        "phonetic": "/jʊrz ɪz ˈθɜrdi-wʌn ˈfɔrti wɪð tæks/",
+        "zh": "您這邊是三十一塊四，含稅。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Her side has dessert, so about eighteen?",
+        "phonetic": "/hɜr saɪd hæz dɪˈzərt soʊ əˈbaʊt ˈeɪˈtin/",
+        "zh": "她那邊含甜點，大概十八塊？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nineteen twenty. Cash or card for her?",
+        "phonetic": "/ˈnaɪnˈtin ˈtwɛnti kæʃ ɔr kɑrd fɔr hɜr/",
+        "zh": "十九塊二。她要用現金還是卡？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "She's digging in her bag... yes, cash.",
+        "phonetic": "/ʃiz ˈdɪɡɪŋ ɪn hɜr bæɡ jɛz kæʃ/",
+        "zh": "她正在翻包……有了，現金。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Cool. I'll grab change at the register quick.",
+        "phonetic": "/kul aɪl ɡræb tʃeɪndʒ æt ðə ˈrɛdʒɪstər kwɪk/",
+        "zh": "好，我快去收銀台給她找零。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "For me, card, please. Now about the tip...",
+        "phonetic": "/fɔr mi kɑrd pliz naʊ əˈbaʊt ðə tɪp/",
+        "zh": "我用刷卡。對了，小費怎麼弄？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's added before you tap. You can change it.",
+        "phonetic": "/ɪts ˈædəd bɪˈfɔr ju tæp ju kæn tʃeɪndʒ ɪt/",
+        "zh": "感應前會先加上，比例可以自己改。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good. Let's do twenty percent, great service.",
+        "phonetic": "/ɡʊd lɛts du ˈtwɛnti pərˈsɛnt ɡreɪt ˈsɜrvəs/",
+        "zh": "好，就百分之二十，服務很棒。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thank you, that's really kind of you two.",
+        "phonetic": "/θæŋk ju ðæts ˈrɪli kaɪnd ʌv ju tu/",
+        "zh": "謝謝你們，兩位真是太體貼了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Our pleasure. Where's the restroom, by the way?",
+        "phonetic": "/aʊər ˈplɛʒər wɛrz ðə ˈrumˌrʌm baɪ ðə weɪ/",
+        "zh": "不客氣。順問一下，洗手間在哪裡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Back left past the counter. Have a good night!",
+        "phonetic": "/bæk lɛft pæst ðə ˈkaʊntər hæv ə ɡʊd naɪt/",
+        "zh": "經過櫃台左邊那間。祝你們晚安！"
+      }
+    ]
+  }
+}

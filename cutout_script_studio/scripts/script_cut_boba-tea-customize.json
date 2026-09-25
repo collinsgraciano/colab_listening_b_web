@@ -1,0 +1,198 @@
+{
+  "id": "script_cut_boba-tea-customize",
+  "topic": "Customizing a Boba Tea Order",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000001.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "CUSTOMIZING A BOBA TEA",
+    "title_zh": "點珍奶",
+    "scene_zh": "手搖飲店 · 客製點單",
+    "story_hook": "Ordering a custom boba tea at a busy shop.",
+    "intro_zh": "在熱鬧的手搖飲店客製一杯珍奶。",
+    "welcome_en": "Hey friends! Today we're customizing a boba tea order.",
+    "welcome_zh": "嗨朋友們！今天我們來客製一杯珍珠奶茶。",
+    "outro": "That's our boba order today! Listen again and repeat.",
+    "outro_zh": "今天的珍奶點餐就到這裡！再聽一遍、跟著唸吧。",
+    "practice_intro_en": "Now, repeat each line after me.",
+    "practice_intro_zh": "現在請跟著我一句一句唸出來。",
+    "char_a_description": "a cheerful young woman in her early twenties with long straight black hair tied in a high ponytail, wearing an oversized lavender hoodie and denim shorts, bouncing happily on her heels",
+    "char_b_description": "a lanky young man in his early twenties with an ash blonde undercut, wearing a mustard milk-tea shop polo shirt and a black visor, tapping the laminated topping menu",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "clerk",
+    "youtube_title": "【🧋🍮珍奶點餐實戰英文】「今天是犒賞日」怎麼說？甜度・冰塊・配料一次學會，聽完就能開口點｜🎧Boba Tea English",
+    "youtube_title_en": "\"Today Is a Treat Day\" — Customizing a Boba Tea Order",
+    "youtube_description": "不會調整甜度跟配料，就不敢走進手搖飲店？這段 18 句的珍奶點餐對話，幫你一次上手！從選糖度、挑冰塊，到加珍珠還是布丁、怎麼付錢、在哪裡等餐，全部用自然的美式口語說完。附上繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽一遍就敢開口。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Too shy to customize your boba in English? This 18-line shop conversation fixes that fast. Pick your sugar level, choose your ice, debate pearls versus pudding, pay, and grab your drink — all in natural American English with IPA transcription. Repeat every line in the second half and speak up on your next order.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "ordering boba tea",
+      "boba shop English",
+      "bubble tea conversation",
+      "custom drink order",
+      "English listening practice",
+      "ESL dialogue",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "sugar level English",
+      "珍珠奶茶英文",
+      "手搖飲點餐",
+      "聽力練習",
+      "日常英語",
+      "美式口語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🧋珍奶英文｜甜度冰塊・珍珠布丁・櫃台取餐｜聽完就會點飲｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n走進手搖飲店，卻不知道「少冰半糖」怎麼說？\n珍珠和布丁差在哪，又該怎麼請店員推薦？\n\n這一集帶大家走進一家人潮絡繹不絕的珍奶店，跟著顧客從選糖度、挑冰塊、加配料，到付款與取餐，全程都是自然的美式英語。\n\n你會聽到：\n🧋 客製點單：例如「can I get it fifty percent sugar?」、「light ice, please」。\n🍮 挑配料：例如「what's the difference between pearls and pudding?」、「add the pudding!」\n💳 付款取餐：例如「Card or cash?」、「I'll call your name when it's ready.」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下次手搖飲店見，原來開口點一杯珍奶可以這麼簡單！",
+    "scene": "boba tea shop",
+    "thumbnail_expression": "curious and excited",
+    "thumbnail_action": "pointing at a topping menu by the counter",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Brown Sugar Boba",
+        "zh": "黑糖珍珠奶茶"
+      },
+      {
+        "en": "Tapioca Pearls",
+        "zh": "珍珠"
+      },
+      {
+        "en": "Pudding",
+        "zh": "布丁"
+      },
+      {
+        "en": "Sugar Level",
+        "zh": "糖度"
+      },
+      {
+        "en": "Light Ice",
+        "zh": "少冰"
+      }
+    ],
+    "title_quote": "Today is a treat day",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi! I'd like your signature brown sugar boba.",
+        "phonetic": "/haɪ aɪd laɪk jɔr ˈsɪɡnətʃrɑʊn ˈʃʊɡər ˈboʊbə/",
+        "zh": "嗨！我想要一杯你們的招牌黑糖珍珠奶茶。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great pick! What size and sugar level do you want?",
+        "phonetic": "/ɡreɪ pɪkt wʌt saɪz ənd ˈʃʊɡər ˈlɛvəl du ju wɑnt/",
+        "zh": "好選擇！請問要多大杯、糖度多少？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Large, please. And can I get it fifty percent sugar?",
+        "phonetic": "/lɑrdʒ pliːz ənd kæn aɪ ɡɛt ɪt ˈfɪfti pərˈsɛnt ˈʃʊɡər/",
+        "zh": "大杯，麻煩了。糖度要百分之五十。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure. Do you want light, regular, or extra ice?",
+        "phonetic": "/ʃʊr du ju wɑnt laɪt ˈrɛɡjələr ɔr ˈɛksˌtrə aɪs/",
+        "zh": "好的。冰塊要少冰、正常還是加冰？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Light ice, please. It's warm outside today.",
+        "phonetic": "/laɪt aɪs pliːz ɪts wɜrm aʊtˈsaɪd təˈdeɪ/",
+        "zh": "少冰，謝謝。今天外面好熱。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. Want any toppings with that?",
+        "phonetic": "/ɡɑt ɪt wɑnt ˈɛni ˈtɑpɪŋz wɪð ðæt/",
+        "zh": "了解。要加配料嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, what's the difference between pearls and pudding?",
+        "phonetic": "/hʌm wʌts ði ˈdɪfərəns bɪˈtwin pɜrlz ənd ˈpʊdɪŋ/",
+        "zh": "嗯，珍珠跟布丁差在哪裡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Pearls are chewy; the pudding is smooth and soft.",
+        "phonetic": "/pɜrlz ar ˈtʃui ðə ˈpʊdɪŋ ɪz smuːθ ənd sɔft/",
+        "zh": "珍珠有嚼勁，布丁滑軟。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'll take pearls then. Are they made fresh today?",
+        "phonetic": "/aɪl teɪk pɜrlz ðɛn ɑr ðeɪ meɪd frɛʃ təˈdeɪ/",
+        "zh": "那我要珍珠。是今天現煮的嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, we cook a new batch every three hours.",
+        "phonetic": "/jɛs wi kʊk ə nu bættʃ ˈɛvri θri ˈaʊərz/",
+        "zh": "對，我們每三小時煮一鍋新的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Should I get pudding too, or is that too much?",
+        "phonetic": "/ʃʊd aɪ ɡɛt ˈpʊdɪŋ tu ɔr ɪz ðæt tu mʌtʃ/",
+        "zh": "我該不該再加布丁？會不會太多？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two add-ons cost extra, but most people do it.",
+        "phonetic": "/tu ˈædˌɑnz kɑst ˈɛkstrə bət moʊst ˈpipəl du ɪt/",
+        "zh": "加兩樣配料要多錢，不過多數人都這樣加。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, today is a treat day. Add the pudding!",
+        "phonetic": "/oʊˈkeɪ təˈdeɪ ɪz ə trit deɪ æd ðə ˈpʊdɪŋ/",
+        "zh": "好吧，今天是犒賞日。加布丁！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nice. That'll be six twenty-five. Card or cash?",
+        "phonetic": "/naɪs ðætəl bi sɪks ˈtwɛnti faɪv kɑrd ɔr kæʃ/",
+        "zh": "好。一共六塊二十五。刷卡還是現金？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Card, please. Do I wait over at the counter?",
+        "phonetic": "/kɑrd pliːz du aɪ weɪt ˈoʊvər æt ðə ˈkaʊntər/",
+        "zh": "刷卡。我要到櫃台那邊等嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yep, I'll call your name when it's ready.",
+        "phonetic": "/jɛp aɪl kɔl jɔr neɪm wɛn ɪts ˈrɛdi/",
+        "zh": "對，做好的時候我會叫你的名字。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Awesome. Thanks for helping me choose!",
+        "phonetic": "/ˈɔsəm θæŋks fɔr ˈhɛlpɪŋ mi tʃuz/",
+        "zh": "太好了，謝謝你幫我選！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime! Enjoy your brown sugar boba.",
+        "phonetic": "/ˈɛnɪˌtaɪm ɛnˈdʒɔɪ jɔr braʊn ˈʃʊɡər ˈboʊbə/",
+        "zh": "不客氣！請享用你的黑糖珍珠奶茶。"
+      }
+    ]
+  }
+}

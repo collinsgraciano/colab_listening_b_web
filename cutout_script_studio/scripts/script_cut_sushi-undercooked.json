@@ -1,0 +1,198 @@
+{
+  "id": "script_cut_sushi-undercooked",
+  "topic": "Sending Back Undercooked Sushi",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000006.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "SENDING SUSHI BACK",
+    "title_zh": "退回壽司",
+    "scene_zh": "壽司店 · 反映料理",
+    "story_hook": "One bite tells her the salmon needs more flame.",
+    "intro_zh": "一口就發現鮭魚還得再烤一下。",
+    "welcome_en": "Welcome back, friends! Today we send a dish back politely.",
+    "welcome_zh": "歡迎回來，朋友們！今天練習怎麼禮貌地退回料理。",
+    "outro": "Polite complaints get results. Try these lines out loud!",
+    "outro_zh": "有禮地反映最有用的，把這些句子大聲練起來！",
+    "practice_intro_en": "Let's repeat the whole scene together.",
+    "practice_intro_zh": "我們把整段對話一起跟讀一遍。",
+    "char_a_description": "a poised woman in her early thirties with wavy auburn hair clipped to one side, wearing a simple black slip dress and pearl studs, chopsticks rested neatly on her plate",
+    "char_b_description": "a polite young man in his mid twenties with neatly trimmed black hair, wearing a navy server jacket over a white collared shirt, bowing slightly beside the table",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "diner",
+    "char_b_role": "server",
+    "youtube_title": "【🍣🥢壽司店進階英文】「這魚有點沒熟」客氣又有效的反映句型，聽完敢退餐｜🎧Sushi Restaurant English",
+    "youtube_title_en": "\"You Know Your Sushi!\" — Sending Back Undercooked Sushi",
+    "youtube_description": "餐點沒熟，該怎麼不尷尬地請服務生處理？這集 18 句壽司店對話示範禮貌抱怨的完整流程：描述問題、請內場確認、更換料理、連醋飯溫度都講得清清楚楚。美式口語搭配繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽一遍就敢開口。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Food arrives undercooked and you don't want to make a scene? This 18-line sushi-bar scene walks you through a polite complaint: describing the issue, asking the server to check with the kitchen, swapping dishes, and even mentioning rice temperature. American English with IPA plus a repeat-after-me section.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "sending food back English",
+      "polite complaint English",
+      "sushi restaurant English",
+      "undercooked food",
+      "restaurant ESL conversation",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "talking to a server",
+      "kitchen check",
+      "壽司店英文",
+      "餐廳反映英文",
+      "聽力練習",
+      "日常英語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🍣壽司英文｜描述沒熟・內場確認・更換料理｜聽完就會反映｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n鮭魚中間還沒熟，要忍了吃完還是開口？\n怎麼說才能既有禮、又讓內場認真處理？\n\n這一集帶大家走進安靜講究的壽司吧檯，跟著顧客從描述問題、請服務生確認、討論醋飯溫度，到最後換成炙烤鮭魚，全程都是自然的美式英語。\n\n你會聽到：\n🍣 描述問題：例如「the salmon seems undercooked.」、「Good sushi rice should be body-warm.」\n🙋 禮貌反映：例如「Can I ask the kitchen for you?」、「Completely fair.」\n🔄 更換料理：例如「I could just switch to tuna.」、「Enjoy the rest of dinner!」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n好好吃一頓飯，從勇敢開口開始！",
+    "scene": "sushi bar",
+    "thumbnail_expression": "quietly unconvinced",
+    "thumbnail_action": "holding chopsticks over a seared salmon nigiri",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Seared Salmon",
+        "zh": "炙烤鮭魚"
+      },
+      {
+        "en": "Sushi Rice",
+        "zh": "醋飯"
+      },
+      {
+        "en": "Seared Tuna",
+        "zh": "炙燒鮪魚"
+      },
+      {
+        "en": "Green Tea",
+        "zh": "綠茶"
+      },
+      {
+        "en": "Chef's Knife",
+        "zh": "廚刀"
+      }
+    ],
+    "title_quote": "You know your sushi",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse me, could you take a look at this?",
+        "phonetic": "/ɪkˈskjuːz mi kʊd ju teɪk ə lʊk æt ðɪs/",
+        "zh": "不好意思，能請你看一下這盤嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course, is everything all right?",
+        "phonetic": "/ʌv ˈkɔrs ɪz ˈɛvriθɪŋ ɔˈraɪt/",
+        "zh": "當然沒問題，一切都還好嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, the salmon seems undercooked in the middle.",
+        "phonetic": "/wɛl ðə ˈsæmən simz ˌʌndərˈkʊkt ɪn ðə ˈmɪdəl/",
+        "zh": "嗯，這塊鮭魚中間看起來沒熟。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh, I'm sorry. Does it look raw to you?",
+        "phonetic": "/oʊ aɪm ˈsɑri dʌz ɪt lʊk rɔ tə ju/",
+        "zh": "噢，很抱歉。您覺得看起來生的嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A little, yes. I'd rather not risk it tonight.",
+        "phonetic": "/ə ˈlɪtəl jɛs aɪd ˈræðər nɑt rɪsk ɪt təˈnaɪt/",
+        "zh": "有一點。今晚我可不想冒險。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Completely fair. Can I ask the kitchen for you?",
+        "phonetic": "/kəmˈplitli fɛr kæn aɪ æsk ðə ˈkɪtʃən fɔr ju/",
+        "zh": "完全應該。我可以替您去問內場嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Please. And maybe check the rice too, um...",
+        "phonetic": "/pliz ænd ˈmeɪbi tʃɛk ðə raɪs tu ʌm/",
+        "zh": "麻煩你了。還有醋飯我也想說一下，呃……"
+      },
+      {
+        "speaker": "char_b",
+        "text": "What's up with the rice? Is it cold?",
+        "phonetic": "/wʌts ʌp wɪð ðə raɪs ɪz ɪt koʊld/",
+        "zh": "醋飯怎麼了嗎？是太冰了嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sort of. Good sushi rice should be body-warm, right?",
+        "phonetic": "/sɔrt əv ɡʊd ˈsuʃi raɪs ʃʊd bi ˈbɑdi wɜrm raɪt/",
+        "zh": "有點像。好的壽司醋飯應該是接近體溫，對吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You know your sushi! Let me talk to the chef.",
+        "phonetic": "/ju noʊ jʊr ˈsuʃi lɛt mi tɔk tə ðə ʃɛf/",
+        "zh": "您真內行！讓我來去跟主廚說。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks, no rush. The eel roll was cooked well.",
+        "phonetic": "/θæŋks noʊ rʌʃ ði il roʊl wʌz kʊkt wɛl/",
+        "zh": "謝謝，不急。鰻魚卷倒是烤得剛剛好。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Back with news: the chef will re-sear it.",
+        "phonetic": "/bæk wɪð nuz ðə ʃɛf wɪl ri sɪr ɪt/",
+        "zh": "有好消息：主廚願意重新炙烤。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Or honestly, I could just switch to tuna.",
+        "phonetic": "/ɔr ˈɑnəstli aɪ kʊd dʒʌst swɪtʃ tə ˈtunə/",
+        "zh": "或者說實話，我也可以直接換成鮪魚。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The chef suggests seared tuna, if you prefer.",
+        "phonetic": "/ðə ʃɛf səɡˈdʒɛsts sɪrd ˈtunə ɪf ju prɪˈfɜr/",
+        "zh": "主廚提議換成炙燒鮪魚，看您喜歡哪個。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That sounds perfect. And the rice, no problem?",
+        "phonetic": "/ðæt saʊndz ˈpɜrfɪkt ænd ðə raɪs noʊ ˈprɑbləm/",
+        "zh": "聽起來很棒。那醋飯也沒問題了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "He'll warm a fresh batch. Five minutes, okay?",
+        "phonetic": "/hil wɔrm ə frɛʃ bættʃ faɪv ˈmɪnɪts oʊˈkeɪ/",
+        "zh": "他會重新溫一份，五分鐘左右，可以嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You've been great, thank you both so much.",
+        "phonetic": "/jubɪn ɡreɪt θæŋk ju boʊθ su mʌtʃ/",
+        "zh": "你處理得很好，替我謝謝你們兩位。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course. Enjoy the rest of dinner!",
+        "phonetic": "/ʌv ˈkɔrs ɛnˈdʒɔɪ ðə rɛst əv ˈdɪnər/",
+        "zh": "應該的，請繼續享受晚餐！"
+      }
+    ]
+  }
+}

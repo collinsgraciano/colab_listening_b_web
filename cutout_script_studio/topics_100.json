@@ -1,0 +1,1005 @@
+{
+  "_note": "100 non-duplicate popular everyday-life topics for original_cutout listening scripts. Each entry is authored content, not a template. roles/hint guide variety; AI writes a unique story per topic. Slugs are used as script_cut_<slug>.json. Existing library topics (Social Media Posting, Ordering Delivery, At the Airport Check-in, Talking About the Day, Asking About Side Effects, Asking About a Warranty, Reporting a Break-In, Reporting an Accident, Awkward Elevator Small Talk) are avoided as exact strings.",
+  "topics": [
+    {
+      "slug": "ordering-coffee-cafe",
+      "topic": "Ordering Coffee at a Busy Café",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "barista"
+      ],
+      "hint": "long line, custom oat-milk latte, mispronounced name on cup"
+    },
+    {
+      "slug": "boba-tea-customize",
+      "topic": "Customizing a Boba Tea Order",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "clerk"
+      ],
+      "hint": "sugar level, ice, extra pearls, choosing toppings"
+    },
+    {
+      "slug": "restaurant-nut-allergy",
+      "topic": "Ordering Dinner with a Nut Allergy",
+      "category": "Dining",
+      "roles": [
+        "diner",
+        "waiter"
+      ],
+      "hint": "disclosing allergy, asking what's in the sauce"
+    },
+    {
+      "slug": "food-court-wrong-order",
+      "topic": "Fixing a Wrong Food-Court Order",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "staff"
+      ],
+      "hint": "got chicken instead of beef, no receipt"
+    },
+    {
+      "slug": "splitting-the-check",
+      "topic": "Splitting the Check at a Diner",
+      "category": "Dining",
+      "roles": [
+        "friend",
+        "waiter"
+      ],
+      "hint": "separate checks, cash vs card, tipping question"
+    },
+    {
+      "slug": "drive-thru-mixup",
+      "topic": "A Mix-Up at the Drive-Thru Window",
+      "category": "Dining",
+      "roles": [
+        "driver",
+        "cashier"
+      ],
+      "hint": "wrong drink size, pull forward to fix"
+    },
+    {
+      "slug": "sushi-undercooked",
+      "topic": "Sending Back Undercooked Sushi",
+      "category": "Dining",
+      "roles": [
+        "diner",
+        "server"
+      ],
+      "hint": "polite complaint, ask kitchen, rice temperature"
+    },
+    {
+      "slug": "ice-cream-sampling",
+      "topic": "Sampling Flavors at an Ice-Cream Shop",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "clerk"
+      ],
+      "hint": "can't decide, sample spoons, kids, cone vs cup"
+    },
+    {
+      "slug": "bakery-cake-pickup",
+      "topic": "Picking Up a Custom Birthday Cake",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "baker"
+      ],
+      "hint": "name spelled wrong, timing, candles box"
+    },
+    {
+      "slug": "pizza-delivery-tip",
+      "topic": "Questioning the Pizza Delivery Tip",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "delivery driver"
+      ],
+      "hint": "delivery fee vs tip confusion, cash only"
+    },
+    {
+      "slug": "brunch-waitlist",
+      "topic": "Getting on the Waitlist for Brunch",
+      "category": "Dining",
+      "roles": [
+        "host",
+        "guest"
+      ],
+      "hint": "45-min wait, text when ready, window seat"
+    },
+    {
+      "slug": "broken-vending-machine",
+      "topic": "A Broken Vending Machine",
+      "category": "Dining",
+      "roles": [
+        "customer",
+        "attendant"
+      ],
+      "hint": "snack stuck, card charged, refund number"
+    },
+    {
+      "slug": "grocery-coupon-checkout",
+      "topic": "Using a Coupon at the Grocery Checkout",
+      "category": "Shopping",
+      "roles": [
+        "shopper",
+        "cashier"
+      ],
+      "hint": "expired coupon, manager override, self scan"
+    },
+    {
+      "slug": "self-checkout-help",
+      "topic": "Getting Help at a Self-Checkout",
+      "category": "Shopping",
+      "roles": [
+        "shopper",
+        "attendant"
+      ],
+      "hint": "unexpected item in bagging area, age check"
+    },
+    {
+      "slug": "choosing-ripe-avocados",
+      "topic": "Picking Ripe Avocados",
+      "category": "Shopping",
+      "roles": [
+        "shopper",
+        "clerk"
+      ],
+      "hint": "squeeze test, brown inside, ripen at home"
+    },
+    {
+      "slug": "return-no-receipt",
+      "topic": "Returning an Item Without a Receipt",
+      "category": "Shopping",
+      "roles": [
+        "customer",
+        "returns clerk"
+      ],
+      "hint": "store credit, ID lookup, final sale tag"
+    },
+    {
+      "slug": "fitting-room-size",
+      "topic": "Asking for a Different Size in Fitting",
+      "category": "Shopping",
+      "roles": [
+        "shoppers",
+        "associate"
+      ],
+      "hint": "jeans too tight, last one, hold for me"
+    },
+    {
+      "slug": "asking-price-match",
+      "topic": "Asking for a Price Match",
+      "category": "Shopping",
+      "roles": [
+        "customer",
+        "manager"
+      ],
+      "hint": "competitor ad, box damaged, same model number"
+    },
+    {
+      "slug": "phone-warranty-claim",
+      "topic": "Claiming a Phone Warranty at the Counter",
+      "category": "Shopping",
+      "roles": [
+        "customer",
+        "tech"
+      ],
+      "hint": "cracked screen vs defect, data backup, turnaround"
+    },
+    {
+      "slug": "farmers-market-eggs",
+      "topic": "Buying Eggs at the Farmers Market",
+      "category": "Shopping",
+      "roles": [
+        "shopper",
+        "vendor"
+      ],
+      "hint": "dozen vs half, cash only, extra cartons"
+    },
+    {
+      "slug": "warehouse-store-sample",
+      "topic": "Trying Samples at a Warehouse Store",
+      "category": "Shopping",
+      "roles": [
+        "shopper",
+        "employee"
+      ],
+      "hint": "membership card, bulk size, sample stand"
+    },
+    {
+      "slug": "right-dog-food",
+      "topic": "Buying the Right Dog Food",
+      "category": "Shopping",
+      "roles": [
+        "customer",
+        "clerk"
+      ],
+      "hint": "puppy vs adult, grain-free, bag size"
+    },
+    {
+      "slug": "pharmacy-prescription-pickup",
+      "topic": "Picking Up a Prescription",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "pharmacist"
+      ],
+      "hint": "ID, refill count, how to take with food"
+    },
+    {
+      "slug": "pharmacy-cold-remedy",
+      "topic": "Asking for an OTC Cold Remedy",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "pharmacist"
+      ],
+      "hint": "non-drowsy daytime, interaction with other meds"
+    },
+    {
+      "slug": "dentist-cleaning-booking",
+      "topic": "Booking a Dental Cleaning",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "receptionist"
+      ],
+      "hint": "insurance, new-patient x-rays, reschedule"
+    },
+    {
+      "slug": "doctor-checkin",
+      "topic": "Checking In for a Doctor Visit",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "nurse"
+      ],
+      "hint": "insurance card, blood pressure, reason for visit"
+    },
+    {
+      "slug": "urgent-care-sprain",
+      "topic": "Visiting Urgent Care for a Sprain",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "nurse"
+      ],
+      "hint": "x-ray wait, crutches, follow-up"
+    },
+    {
+      "slug": "eye-exam-frames",
+      "topic": "Choosing Frames after an Eye Exam",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "optician"
+      ],
+      "hint": "progressive lenses, budget, style"
+    },
+    {
+      "slug": "dog-vaccination",
+      "topic": "Booking a Dog Vaccination",
+      "category": "Health",
+      "roles": [
+        "owner",
+        "vet tech"
+      ],
+      "hint": "annual shot, behavior at clinic, reminder"
+    },
+    {
+      "slug": "physical-therapy-first",
+      "topic": "Scheduling a First PT Session",
+      "category": "Health",
+      "roles": [
+        "patient",
+        "therapist"
+      ],
+      "hint": "referral form, pain area, home exercises"
+    },
+    {
+      "slug": "apartment-tour",
+      "topic": "Touring a Vacant Apartment",
+      "category": "Housing",
+      "roles": [
+        "renter",
+        "leasing agent"
+      ],
+      "hint": "utilities included, parking, application fee"
+    },
+    {
+      "slug": "lease-renewal-talk",
+      "topic": "Negotiating a Lease Renewal",
+      "category": "Housing",
+      "roles": [
+        "tenant",
+        "landlord"
+      ],
+      "hint": "rent increase, longer term, repairs promised"
+    },
+    {
+      "slug": "broken-heater-report",
+      "topic": "Reporting a Broken Heater",
+      "category": "Housing",
+      "roles": [
+        "tenant",
+        "maintenance"
+      ],
+      "hint": "no heat in winter, emergency, entry permission"
+    },
+    {
+      "slug": "noise-complaint",
+      "topic": "Filing a Noise Complaint",
+      "category": "Housing",
+      "roles": [
+        "tenant",
+        "building manager"
+      ],
+      "hint": "late parties, documenting, quiet hours"
+    },
+    {
+      "slug": "kitchen-ants",
+      "topic": "Reporting Ants in the Kitchen",
+      "category": "Housing",
+      "roles": [
+        "tenant",
+        "landlord"
+      ],
+      "hint": "pest control, prep counters, lease responsibility"
+    },
+    {
+      "slug": "move-out-inspection",
+      "topic": "Passing the Move-Out Inspection",
+      "category": "Housing",
+      "roles": [
+        "tenant",
+        "manager"
+      ],
+      "hint": "deposit deductions, carpet stain, touch-ups"
+    },
+    {
+      "slug": "stolen-porch-package",
+      "topic": "Reporting a Stolen Porch Package",
+      "category": "Housing",
+      "roles": [
+        "resident",
+        "building manager"
+      ],
+      "hint": "camera footage, delivery time, replacement claim"
+    },
+    {
+      "slug": "roommate-house-rules",
+      "topic": "Setting House Rules with a Roommate",
+      "category": "Housing",
+      "roles": [
+        "roommate",
+        "roommate"
+      ],
+      "hint": "guests, dishes, quiet hours, bills"
+    },
+    {
+      "slug": "gas-station-pump-help",
+      "topic": "Asking for Help with the Gas Pump",
+      "category": "Transport",
+      "roles": [
+        "driver",
+        "attendant"
+      ],
+      "hint": "pay inside, card declined, diesel lane"
+    },
+    {
+      "slug": "learning-ev-charging",
+      "topic": "Learning to Use an EV Charger",
+      "category": "Transport",
+      "roles": [
+        "driver",
+        "attendant"
+      ],
+      "hint": "app start, connector stuck, cost per kwh"
+    },
+    {
+      "slug": "appealing-parking-ticket",
+      "topic": "Appealing a Parking Ticket",
+      "category": "Transport",
+      "roles": [
+        "driver",
+        "clerk"
+      ],
+      "hint": "broken meter, wrong sign, hearing date"
+    },
+    {
+      "slug": "rideshare-pickup-mismatch",
+      "topic": "Locating a Rideshare Pickup",
+      "category": "Transport",
+      "roles": [
+        "passenger",
+        "driver"
+      ],
+      "hint": "wrong terminal, meet at door 5, cancel timer"
+    },
+    {
+      "slug": "bus-transfer-question",
+      "topic": "Asking About a Bus Transfer",
+      "category": "Transport",
+      "roles": [
+        "rider",
+        "driver"
+      ],
+      "hint": "exact fare, paper transfer, crosstown"
+    },
+    {
+      "slug": "train-delay-refund",
+      "topic": "Getting a Train Delay Refund",
+      "category": "Transport",
+      "roles": [
+        "commuter",
+        "ticket agent"
+      ],
+      "hint": "gate delay pass, partial refund, receipt needed"
+    },
+    {
+      "slug": "rental-car-upgrade",
+      "topic": "Asking for a Rental Car Upgrade",
+      "category": "Transport",
+      "roles": [
+        "customer",
+        "agent"
+      ],
+      "hint": "economy sold out, extra driver, insurance"
+    },
+    {
+      "slug": "parallel-parking-lesson",
+      "topic": "A First Parallel-Parking Attempt",
+      "category": "Transport",
+      "roles": [
+        "student",
+        "instructor"
+      ],
+      "hint": "reference points, curb hit, confidence"
+    },
+    {
+      "slug": "toll-booth-payment",
+      "topic": "Handling a Toll Booth",
+      "category": "Transport",
+      "roles": [
+        "driver",
+        "attendant"
+      ],
+      "hint": "coin vs card, transponder, exact change lane"
+    },
+    {
+      "slug": "hotel-no-hot-water",
+      "topic": "Reporting No Hot Water",
+      "category": "Travel",
+      "roles": [
+        "guest",
+        "front desk"
+      ],
+      "hint": "maintenance, room switch, compensation"
+    },
+    {
+      "slug": "hotel-early-checkin",
+      "topic": "Asking for Early Check-In",
+      "category": "Travel",
+      "roles": [
+        "guest",
+        "receptionist"
+      ],
+      "hint": "red-eye flight, room not ready, luggage hold"
+    },
+    {
+      "slug": "flight-overbooking",
+      "topic": "Handling an Overbooked Flight",
+      "category": "Travel",
+      "roles": [
+        "traveler",
+        "gate agent"
+      ],
+      "hint": "volunteer bump, voucher, next flight"
+    },
+    {
+      "slug": "delayed-luggage",
+      "topic": "Reporting Delayed Luggage",
+      "category": "Travel",
+      "roles": [
+        "traveler",
+        "airline agent"
+      ],
+      "hint": "claim tag, essentials kit, delivery address"
+    },
+    {
+      "slug": "museum-tickets",
+      "topic": "Buying Museum Tickets",
+      "category": "Travel",
+      "roles": [
+        "visitor",
+        "box office"
+      ],
+      "hint": "timed entry, member discount, audio guide"
+    },
+    {
+      "slug": "school-registration",
+      "topic": "Registering a Kid for School",
+      "category": "School",
+      "roles": [
+        "parent",
+        "registrar"
+      ],
+      "hint": "proof of address, records, immunization"
+    },
+    {
+      "slug": "parent-teacher-meeting",
+      "topic": "A Parent-Teacher Conference",
+      "category": "School",
+      "roles": [
+        "parent",
+        "teacher"
+      ],
+      "hint": "reading level, homework habits, plan"
+    },
+    {
+      "slug": "peanut-free-lunch",
+      "topic": "Arranging a Peanut-Free Lunch",
+      "category": "School",
+      "roles": [
+        "parent",
+        "cafeteria staff"
+      ],
+      "hint": "allergy form, labeled tray, seat policy"
+    },
+    {
+      "slug": "tutor-extra-help",
+      "topic": "Asking the Tutor for Extra Help",
+      "category": "School",
+      "roles": [
+        "student",
+        "tutor"
+      ],
+      "hint": "fraction confusion, extra session, homework"
+    },
+    {
+      "slug": "kids-party-room",
+      "topic": "Booking a Birthday Party Room",
+      "category": "School",
+      "roles": [
+        "parent",
+        "venue coordinator"
+      ],
+      "hint": "guest limit, outside food, deposit"
+    },
+    {
+      "slug": "summer-camp-signup",
+      "topic": "Signing Up for Summer Camp",
+      "category": "School",
+      "roles": [
+        "parent",
+        "counselor"
+      ],
+      "hint": "session dates, swim gear, buddy request"
+    },
+    {
+      "slug": "hair-salon-cut",
+      "topic": "Getting the Right Haircut",
+      "category": "Services",
+      "roles": [
+        "client",
+        "stylist"
+      ],
+      "hint": "reference photo, layers, keep length"
+    },
+    {
+      "slug": "gel-manicure",
+      "topic": "Asking for a Gel Manicure",
+      "category": "Services",
+      "roles": [
+        "client",
+        "technician"
+      ],
+      "hint": "champagne color, chips, removal next time"
+    },
+    {
+      "slug": "dry-cleaner-stain",
+      "topic": "Pointing Out a Shirt Stain",
+      "category": "Services",
+      "roles": [
+        "customer",
+        "attendant"
+      ],
+      "hint": "wine stain, fabric type, same-day service"
+    },
+    {
+      "slug": "pants-hemming",
+      "topic": "Getting Pants Hemmed",
+      "category": "Services",
+      "roles": [
+        "customer",
+        "tailor"
+      ],
+      "hint": "break length, rush fee, try on"
+    },
+    {
+      "slug": "laundry-detergent-choice",
+      "topic": "Choosing Laundry Detergent",
+      "category": "Services",
+      "roles": [
+        "customer",
+        "clerk"
+      ],
+      "hint": "HE machine, sensitive skin, pods vs liquid"
+    },
+    {
+      "slug": "plumber-appointment",
+      "topic": "Scheduling a Plumber",
+      "category": "Services",
+      "roles": [
+        "homeowner",
+        "dispatcher"
+      ],
+      "hint": "leak under sink, service call fee, window"
+    },
+    {
+      "slug": "internet-install",
+      "topic": "Scheduling an Internet Install",
+      "category": "Services",
+      "roles": [
+        "customer",
+        "tech"
+      ],
+      "hint": "two-hour window, router, upstairs weak signal"
+    },
+    {
+      "slug": "moving-quote",
+      "topic": "Getting a Moving Quote",
+      "category": "Services",
+      "roles": [
+        "customer",
+        "mover"
+      ],
+      "hint": "stairs, piano fee, boxes provided"
+    },
+    {
+      "slug": "open-checking-account",
+      "topic": "Opening a Checking Account",
+      "category": "Finance",
+      "roles": [
+        "customer",
+        "banker"
+      ],
+      "hint": "minimum balance, debit card, direct deposit"
+    },
+    {
+      "slug": "depositing-a-check",
+      "topic": "Depositing a Check at the Bank",
+      "category": "Finance",
+      "roles": [
+        "customer",
+        "teller"
+      ],
+      "hint": "mobile vs branch, hold, endorsement"
+    },
+    {
+      "slug": "atm-swallowed-card",
+      "topic": "Retrieving a Card from an ATM",
+      "category": "Finance",
+      "roles": [
+        "customer",
+        "security"
+      ],
+      "hint": "bank hours, replacement card, receipt"
+    },
+    {
+      "slug": "car-loan-payment",
+      "topic": "Asking About a Car Loan Payment",
+      "category": "Finance",
+      "roles": [
+        "customer",
+        "banker"
+      ],
+      "hint": "autopay, extra principal, payoff quote"
+    },
+    {
+      "slug": "sending-money-abroad",
+      "topic": "Sending Money Abroad",
+      "category": "Finance",
+      "roles": [
+        "customer",
+        "agent"
+      ],
+      "hint": "transfer fee, exchange rate, arrival time"
+    },
+    {
+      "slug": "credit-card-overpayment",
+      "topic": "Fixing an Overpaid Credit Card Bill",
+      "category": "Finance",
+      "roles": [
+        "customer",
+        "rep"
+      ],
+      "hint": "negative balance, refund check, minimum"
+    },
+    {
+      "slug": "shipping-a-box",
+      "topic": "Shipping a Box at the Post Office",
+      "category": "Errands",
+      "roles": [
+        "customer",
+        "clerk"
+      ],
+      "hint": "fragile label, tracking, insurance"
+    },
+    {
+      "slug": "getting-a-library-card",
+      "topic": "Getting a Library Card",
+      "category": "Errands",
+      "roles": [
+        "patron",
+        "librarian"
+      ],
+      "hint": "e-card, fine lookup, wifi code"
+    },
+    {
+      "slug": "passport-photos",
+      "topic": "Getting Passport Photos",
+      "category": "Errands",
+      "roles": [
+        "applicant",
+        "clerk"
+      ],
+      "hint": "no glasses, size, printed form"
+    },
+    {
+      "slug": "drivers-license-renewal",
+      "topic": "Renewing a Driver's License",
+      "category": "Errands",
+      "roles": [
+        "customer",
+        "DMV clerk"
+      ],
+      "hint": "vision test, documents, temporary paper"
+    },
+    {
+      "slug": "voter-registration",
+      "topic": "Registering to Vote",
+      "category": "Errands",
+      "roles": [
+        "citizen",
+        "volunteer"
+      ],
+      "hint": "deadline, ID number, party choice"
+    },
+    {
+      "slug": "joining-a-gym",
+      "topic": "Joining a Gym",
+      "category": "Errands",
+      "roles": [
+        "member",
+        "staff"
+      ],
+      "hint": "trial class, contract, cancel policy"
+    },
+    {
+      "slug": "first-yoga-class",
+      "topic": "Walking into a First Yoga Class",
+      "category": "Errands",
+      "roles": [
+        "beginner",
+        "instructor"
+      ],
+      "hint": "bring mat, Modifications, drop-in fee"
+    },
+    {
+      "slug": "dog-park-rules",
+      "topic": "Learning the Rules at the Dog Park",
+      "category": "Community",
+      "roles": [
+        "owner",
+        "regular"
+      ],
+      "hint": "small dog gate, water, leashes off"
+    },
+    {
+      "slug": "neighbor-lawn-talk",
+      "topic": "Talking to a Neighbor About the Lawn",
+      "category": "Community",
+      "roles": [
+        "neighbor",
+        "neighbor"
+      ],
+      "hint": "leaves blowing over, hedge trim, friendly fix"
+    },
+    {
+      "slug": "party-introductions",
+      "topic": "Introducing Yourself at a Party",
+      "category": "Community",
+      "roles": [
+        "guest",
+        "guest"
+      ],
+      "hint": "how you know host, work small talk, name repeat"
+    },
+    {
+      "slug": "coworker-lunch-invite",
+      "topic": "Inviting a Coworker to Lunch",
+      "category": "Community",
+      "roles": [
+        "coworker",
+        "coworker"
+      ],
+      "hint": "dietary picks, calendar time, casual invite"
+    },
+    {
+      "slug": "help-carry-groceries",
+      "topic": "Offering to Help Carry Groceries",
+      "category": "Community",
+      "roles": [
+        "stranger",
+        "stranger"
+      ],
+      "hint": "spill, thanks, refuse politely"
+    },
+    {
+      "slug": "coffee-meetup-wait",
+      "topic": "Waiting for a First Meetup",
+      "category": "Community",
+      "roles": [
+        "friend",
+        "friend"
+      ],
+      "hint": "wrong coffee shop, describe outfit, running late"
+    },
+    {
+      "slug": "returning-lost-wallet",
+      "topic": "Returning a Lost Wallet",
+      "category": "Community",
+      "roles": [
+        "finder",
+        "owner"
+      ],
+      "hint": "ID inside, reward offered, thank-you call"
+    },
+    {
+      "slug": "getting-wrong-dish",
+      "topic": "Getting the Wrong Dish at a Sit-Down",
+      "category": "Problem",
+      "roles": [
+        "diner",
+        "server"
+      ],
+      "hint": "well-done vs medium, already eaten, swap"
+    },
+    {
+      "slug": "phone-bill-overcharge",
+      "topic": "Questioning a Phone Bill Charge",
+      "category": "Problem",
+      "roles": [
+        "customer",
+        "rep"
+      ],
+      "hint": "unfamiliar add-on, prorated, credit"
+    },
+    {
+      "slug": "food-truck-cash",
+      "topic": "Food Truck Out of Cash Change",
+      "category": "Problem",
+      "roles": [
+        "customer",
+        "truck owner"
+      ],
+      "hint": "card down, exact change, nearby ATM"
+    },
+    {
+      "slug": "repair-estimate",
+      "topic": "Getting an Estimate for a Repair",
+      "category": "Problem",
+      "roles": [
+        "customer",
+        "technician"
+      ],
+      "hint": "part on order, labor vs parts, second look"
+    },
+    {
+      "slug": "sick-kid-call-office",
+      "topic": "Calling the Office about a Sick Kid",
+      "category": "Family",
+      "roles": [
+        "parent",
+        "boss"
+      ],
+      "hint": "cover meeting, work from home, pick up"
+    },
+    {
+      "slug": "pickup-authorization",
+      "topic": "Authorizing a Friend to Pick Up a Kid",
+      "category": "Family",
+      "roles": [
+        "parent",
+        "front office"
+      ],
+      "hint": "photo ID, list update, emergency contact"
+    },
+    {
+      "slug": "hiring-a-babysitter",
+      "topic": "Hiring a Babysitter",
+      "category": "Family",
+      "roles": [
+        "parent",
+        "sitter"
+      ],
+      "hint": "bedtime, rate, emergency number, references"
+    },
+    {
+      "slug": "help-parent-set-phone",
+      "topic": "Helping a Parent Set Up a Phone",
+      "category": "Family",
+      "roles": [
+        "adult child",
+        "parent"
+      ],
+      "hint": "larger text, wifi login, patience"
+    },
+    {
+      "slug": "cooking-line-substitute",
+      "topic": "Calling a Cooking Hotline for a Substitute",
+      "category": "Family",
+      "roles": [
+        "caller",
+        "host"
+      ],
+      "hint": "out of buttermilk, baking soda, ratio"
+    },
+    {
+      "slug": "picking-a-birthday-gift",
+      "topic": "Picking a Gift for a Friend",
+      "category": "Family",
+      "roles": [
+        "shopper",
+        "clerk"
+      ],
+      "hint": "surprise, gift receipt, wrapping"
+    },
+    {
+      "slug": "online-order-missing-item",
+      "topic": "Reporting a Missing Item in an Order",
+      "category": "Family",
+      "roles": [
+        "customer",
+        "support"
+      ],
+      "hint": "photo request, partial refund, replacement"
+    },
+    {
+      "slug": "used-car-inspection",
+      "topic": "Buying a Used Car from a Lot",
+      "category": "Family",
+      "roles": [
+        "buyer",
+        "salesperson"
+      ],
+      "hint": "test drive, mileage, pre-purchase check"
+    },
+    {
+      "slug": "bike-repair-shop",
+      "topic": "Getting a Bike Fixed at a Shop",
+      "category": "Family",
+      "roles": [
+        "customer",
+        "mechanic"
+      ],
+      "hint": "flat tire, brake adjust, tune-up cost"
+    },
+    {
+      "slug": "choosing-a-houseplant",
+      "topic": "Choosing a Houseplant",
+      "category": "Family",
+      "roles": [
+        "customer",
+        "clerk"
+      ],
+      "hint": "low light, pet-safe, watering schedule"
+    }
+  ]
+}

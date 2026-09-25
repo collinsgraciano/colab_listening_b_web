@@ -1,0 +1,199 @@
+{
+  "id": "script_cut_pizza-delivery-tip",
+  "topic": "Questioning the Pizza Delivery Tip",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000009.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "PIZZA DELIVERY AND THE TIP",
+    "title_zh": "外送小費",
+    "scene_zh": "家門口 · 收披薩",
+    "story_hook": "A rainy night, hot pizza, and a confusing receipt.",
+    "intro_zh": "下雨的夜晚、熱騰騰的披薩，還有讓人困惑的收據。",
+    "welcome_en": "Hey everyone! Today we're talking pizza delivery tips.",
+    "welcome_zh": "大家好！今天來聊聊披薩外送的費用和小費。",
+    "outro": "Now tipping at the door is easy in English. Practice on!",
+    "outro_zh": "現在開門給小費對你來說超簡單，繼續練習囉！",
+    "practice_intro_en": "Time to repeat. Copy me line by line.",
+    "practice_intro_zh": "該跟讀了，一句一句跟著我唸。",
+    "char_a_description": "a sleepy-looking woman in her late twenties with a messy bun held up by a pencil, wearing an oversized college hoodie and fluffy slippers at her doorway",
+    "char_b_description": "a warm-smiling man in his early forties with a close-cropped, gray-flecked beard, wearing a neon reflective delivery jacket and rain hood, holding an insulated pizza bag",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "delivery driver",
+    "youtube_title": "【🍕💸披薩外送英文】「到貨」才懂：運費、小費、QR-code 收款的 18 句對話｜🎧Delivery Tip English",
+    "youtube_title_en": "\"Tip Separate\" — Questioning the Pizza Delivery Tip",
+    "youtube_description": "外送費裡到底有沒有包含小費？當面問會不會很尷尬？這集 18 句家門口對話一次拆開：運費歸店家、小費歸司機、沒現金怎麼辦、掃碼付款怎麼說。自然美式口語加上繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽完就能從容收餐。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Does the delivery fee tip the driver? Ask at the door without the awkwardness. This 18-line porch scene untangles fees from tips, handles the no-cash moment, and covers paying by QR code, all in natural American English with IPA. A repeat-after-me section seals the phrases in.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "pizza delivery English",
+      "delivery tip etiquette",
+      "tipping in America",
+      "QR code payment English",
+      "ESL conversation",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "ordering delivery food",
+      "paying the driver",
+      "外送英文",
+      "小費文化英文",
+      "聽力練習",
+      "日常英語",
+      "美式口語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🍕外送英文｜拆開運費・掃碼給費・雨天道謝｜聽完就會收餐｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n帳單上有運費，那司機的小費還算不算在裡面？\n身上沒帶現金，門口該怎麼辦？\n\n這一集帶大家走進雨夜的家門口，跟著顧客與司機從對單、拆開運費與小費，到掃碼付款、雨天道謝，全程都是自然的美式英語。\n\n你會聽到：\n🧾 對數額：例如「How much total?」、「Sixteen forty-five, tip separate.」\n💸 拆費用：例如「three fifty goes to the shop, not me.」、「I thought the fee covered you.」\n📲 掃碼與道謝：例如「See this QR sticker?」、「Driving in rain makes tips count double.」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下次外送小哥按門鈴，你也能笑著把費用問清楚！",
+    "scene": "apartment doorway",
+    "thumbnail_expression": "squinting at a receipt in confusion",
+    "thumbnail_action": "holding a pizza bag and a small QR sticker",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Delivery Fee",
+        "zh": "外送費"
+      },
+      {
+        "en": "Tip",
+        "zh": "小費"
+      },
+      {
+        "en": "QR Sticker",
+        "zh": "收款碼"
+      },
+      {
+        "en": "Cashless",
+        "zh": "行動支付"
+      },
+      {
+        "en": "Pizza Bag",
+        "zh": "保溫袋"
+      }
+    ],
+    "title_quote": "tip separate",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Oh, hi! That's the pizza from Mario's?",
+        "phonetic": "/oʊ haɪ ðæts ðə ˈpitsə frʌm məˈrioʊz/",
+        "zh": "噢嗨！你是 Mario 家的披薩司機嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's me. Large pepperoni, still hot.",
+        "phonetic": "/ðæts mi lɑrdʒ ˌpɛpəˈroʊni stɪl hɑt/",
+        "zh": "就是我。大份義式香腸披薩，還熱騰騰。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Amazing, you made great time. How much total?",
+        "phonetic": "/əˈmeɪzɪŋ ju meɪd ɡreɪt taɪm haʊ mʌtʃ ˈtoʊtəl/",
+        "zh": "好快！請問總共多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sixteen forty-five, tip separate if you like.",
+        "phonetic": "/ˈsɪksən ˈfɔrti faɪv tɪp ˈsɛpərət ɪf ju laɪk/",
+        "zh": "十六塊四五，小費是另外計算的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, there's a delivery fee too? On top?",
+        "phonetic": "/weɪt ðɛrz ə dɪˈlɪvəri fim tu ɑn tɑp/",
+        "zh": "等等，還外加運費嗎？在這之上？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yeah, three fifty goes to the shop, not me.",
+        "phonetic": "/jɛ θri ˈfɪfti ɡoz tə ðə ʃɑp nɑt mi/",
+        "zh": "對，三塊五是店家收的，不是我。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, I'm sorry, I thought the fee covered you.",
+        "phonetic": "/oʊ aɪm ˈsɑri aɪ θɔt ðə fim ˈkʌvərd ju/",
+        "zh": "噢抱歉，我以為運費就含司機費用。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Lots of folks think that, no worries at all.",
+        "phonetic": "/lɑts əv foʊks θɪŋk ðæt noʊ ˈwɜriz ət ɔl/",
+        "zh": "很多人都這麼想，完全不用在意。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How does the tip work? I don't have cash.",
+        "phonetic": "/haʊ dʌz ðə tɪp wɜrk aɪ doʊnt hæv kæʃ/",
+        "zh": "那小費怎麼給？我身上沒現金。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "See this QR sticker? It goes straight to me.",
+        "phonetic": "/si ðɪs kɑr ˈstɪkər ɪt ɡoz streɪt tə mi/",
+        "zh": "看到這個收款貼碼了嗎？直接進我帳戶。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, scanning now... one sec, weak signal.",
+        "phonetic": "/ˈpɜrfɪkt ˈskænɪŋ naʊ wʌn sɛk wik ˈsɪɡnəl/",
+        "zh": "好了，我在掃……等一下，訊號很弱。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No rush, I'm parked right out front.",
+        "phonetic": "/noʊ rʌʃ aɪm pɑrkt raɪt aʊt frʌnt/",
+        "zh": "不急，我就停在門口前面。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Got it, sent five dollars. Did that land?",
+        "phonetic": "/ɡɑt ɪt sɛnt faɪv ˈdɑlərz dɪd ðæt lænd/",
+        "zh": "成功了，轉了五塊。你有收到嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yep, pinged it, thank you so much, truly.",
+        "phonetic": "/jɛp pɪŋd ɪt θæŋk ju su mʌtʃ ˈtruːli/",
+        "zh": "有，跳提示了，真的非常感謝。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You deserve ten, honestly, it's pouring outside.",
+        "phonetic": "/ju dɪˈzɜrv tɛn ˈɑnəstli ɪts ˈpɔrɪŋ aʊtˈsaɪd/",
+        "zh": "說真的你值得十塊，外面雨超大。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Driving in rain makes tips count double, trust me.",
+        "phonetic": "/ˈdraɪvɪŋ ɪn reɪn meɪks tɪps kaʊnt ˈdʌbəl trʌst mi/",
+        "zh": "雨天開車送費，小費都加倍珍貴，相信我。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Here, take this bottle of water too, okay?",
+        "phonetic": "/hɪr teɪk ðɪs ˈbɑtəl əv ˈwɔtər tu oʊˈkeɪ/",
+        "zh": "來，這瓶水也給你了，好不？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're the best. Enjoy your pizza tonight!",
+        "phonetic": "/jʊr ðə bɛst ɛnˈdʒɔɪ jʊr ˈpitsə təˈnaɪt/",
+        "zh": "你太好了，今晚披薩慢慢享用！"
+      }
+    ]
+  }
+}

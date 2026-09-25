@@ -1,0 +1,198 @@
+{
+  "id": "script_cut_restaurant-nut-allergy",
+  "topic": "Ordering Dinner with a Nut Allergy",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000002.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "DINING WITH A NUT ALLERGY",
+    "title_zh": "堅果過敏",
+    "scene_zh": "餐廳 · 告知過敏",
+    "story_hook": "Dinner turns serious when a nut allergy surfaces.",
+    "intro_zh": "一頓晚餐因為堅果過敏變得認真起來。",
+    "welcome_en": "Welcome back, everyone! Today a diner talks about a nut allergy.",
+    "welcome_zh": "歡迎大家回來！今天的情境是一場關於堅果過敏的晚餐點餐。",
+    "outro": "Safe dining starts with good English. Practice tonight!",
+    "outro_zh": "安心用餐從好的英文開始。今晚就練習一次吧！",
+    "practice_intro_en": "Time to speak up. Repeat every line with me.",
+    "practice_intro_zh": "該開口了，跟著我一句一句唸。",
+    "char_a_description": "a calm middle-aged man in his forties with salt-and-pepper hair and rectangular glasses, wearing a navy polo shirt and khaki slacks, nervously tapping his water glass",
+    "char_b_description": "a brisk woman in her early thirties with dark red hair pulled into a tight braid, wearing a charcoal waiter vest over a rolled-sleeve white shirt, holding a leather order pad",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "diner",
+    "char_b_role": "waiter",
+    "youtube_title": "【🥜🥗餐廳點餐實戰英文】「小心總比較好」怎麼說？告知過敏、確認食材最實用｜聽完就會用｜🎧Restaurant English",
+    "youtube_title_en": "\"Better to Be Safe\" — Ordering Dinner with a Nut Allergy",
+    "youtube_description": "有食物過敏，出國到底怎麼跟服務生說？這集 18 句對話帶你完整演練：告知堅果過敏、確認醬料與鍋具、連甜點都不放過。全部是自然的美式口語，附上繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽一遍就敢在服務生面前清楚表達。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Got a food allergy and no idea how to say it in English? This 18-line restaurant scene covers it all: telling your waiter, double-checking sauces and pans, and even screening dessert. Real American English with IPA transcription and Traditional Chinese meaning, plus a repeat-after-me section. Listen once, speak with confidence tonight.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "nut allergy English",
+      "restaurant ordering English",
+      "food allergy conversation",
+      "ESL role play",
+      "English listening practice",
+      "everyday American English",
+      "talking to a waiter",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "ordering dinner out",
+      "餐廳點餐英文",
+      "食物過敏英文",
+      "聽力練習",
+      "日常英語",
+      "美式口語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🥗餐廳英文｜告知過敏・確認食材・篩選甜點｜聽完就會點餐｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n對堅果過敏，在國外餐廳該從何開口？\n醬料裡有沒有堅果？鍋子會不會共用？\n\n這一集帶大家走進一家溫暖熱鬧的晚餐餐廳，跟著顧客從告知過敏、詢問主廚，到確認甜點，全程都是自然的美式英語。\n\n你會聽到：\n🥜 告知過敏：例如「I have a nut allergy.」、「even a little crumb makes me sick.」\n🍳 確認料理：例如「Is the pan shared with nut dishes?」、「let me double-check with the chef.」\n🍰 甜點把關：例如「The chocolate cake has hazelnut layers.」、「Is that safe?」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n平安吃飽一頓飯，也能靠英文辦到！",
+    "scene": "restaurant dining room",
+    "thumbnail_expression": "serious but polite",
+    "thumbnail_action": "showing an epinephrine pen packet to the waiter",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Nut-Free Plate",
+        "zh": "無過敏餐盤"
+      },
+      {
+        "en": "Almond Risotto",
+        "zh": "杏仁燉飯"
+      },
+      {
+        "en": "Grilled Salmon",
+        "zh": "烤鮭魚"
+      },
+      {
+        "en": "Berry Dessert",
+        "zh": "漿果甜點"
+      },
+      {
+        "en": "Allergy Note",
+        "zh": "過敏提醒"
+      }
+    ],
+    "title_quote": "Better to be safe",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse me, I have a nut allergy.",
+        "phonetic": "/ɪkˈskjuːz mi aɪ hæv ə nʌt ˈælərdʒi/",
+        "zh": "打擾一下，我對堅果過敏。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thanks for letting me know. Peanuts, or all nuts?",
+        "phonetic": "/θæŋks fər ˈlɛtɪŋ mi noʊ ˈpinəts ɔr ɔl nʌts/",
+        "zh": "謝謝你告訴我。是花生，還是所有堅果？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "All nuts, even a little crumb makes me sick.",
+        "phonetic": "/ɔl nʌts ˈivn ə ˈlɪtəl kræm meɪks mi sɪk/",
+        "zh": "全部堅果，哪怕一點碎屑都會讓我不舒服。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. Do you have an epipen with you tonight?",
+        "phonetic": "/ɡɑt ɪt du ju hæv ən ˈɛpəˌpɛn wɪð ju təˈnaɪt/",
+        "zh": "了解。你今晚帶有腎上腺素筆嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, it's in my bag. Better to be safe.",
+        "phonetic": "/jɛs ɪts ɪn maɪ bæɡ ˈbɛtər tə bi seɪf/",
+        "zh": "有，在我包裡。小心總比較好。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect. The mushroom risotto has almond crumbs on top.",
+        "phonetic": "/ˈpərfɪkt ðə ˈmʌʃrʊm roʊˈzɑtoʊ hæz ˈɑmənd krɑmz ɑn tɑp/",
+        "zh": "太好了。蘑菇燉飯上面撒了杏仁碎。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, I didn't know that. What would you suggest?",
+        "phonetic": "/oʊ aɪ ˈdɪdənt noʊ ðæt wʌt wʊd ju sədʒɛst/",
+        "zh": "啊，我不知道。你會推薦什麼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The grilled salmon comes with a citrus butter sauce.",
+        "phonetic": "/ðə ɡrɪld ˈsæmən kʌmwɪð ə ˈsɪtrəs ˈbʌtər sɔs/",
+        "zh": "烤鮭魚附的是柑橘奶油醬。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That sounds good. Is the pan shared with nut dishes?",
+        "phonetic": "/ðæt saʊndz ɡʊd ɪz ðə pæn ʃɛrd wɪð nʌt ˈdɪʃɪz/",
+        "zh": "聽起來不錯。平底鍋有沒有跟堅果料理共用？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great question, let me double-check with the chef.",
+        "phonetic": "/ɡreɪt ˈkwɛstʃən lɛt mi ˈdʌbəlˌtʃɛk wɪð ðə ʃɛf/",
+        "zh": "好問題，讓我再去跟主廚確認。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Take your time. I really don't want to risk it.",
+        "phonetic": "/teɪk jɔr taɪm aɪ ˈrɪli doʊnt wɑnt tə rɪsk ɪt/",
+        "zh": "不急。我真的不想冒這個險。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Back with news: fresh clean pan, totally safe for you.",
+        "phonetic": "/bæk wɪð nuz frɛʃ klin pæn ˈtoʊtli seɪf fɔr ju/",
+        "zh": "有好消息：用乾淨的新鍋煎，對你完全安全。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you so much. Can I also ask about dessert?",
+        "phonetic": "/θæŋk ju su mʌtʃ kæn aɪ ˈɔlsə æsk əˈbaʊt dɪˈzərt/",
+        "zh": "太感謝了。可以順便問甜點嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The chocolate cake has hazelnut layers, I'm afraid.",
+        "phonetic": "/ðə ˈtʃɑklət keɪk hæz ˈhæzənˌʌt ˈleɪərz aɪm əˈfreɪd/",
+        "zh": "恐怕巧克力蛋糕裡夾了榛果層。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Better skip it then. Fruit, maybe? Is that safe?",
+        "phonetic": "/ˈbɛtər skɪp ɪt ðɛn frut ˈmeɪbi ɪz ðæt seɪf/",
+        "zh": "那還是跳過吧。水果呢？那個安全嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Absolutely. I'll bring a berry plate with the salmon.",
+        "phonetic": "/ˌæbsəˈlutli aɪl brɪŋ ə ˈbɛri pleɪt wɪð ðə ˈsæmən/",
+        "zh": "當然可以。我會連鮭魚一起端上漿果盤。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You've been so helpful. Thanks for checking everything.",
+        "phonetic": "/jubɪn su ˈhɛlpfl θæŋks fər ˈtʃɛkɪŋ ˈɛvriˌθɪŋ/",
+        "zh": "你幫了大忙，謝謝你確認所有細節。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "My pleasure. Enjoy your dinner, allergy-free tonight.",
+        "phonetic": "/maɪ ˈplɛʒər ɛnˈdʒɔɪ jɔr ˈdɪnər ˌælərˈdʒi fri təˈnaɪt/",
+        "zh": "不客氣。請慢慢享用，今晚零過敏。"
+      }
+    ]
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "id": "script_cut_brunch-waitlist",
+  "topic": "Getting on the Waitlist for Brunch",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000010.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "ON THE BRUNCH WAITLIST",
+    "title_zh": "排隊等位",
+    "scene_zh": "早午餐店 · 登記等位",
+    "story_hook": "Brunch without a reservation, the waitlist way.",
+    "intro_zh": "沒有訂位的早午餐，用等位名單搞定。",
+    "welcome_en": "Hello friends! Today we're joining a brunch waitlist.",
+    "welcome_zh": "嗨朋友們！今天到熱門的早午餐店排隊等位。",
+    "outro": "Waiting smart is a skill now. Repeat and own it!",
+    "outro_zh": "聰明等位也是一種能力，跟著唸就學會了！",
+    "practice_intro_en": "Let's go through it once more. Your turn.",
+    "practice_intro_zh": "我們再來一遍，換你開口。",
+    "char_a_description": "a young woman in her late twenties with honey-brown braids wound into a crown, wearing a denim jacket over a striped dress, juggling a crossbody purse and a folded stroller",
+    "char_b_description": "a composed man in his fifties with steel-blue hair combed straight back and wire-rim glasses, wearing a sage-green host blazer with a gold name tag, holding a waitlist tablet",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "guest",
+    "char_b_role": "host",
+    "youtube_title": "【🥞🪟人氣早午餐等位英文】「傳訊息通知我們」怎麼說？登記、座位偏好、停車折抵 18 句｜🎧Brunch English",
+    "youtube_title_en": "\"You Thought of Everything\" — Getting on the Brunch Waitlist",
+    "youtube_description": "週末想吃的早午餐店沒有訂位，要不要排？這集 18 句外場對話教你：登記人數與電話、請店家傳訊息通知、指定窗邊座位、兒童餐椅與停車折抵一次問好。自然美式口語搭配繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽完就會從容等位。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Craving brunch at the hottest spot with no reservation? This 18-line host-stand scene covers joining the waitlist, asking for a text when the table is ready, requesting a window seat, and sorting out high chairs and parking validation. Natural American English with IPA plus a repeat-after-me section.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "brunch waitlist English",
+      "restaurant host stand English",
+      "joining a waitlist",
+      "text me when ready",
+      "window seat request",
+      "ESL conversation",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "parking validation English",
+      "restaurant small talk",
+      "等位英文",
+      "早午餐英文",
+      "聽力練習",
+      "日常英語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🥞等位英文｜登記名單・訊息通知・座位偏好｜聽完就會排隊｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n週末的熱門早午餐店，沒訂位到底能不能等？\n登記的資料、座位偏好、停車問題，要用英文怎麼問？\n\n這一集帶大家走進陽光滿溢的早午餐店門口，跟著顧客與外場從登記名單、請店家傳訊息通知、指定窗邊座位，到兒童餐椅與停車折抵，全程都是自然的美式英語。\n\n你會聽到：\n📝 登記等位：例如「table for three?」、「Can you text when it's ready?」\n🪟 座位偏好：例如「any chance of a window seat?」、「they have high chairs.」\n🚗 貼心收尾：例如「we validate parking for waitlist guests.」、「See you soon.」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下一個悠閒早晨，安心喝著咖啡等開門！",
+    "scene": "brunch restaurant host stand",
+    "thumbnail_expression": "hopeful with a slight smile",
+    "thumbnail_action": "signing the waitlist tablet at the host stand",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Waitlist Tablet",
+        "zh": "等位名單"
+      },
+      {
+        "en": "Text Alert",
+        "zh": "訊息通知"
+      },
+      {
+        "en": "Window Seat",
+        "zh": "窗邊座位"
+      },
+      {
+        "en": "High Chair",
+        "zh": "兒童餐椅"
+      },
+      {
+        "en": "Parking Validation",
+        "zh": "停車折抵"
+      }
+    ],
+    "title_quote": "You thought of everything",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, table for three? No reservation, I know.",
+        "phonetic": "/haɪ ˈteɪbəl fɔr θri noʊ ˌrɛzərˈveɪʃən aɪ noʊ/",
+        "zh": "嗨，三人座？我們沒有訂位，我知道。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're in luck-ish... forty-five minutes, okay?",
+        "phonetic": "/jʊrz ɪn lʌk ɪʃ ˈfɔrti faɪv ˈmɪnɪts oʊˈkeɪ/",
+        "zh": "算運氣不錯……要等四十五分鐘，可以嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, that long? We drove across town for this.",
+        "phonetic": "/ʌm ðæt lɔŋ wi droʊd əˈkrɑs taʊn fɔr ðɪs/",
+        "zh": "呃，要這麼久？我們特地開車跨區過來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fully booked, it's the last sunny Sunday.",
+        "phonetic": "/ˈfʊli bʊkt ɪts ðə læst ˈsʌni ˈsʌndeɪ/",
+        "zh": "今天全訂滿啦，這是最後一個晴朗的週日。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, we'll wait. Can you text when it's ready?",
+        "phonetic": "/oʊˈkeɪ wil weɪt kæn ju tɛkst wɛn ɪts ˈrɛdi/",
+        "zh": "好吧，我們等。到時候可以傳訊息通知嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, I'll text the phone number you give.",
+        "phonetic": "/jɛs aɪl tɛkst ðə foʊn ˈnʌmbər ju ɡɪv/",
+        "zh": "可以，我會傳到您留的電話。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great. And any chance of a window seat?",
+        "phonetic": "/ɡreɪt ænd ˈɛni tʃæns əv ə ˈwɪndoʊ sit/",
+        "zh": "太好了。有機會坐到窗邊嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll note it down: window for three.",
+        "phonetic": "/aɪl noʊt ɪt daʊn ˈwɪndoʊ fɔr θri/",
+        "zh": "我幫您註記：窗邊三人座。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you! Is there somewhere to wait nearby?",
+        "phonetic": "/θæŋk ju ɪz ðɛr ˈsʌmwɛr tə weɪt ˈnɪrˌbaɪ/",
+        "zh": "謝謝！這附近哪裡可以等？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Coffee shop next door, they have high chairs.",
+        "phonetic": "/ˈkɔfi ʃɑp nɛkst dɔr ðeɪ hæv haɪ tʃɛrz/",
+        "zh": "隔壁的咖啡廳就好，那邊有兒童椅。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, my sister brought the baby actually.",
+        "phonetic": "/ˈpɜrfɪkt maɪ ˈsɪstər brɔt ðə ˈbeɪbi ˈæktʃuəli/",
+        "zh": "剛好，我妹妹今天帶了寶寶來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Smart move. You've got about forty minutes.",
+        "phonetic": "/smɑrt muv juv ɡɑt əˈbaʊt ˈfɔrti ˈmɪnɪts/",
+        "zh": "那正好。您還有大約四十分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "One more thing, parking's only two hours.",
+        "phonetic": "/wʌn mɔr θɪŋ ˈpɑrkɪŋz ˈoʊnli tu ˈaʊərz/",
+        "zh": "還有一件事，停車限兩小時。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No worries, we validate parking for waitlist guests.",
+        "phonetic": "/noʊ ˈwɜriz wi ˈvælɪˌdeɪt ˈpɑrkɪŋ fɔr ˈweɪtˌlɪst ɡɛsts/",
+        "zh": "別擔心，等位的客人我們可以折抵停車。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You thought of everything, honestly. See you soon.",
+        "phonetic": "/ju θɔt əv ˈɛvriˌθɪŋ ˈɑnəstli si ju sun/",
+        "zh": "說真的，您什麼都想到了。一會兒見！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll update the app if tables open sooner.",
+        "phonetic": "/aɪl ˈʌpˌdeɪt ði æp ɪf ˈteɪbəlz ˈoʊpən ˈsunər/",
+        "zh": "如果有桌提前空出來，我會更新通知。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Amazing. Thanks for making waiting so easy.",
+        "phonetic": "/əˈmeɪzɪŋ θæŋks fɔr ˈmeɪkɪŋ ˈweɪtɪŋ soʊ ˈizi/",
+        "zh": "太周到了，謝謝讓等待這麼輕鬆。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Enjoy those pancakes, you've earned them!",
+        "phonetic": "/ɛnˈdʒɔɪ ðoʊz ˈpænˌkeɪks juv ɜrnd ðɛm/",
+        "zh": "好好享用松餅吧，這是你們應得的！"
+      }
+    ]
+  }
+}

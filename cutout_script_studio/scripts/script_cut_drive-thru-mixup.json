@@ -1,0 +1,198 @@
+{
+  "id": "script_cut_drive-thru-mixup",
+  "topic": "A Mix-Up at the Drive-Thru Window",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 18,
+  "created": 1790000005.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A DRIVE-THRU MIX-UP",
+    "title_zh": "車道拿錯餐",
+    "scene_zh": "得來速車道 · 換餐",
+    "story_hook": "A wrong drink turns into a drive-thru rescue.",
+    "intro_zh": "一杯錯飲品，展開一場得來速救援。",
+    "welcome_en": "Hey everyone! Today we're fixing an order at the drive-thru.",
+    "welcome_zh": "大家好！今天要處理得來速拿錯餐的狀況。",
+    "outro": "Wrong tray again? Now you can handle it in English.",
+    "outro_zh": "再拿到錯餐？現在你能用英文搞定它了！",
+    "practice_intro_en": "Let's review together. Repeat after me.",
+    "practice_intro_zh": "一起來複習，跟著我重複。",
+    "char_a_description": "an easygoing man in his mid thirties with short sandy hair and light stubble, wearing a heather gray quarter-zip fleece, glancing back toward his car seats",
+    "char_b_description": "a chipper young woman around nineteen with perky twin ponytails dyed teal, wearing a golden-yellow drive-thru visor and matching polo, stacking receipt rolls by the window",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "driver",
+    "char_b_role": "cashier",
+    "youtube_title": "【🚗🥤得來速救場英文】「兩分鐘就好」怎麼說？拿錯餐飲料、請店員重做全靠這 18 句｜🎧Drive-Thru English",
+    "youtube_title_en": "\"Two Minutes, Tops\" — A Mix-Up at the Drive-Thru Window",
+    "youtube_description": "在得來速拿到錯的餐點，搖下車窗該怎麼開口？這集 18 句車道對話教你：指出錯誤、問等待時間、把車往前開、收下補償折價券。全部用最常聽到的美式口語，附繁體中文翻譯與 IPA 標音，後半段逐句跟讀，聽完馬上會用。\n#EnglishListening #ESL #LearnEnglish\n訂閱我們的頻道，每天一集，讓英語變成你的直覺！",
+    "youtube_description_en": "Grabbed the wrong tray at the drive-thru window? This 18-line scene shows you how to flag the mistake, ask how long a remake takes, pull forward when told, and accept a goodwill coupon. All in the most common American spoken English, with IPA transcription and a repeat-after-me section.\n#EnglishListening #ESL #LearnEnglish\nSubscribe for a new episode every day!",
+    "youtube_tags": [
+      "drive thru English",
+      "fast food window order",
+      "wrong order fix",
+      "pull forward English",
+      "ESL conversation",
+      "English listening practice",
+      "everyday American English",
+      "learn English",
+      "daily English phrases",
+      "listen and repeat",
+      "ordering fast food",
+      "coupon English",
+      "得來速英文",
+      "速食店英文",
+      "聽力練習",
+      "日常英語",
+      "ESL聽力"
+    ],
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🚗得來速英文｜指出錯餐・把車前移・收下折價券｜聽完就會換餐｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n得來速窗口搖下來，才發現飲品尺寸不對？\n趕時間又不想吵架，該怎麼清楚又禮貌地說？\n\n這一集帶大家走進傍晚忙碌的速食店車道，跟著一位爸爸從指出錯餐、確認重做時間、把車往前開，到收好折價券道別，全程都是自然的美式英語。\n\n你會聽到：\n🥤 指出錯誤：例如「something's off with my order.」、「I asked for a large iced tea.」\n⏱️ 確認等待：例如「Will that take long?」、「Could you pull forward?」\n🎟️ 收尾與補償：例如「No hassle at all.」、「Here's a coupon for the mix-up.」\n\n後半段是逐句聽力加上跟讀練習 🎧，先聽一遍，再跟著一句一句唸，把整段對話變成自然的口語直覺。\n\n🌱 適合 A2 初級英文學習者：不用死背，跟著情境反覆聽，自然就會用。\n\n下次得來速遇到錯餐，搖下窗口就能從容解決！",
+    "scene": "drive-thru lane",
+    "thumbnail_expression": "raising an eyebrow at a cup",
+    "thumbnail_action": "holding a small cup beside a large order bag",
+    "thumbnail_subtitle": "18句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Iced Tea",
+        "zh": "冰茶"
+      },
+      {
+        "en": "No-Salt Fries",
+        "zh": "無鹽薯條"
+      },
+      {
+        "en": "Cashier Window",
+        "zh": "車道窗口"
+      },
+      {
+        "en": "Coupon",
+        "zh": "折價券"
+      },
+      {
+        "en": "Tray",
+        "zh": "餐盤"
+      }
+    ],
+    "title_quote": "Two minutes, tops",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, something's off with my order here.",
+        "phonetic": "/haɪ ˈsʌmθɪŋz ɔf wɪð maɪ ˈɔrdər hɪr/",
+        "zh": "嗨，我的餐點好像有點不對。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh? What did you get, versus what you ordered?",
+        "phonetic": "/oʊ wʌt dɪd ju ɡɛt ˈvɜrsəz wʌt ju ˈɔrdərd/",
+        "zh": "噢？您拿到的是什麼，點的又是什麼？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I asked for a large iced tea, this is small.",
+        "phonetic": "/aɪ ˈæskt fɔr ə lɑrdʒ aɪst ti ðɪs ɪz smɔl/",
+        "zh": "我要的是大杯冰茶，這杯是小杯。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ugh, sorry about that. Anything else wrong?",
+        "phonetic": "/ʌɡ ˈsɑri əˈbaʊt ðæt ˈɛniθɪŋ ɛls rɔŋ/",
+        "zh": "呃，好抱歉。還有別的地方不對嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, the fries are salted... mine are no salt.",
+        "phonetic": "/wɛl ðə fraɪz ɑr ˈsɔltɪd maɪn ɑr noʊ sɔlt/",
+        "zh": "嗯，薯條加了鹽……我要的是無鹽。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. Let me fix both right now, okay?",
+        "phonetic": "/ɡɑt ɪt lɛt mi fɪks boʊθ raɪt naʊ oʊˈkeɪ/",
+        "zh": "了解，我馬上幫您重做這兩樣，好嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Will that take long? I'm kind of in a rush.",
+        "phonetic": "/wɪl ðæt teɪk lɔŋ aɪm kaɪnd əv ɪn ə rʌʃ/",
+        "zh": "會很久嗎？我有點趕時間。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two minutes, tops. Could you pull forward?",
+        "phonetic": "/tu ˈmɪnɪts tɑps kʊd ju pʊl ˈfɔrwərd/",
+        "zh": "最多兩分鐘。麻煩您把車往前開好嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sure, that little gray spot up ahead works?",
+        "phonetic": "/ʃʊr ðæt ˈlɪtəl ɡreɪ spɑt ʌp əˈhɛd wɜrks/",
+        "zh": "好，前面那個灰色車位就可以嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, right there. Keep your window down, please.",
+        "phonetic": "/jɛs raɪt ðɛr kip jʊr ˈwɪndoʊ daʊn pliz/",
+        "zh": "對就那裡。請把車窗搖下來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, waiting here. Hope it's not a hassle.",
+        "phonetic": "/oʊˈkeɪ ˈweɪtɪŋ hɪr hoʊp ɪts nɑt ə ˈhæsl/",
+        "zh": "好的，我在這等。希望不會造成麻煩。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No hassle at all, happens to us too sometimes.",
+        "phonetic": "/noʊ ˈhæsl æt ɔl ˈhæpnəz tə ʌs tu ˈsʌmˌtaɪmz/",
+        "zh": "一點都不會，我們偶爾也會出錯。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, you're too kind, honestly. No rush though.",
+        "phonetic": "/oʊ jʊr tu kaɪnd ˈɑnəstli noʊ rʌʃ ðoʊ/",
+        "zh": "你人真好，說實話。不過我現在也不趕了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here's your tray: large tea, no-salt fries.",
+        "phonetic": "/hɪrz jʊr treɪ lɑrdʒ ti noʊ sɔlt fraɪz/",
+        "zh": "這是您的餐盤：大杯茶、無鹽薯條。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect timing, thank you! My kid will be glad.",
+        "phonetic": "/ˈpərfɪkt ˈtaɪmɪŋ θæŋk ju maɪ kɪd wɪl bi ɡlæd/",
+        "zh": "時間剛剛好，謝謝！我小孩會很開心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And here's a coupon for the mix-up today.",
+        "phonetic": "/ænd hɪrz ə ˈkupɑn fɔr ðə ˈmɪks ʌp təˈdeɪ/",
+        "zh": "這張折價券補償今天的錯誤。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Really? That's awesome, see you next week!",
+        "phonetic": "/ˈrɪli ðæts ˈɔsəm si ju nɛkst wik/",
+        "zh": "真的嗎？太棒了，下週見！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Drive safe! Thanks for your patience today.",
+        "phonetic": "/draɪ seɪf θæŋks fɔr jʊr ˈpeɪʃəns təˈdeɪ/",
+        "zh": "開車慢走！謝謝您今天的耐心。"
+      }
+    ]
+  }
+}
