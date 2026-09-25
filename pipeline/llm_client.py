@@ -1718,12 +1718,38 @@ def _generate_listening_raw(topic: str, cefr: str, used_summaries: list[str],
     """生成 + 字段兜底（不含 QA 循环），供 generate_listening_script 调用。
 
     num_lines > _LISTENING_SINGLE_SHOT_MAX 时走分批续写（flash 单请求
-    写长对话数不准，60 行实发 24-36 行）。
+    写长对话数不准，60 行实发 24-36 行）。SCRIPT_SINGLE_SHOT=1 时跳过分批
+    一次请求出全量（强模型可开），行数不足自动回退分批。
     """
+    single_shot = _env_flag("SCRIPT_SINGLE_SHOT")
     if num_lines > _LISTENING_SINGLE_SHOT_MAX:
-        script = _generate_listening_batched(topic, cefr, used_summaries,
-                                             num_lines, structure, style_boost,
-                                             devices, outline, temp_start)
+        script = None
+        if single_shot:
+            print(f"  [LLM] Single-shot mode ON: requesting all {num_lines} "
+                  f"lines in ONE request (fallback to batched if short)")
+            prompt = _build_listening_prompt(topic, cefr, used_dialogues=used_summaries,
+                                             num_lines=num_lines, structure=structure,
+                                             style_boost=style_boost, outline=outline,
+                                             devices=devices)
+            try:
+                script = _chat_json_with_retry(
+                    [
+                        {"role": "system", "content": "You are an expert ESL teacher creating English listening practice content for overseas Chinese learners. Output valid JSON only — no markdown, no explanations."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temp_start=temp_start, label="script generation (single-shot)")
+            except (RuntimeError, json.JSONDecodeError) as e:
+                print(f"  [LLM] Single-shot failed: {e} — falling back to batched")
+                script = None
+            if isinstance(script, dict) and len(script.get("dialogue", [])) < num_lines:
+                got = len(script.get("dialogue", []))
+                print(f"  [LLM] Single-shot returned {got}/{num_lines} lines "
+                      f"— falling back to batched")
+                script = None
+        if script is None:
+            script = _generate_listening_batched(topic, cefr, used_summaries,
+                                                 num_lines, structure, style_boost,
+                                                 devices, outline, temp_start)
     else:
         prompt = _build_listening_prompt(topic, cefr, used_dialogues=used_summaries,
                                          num_lines=num_lines, structure=structure,

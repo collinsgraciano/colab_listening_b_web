@@ -86,18 +86,43 @@ def _generate_quest_raw(topic: str, cefr: str, lessons_dir: str,
         label="outline",
         system="You are an expert ESL video director designing slow-listening stories for overseas Chinese beginners. Output valid JSON only.")
 
-    print(f"  [LLM] Phase A: beat sheet (beat_lines={beat_lines})...")
-    beats = _generate_beat_sheet(
-        outline, n_buildup, n_core, n_reveal, n_review, beat_lines)
-    total_beats = sum(len(v) for v in beats.values())
-    print(f"    beats: " + ", ".join(f"{ph}={len(beats[ph])}" for ph in beats))
+    # ── 单请求模式：一次产出全部对白 + Phase C 元数据（跳过节拍/分组会话）──
+    single_shot = _env_get("SCRIPT_SINGLE_SHOT", "").strip().lower() in (
+        "1", "true", "yes", "on")
+    if single_shot:
+        print("  [LLM] Single-shot mode ON: all dialogue + metadata in ONE request...")
+        _mw = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
+        _style_section = (build_cliche_block() + "\n\n"
+                          + build_fewshot_block(_mw, cefr) + "\n") if style_boost else ""
+        try:
+            all_dialogue, meta = _generate_quest_single_shot(
+                outline, topic, cefr, num_lines, n_buildup, n_core,
+                n_reveal, n_review, _style_section)
+        except RuntimeError as e:
+            print(f"  [LLM] Single-shot failed ({str(e)[:300]}) — "
+                  f"falling back to multi-stage")
+            all_dialogue, meta = None, None
+    else:
+        all_dialogue, meta = None, None
 
-    # ── Phase B: multi-turn dialogue session ────────────────────────────
-    print("  [LLM] Phase B: multi-turn dialogue session...")
-    all_dialogue = _generate_dialogue_session(outline, beats, cefr)
-    print(f"    generated {len(all_dialogue)} dialogue lines")
+    if all_dialogue is None:
+        # ── 多阶段：节拍表 + 分组对话会话 + 元数据（默认路径）──────────────
+        print(f"  [LLM] Phase A: beat sheet (beat_lines={beat_lines})...")
+        beats = _generate_beat_sheet(
+            outline, n_buildup, n_core, n_reveal, n_review, beat_lines)
+        total_beats = sum(len(v) for v in beats.values())
+        print(f"    beats: " + ", ".join(f"{ph}={len(beats[ph])}" for ph in beats))
 
-    # Per-line defaults + zh fallback
+        # ── Phase B: multi-turn dialogue session ────────────────────────
+        print("  [LLM] Phase B: multi-turn dialogue session...")
+        all_dialogue = _generate_dialogue_session(outline, beats, cefr)
+        print(f"    generated {len(all_dialogue)} dialogue lines")
+
+        # ── Phase C: metadata with target validation ────────────────────
+        print("  [LLM] Phase C: narration + metadata...")
+        meta = _generate_metadata_validated(topic, cefr, outline, all_dialogue)
+
+    # Per-line defaults + zh fallback（两条路径共用）
     for line in all_dialogue:
         if not line.get("on_screen"):
             line["on_screen"] = [line.get("speaker", "char_a")]
@@ -108,10 +133,6 @@ def _generate_quest_raw(topic: str, cefr: str, lessons_dir: str,
         zh_map = _batch_translate_zh(empty_zh)
         for i, zh in zh_map.items():
             all_dialogue[i]["zh"] = zh
-
-    # ── Phase C: metadata with target validation ────────────────────────
-    print("  [LLM] Phase C: narration + metadata...")
-    meta = _generate_metadata_validated(topic, cefr, outline, all_dialogue)
 
     # ── Assemble final script ───────────────────────────────────────────
     script = {
@@ -782,6 +803,140 @@ def _post_validate_lines(lines: list[dict], group: list[dict],
             line["on_screen"] = [line["speaker"]]
         if not str(line.get("zh", "")).strip():
             line["zh"] = ""
+
+
+# ---------------------------------------------------------------------------
+# 单请求模式：一次产出全部对白 + Phase C 元数据（跳过节拍表/分组会话）
+# ---------------------------------------------------------------------------
+
+def _build_quest_single_shot_prompt(outline: dict, topic: str, cefr: str,
+                                    num_lines: int, n_buildup: int,
+                                    n_core: int, n_reveal: int,
+                                    n_review: int,
+                                    style_section: str = "") -> str:
+    """单请求 prompt：一次产出全部对白（按阶段行数）+ Phase C 元数据。"""
+    from style_manager import get_active_style_prompt
+    style_prompt = get_active_style_prompt()
+    mw = resolve_max_line_words("QUEST_MAX_LINE_WORDS")
+    question = outline.get("listening_question_en", "")
+    scene = outline.get("scene", "")
+    key_words = ", ".join(w.get("en", "") for w in outline.get("key_words", []))
+    rules = "\n".join(f"PHASE {ph} RULES:\n{_PHASE_RULES[ph]}"
+                      for ph in ("buildup", "core", "reveal", "review"))
+    return f"""Write a COMPLETE ESL slow-listening dialogue ({num_lines} lines) AND all narration/YouTube metadata in ONE response.
+
+Story concept: {outline.get("story_concept", "")}
+Scene: {scene}
+Characters:
+- char_a: {outline.get("char_a_description", "")} — personality: {outline.get("char_a_personality", "")}
+- char_b: {outline.get("char_b_description", "")} — personality: {outline.get("char_b_personality", "")}
+- char_c: {outline.get("char_c_description", "")} (staff, speaks ONLY in core phase)
+Key words: {key_words}
+Listening question: {question}
+True answer (revealed ONLY in reveal phase): {outline.get("answer_en", "")}
+Common misconception: {outline.get("common_misconception_en", "")}
+
+DIALOGUE — EXACTLY {num_lines} lines in this phase order:
+- buildup: {n_buildup} lines
+- core: {n_core} lines
+- reveal: {n_reveal} lines
+- review: {n_review} lines
+
+{rules}
+
+{style_section}{_DIALOGUE_QUALITY_RULES}
+
+CEFR {cefr}: each line 5-{mw} words (HARD LIMIT: never exceed {mw} words — subtitles must fit 2 lines), vary length naturally.
+on_screen rules:
+- mix of ["char_a","char_c"], ["char_b","char_c"], ["char_a","char_b"] in core
+- mostly ["char_a","char_b"] elsewhere, occasional single-character close-ups
+- NEVER empty: every line shows at least the speaker on screen
+Every line MUST include "zh" (Traditional Chinese 繁體中文), "phase", and "on_screen".
+
+METADATA — also generate:
+- "title": ENGLISH TITLE (e.g. AT THE COFFEE SHOP)
+- "title_quote": the single most catchy dialogue line from the dialogue above, copied VERBATIM (under 10 words)
+- "title_zh": 繁中短标题 (max 6 chars)
+- "scene_zh": 繁中場景描述
+- "intro_zh": 繁中 story hook translation
+- "welcome_en": short channel welcome (max 8 words)
+- "welcome_zh": 繁中
+- "hook_intro_en": narrator opening 70-110 words, SHORT sentences (every sentence at most {mw} words)
+- "hook_intro_zh": 繁中
+- "outro": narrator closing 80-110 words, SHORT sentences (every sentence at most {mw} words)
+- "outro_zh": 繁中
+- "host_bg_prompt": TV studio background prompt (no people)
+- "youtube_title": 高CTR繁中标题 with 【】and ｜ format, ≤95 chars
+- "youtube_title_en": high-CTR PURE ENGLISH title, max 100 chars
+- "youtube_description": full 繁中 description (no chapter timestamps)
+- "youtube_description_en": full PURE ENGLISH description (no chapter timestamps)
+- "youtube_tags": 15-20 tags{_seo_hint_line(topic)}
+- "thumbnail_expression": main character expression
+- "thumbnail_action": main character action
+- "thumbnail_subtitle": 繁中 short subtitle
+- "thumbnail_icons": 4-5 icons [{{"en":"word","zh":"繁中"}}]
+- "scene_images": at least 8 [{{"prompt":"...","label":"..."}}] covering different angles/details of the scene
+
+VISUAL STYLE (CRITICAL): the video's art style is "{style_prompt}". EVERY host_bg_prompt and scene_images prompt MUST include this EXACT style descriptor phrase. Do NOT mix other art styles.
+
+Output ONE JSON object:
+{{"dialogue":[{{"speaker":"char_a","text":"...","phase":"buildup","zh":"繁中","on_screen":["char_a","char_b"]}}, ... exactly {num_lines} items], "title":"...", "title_quote":"...", ...all metadata fields above...}}
+
+JSON ONLY, no markdown."""
+
+
+def _generate_quest_single_shot(outline: dict, topic: str, cefr: str,
+                                num_lines: int, n_buildup: int, n_core: int,
+                                n_reveal: int, n_review: int,
+                                style_section: str = "") -> tuple[list[dict], dict]:
+    """单请求路径：一次产出全部对白 + Phase C 元数据。
+
+    解析失败 / 行数不足时抛 RuntimeError，由调用方回退多阶段路径。
+    """
+    prompt = _build_quest_single_shot_prompt(
+        outline, topic, cefr, num_lines, n_buildup, n_core, n_reveal, n_review,
+        style_section)
+    result = _chat_and_parse(
+        prompt, temperature=0.8, max_tokens=16384, reasoning_effort="low",
+        label="single_shot", retries=4,
+        system="You are an expert ESL video director writing a complete slow-listening script. Output valid JSON only.")
+    if not isinstance(result, dict):
+        raise RuntimeError("single-shot returned non-dict JSON")
+    dialogue = result.get("dialogue")
+    if not isinstance(dialogue, list):
+        raise RuntimeError("single-shot returned no dialogue array")
+    dialogue = [l for l in dialogue if isinstance(l, dict)]
+    if len(dialogue) < num_lines:
+        raise RuntimeError(f"single-shot returned {len(dialogue)}/{num_lines} lines")
+    # 阶段行数按位置强制分配（无节拍表，门禁阶段分布靠此保证）
+    for i, line in enumerate(dialogue):
+        if i < n_buildup:
+            line["phase"] = "buildup"
+        elif i < n_buildup + n_core:
+            line["phase"] = "core"
+        elif i < n_buildup + n_core + n_reveal:
+            line["phase"] = "reveal"
+        else:
+            line["phase"] = "review"
+    meta = {k: v for k, v in result.items() if k != "dialogue"}
+    # 元数据目标校验 + 一次定向修复（与 _generate_metadata_validated 同源）
+    failing = _meta_failing_fields(meta)
+    if failing:
+        print(f"  [LLM] Single-shot metadata below target, retrying: {failing}")
+        try:
+            fixes = _chat_and_parse(
+                _build_metadata_fix_prompt(meta, failing, topic, cefr),
+                temperature=0.6, max_tokens=4096, reasoning_effort="low",
+                label="single_shot_meta_fix", retries=2,
+                system="You are a YouTube content strategist. Output valid JSON only.")
+            if isinstance(fixes, dict):
+                for k, v in fixes.items():
+                    if v:
+                        meta[k] = v
+        except RuntimeError as e:
+            print(f"  [LLM] Single-shot metadata fix failed: {e}")
+    _pad_metadata(meta, outline, topic, cefr)
+    return dialogue, meta
 
 
 # ---------------------------------------------------------------------------

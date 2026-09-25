@@ -255,6 +255,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Script quality boost C: engagement judge in QA loop rewrites the dullest stretches (default off)")
     parser.add_argument("--script-candidates", type=int, default=1,
                         help="Script quality boost D: generate N candidates and keep the best by programmatic gate score (1-3, default 1)")
+    parser.add_argument("--llm-single-shot", action="store_true",
+                        help="Single-request full script: skip listening batched continuation (>30 lines) and quest beat-group dialogue sessions — one LLM request for all lines + metadata; falls back to multi-stage if line count is short (default off)")
     parser.add_argument("--mcp-tokens", default=None, help="TJGenerators MCP OAuth tokens, comma-separated for multi-token rotation")
     parser.add_argument("--mcp-token", default=None, help="(Deprecated) Single MCP token. Use --mcp-tokens instead.")
     parser.add_argument("--image-provider", default="mcp", choices=["mcp", "sensenova"],
@@ -1930,6 +1932,8 @@ def main():
     os.environ["SCRIPT_ENGAGEMENT_QA"] = "1" if args.script_engagement_qa else ""
     os.environ["SCRIPT_CANDIDATES"] = str(
         max(1, min(3, int(args.script_candidates or 1))))
+    # 一次请求生成完整脚本（跳过 listening 大行数分批 / quest 分组会话；默认关）
+    os.environ["SCRIPT_SINGLE_SHOT"] = "1" if getattr(args, "llm_single_shot", False) else ""
     # 画面风格：注入 env 供 llm_client / thumbnail_gen / 各 step 读取
     os.environ["VISUAL_STYLE_ID"] = str(getattr(args, "visual_style", "pixar3d"))
     os.environ["VISUAL_STYLE_PROMPT"] = _resolve_style_prompt(args.visual_style)

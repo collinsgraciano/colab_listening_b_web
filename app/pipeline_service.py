@@ -363,6 +363,8 @@ class PipelineService:
         except (TypeError, ValueError):
             _cand = 1
         os.environ["SCRIPT_CANDIDATES"] = str(max(1, min(3, _cand)))
+        # 一次请求生成完整脚本（跳过分批/分组会话；默认关）
+        os.environ["SCRIPT_SINGLE_SHOT"] = "1" if config.get("llm_single_shot") else ""
 
         # MOSS-TTS env vars (read by generate_tts -> MossTTSEngine)
         if config.get("moss_model_path"):

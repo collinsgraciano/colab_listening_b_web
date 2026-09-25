@@ -430,6 +430,8 @@ def _build_llm_override(provider_id: str, model: str, structure: str) -> dict:
     except (TypeError, ValueError):
         _cand = 1
     ov["SCRIPT_CANDIDATES"] = str(max(1, min(3, _cand)))
+    if cfg.get("llm_single_shot"):
+        ov["SCRIPT_SINGLE_SHOT"] = "1"
     if structure == "quest":
         if cfg.get("quest_beat_lines"):
             ov["QUEST_BEAT_LINES"] = str(cfg["quest_beat_lines"])

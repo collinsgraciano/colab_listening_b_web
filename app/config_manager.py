@@ -328,6 +328,9 @@ PARAM_SPEC = {
     "script_candidates": {"default": 1, "type": "number", "group": "llm",
                           "label": "候选脚本数 D (1-3)",
                           "help": "同主题生成 N 个候选，程序化门禁打分选优后再跑 QA；>1 时生成成本 ×N（quest 更高，默认 1）"},
+    "llm_single_shot": {"default": False, "type": "checkbox", "group": "llm",
+                        "label": "一次请求生成完整脚本",
+                        "help": "开启后跳过大行数分批续写（original* >30 行）与 Quest 节拍分组会话，一次请求产出全部对白+元数据；行数不足自动回退分批（默认关=多阶段生成，质量更稳）"},
 
     # --- TTS ---
     "tts_engine": {"default": "kokoro", "type": "select", "group": "tts",
@@ -683,7 +686,7 @@ _SLEEP_UNUSED_KEYS = (
     "character_library", "character_voices",
     "quest_qa_rounds",
     "script_style_boost", "script_outline_first",
-    "script_engagement_qa", "script_candidates",
+    "script_engagement_qa", "script_candidates", "llm_single_shot",
     "tts_rate_en", "tts_rate_narration",
     "mcp_tokens", "image_concurrency", "image_provider", "lessons_dir",
     "pad", "subtitle_style", "subtitle_font_size", "no_zh_subtitle",
@@ -1093,6 +1096,8 @@ def build_cli_args(config: dict[str, Any], resume: bool = False) -> list[str]:
             _cand = 1
         if _cand > 1:
             args += ["--script-candidates", str(min(3, max(1, _cand)))]
+    if config.get("llm_single_shot"):
+        args.append("--llm-single-shot")
     args += ["--structure", str(config.get("structure", "original"))]
     if config.get("structure") in ("story", "story_sprite") and config.get("story_kind"):
         args += ["--story-kind", str(config["story_kind"])]
