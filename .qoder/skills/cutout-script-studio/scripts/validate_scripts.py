@@ -83,8 +83,10 @@ def check_doc(path: Path, seen: dict) -> tuple[list, list]:
         errs.append("cefr must be 'A2'")
     if doc.get("structure") != "original_cutout":
         errs.append("doc structure must be 'original_cutout'")
-    if doc.get("num_lines") != 18:
-        errs.append("doc num_lines must be 18")
+    nlines = doc.get("num_lines")
+    if not isinstance(nlines, int) or nlines < 1:
+        errs.append("doc num_lines must be a positive int")
+        nlines = None
 
     s = doc.get("script")
     if not isinstance(s, dict):
@@ -169,8 +171,9 @@ def check_doc(path: Path, seen: dict) -> tuple[list, list]:
 
     # dialogue
     dl = s.get("dialogue")
-    if not isinstance(dl, list) or len(dl) != 18:
-        errs.append(f"dialogue must have exactly 18 lines (got {len(dl) if isinstance(dl, list) else 'N/A'})")
+    got = len(dl) if isinstance(dl, list) else None
+    if not isinstance(dl, list) or (nlines is not None and got != nlines):
+        errs.append(f"dialogue must have exactly {nlines} lines (got {got})")
         return errs, warns
     fp_parts = []
     for i, ln in enumerate(dl):

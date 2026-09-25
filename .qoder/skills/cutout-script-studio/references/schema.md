@@ -12,7 +12,7 @@ A library doc is one JSON file, UTF-8, filename `<id>.json`. The web app
   "cefr": "A2",
   "structure": "original_cutout",
   "llm_provider": "", "llm_model": "",
-  "num_lines": 18,
+  "num_lines": 60,                         // == len(script.dialogue); batch decides (18 default)
   "created": 1756000000.0,                 // epoch float (any plausible value)
   "status": "draft",
   "review": null,
@@ -50,7 +50,7 @@ A library doc is one JSON file, UTF-8, filename `<id>.json`. The web app
 | `char_a_gender` / `char_b_gender` | `"male"` or `"female"`, must match the description words |
 | `char_a_role` / `char_b_role` | story role, e.g. `"customer"`, `"barista"` |
 
-### Dialogue — `dialogue`: array of exactly 18 objects
+### Dialogue — `dialogue`: array of exactly `num_lines` objects (this batch: 60)
 ```json
 {"speaker": "char_a", "text": "...", "phonetic": "/.../", "zh": "..."}
 ```
@@ -62,8 +62,12 @@ A library doc is one JSON file, UTF-8, filename `<id>.json`. The web app
 - `zh`: 繁體中文 translation, natural phrasing, NOT simplified characters.
 - **No** `image_prompt` / `video_prompt` / `poses` fields (cutout renders
   stop-motion from pose sheets; those fields belong to other modes).
-- Story arc across 18 lines: greeting/setup → request → small problem or
-  development → resolution + goodbye. Coherent, single continuous exchange.
+- Story arc across the lines: greeting/setup → request → small problem or
+  development → deeper exploration → resolution + goodbye. Coherent, single
+  continuous exchange. For long dialogues (≈60 lines) keep ONE scene and let
+  the conversation go deeper — more topics naturally branch off (details,
+  preferences, prices, follow-ups, small mishaps, small talk, thanks), never
+  pad with repeated or filler lines that teach nothing.
 
 ### YouTube metadata
 | field | rule |
@@ -82,7 +86,7 @@ A library doc is one JSON file, UTF-8, filename `<id>.json`. The web app
 | `scene` | English location noun, e.g. `"coffee shop"` |
 | `thumbnail_expression` | facial expression phrase, e.g. `"cheerful and smiling"` |
 | `thumbnail_action` | what main character does, e.g. `"pointing to a menu"` |
-| `thumbnail_subtitle` | 繁中 short, e.g. `"18句聽力練習"` |
+| `thumbnail_subtitle` | 繁中 short, e.g. `"60句聽力練習"` (match num_lines) |
 | `thumbnail_icons` | 4–5 objects `{"en": "...", "zh": "..."}`, scene keywords, e.g. `{"en":"Oat Milk","zh":"燕麥奶"}` |
 
 ## Global language rules

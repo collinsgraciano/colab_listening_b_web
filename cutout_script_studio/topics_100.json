@@ -1,5 +1,5 @@
 {
-  "_note": "100 non-duplicate popular everyday-life topics for original_cutout listening scripts. Each entry is authored content, not a template. roles/hint guide variety; AI writes a unique story per topic. Slugs are used as script_cut_<slug>.json. Existing library topics (Social Media Posting, Ordering Delivery, At the Airport Check-in, Talking About the Day, Asking About Side Effects, Asking About a Warranty, Reporting a Break-In, Reporting an Accident, Awkward Elevator Small Talk) are avoided as exact strings.",
+  "_note": "100 popular daily-life topics for original_cutout scripts, A2, 60 dialogue lines per script (batch 2026-09-25). Slugs unique; roles/hint are authoring seeds, free to vary.",
   "topics": [
     {
       "slug": "ordering-coffee-cafe",

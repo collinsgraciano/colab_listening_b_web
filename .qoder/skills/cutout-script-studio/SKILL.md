@@ -9,7 +9,8 @@ description: Generate ready-to-run English listening-practice dialogue scripts f
 
 Produce `original_cutout` listening-practice scripts as JSON library docs that the
 web dashboard can run directly (脚本库 → 一键生成视频, zero LLM Step 0). Each script =
-one topic: 18-line two-speaker American-English dialogue + IPA + 繁體中文 + host
+one topic: an N-line two-speaker American-English dialogue (N = doc `num_lines`,
+default 18; current batch uses 60) + IPA + 繁體中文 + host
 narration (welcome/hook/outro/practice_intro) + full YouTube metadata.
 
 ## Hard rules
@@ -18,7 +19,9 @@ narration (welcome/hook/outro/practice_intro) + full YouTube metadata.
    NEVER write or run a Python/JS generator that fills a template with variables;
    the only allowed scripts are the bundled validator and installer.
 2. **Schema contract.** Exact field list, formats and limits in
-   `references/schema.md`. Non-negotiables: 18 dialogue lines, every English
+   `references/schema.md`. Non-negotiables: dialogue length == doc `num_lines`
+   (batch size chosen before generating; every line still ≤10 words),
+   every English
    sentence ≤10 words, 繁體中文 everywhere Chinese, IPA in /slashes/,
    `structure: "original_cutout"` in both doc and script, doc `id` ==
    `script_cut_<slug>` == filename stem.
