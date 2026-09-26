@@ -74,7 +74,10 @@ def check_doc(path: Path, seen: dict) -> tuple[list, list]:
         errs.append("empty topic")
     key = topic.lower()
     if key in seen["topics"]:
-        errs.append(f"duplicate topic (also in {seen['topics'][key]})")
+        owner = seen["topics"][key]
+        # 同名库内副本是"自己"（更新重装场景），不算重复
+        if owner != f"(library {path.name})":
+            errs.append(f"duplicate topic (also in {owner})")
     seen["topics"][key] = path.name
     if slug in seen["slugs"]:
         errs.append(f"duplicate slug (also in {seen['slugs'][slug]})")
