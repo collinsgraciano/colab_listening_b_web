@@ -1,0 +1,125 @@
+{
+  "_note": "2026-09-26 上网调研选题包（skill 首次演示 topic_research.md 流程）。来源：YouTube/EnglishClub survival-English 清单、B站/抖音华人英语场景视频、移美播客与体检/eSIM/DMV 中文攻略贴。已对 configs/script_library 与 cutout_script_studio/scripts 现有 100 topic 逐条去重（近重复均已换角度）。15 题，A2，每题为双人可演的具体场景。",
+  "topics": [
+    {
+      "slug": "activating-phone-esim",
+      "topic": "Activating a Phone Plan and eSIM at the Carrier Store",
+      "category": "phone",
+      "roles": ["new arrival", "carrier rep"],
+      "hint": "bring passport, prepaid vs plan, hotspot data, port an old number",
+      "demand_evidence": "eSIM/电话卡购买攻略高频搜索（pikabu 美国SIM总览、华人通 SinoConnection eSIM 教程 bilibili）"
+    },
+    {
+      "slug": "scheduling-annual-physical",
+      "topic": "Booking a First Annual Physical with a Family Doctor",
+      "category": "health",
+      "roles": ["patient", "clinic scheduler"],
+      "hint": "new patient forms, insurance card, fasting before labs, best time to call",
+      "demand_evidence": "「美国体检初体验」「来美国第一次去体检，约了家庭医生」「赴美留学生如何预约体检」"
+    },
+    {
+      "slug": "hospital-bill-payment-plan",
+      "topic": "Asking the Billing Desk to Set Up a Payment Plan",
+      "category": "health",
+      "roles": ["patient", "hospital biller"],
+      "hint": "bill looks wrong, itemized statement, monthly amount, no interest",
+      "demand_evidence": "移居美国生活指南播客 We Live in USA（医疗账单）；华人论坛医疗缴费高频痛点"
+    },
+    {
+      "slug": "applying-social-security-card",
+      "topic": "Applying for a First Social Security Number at the Office",
+      "category": "admin",
+      "roles": ["new resident", "SSA clerk"],
+      "hint": "documents list, form details wrong, card mailing time, name on card",
+      "demand_evidence": "新移民落地清单类攻略（Kungfu English 移民职场英语、toutiao 出国挣扎帖：银行/社保开户）"
+    },
+    {
+      "slug": "setting-up-utilities",
+      "topic": "Turning On Electricity and Water Before Moving In",
+      "category": "housing",
+      "roles": ["new tenant", "utility rep"],
+      "hint": "service start date, deposit waive, bill autopay, confirm both units",
+      "demand_evidence": "「水电网开通」为留学/新移民攻略贴必列项（海外生存英语课件、360doc 生存技能课）"
+    },
+    {
+      "slug": "redelivery-post-office-notice",
+      "topic": "Picking Up a Package after Missing the Carrier Notice",
+      "category": "shopping",
+      "roles": ["customer", "postal clerk"],
+      "hint": "notice left on door, hold days, ID to collect, ask redelivery",
+      "demand_evidence": "EnglishClub Survival English 购物/邮寄类常列场景；海外生活攻略取件痛点"
+    },
+    {
+      "slug": "hr-first-day-paperwork",
+      "topic": "Sorting Out First-Day Paperwork with HR",
+      "category": "work",
+      "roles": ["new hire", "HR staff"],
+      "hint": "direct deposit form, tax withholding, insurance enrollment window, badge photo",
+      "demand_evidence": "Kungfu English「移民工作英语」方法页：入职文件为工作英语第一课"
+    },
+    {
+      "slug": "booking-birthday-dinner-table",
+      "topic": "Reserving a Big Birthday Table over the Phone",
+      "category": "food",
+      "roles": ["organizer", "host staff"],
+      "hint": "party of ten, high chair, cake on ice, deposit for reservation",
+      "demand_evidence": "餐厅订位为 survival/点餐类 ESL 视频高频主题（Daily Eng 场景系列）"
+    },
+    {
+      "slug": "rescheduling-appointment",
+      "topic": "Rescheduling an Appointment Last Minute",
+      "category": "services",
+      "roles": ["client", "receptionist"],
+      "hint": "sick kid, cancel fee rules, next open slot, confirm by text",
+      "demand_evidence": "预约/改期对话是雅思听力与 ESL survival 清单经典场景（剑四 Section1 场景词汇汇编）"
+    },
+    {
+      "slug": "roadside-assistance-call",
+      "topic": "Calling Roadside Assistance after a Flat Tire",
+      "category": "transport",
+      "roles": ["driver", "dispatch agent"],
+      "hint": "exact location, lane or shoulder, membership code, wait time",
+      "demand_evidence": "美国驾车生存攻略（留学生开车贴）道路救援为必备场景"
+    },
+    {
+      "slug": "private-sale-title-transfer",
+      "topic": "Transferring a Car Title Bought from a Private Seller",
+      "category": "auto",
+      "roles": ["buyer", "DMV clerk"],
+      "hint": "signed title, bill of sale, smog check, sales tax at counter",
+      "demand_evidence": "中文搜索「买车 过户」高频（美国华人买车攻略贴、豆丁公派出国场景词汇）"
+    },
+    {
+      "slug": "real-id-document-counter",
+      "topic": "Sorting REAL ID Documents as a Non-Citizen",
+      "category": "gov",
+      "roles": ["applicant", "DMV clerk"],
+      "hint": "which documents accepted, vision test, appointment vs walk-in, card by mail",
+      "demand_evidence": "California DMV 官方 REAL ID Info: Non-U.S. Citizens 页（搜索直接命中）"
+    },
+    {
+      "slug": "pet-adoption-shelter",
+      "topic": "Adopting a Cat at the Animal Shelter",
+      "category": "community",
+      "roles": ["adopter", "shelter staff"],
+      "hint": "meets the cat, adoption fee covers shots, home check, supplies list",
+      "demand_evidence": "海外生活「养宠物」攻略贴常提领养面谈英语；宠物类为 ESL 生活对话热门类目"
+    },
+    {
+      "slug": "community-esl-class-signup",
+      "topic": "Signing Up for a Free Community ESL Class",
+      "category": "community",
+      "roles": ["resident", "community center staff"],
+      "hint": "free level, placement test, evening class, childcare during class",
+      "demand_evidence": "抖音「前移民官Sammy」：社区大学 ESL 免费课是新移民被反复推荐的第一站"
+    },
+    {
+      "slug": "insurance-quote-comparison",
+      "topic": "Comparing Car Insurance Quotes on the Phone",
+      "category": "auto",
+      "roles": ["driver", "insurance agent"],
+      "hint": "liability vs full coverage, deductible choice, bundling, cancel window",
+      "demand_evidence": "新移民买车帖必提「先问保险再买车」；过户/保险中文搜索连体高频"
+    }
+  ]
+}

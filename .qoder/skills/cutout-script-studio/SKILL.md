@@ -1,6 +1,6 @@
 ---
 name: cutout-script-studio
-description: Generate ready-to-run English listening-practice dialogue scripts for the colab_listening_b_web pipeline in "original_cutout" (Original Cutout 4章+人物抠图) video structure mode, with a mandatory multi-round review loop (deterministic lint + AI rubric review) for grammar-perfect, engaging dialogue. Use when asked to create/batch-generate ESL cutout scripts, topic packs, review/fix existing cutout scripts, or one-click runnable script JSON files for this project. Every script must be authored fresh by AI per topic — never by filling Python templates.
+description: Generate ready-to-run English listening-practice dialogue scripts for the colab_listening_b_web pipeline in "original_cutout" (Original Cutout 4章+人物抠图) video structure mode, with web-researched hot topics (search what overseas-Chinese A2 learners actually look up) and a mandatory multi-round review loop (deterministic lint + AI rubric review) for grammar-perfect, engaging dialogue. Use when asked to create/batch-generate ESL cutout scripts, research/find popular learner topics for a new pack, topic packs, review/fix existing cutout scripts, or one-click runnable script JSON files for this project. Every script must be authored fresh by AI per topic — never by filling Python templates.
 ---
 
 # Cutout Script Studio
@@ -45,8 +45,11 @@ narration (welcome/hook/outro/practice_intro) + full YouTube metadata.
 ## Workflow
 
 1. Read `references/schema.md` fully (field-by-field spec + quality bar).
-2. Get the topic list — from `cutout_script_studio/topics_100.json` or the user's
-   own topics. Work in batches (≈10 topics per batch keeps quality).
+2. Get the topic list — the user's own topics, `cutout_script_studio/topics_100.json`
+   / `topics_researched_*.json`, or: when no list is given, run **web topic research**
+   per `references/topic_research.md` (WebSearch popular overseas-Chinese learner
+   scenarios → filter → dedup vs library → write `topics_researched_<date>.json`).
+   Work in batches (≈10 topics per batch keeps quality).
 3. For each topic write the complete story first in your head: two characters with
    concrete roles for the scene, beginning → small problem/development → natural
    resolution, overseas-Chinese daily-life practicality. Then write the JSON file to
@@ -81,6 +84,8 @@ narration (welcome/hook/outro/practice_intro) + full YouTube metadata.
 ## Resources
 
 - `references/schema.md` — authoritative field spec for doc + script + dialogue.
+- `references/topic_research.md` — web-search playbook for sourcing hot
+  learner-demand topics into a deduped `topics_researched_<date>.json` pack.
 - `references/review_rubric.md` — 6-dimension review loop: severities, loop
   policy (≥2 rounds, 2 consecutive clean, max 4), issue + report formats.
 - `scripts/validate_scripts.py` — deterministic checks (schema, 10-word cap, IPA,
