@@ -63,7 +63,7 @@
       {"speaker": "char_a", "text": "And the replacement, when would it arrive?", "phonetic": "/ænd ðə ɹɪˈpleɪsmənt wɛn wʊd ɪt əˈɹaɪv/", "zh": "那補寄的話，什麼時候會到？"},
       {"speaker": "char_b", "text": "Normally three to five business days.", "phonetic": "/ˈnɔɪməli θɹi tə faɪv ˈbɪznəs deɪz/", "zh": "一般要三到五個工作天。"},
       {"speaker": "char_a", "text": "Oh, that won't work, I need it by Saturday.", "phonetic": "/oʊ ðæt woʊnt wɝk aɪ nid ɪt baɪ ˈsætɚˌdeɪ/", "zh": "噢，那不行，我週六前就要用。"},
-      {"speaker": "char_b", "text": "For a... urgent smoothie situation?", "phonetic": "/fɚ ɹ ə ˈɝdʒənt ˈsmuˌði sɪˈtʃueɪʃən/", "zh": "是為了……急上大場的奶昔工程嗎？"},
+      {"speaker": "char_b", "text": "For a... urgent smoothie situation?", "phonetic": "/fɚ ə ˈɝdʒənt ˈsmuːði sɪˌtʃuˈeɪʃən/", "zh": "是為了……急上大場的奶昔工程嗎？"},
       {"speaker": "char_a", "text": "My kid's bake sale! She's counting on me.", "phonetic": "/maɪ kɪdz beɪk seɪl ʃi z ˈkaʊnɾɪŋ ɑn mi/", "zh": "我孩子在辦烘焙義賣！她全指望我了。"},
       {"speaker": "char_b", "text": "Okay, that changes things. Let me upgrade the shipping.", "phonetic": "/oʊˈkeɪ ðæt ˈtʃeɪndʒɪz θɪŋz lɛt mi ˈʌpˌɡɹeɪd ðə ˈʃɪpɪŋ/", "zh": "好，那就不一樣了。我幫您升級配送。"},
       {"speaker": "char_a", "text": "Can you do that?", "phonetic": "/kən ju du ðæt/", "zh": "你們可以做到嗎？"},

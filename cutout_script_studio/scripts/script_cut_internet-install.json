@@ -38,7 +38,7 @@
         "speaker": "char_a",
         "text": "Hi, you must be the internet person.",
         "phonetic": "/haɪ ju məst bi ði ˈɪntɚnɛt ˈpɝsən/",
-        "zh": "嗨，你一定是裝網路的技師了。"
+        "zh": "嗨，你一定是來裝網路的技師吧。"
       },
       {
         "speaker": "char_b",
@@ -55,19 +55,19 @@
       {
         "speaker": "char_b",
         "text": "The two-hour window lied to us both, ha.",
-        "phonetic": "/ðə tu ˈaʊɚ ˈwɪndoʊ laɪd tə ʌs boʊθ hɑ/",
+        "phonetic": "/ðə tuː ˈaʊɚ ˈwɪndoʊ laɪd tə ʌs boʊθ hɑ/",
         "zh": "那個兩小時時段根本是騙我們倆的，哈。"
       },
       {
         "speaker": "char_a",
         "text": "No worries really. Where do we start?",
-        "phonetic": "/noʊ ˈwɝiz ˈɹɪɫi wɛɹ du wi stɑɹt/",
+        "phonetic": "/noʊ ˈwɝiz ˈɹɪli wɛɹ du wi stɑɹt/",
         "zh": "真的別放在心上。從哪裡開始？"
       },
       {
         "speaker": "char_b",
         "text": "First, the white box from your welcome kit.",
-        "phonetic": "/fɝst ðə ʍaɪt bɑks fɹʌm jɔɹ ˈwɛɫkəm kɪt/",
+        "phonetic": "/fɝst ðə waɪt bɑks fɹʌm jɔɹ ˈwɛlkəm kɪt/",
         "zh": "先是歡迎套件裡那台白色小機器。"
       },
       {
@@ -85,7 +85,7 @@
       {
         "speaker": "char_a",
         "text": "The gatekeeper, cute. Where does it go?",
-        "phonetic": "/ðə ˈɡeɪtˌkipɚ kjuʰ wɛɹ dʌz ɪt ɡoʊ/",
+        "phonetic": "/ðə ˈɡeɪtˌkipɚ kjut wɛɹ dʌz ɪt ɡoʊ/",
         "zh": "守門員，好可愛。它要放哪裡？"
       },
       {
@@ -132,9 +132,9 @@
       },
       {
         "speaker": "char_a",
-        "text": "Cool, meanwhile can I ask about the price?",
-        "phonetic": "/kul ˈminwaɪl kən aɪ æsk əˈbaʊt ðə praɪs/",
-        "zh": "好，其間我可以問一下價錢嗎？"
+        "text": "Can I ask about the plan while we wait?",
+        "phonetic": "/kənaɪ æsk əˈbaʊt ðə plæn ˌwaɪl wi ˈweɪt/",
+        "zh": "趁等待的空檔，我能問一下方案嗎？"
       },
       {
         "speaker": "char_b",
@@ -151,7 +151,7 @@
       {
         "speaker": "char_b",
         "text": "Gig means super fast, streaming heaven.",
-        "phonetic": "/ɡɪɡ minz ˈsupɹɛɪtʃ ˈstrimin ˈhɛvən/",
+        "phonetic": "/ɡɪɡ minz ˈsuːpɚ fæst ˈstrimin ˈhɛvən/",
         "zh": "千兆代表超快，串流天堂。"
       },
       {
@@ -164,7 +164,7 @@
         "speaker": "char_b",
         "text": "Then you'll want one more thing later.",
         "phonetic": "/ðɛn jʊl wɑnt wʌn mɔɹ θɪŋ ˈleɾɚ/",
-        "zh": "那等一下你會還想要多一樣東西。"
+        "zh": "那你等等會想再添一樣東西。"
       },
       {
         "speaker": "char_a",
@@ -188,7 +188,7 @@
         "speaker": "char_b",
         "text": "Right. Now let's test the speed downstairs.",
         "phonetic": "/ɹaɪt naʊ lɛts tɛst ðə spid daʊnˈstɛɹz/",
-        "zh": "對。我們先在一樓測測網速。"
+        "zh": "對。我們先在樓下測測網速。"
       },
       {
         "speaker": "char_a",
@@ -200,7 +200,7 @@
         "speaker": "char_b",
         "text": "Numbers look great, ninety-eight percent of gig.",
         "phonetic": "/ˈnʌmbɚz lʊk ɡɹeɪt ˈnaɪnti eɪt pɚˈsɛnt əv ɡɪɡ/",
-        "zh": "數字很漂亮，有千兆的九十八%。"
+        "zh": "數字很漂亮，有千兆的百分之九十八。"
       },
       {
         "speaker": "char_a",
@@ -216,9 +216,9 @@
       },
       {
         "speaker": "char_a",
-        "text": "The upstairs bedroom, I guessed it.",
-        "phonetic": "/ði ˈʌpˈstɛɹz ˈbɛdɹʊm aɪ ɡɛst ɪt/",
-        "zh": "是樓上臥室收訊對吧，我猜到了。"
+        "text": "The upstairs bedroom, I figured.",
+        "phonetic": "/ði ˈʌpˈstɛɹz ˈbɛdɹʊm aɪ ˈfɪɡjɚd/",
+        "zh": "是樓上臥室對吧，我就知道。"
       },
       {
         "speaker": "char_b",
@@ -235,13 +235,13 @@
       {
         "speaker": "char_b",
         "text": "I'll show you two fixes: extender or mesh.",
-        "phonetic": "/aɪl ʃoʊ ju tu fɪks ɪkˈstɛndɚ ɔɹ mɛʃ/",
+        "phonetic": "/aɪl ʃoʊ ju tuː fɪks ɪkˈstɛndɚ ɔɹ mɛʃ/",
         "zh": "有兩種解法：訊號延伸器或網狀系統。"
       },
       {
         "speaker": "char_a",
-        "text": "What's the difference, simply?",
-        "phonetic": "/wʌts ðə ˈdɪfɚəns ˈsɪmpli/",
+        "text": "In short, what's the difference?",
+        "phonetic": "/ɪn ʃɔɹt wʌts ðə ˈdɪfɚəns/",
         "zh": "簡單說，兩者差在哪？"
       },
       {
@@ -270,26 +270,26 @@
       },
       {
         "speaker": "char_b",
-        "text": "Try this: I'll move the router to the hall.",
-        "phonetic": "/tɹaɪ ðɪs aɪl muv ðə ˈɹaʊtɚ tə ðə hɔl/",
-        "zh": "試試這樣：我把分享器搬到走廊。"
+        "text": "Try free first: I'll move the router to the hall.",
+        "phonetic": "/tɹaɪ fɹi fɝst aɪl muv ðə ˈɹaʊtɚ tə ðə hɔl/",
+        "zh": "先試免費的：我把分享器搬到走廊。"
       },
       {
         "speaker": "char_a",
-        "text": "The hallway closet? That's deep in the house.",
-        "phonetic": "/ðə ˈhɔlˌweɪ ˈklɑzɪt ðæts dip ɪn ðə haʊs/",
-        "zh": "走廊的儲藏室？那在房子很深處。"
+        "text": "The hallway closet? That's in the middle, right?",
+        "phonetic": "/ðə ˈhɔlˌweɪ ˈklɑzɪt ðæts ɪn ðə ˈmɪdəl ɹaɪt/",
+        "zh": "走廊的儲藏室？位置就在正中間，對吧？"
       },
       {
         "speaker": "char_b",
         "text": "Closets are actually great for signals.",
         "phonetic": "/ˈklɑzɪts ɑɹ ˈæktʃuəli ɡɹeɪt fɚ ˈsɪɡnəlz/",
-        "zh": "儲藏室其實最適合放訊號了。"
+        "zh": "其實儲藏室對訊號最有利。"
       },
       {
         "speaker": "char_a",
         "text": "Huh, learn something new every day.",
-        "phonetic": "/hʌ lɝn ˈsʌmθɪŋ nju ˈɛvɹi deɪ/",
+        "phonetic": "/hʌ lɝn ˈsʌmθɪŋ nuː ˈɛvɹi deɪ/",
         "zh": "嗯，每天都能學到新東西。"
       },
       {
@@ -313,7 +313,7 @@
       {
         "speaker": "char_a",
         "text": "Free fix, I appreciate that a lot.",
-        "phonetic": "/fɹi fɪks aɪ əˈpɹiʃieɪt ðæt ə lɑt/",
+        "phonetic": "/fɹiː fɪks aɪ əˈpɹiʃieɪt ðæt ə lɑt/",
         "zh": "免費的解法，我真的很感謝。"
       },
       {
@@ -338,7 +338,7 @@
         "speaker": "char_a",
         "text": "Signed, sealed, delivered.",
         "phonetic": "/saɪnd sil dɪˈlɪvɚd/",
-        "zh": "簽名、完成、送到位。"
+        "zh": "簽名完成，一切到位。"
       },
       {
         "speaker": "char_b",
@@ -349,7 +349,7 @@
       {
         "speaker": "char_a",
         "text": "Will do. Can you take the empty box?",
-        "phonetic": "/wɪl du kæn ju teɪk ði ˈɛmpi bɑks/",
+        "phonetic": "/wɪl duː kæn ju teɪk ði ˈɛmpi bɑks/",
         "zh": "我會留著。你可以順手帶走空紙箱嗎？"
       },
       {
@@ -367,14 +367,14 @@
       {
         "speaker": "char_b",
         "text": "Twenty years of installs teaches a few things.",
-        "phonetic": "/ˈtwɛnti jɪɹz əv ɪnˈstɔːlz ˈtitʃəz ə fju θɪŋz/",
+        "phonetic": "/ˈtwɛnti jɪɹz əv ɪnˈstɔlz ˈtitʃəz ə fu θɪŋz/",
         "zh": "裝了二十年機，總會學到幾招。"
       },
       {
         "speaker": "char_a",
-        "text": "Ha, welcome to the neighborhood, tech legend.",
-        "phonetic": "/hɑ ˈwɛɫkəm tə ðə ˈneɪbəɹˌhʊd tɛk ˈlɛdʒənd/",
-        "zh": "哈，歡迎來這街區工作，技師傳說。"
+        "text": "Ha, nailed it, tech legend.",
+        "phonetic": "/hɑ neɪld ɪt tɛk ˈlɛdʒənd/",
+        "zh": "哈，完美收工，傳說級技師！"
       },
       {
         "speaker": "char_b",
@@ -385,22 +385,22 @@
       {
         "speaker": "char_a",
         "text": "I sure will. Have a great afternoon!",
-        "phonetic": "/aɪ ʃʊɹ wɪl hæv ə ɡɹeɪt ˈæftɚˈnun/",
+        "phonetic": "/aɪ ʃʊɹ wɪl hæv ə ɡɹeɪt ˌæftɚˈnun/",
         "zh": "一定會的。祝你下午愉快！"
       },
       {
         "speaker": "char_b",
         "text": "You too, and text if anything blinks red.",
-        "phonetic": "/ju tu ænd tɛkst ɪf ˈɛnɪθɪŋ blɪŋks ɹɛd/",
+        "phonetic": "/ju tuː ænd tɛkst ɪf ˈɛnɪθɪŋ blɪŋks ɹɛd/",
         "zh": "你也是，只要有紅燈閃爍就傳訊給我。"
       }
     ],
     "youtube_title": "【安裝網路📶】「密碼在貼紙上」一場兩小時時段裡的滿格救援🧰✨🎧｜聽完就會搞定收訊死角｜60句沉浸式英語聽力｜Scheduling an Internet Install",
     "youtube_title_en": "\"The Password's On The Sticker\" — Internet Install Day and the Dead Bedroom",
-    "youtube_description": "「那個兩小時時段，根本是騙我們倆的。」新公寓裝網路當天，遲到二十分鐘的技師到了，樓上的收訊卻還是大問題。這一集 60 句沉浸式英語聽力，從接上數據機一路聽到滿格訊號。\n\n你會聽到：怎麼問價位與方案（You're on the gig plan, right?）；啟動線路、看指示燈、測速的整套流程語；延伸器和網狀系統差在哪（An extender borrows the signal, mesh shares it.）；還有免費調整擺位、簽名、拿 password 貼紙的全部句子。\n\n整段都是 A2 初級短句，都是美式自然語感：ha, huh, oh my, totally legal。聽完你就會用：Where do we start?、What's the difference, simply?、Anything I sign?、Have a great afternoon。\n\n後半段是逐句聽力＋跟讀練習，大聲跟著唸，下次裝機日換你冷靜指揮全場。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡請訂閱並開啟小鈴鐺。",
-    "youtube_description_en": "\"The two-hour window lied to us both.\" Install day at a new apartment: the tech is twenty minutes late, and the upstairs bedroom still has no signal. This episode is a 60-line immersive English listening practice that follows a full internet installation from the modem box to full bars.\n\nYou will hear: asking about plans and prices (You're on the gig plan, right?); the activation, blinking lights, and speed-test routine; the extender-versus-mesh conversation (An extender borrows the signal, mesh shares it.); plus a free fix by moving the router, signing on a phone, and finding the password sticker.\n\nEverything stays in A2-level sentences with natural American fillers like ha, huh, oh my, totally legal. By the end you'll own phrases like Where do we start?, What's the difference, simply?, and Anything I sign?\n\nThe final chapter is a line-by-line listen-and-repeat workout, so speak out loud and run your own install day like a pro.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe and ring the bell for a new scene every day.",
-    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧裝機日英文｜啟動線路・網狀系統・收訊死角｜密碼在哪張貼紙上？｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
-    "youtube_description_ref": "📌 影片簡介：\n新家住客第一天就斷網，等了兩小時時段，技師還遲到二十分鐘，這一天該怎麼收場？\n\n這一集帶大家走進新公寓的裝機日，從接上數據機、打電話啟動線路，到樓上臥室收訊卡關、延伸器和網狀系統怎麼選，一口氣聽完 60 句連續真實對話。\n\n你會聽到：\n🧰 見面第一句：Hi, you must be the internet person.\n📡 學新知識：An extender borrows the signal, mesh shares it.\n😲 免費妙解：Oh my, full bars! Is that legal?\n🔐 收尾細節：One last thing, the password's on the sticker.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 huh、oh my、totally 這種真實語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這次裝機走一趟，下次網路再卡，你也能從容問到重點。\n\n祝你的每一格訊號，永遠綠燈。",
+    "youtube_description": "「那個兩小時時段，根本是騙我們倆的。」新公寓裝網路當天，遲到二十分鐘的技師到了，樓上的收訊卻還是大問題。這一集 60 句沉浸式英語聽力，從接上數據機一路聽到滿格訊號。\n\n你會聽到：怎麼問價位與方案（You're on the gig plan, right?）；啟動線路、看指示燈、測速的整套流程語；延伸器和網狀系統差在哪（An extender borrows the signal, mesh shares it.）；還有免費調整擺位、簽名、拿密碼貼紙的全部句子。\n\n整段都是 A2 初級短句，都是美式自然語感：ha, huh, oh my, totally legal。聽完你就會用：Where do we start?、In short, what's the difference?、Anything I sign?、Have a great afternoon。\n\n後半段是逐句聽力＋跟讀練習，大聲跟著唸，下次裝機日換你冷靜指揮全場。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡請訂閱並開啟小鈴鐺。",
+    "youtube_description_en": "\"The two-hour window lied to us both.\" Install day at a new apartment: the tech is twenty minutes late, and the upstairs bedroom still has no signal. This episode is a 60-line immersive English listening practice that follows a full internet installation from the modem box to full bars.\n\nYou will hear: asking about plans and prices (You're on the gig plan, right?); the activation, blinking lights, and speed-test routine; the extender-versus-mesh conversation (An extender borrows the signal, mesh shares it.); plus a free fix by moving the router, signing on a phone, and finding the password sticker.\n\nEverything stays in A2-level sentences with natural American fillers like ha, huh, oh my, totally legal. By the end you'll own phrases like Where do we start?, In short, what's the difference?, and Anything I sign?\n\nThe final chapter is a line-by-line listen-and-repeat workout, so speak out loud and run your own install day like a pro.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe and ring the bell for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧裝機日英文｜啟動線路・網狀系統・收訊死角｜密碼就在貼紙上！｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n搬進新公寓第一天就是裝機日，等了兩小時時段，技師還遲到二十分鐘，這一天該怎麼收場？\n\n這一集帶大家走進新公寓的裝機日，從接上數據機、打電話啟動線路，到樓上臥室收訊卡關、延伸器和網狀系統怎麼選，一口氣聽完 60 句連續真實對話。\n\n你會聽到：\n🧰 見面第一句：Hi, you must be the internet person.\n📡 學新知識：An extender borrows the signal, mesh shares it.\n😲 免費妙解：Oh my, full bars! Is that legal?\n🔐 收尾細節：One last thing, the password's on the sticker.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 huh、oh my、totally 這種真實語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這次裝機走一趟，下次網路再卡，你也能從容問到重點。\n\n祝你的每一格訊號，永遠綠燈。",
     "youtube_tags": [
       "english listening practice",
       "internet installation english",
