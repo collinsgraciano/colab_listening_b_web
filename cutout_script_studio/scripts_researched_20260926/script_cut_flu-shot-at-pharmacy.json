@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_flu-shot-at-pharmacy",
+  "topic": "Getting a Flu Shot at the Pharmacy Counter",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758906000.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A SHOT AT THE PHARMACY",
+    "title_zh": "藥局打針",
+    "scene_zh": "藥局櫃台 · 打流感疫苗",
+    "story_hook": "One patient, one needle, fifteen boring minutes.",
+    "intro_zh": "一位病人、一支針，還有十五分鐘的無聊等待。",
+    "welcome_en": "Welcome to a pharmacy shot corner. Listen for clinic words made simple.",
+    "welcome_zh": "歡迎來到藥局的施打角落。留意把醫療用詞說得簡單的說法。",
+    "outro": "And that's a flu shot with no drama. Wait out the timer, then listen again.",
+    "outro_zh": "一支毫無驚悚劇情的流感疫苗就這樣打完。等完計時，再聽一次。",
+    "practice_intro_en": "Now let's say every line out loud.",
+    "practice_intro_zh": "現在我們逐句大聲說出來。",
+    "title_quote": "the needle and I have history",
+    "char_a_description": "a calm man in his late thirties with short straight black hair, thin wire glasses, a light blue denim shirt over a white tee, and a lean build",
+    "char_b_description": "a brisk woman in her forties with auburn hair pulled into a high ponytail, small gold hoop earrings, a white pharmacist coat over teal scrubs, and a stocky build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "patient",
+    "char_b_role": "pharmacist",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, do I need a visit for a flu shot?",
+        "phonetic": "/haɪ du aɪ nid ə ˈvɪzɪt fɚ ə flʊ ʃɑt/",
+        "zh": "嗨，打流感疫苗要先掛號約診嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No appointment here, just line up at this counter.",
+        "phonetic": "/noʊ əˈpɔɪntmənt hɪɹ dʒʌst laɪn ʌp æt ðɪs ˈkaʊnɚ/",
+        "zh": "這邊不用預約，直接在這個櫃台排隊就好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, um, I've been meaning to get one since October.",
+        "phonetic": "/ɡɹeɪt ʌm aɪv bɪn ˈminɪŋ tə ɡɛt wʌn sɪns ɑkˈtoʊbɚ/",
+        "zh": "太好了，嗯，我從十月就一直想來打這一針。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "October is our busy season, you picked a good week.",
+        "phonetic": "/ɑkˈtoʊbɚ ɪz ɑɹ ˈbizi ˈsizən ju pɪkt ə ɡʊd wik/",
+        "zh": "十月是我們最忙的季節，你挑了很好的一週。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, how much is it with my insurance?",
+        "phonetic": "/soʊ haʊ mʌtʃ ɪz ɪt wɪð maɪ ˈɪnʃɚəns/",
+        "zh": "那，用我的保險卡打要多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let's check your card, can I have it please?",
+        "phonetic": "/ˈlɛts ˈtʃɛk jɔɹ ˈkɑɹd kæn aɪ hæv ˈɪt pliz/",
+        "zh": "我們看一下你的卡，可以把卡給我嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Here you go, it's from my new job plan.",
+        "phonetic": "/ˈhɪɹ ju ˈɡoʊ ɪts fɚ maɪ nu ˈdʒɑb ˈplæn/",
+        "zh": "給你，這是我新工作的保險卡。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, this one covers it, so you pay nothing.",
+        "phonetic": "/oʊˈkeɪ ðɪs wʌn ˈkʌvɚz ɪt soʊ ju peɪ ˈnʌθɪŋ/",
+        "zh": "好，這張有覆蓋，所以你完全不用付錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nothing? Well, that answers my other worry, honestly.",
+        "phonetic": "/ˈnʌθɪŋ wɛl ðæt ˈænsɚz maɪ ˈʌðɚ ˈwɝi ˈɑnəstli/",
+        "zh": "不用付？老實說，那剛好解決我另一個擔心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The other worry being money, totally fair.",
+        "phonetic": "/ði ˈʌðɚ ˈwɝi ˈbin ˈmʌni ˈtoʊɾli fɛɹ/",
+        "zh": "另一個擔心就是錢，這很合理。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, my last clinic charged me forty dollars.",
+        "phonetic": "/jɛs maɪ læst ˈklɪnɪk tʃɑɹdʒd mi ˈfɔɹɾi ˈdɑlɚz/",
+        "zh": "對，我上次在診所付了四十塊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Pharmacies are cheaper for shots, that's the trick.",
+        "phonetic": "/ˈfɑɹməˌsiz ɑɹ ˈtʃipɚ fɚ ʃɑts ðæts ðə trɪk/",
+        "zh": "打疫苗在藥局比較便宜，這就是訣竅。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good to know. Now, um, there's one thing, though.",
+        "phonetic": "/ˈɡʊd tə ˈnoʊ naʊ ʌm ðɛrz wʌn ˈθɪŋ ˈðoʊ/",
+        "zh": "知道了。那，嗯，不過有一件事。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let me guess, needles and you aren't friends?",
+        "phonetic": "/lɛt mi ɡɛs ˈnidəlz ænd ju ɑɹnt fɹɛndz/",
+        "zh": "讓我猜，你和針頭不是朋友？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, the needle and I have history, yeah.",
+        "phonetic": "/soʊ ðə ˈnidəl ænd aɪ hæv ˈhɪstɹi jɛ/",
+        "zh": "所以，我和針頭有舊怨，是啊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Totally normal, I'll count slowly, it helps a lot.",
+        "phonetic": "/ˈtoʊɾəli ˈnɔɹməl aɪl kaʊnt ˈsloʊli ɪt hɛlpz ə lɑt/",
+        "zh": "很正常，我會慢慢數，那很有幫助。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Please do. Also, egg allergy, is that still okay?",
+        "phonetic": "/pliz du ˈɔlsoʊ ɛɡ ˈælɚdʒi ɪz ðæt stɪl oʊˈkeɪ/",
+        "zh": "拜託。還有，我對雞蛋過敏，還可以打嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Glad you told me, let me note it here.",
+        "phonetic": "/ɡlæd ju ˈtoʊld mi lɛt mi ˈnoʊt ɪt hɪɹ/",
+        "zh": "你告訴我真好，我在這裡記錄一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do I sign something for that part?",
+        "phonetic": "/du aɪ saɪn ˈsʌmθɪŋ fɚ ðæt pɑɹt/",
+        "zh": "那這部分我要簽什麼東西嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One short form, um, right at the bottom.",
+        "phonetic": "/wʌn ʃɔɹt fɔɹm ʌm ɹaɪt æt ðə ˈbɑtəm/",
+        "zh": "一張很短的表格，嗯，就在最下面。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, I'll write that I get hives sometimes.",
+        "phonetic": "/oʊˈkeɪ aɪl ɹaɪt ðæt aɪ ɡɛt haɪvz ˈsʌmˌtaɪmz/",
+        "zh": "好，我就寫上我偶爾會起蕁麻疹。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, that tells me exactly what to watch.",
+        "phonetic": "/ˈpɝfɪkt ðæt tɛlz mi ɪɡˈzæktli wʌt tə wɑtʃ/",
+        "zh": "很好，那我就清楚要注意什麼。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, my handwriting is terrible, sorry in advance.",
+        "phonetic": "/weɪt maɪ ˈhændˌɹaɪtɪŋ ɪz ˈtɛɹəbl ˈsɑɹi ɪn ədˈvæns/",
+        "zh": "等等，我的字很醜，先跟你說抱歉。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, I read messy forms all day, don't worry.",
+        "phonetic": "/hɑ aɪ ɹid ˈmɛsi fɔɹmz ɔl deɪ doʊnt ˈwɝi/",
+        "zh": "哈，我整天都在看很亂的表格，別擔心。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're kind. Which vaccine are you giving today?",
+        "phonetic": "/jʊɹz kaɪnd wɪtʃ ˈvæksiˌn ɑɹ ju ɡɪvɪŋ təˈdeɪ/",
+        "zh": "你真好。今天你們要打哪一種疫苗？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We have the regular one, it is the standard dose.",
+        "phonetic": "/wi hæv ðə ˈɹɛɡjələɹ wʌn ɪt ɪz ðə ˈstændəɹd doʊs/",
+        "zh": "我們有一般的疫苗，那就是標準劑量。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Is there a stronger version? My brother asked about that.",
+        "phonetic": "/ɪz ðɛɹ ə ˈstɔɹŋɡɚ ˈvɝʒən maɪ ˈbɹʌðɚ æskt əˈbaʊt ðæt/",
+        "zh": "有沒有比較強的版本？我兄弟前陣子問過。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The high dose is only for people over sixty-five.",
+        "phonetic": "/ðə haɪ doʊz ɪz ˈoʊnli fɚ ˈpipəl ˈoʊvɚ ˈsɪksti ˌfaɪv/",
+        "zh": "高劑量那款只給六十五歲以上的人。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'm thirty-eight, so the regular one is mine.",
+        "phonetic": "/aɪm ˈθɝɾi ˌeɪt soʊ ðə ˈɹɛɡjələɹ wʌn ɪz maɪn/",
+        "zh": "我三十八歲，所以一般那款就是我的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly right, and it covers four flu types.",
+        "phonetic": "/ɪɡˈzæktli ɹaɪt ænd ɪt ˈkʌvɚz fɔɹ flʊ taɪps/",
+        "zh": "完全正確，而且它涵蓋四種流感類型。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nice. Um, do I need to lift my whole arm?",
+        "phonetic": "/ˈnaɪs ʌm du aɪ ˈnid tə ˈlɪft maɪ hoʊl ˈɑɹm/",
+        "zh": "不錯。嗯，我要把整條手臂抬起來嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Just the sleeve, up to the shoulder, that's all.",
+        "phonetic": "/dʒʌst ðə sliv ʌp tə ðə ˈʃoʊldɚ ðæts ɔl/",
+        "zh": "只要捲起袖子，到肩膀那裡就好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "This shirt is tight, could I use the other arm?",
+        "phonetic": "/ðɪs ʃɝt ɪz taɪt kʊd aɪ juz ði ˈʌðɚ ɑɹm/",
+        "zh": "這件襯衫很緊，我可以用另一隻手臂嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, left works fine, I can use both hands.",
+        "phonetic": "/ʃʊɹ lɛft wɝks faɪn aɪ kæn juz boʊt hændz/",
+        "zh": "當然，左手沒問題，我兩隻手都能打。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Both hands, wow, that's a serious pharmacy skill.",
+        "phonetic": "/boʊt hændz waʊ ðæts ə ˈsɪɹiəs ˈfɑɹməsi skɪl/",
+        "zh": "兩隻手都會，哇，那可是很厲害的藥局技能。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's my favorite one, nobody ever asks, ha.",
+        "phonetic": "/ɪts maɪ ˈfɛvɹɪt wʌn ˈnoʊˌbɑdi ˈɛvɚ æsks hɑ/",
+        "zh": "這是我最自豪的本領，都沒有人問過，哈。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, I'm asking. Am I supposed to sit down?",
+        "phonetic": "/wɛl aɪm ˈæskɪŋ æm aɪ səˈpoʊzd tə sɪt daʊn/",
+        "zh": "我現在不就問了。我是不是應該坐下來？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, sit on that stool, keep your feet flat.",
+        "phonetic": "/ˈjɛs ˈsɪt ɑn ðæt ˈstul kip jɔɹ fit ˈflæt/",
+        "zh": "是的，坐到那張圓凳上，腳平平踩著。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Feet flat, got it. Should I look away or...?",
+        "phonetic": "/fit flæt ɡɑɾ ɪt ʃʊd aɪ lʊk əˈweɪ ɔɹ/",
+        "zh": "腳平踩，記下了。我該看向別的地方，還是……？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Either way. Most people watch, then pretend they didn't.",
+        "phonetic": "/ˈiðɚ weɪ moʊst ˈpipəl wɑtʃ ðɛn pɹɪˈtɛnd ðeɪ dɪdnt/",
+        "zh": "都可以。多數人盯著看，然後假裝自己沒看。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, that's me exactly, I'll watch and panic.",
+        "phonetic": "/hɑ ðæts mi ɪɡˈzæktli aɪl wɑtʃ ænd ˈpænɪk/",
+        "zh": "哈，那就是我，我會盯著看然後緊張。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Deep breath, and... done, that was a quick one.",
+        "phonetic": "/ˈdip ˈbɹɛθ ænd ˈdʌn ðæt wəz ə kwɪk ˈwʌn/",
+        "zh": "深呼吸，然後……好了，這一針很快。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Done? Um, I barely felt it, honestly.",
+        "phonetic": "/dʌn ʌm aɪ ˈbɛɹli fɛlt ɪt ˈɑnəstli/",
+        "zh": "打完了？嗯，我幾乎沒有感覺，老實說。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You did great, most people say it's a pinch.",
+        "phonetic": "/ju dɪd ˈɡɹeɪt ˈmoʊst ˈpipəl ˈseɪ ɪts ə ˈpɪntʃ/",
+        "zh": "你做得很棒，多數人說就是輕輕捏一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A pinch, okay, I can live with a pinch.",
+        "phonetic": "/ə pɪntʃ oʊˈkeɪ aɪ kæn lɪv wɪð ə pɪntʃ/",
+        "zh": "就是捏一下，好哇，這種我承受得住。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Now the boring part, wait here fifteen minutes.",
+        "phonetic": "/naʊ ðə ˈbɔɹɪŋ pɑɹt weɪt hɪɹ ˌfɪfˈtin ˈmɪnɪts/",
+        "zh": "現在是無聊的部分，要在這裡等十五分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fifteen? Is that a rule or just a habit?",
+        "phonetic": "/fɪfˈtin ɪz ðæt ə ɹul ɔɹ dʒʌst ə ˈhæbɪt/",
+        "zh": "十五分鐘？那是規定，還是只是習慣？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's a rule, we watch for any funny reaction.",
+        "phonetic": "/ɪts ə ɹul wi wɑtʃ fɔɹ ˈɛni ˈfʌni ɹiˈækʃən/",
+        "zh": "是規定，我們要觀察有沒有奇怪的反應。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Funny meaning bad, or funny meaning weird?",
+        "phonetic": "/ˈfʌni ˈminɪŋ bæd ɔɹ ˈfʌni ˈminɪŋ wɪɹd/",
+        "zh": "奇怪指的是不好，還是怪怪的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Meaning weird, dizziness or a rash, rare but real.",
+        "phonetic": "/ˈminɪŋ wɪɹd ˈdɪzənəs ɔɹ ə ɹæʃ ɹɛɹ bʌt ɹiəl/",
+        "zh": "是怪怪的，例如頭暈或長疹子，很少見，但真的可能。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, I'll sit right here, do you have wifi?",
+        "phonetic": "/oʊˈkeɪ aɪl sɪt ɹaɪt hɪɹ du ju hæv ˈwaɪfaɪ/",
+        "zh": "好，我就坐這裡，你們有無線網路嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The code's on the wall, it's free, take a seat.",
+        "phonetic": "/ðə ˈkoʊdz ɑn ðə ˈwɔl ɪts ˈfɹi teɪk ə ˈsit/",
+        "zh": "代碼在牆上，免費的，請坐。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect timing, I have emails to ignore anyway.",
+        "phonetic": "/ˈpɝfɪkt ˈtaɪmɪŋ aɪ hæv ˈiməlz tə ɪɡˈnɔɹ ˈɛniˌweɪ/",
+        "zh": "時間剛好，我有一堆信件要放著不回。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here's your shot record, and a receipt for work.",
+        "phonetic": "/hɪɹz jɔɹ ʃɑt ɹɪˈkɔɹd ænd ə ɹɪˈsit fɚ wɝk/",
+        "zh": "這是你的接種紀錄，還有給公司看的收據。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My office wants proof? That's actually useful, thanks.",
+        "phonetic": "/maɪ ˈɔfəs wɑnts pɹuf ðæts ˈæktʃuəli ˈjusfəl θæŋks/",
+        "zh": "我公司要證明嗎？那真的很有用，謝謝。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "They ask every flu season, keep it in your file.",
+        "phonetic": "/ðeɪ æsk ˈɛvɹi flʊ ˈsizən kip ɪt ɪn jɔɹ faɪl/",
+        "zh": "每個流感季他們都會要，把它存進你的檔案。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I will. It's been ten minutes, can I go?",
+        "phonetic": "/aɪ wɪl ɪts bɪn tɛn ˈmɪnɪts kæn aɪ ɡoʊ/",
+        "zh": "我會存好的。已經十分鐘了，我可以走了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Almost, stay five more, I'll set a timer.",
+        "phonetic": "/əˈmoʊst steɪ faɪv mɔɹ aɪl sɛt ə ˈtaɪmɚ/",
+        "zh": "還差一點，再等五分鐘，我幫你設個計時器。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Five more minutes, then I'm free to go home?",
+        "phonetic": "/faɪv mɔɹ ˈmɪnɪts ðɛn aɪm fɹi tə ɡoʊ hoʊm/",
+        "zh": "再五分鐘，然後我就可以回家了？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and come back next October, you're a pro.",
+        "phonetic": "/ɪɡˈzæktli ænd kʌm bæk nɛkst ɑkˈtoʊbɚ jʊɹz ə pɹoʊ/",
+        "zh": "就是這樣，明年十月再來，你已經很熟了。"
+      }
+    ],
+    "youtube_title": "【藥局打流感疫苗💉】「我跟那支針有舊怨」教你用保險卡免費施打💳🎧｜聽完敢開口問過敏｜60句沉浸式英文聽力｜A Shot at the Pharmacy",
+    "youtube_title_en": "\"The Needle and I Have History\" — Getting a Free Flu Shot at the Pharmacy",
+    "youtube_description": "在藥局打一支流感疫苗，其實只要講清楚三件事：保險卡、過敏史、還有那十五分鐘的等待。這一集是 60 句沉浸式英文聽力練習，場景就在藥局的施打櫃台前，從問要不要預約一路聽到打針、等計時器、拿接種紀錄。\n\n你會聽到：怎麼問 Do I need a visit for a flu shot；怎麼拿出保險卡確認不用付錢；怎麼主動說出 egg allergy 並填在表格上；還有袖子太緊能不能換邊、打針時該不該看、為什麼要等十五分鐘的實用問句。\n\n整段只用 A2 初級單字與短句，反覆出現的是美國人走進藥局時的真實語感：um、well、so、ha、honestly、totally fair。聽完你就會用：Let me guess、Got it、Please do、Take a seat、You're a pro。\n\n後半段是逐句聽力加跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "A flu shot at the pharmacy comes down to three things: your insurance card, your allergy note, and fifteen boring minutes of waiting. This is a 60-line immersive English listening practice set right at the shot counter.\n\nYou will hear: asking whether you need an appointment, pulling out the insurance card and finding out you pay nothing, telling the pharmacist about an egg allergy before signing the form, and the small human stuff, a tight sleeve, switching arms, watching the needle or not, and the timer rule.\n\nEverything stays in A2-level words, with the fillers Americans really use: um, well, so, ha, honestly, totally fair. By the end you'll own lines like Let me guess, Got it, Please do, Take a seat, and You're a pro.\n\nThe last chapter is a line-by-line listen and repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed, just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧藥局打疫苗英文｜問要不要預約・用保險卡・說出雞蛋過敏｜十五分鐘等待與接種紀錄｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n走進藥局想打一支流感疫苗，你知道怎麼問要不要先預約嗎？保險卡要怎麼遞出去、怎麼確認自己不用付錢？雞蛋過敏這種事，要在哪一句開口說出來才對？\n\n這一集帶大家走進藥局的施打角落，從排隊問話、查保險卡、填過敏表格、捲袖子換邊，一路聽到打完針的十五分鐘等待與拿到接種紀錄，共 60 句連續真實對話。\n\n你會聽到：\n💉 開場問句：Hi, do I need a visit for a flu shot?\n💳 保險卡：Okay, this one covers it, so you pay nothing.\n🥚 說出過敏：Please do. Also, egg allergy, is that still okay?\n🎧 打完等計時：Now the boring part, wait here fifteen minutes.\n\n後半段是逐句聽力加跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so、ha 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這一針走一趟藥局，下次你自己站在櫃台前，該問的錢、該說的過敏，話就會自己冒出來。\n\n祝你打完針，抬頭看見計時器時，還能從容地滑一下手機。",
+    "youtube_tags": [
+      "english listening practice",
+      "pharmacy english dialogue",
+      "getting a flu shot in english",
+      "vaccine english conversation",
+      "esl listening a2",
+      "american english conversation",
+      "insurance card english",
+      "allergy english phrases",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "藥局英文",
+      "打疫苗英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "看醫生英文對話"
+    ],
+    "scene": "pharmacy shot counter",
+    "thumbnail_expression": "bracing himself with a nervous grin",
+    "thumbnail_action": "rolling up one sleeve and looking away",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Flu Vaccine",
+        "zh": "流感疫苗"
+      },
+      {
+        "en": "Insurance Card",
+        "zh": "保險卡"
+      },
+      {
+        "en": "Allergy Form",
+        "zh": "過敏表格"
+      },
+      {
+        "en": "Small Bandage",
+        "zh": "小繃帶"
+      },
+      {
+        "en": "Fifteen Minute Timer",
+        "zh": "十五分鐘計時器"
+      }
+    ]
+  }
+}

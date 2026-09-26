@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_bike-theft-police-report",
+  "topic": "Reporting a Stolen Bike at the Campus Police Desk",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758848400.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A STOLEN BICYCLE",
+    "title_zh": "腳踏車報案",
+    "scene_zh": "校園警衛台 · 報失竊",
+    "story_hook": "A cable, a cut lock, and a paper trail.",
+    "intro_zh": "一條纜線、一把斷鎖，還有一整份報案紀錄。",
+    "welcome_en": "Welcome to the campus police desk today. Listen for reporting a theft.",
+    "welcome_zh": "歡迎來到今天的校園警衛台。留意失竊報案的說法。",
+    "outro": "The bike is filed, the plan is set. Listen once more and speak along.",
+    "outro_zh": "報案建檔完成，對策也有了。再聽一遍，跟著開口。",
+    "practice_intro_en": "Repeat after us, one line at a time.",
+    "practice_intro_zh": "跟讀練習，一句一句來。",
+    "title_quote": "ghost bikes are a campus thing",
+    "char_a_description": "a male college student in his early twenties with curly black hair under a teal beanie, a faded maroon campus hoodie, ripped jeans, a canvas shoulder bag, and a lanky build",
+    "char_b_description": "a female campus officer in her forties with dark hair in a tight regulation bun, a tan uniform polo, a badge belt, small reading glasses, and a broad strong build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "student",
+    "char_b_role": "officer",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse me, I need to report a stolen bike.",
+        "phonetic": "/ɪkˈskjuz mi aɪ nid tə rɪˈpɔɹt ə stoʊl baɪk/",
+        "zh": "不好意思，我要報案，我的腳踏車失竊了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sorry, have a seat. When did it happen?",
+        "phonetic": "/ˈsɑɹi hæv ə sit wɛn dɪd ɪt ˈhæpən/",
+        "zh": "很抱歉，先請坐。什麼時候發生的？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Last night, around ten, library side.",
+        "phonetic": "/læst naɪt əˈɹaʊnd tɛn ˈlaɪˌbɹɛɹi saɪd/",
+        "zh": "昨晚大約十點，在圖書館那一側。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The back rack by the bike cages?",
+        "phonetic": "/ðə bæk ɹæk baɪ ðə baɪk ˈkeɪdʒəz/",
+        "zh": "是後方停車籠那一區嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, the third cage, mine was on the left.",
+        "phonetic": "/jɛs ðə θɜɹd ˈkeɪdʒ maɪn wʌz ɑn ðə lɛft/",
+        "zh": "對，第三個籠，我的車靠在左邊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Any cameras you noticed up there?",
+        "phonetic": "/ˈɛni ˈkæmɹəz ju ˈnoʊtɪst ʌp ðɛɹ/",
+        "zh": "您有沒有注意到那裡有攝影機？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two, but they face the road, not the cages.",
+        "phonetic": "/tu bʌt ðeɪ feɪs ðə ɹoʊd nɑt ðə ˈkeɪdʒəz/",
+        "zh": "有兩台，但它們對著馬路，不對著停車籠。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it, so describe the bike for me.",
+        "phonetic": "/ɡɑɾ ɪt soʊ dɪˈskɹaɪb ðə baɪk fɜɹ mi/",
+        "zh": "記下了，那描述一下你的車給我聽。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's a blue hybrid, medium frame, twenty-one speeds.",
+        "phonetic": "/ɪts ə blu ˈhaɪˌbɹɪd ˈmidiəm fɹeɪm ˈtwɛnti wʌn spidz/",
+        "zh": "是一台藍色混合車，中尺寸車架，二十一速。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nice, any stickers, scratches, or repairs?",
+        "phonetic": "/naɪs ˈɛni ˈstɪkɚz ˈskɹætʃɪz ɔɹ rɪˈpɛɹz/",
+        "zh": "好，有沒有貼紙、刮痕或修補過的痕跡？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A sunset sticker on the frame, taped handlebar.",
+        "phonetic": "/ə ˈsʌnˌsɛt ˈstɪkɚ ɑn ðə fɹeɪm teɪpt ˈhændəlˌbɑɹ/",
+        "zh": "車架有日落圖案貼紙，把手纏著膠帶。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Tape there, noted. What lock did you use?",
+        "phonetic": "/teɪp ðɛɹ ˈnoʊtəd wʌt lɑk dɪd ju ˈjuːz/",
+        "zh": "都記錄了。你用的是哪一種鎖？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A cable lock, thin one, looped through the wheel.",
+        "phonetic": "/ə ˈkeɪbəl lɑk θɪn wʌn lupt θɹu ðə wil/",
+        "zh": "一條纜線鎖，很細，繞在輪圈上。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thin cables fall to bolt cutters in seconds.",
+        "phonetic": "/θɪn ˈkeɪbəlz fɔl tə boʊlt ˈkʌtəɹz ɪn ˈsɛkəndz/",
+        "zh": "細纜線碰上剪鉗，幾秒就斷了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yeah, I found the cable in pieces on the ground.",
+        "phonetic": "/jæ aɪ faʊnd ðə ˈkeɪbəl ɪn ˈpisəz ɑn ðə ɡɹaʊnd/",
+        "zh": "是啊，我在地上找到了剪碎的纜線。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's the usual play, sadly, around ten p.m.",
+        "phonetic": "/ðæts ðə ˈjuːʒuəl pleɪ ˈsædli əˈɹaʊnd tɛn ˌpiˈɛm/",
+        "zh": "很遺憾，這是最常見的手法，多在晚上十點前後。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I took photos, the cut cable's in them.",
+        "phonetic": "/aɪ tʊk ˈfoʊtoʊz ðə kʌt ˈkeɪbəlzɪn ðɛm/",
+        "zh": "我有拍照，剪斷的纜線都在照片裡。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, upload them to this report portal later.",
+        "phonetic": "/ˈpɜɹfɪkt ʌpˈloʊd ðəm tə ðɪs rɪˈpɔɹt ˈpɔɹtəl ˈleɪtɚ/",
+        "zh": "太好了，之後把照片上傳到報案系統。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sure thing, my phone has the whole scene.",
+        "phonetic": "/ʃʊɹ θɪŋ maɪ foʊn hæz ðə hoʊl sin/",
+        "zh": "沒問題，我手機裡有現場照片。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Now, serial number, do you know yours by heart?",
+        "phonetic": "/naʊ ˈsɪɹiəl ˈnʌmbɚ du ju noʊ jɔɹz baɪ hɑɹt/",
+        "zh": "接下來是車架序號，這個你背得出來嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, no, it's under the pedals, I never looked.",
+        "phonetic": "/ʌm noʊ ɪts ˈʌndɚ ðə ˈpɛdəlz aɪ ˈnɛvɚ lʊkt/",
+        "zh": "呃，沒有，序號在踏板下方，我從來沒低頭看。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Receipt, warranty email, anything with the number?",
+        "phonetic": "/ɹiˈsɪt ˈwɔɹənti ˈimeɪl ˈɛnɪθɪŋ wɪð ðə ˈnʌmbɚ/",
+        "zh": "那收據、保固信，有沒有任何寫到序號的文件？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The warranty email, it listed the frame code.",
+        "phonetic": "/ðə ˈwɔɹənti ˈimeɪl ɪt ˈlɪstɪd ðə fɹeɪm koʊd/",
+        "zh": "保固信件裡有列出車架碼。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Search your inbox for serial, then send it over.",
+        "phonetic": "/sɜɹtʃ jɔɹ ˈɪnˌbɑks fɜɹ ˈsɪɹiəl ðɛn sɛnd ɪt ˈoʊvɚ/",
+        "zh": "搜尋信箱裡的序號關鍵字，然後傳給我。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Found it, eight letters, two zeros, sent.",
+        "phonetic": "/faʊnd ɪt eɪt ˈlɛtəɹz tu ˈzɪɹoʊz sɛnt/",
+        "zh": "找到了，八個字母加兩個零，已經傳出。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Locked in, your bike is now in the system.",
+        "phonetic": "/lɑkt ɪn jɔɹ baɪk ɪz naʊ ɪn ðə ˈsɪstəm/",
+        "zh": "建檔完成，這台車已經進系統了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Does insurance matter here? I paid renter's, I think.",
+        "phonetic": "/dʌz ɪnˈʃʊɹəns ˈmæɾɚ hɪɹ aɪ ˈpeɪd ɹɛntəɹz aɪ θɪŋk/",
+        "zh": "保險有用嗎？我記得有買租客保險。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bring a policy copy, claims need our report.",
+        "phonetic": "/brɪŋ ə ˈpɑləsi ˈkɑpi kleɪmz nid ɑʊɹ rɪˈpɔɹt/",
+        "zh": "帶保單影本過來，申請理賠需要報案紀錄。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "They'll want the report number first, right?",
+        "phonetic": "/ðeɪl wɑnt ðə rɪˈpɔɹt ˈnʌmbɚ fɜɹst raɪt/",
+        "zh": "他們會先要求報案編號，對吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and a photo of that empty cage too.",
+        "phonetic": "/ɪɡˈzɛktli ænd ə ˈfoʊtoʊ ʌv ðæt ˈɛmpti ˈkeɪdʒ tu/",
+        "zh": "沒錯，再附一張空停車籠的照片。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "This feels weird, talking about a ghost bike.",
+        "phonetic": "/ðɪs filz wɪɹd ˈtɔkɪŋ əˈbaʊt ə ɡoʊst baɪk/",
+        "zh": "對著表格談一台消失的車，感覺好奇怪。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ghost bikes are a campus thing, sadly common.",
+        "phonetic": "/ɡoʊst baɪkz ɑɹ ə ˈkæmpəs θɪŋ ˈsædli ˈkɑmən/",
+        "zh": "消失的腳踏車在校園很常聽到，真的不少。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How many reports like mine come in weekly?",
+        "phonetic": "/haʊ ˈmɛni rɪˈpɔɹts laɪk maɪn kʌm ɪn ˈwikli/",
+        "zh": "像我這樣的車失竊案，一週有幾件？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ten or twelve, mostly cables, mostly after dark.",
+        "phonetic": "/tɛn ɔɹ twɛlv ˈmoʊstli ˈkeɪbəlz ˈmoʊstli ˈæftɚ dɑɹk/",
+        "zh": "十件到十二件，多半是纜線鎖，多半在天黑後。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, now I feel hopeful, thanks a lot.",
+        "phonetic": "/ɡɹeɪt naʊ aɪ fil ˈhoʊpfəl θæŋks ə lɑt/",
+        "zh": "真好，我現在充滿希望，真是感謝喔。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, keep it real, here's the useful part.",
+        "phonetic": "/hɑ kip ɪt ɹiəl hɪɹz ðə ˈjusfəl pɑɹt/",
+        "zh": "哈，坦白講，重頭戲是接下來的建議。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Useful like what? I have a lecture soon.",
+        "phonetic": "/ˈjusfəl laɪk wʌt aɪ hæv ə ˈlɛktʃɚ sun/",
+        "zh": "比如什麼建議？我馬上要上課了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Watch resale sites, stolen bikes get relisted fast.",
+        "phonetic": "/wɑtʃ ɹiˈseɪl saɪts stoʊl baɪkz ɡɛt ɹiˈlɪstɪd fæst/",
+        "zh": "盯緊二手拍賣網，失竊車很快就會重新上架。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "On the campus marketplace too? People flip there.",
+        "phonetic": "/ɑn ðə ˈkæmpəs ˈmɑɹkəˌtɛs tu pipəl flɪp ðɛɹ/",
+        "zh": "校園二手市集也要看嗎？那裡很多人在轉手。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Especially there, set alerts for blue hybrids.",
+        "phonetic": "/ɪˈspɛʃəli ðɛɹ sɛt əˈɜɹts fɜɹ blu ˈhaɪˌbɹɪdz/",
+        "zh": "尤其那裡，把藍色混合車設成上架提醒。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Alert words: sunset sticker, taped bar, twenty-one.",
+        "phonetic": "/əˈɜɹts wɜɹdz ˈsʌnˌsɛt ˈstɪkɚ teɪpt bɑɹ ˈtwɛnti wʌn/",
+        "zh": "提醒詞就設：日落貼紙、纏膠帶的把手、二十一速。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And if a bike looks like yours, don't grab it.",
+        "phonetic": "/ænd ɪf ə baɪk lʊks laɪk jɔɹz doʊnt ɡɹæb ɪt/",
+        "zh": "如果看到像你的車，先別自己去取車。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'd message you, then you handle the meet-up?",
+        "phonetic": "/aɪd ˈmɛsɪdʒ ju ðɛn ju ˈhændəl ðə mit ʌp/",
+        "zh": "那我先傳訊息給您，後續由你們接手？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, snap screenshots, never meet sellers alone.",
+        "phonetic": "/ɪɡˈzɛktli snæp ˈskɹinˌʃɑts ˈnɛvɚ miːt ˈsɛləɹz əˈloʊn/",
+        "zh": "沒錯，先截好圖，絕對不要一個人去見賣家。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Deal, here's my email for any updates.",
+        "phonetic": "/dil hɪɹz maɪ ˈimeɪl fɜɹ ˈɛni ˈʌpˌdeɪts/",
+        "zh": "好，有任何消息請寫信給我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Report number ends nine-two-five, check your inbox.",
+        "phonetic": "/rɪˈpɔɹt ˈnʌmbɚ ɛndz naɪn tu faɪv tʃɛk jɔɹ ˈɪnˌbɑks/",
+        "zh": "報案編號尾碼是九二五，收件匣看一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Got it, what if I just want closure?",
+        "phonetic": "/ɡɑɾ ɪt wʌt ɪf aɪ dʒʌst wɑnt ˈkloʊʒɚ/",
+        "zh": "記下了，如果我想要有個明確交代呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bikes surface at lost and found sometimes, two weeks.",
+        "phonetic": "/baɪkz ˈsɜɹfəs æt lɔst ænd faʊnd ˈsʌmˌtaɪmz tu wiːks/",
+        "zh": "失竊車偶爾會出現在遺失物中心，約兩週內。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two weeks of ghost bike watching, fun.",
+        "phonetic": "/tu wiːks ʌv ɡoʊst baɪk ˈwɑtʃɪŋ fʌn/",
+        "zh": "要當兩週尋車偵探，真有趣。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Check resale sites, fresh listings daily, same routine.",
+        "phonetic": "/tʃɛk ɹiˈseɪl saɪts fɹɛʃ ˈlɪstɪŋz ˈdeɪli seɪm ɹuˈtin/",
+        "zh": "每天刷新二手網站，就是固定的功課。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can the department lend a bike meanwhile?",
+        "phonetic": "/kæn ðə dɪˈpɑɹtmənt lɛnd ə baɪk ˈmilˌwaɪlz/",
+        "zh": "這段期間，你們會出借腳踏車嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We run a bike loan program, five days free.",
+        "phonetic": "/wi ɹʌn ə baɪk lon ˈpɹɑɡɹæm faɪv deɪz fri/",
+        "zh": "我們有借車計畫，可以免費用五天。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No way, that's actually beautiful policy.",
+        "phonetic": "/noʊ weɪ ðæts ˈæktʃuəli ˈbjutəfəl ˈpɑləsi/",
+        "zh": "真的假的？這政策太貼心了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fill one form, grab a loaner, keep riding.",
+        "phonetic": "/fɪl wʌn fɔɹm ɡɹæb ə ˈloʊnɚ kip ˈɹaɪdɪŋ/",
+        "zh": "填一張表，就能領一台備用車繼續騎。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Officer, you just rescued my whole semester.",
+        "phonetic": "/əˈfɪsəɹ ju dʒʌst rɪˈskjud maɪ hoʊl səˈmɛstəɹ/",
+        "zh": "警官，您剛救了我整個學期。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bikes are legs here, we know that well.",
+        "phonetic": "/baɪkz ɑɹ lɛɡz hɪɹ wi noʊ ðæt wɛl/",
+        "zh": "在這裡，腳踏車就是腿，我們很清楚。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'll upload photos tonight, and tell my roommate.",
+        "phonetic": "/aɪl ʌpˈloʊd ˈfoʊtoʊz təˈnaɪt ænd tɛl maɪ ˈɹumˌmeɪt/",
+        "zh": "我今晚會上傳照片，也告訴我室友。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Roommate's a bike owner? More alerts, more eyes.",
+        "phonetic": "/ˈɹumˌmeɪts ə baɪk ˈoʊnəɹ mɔɹ əˈɜɹts mɔɹ aɪz/",
+        "zh": "室友也有車嗎？多一個人留意，多一雙眼睛。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Lesson learned: thick chain lock from now on.",
+        "phonetic": "/ˈlɛsən lɜrnd θɪk tʃeɪn lɑk fɹʌm naʊ ɑn/",
+        "zh": "學到教訓了：以後改用粗鏈條鎖。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ride safe, and ping the portal, deal?",
+        "phonetic": "/ɹaɪd seɪf ænd pɪŋ ðə ˈpɔɹtəl dil/",
+        "zh": "騎車小心，有線索就上系統，好嗎？"
+      }
+    ],
+    "youtube_title": "【校園腳踏車失竊🚲】「消失的腳踏車是校園日常」教你報案、記序號、盯二手網📱🎧｜聽完就會報案｜60句沉浸式英語聽力｜Reporting a Stolen Bike",
+    "youtube_title_en": "Ghost Bikes Are a Campus Thing — Reporting a Stolen Bike at the Police Desk",
+    "youtube_description": "「消失的腳踏車是校園日常」——當纜線鎖變成地上碎片，怎麼走進警衛台把失竊案報得完整又清楚？這一集是 60 句沉浸式英語聽力練習，場景就在學期中的校園警察服務台。\n\n你會聽到：說明案發時間地點、描述車架貼紙與刮痕、交代鎖的種類；搜尋保固信裡的序號、上傳照片到報案系統、申請保險理賠；還有按警官建議盯二手拍賣網、設定上架提醒、申請備用借車計畫的實用對話。\n\n全篇使用 A2 初級單字與短句，充滿真實報案的語感：um、yeah、ha、right?、exactly。聽完你就會用：I need to report、do you know yours by heart、Bring a policy copy、set alerts for。\n\n後半段是逐句聽力＋跟讀練習，大聲跟著念，先把舌頭練熟，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱並開啟小鈴鐺。",
+    "youtube_description_en": "\"Ghost bikes are a campus thing\" — when your cable lock ends up in pieces on the pavement, how do you file a clean theft report? This is a 60-line immersive English listening practice at the campus police desk.\n\nYou will hear: giving the time and place, describing stickers and scratches on the frame, naming your lock; hunting the serial number in a warranty email, uploading photos to the portal, and preparing insurance papers; plus tips on resale-site alerts and a free loaner-bike program.\n\nEverything stays in A2-level words, with real reporting rhythm: um, yeah, ha, right?, exactly. By the end you'll own lines like I need to report a stolen bike, Do you know yours by heart, and set alerts for blue hybrids.\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new real-life scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧腳踏車失竊報案英文｜記序號・傳照片・盯二手網｜免費借車計畫怎麼申請｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n腳踏車鎖斷了、車不見了，走進警衛台第一句話要說什麼？序號背不起來、保固信找不到，報案還進行得下去嗎？\n\n這一集帶大家全程參與一趟校園腳踏車失竊報案，從描述車況、建檔序號、上傳照片，一路聽到理賠準備、盯二手網站與申請備用車，共 60 句連續真實對話。\n\n你會聽到：\n🚲 描述愛車：It's a blue hybrid, medium frame, twenty-one speeds.\n🔢 序號建檔：Search your inbox for serial, then send it over.\n💸 理賠準備：Bring a policy copy, claims need our report.\n🔎 反制對策：Watch resale sites, stolen bikes get relisted fast.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、yeah、exactly 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著這位學生報完一次案，下次遇到麻煩，你也能把整件事說清楚。\n\n祝你永遠用不上這集，但聽得懂每一句。",
+    "youtube_tags": [
+      "english listening practice",
+      "reporting theft in english",
+      "campus police english dialogue",
+      "stolen bike vocabulary",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "insurance claim english",
+      "police station role play esl",
+      "英語聽力練習",
+      "腳踏車英文",
+      "報案英文對話",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "日常英文對話"
+    ],
+    "scene": "campus police front desk",
+    "thumbnail_expression": "worried but hopeful, eyebrows raised",
+    "thumbnail_action": "holding up a severed cable lock at the counter",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Blue Hybrid Bike",
+        "zh": "藍色混合車"
+      },
+      {
+        "en": "Cut Cable Lock",
+        "zh": "剪斷的纜線鎖"
+      },
+      {
+        "en": "Serial Number",
+        "zh": "車架序號"
+      },
+      {
+        "en": "Report Form",
+        "zh": "報案表"
+      },
+      {
+        "en": "Loaner Bike",
+        "zh": "備用借車"
+      }
+    ]
+  }
+}

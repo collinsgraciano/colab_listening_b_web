@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_cancel-streaming-service",
+  "topic": "Calling to Cancel a Streaming Subscription",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758860400.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "CANCEL OR PAUSE",
+    "title_zh": "退訂電話",
+    "scene_zh": "客服電話 · 退訂溝通",
+    "story_hook": "One subscription, one brave phone call.",
+    "intro_zh": "一份訂閱，一通勇敢的退訂電話。",
+    "welcome_en": "Hi, welcome to today's phone scene. Listen for polite ways to quit a service.",
+    "welcome_zh": "嗨，歡迎來到今天的電話場景。留意如何禮貌又堅定地退訂服務。",
+    "outro": "And that's a cancellation handled kindly. Pause now, decide later, no pressure.",
+    "outro_zh": "一通退訂電話就這樣溫和地收尾。先暫停，之後再決定，毫無壓力。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "I watched one show in March",
+    "char_a_description": "a young woman in her mid twenties with black hair in two long braids, small gold hoop earrings, an oversized purple hoodie, cozy striped socks, and a tall slim build",
+    "char_b_description": "a cheerful man in his forties with closely cropped salt-and-pepper hair, rectangular glasses, a light blue office shirt with rolled sleeves, a headset with microphone, and an average build",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "retention agent",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hello, I'm calling to cancel my subscription.",
+        "phonetic": "/hɛˈloʊ aɪm ˈkɔ.lɪŋ tə ˈkæn.səl maɪ ˌsʌb.skrɪpˈʃən/",
+        "zh": "嗨，我打電話來是想取消訂閱。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thanks for calling, and I'm sorry to hear that.",
+        "phonetic": "/θæŋks fɚ kɔ.lɪŋ ænd aɪm ˈsɑɹ.i tə hɪɹ ðæt/",
+        "zh": "感謝來電，很遺憾聽到這個消息。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Honestly? I watched one show in March.",
+        "phonetic": "/ˈɑ.nəst.li aɪ wɑtʃt wʌn ʃoʊ ɪn mɑɹtʃ/",
+        "zh": "老實講，我整個三月只看過一部劇。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fair enough. May I ask your name?",
+        "phonetic": "/fɛɹ ɪˈnʌf me aɪ æsk jɔɹ neɪm/",
+        "zh": "合理。請問您的大名？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's Dana Okafor, D-A-N-A.",
+        "phonetic": "/ɪts ˈdeɪ.nə oʊˈkɑ.fɔɹ ˈdi eɪ ɛn eɪ/",
+        "zh": "我是 Dana Okafor，D-A-N-A。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thank you, Dana. And the email on file?",
+        "phonetic": "/θæŋk ju ˈdeɪ.nə ænd ði ˈi.meɪl ɑn faɪl/",
+        "zh": "謝謝，Dana。註冊信箱是哪一個？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's dana.o at fastmail dot com.",
+        "phonetic": "/ɪts ˈdæ.nə oʊ æt ˈfæst.meɪl dɑt kɑm/",
+        "zh": "是 dana.o，圈 a，fastmail 點 com。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Found you. You're on the fifteen ninety-nine plan.",
+        "phonetic": "/faʊnd ju jʊɹz ɑn ðə ˌfɪfˈtin ˈnɪn.ti naɪn plæn/",
+        "zh": "找到您了。您用的是一個月十五塊九毛九的方案。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, why does that number sound bigger now?",
+        "phonetic": "/ʌm waɪ dʌz ðæt ˈnʌm.bɚ saʊnd ˈbɪɡ.ɚ naʊ/",
+        "zh": "嗯，這個數字怎麼聽起來變大了？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "There was a price change in January, I'm sorry.",
+        "phonetic": "/ðɛɹ wəz ə praɪs tʃeɪndʒ ɪn ˈdʒæn.ju.ɛ.ɹi aɪm ˈsɑɹ.i/",
+        "zh": "一月份調過價，真的很抱歉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No, that's okay. Can I hear the options?",
+        "phonetic": "/noʊ ðæts oʊˈkeɪ kən aɪ hɪɹ ði ˈɑp.ʃənz/",
+        "zh": "沒事沒事。可以告訴我有哪些選項嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You can cancel, pause, or switch to a cheaper plan.",
+        "phonetic": "/ju kæn ˈkæn.səl pɔz ɔɹ swɪtʃ tə ə ˈtʃi.pɚ plæn/",
+        "zh": "您可以取消、暫停，或改用更便宜的方案。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cancel first, please. I mean, that's my goal.",
+        "phonetic": "/ˈkæn.səl fɝst pliz aɪ min ðæts maɪ ɡoʊl/",
+        "zh": "先講取消這事吧，我是說，那才是目標。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Totally your call. Mind if I check one thing?",
+        "phonetic": "/ˈtoʊ.ə.li jɔɹ kɔl maɪnd ɪf aɪ tʃɛk wʌn θɪŋ/",
+        "zh": "一切聽您的。介意我查一件事嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Go ahead.",
+        "phonetic": "/ɡoʊ əˈhɛd/",
+        "zh": "請便。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, um, today is the ninth, so you're fine.",
+        "phonetic": "/oʊˈkeɪ ʌm təˈdeɪ ɪz ðə naɪnθ soʊ jʊɹz faɪn/",
+        "zh": "好，今天是九號，所以您還不緊急。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fine how? Do I still get charged today?",
+        "phonetic": "/faɪn haʊ du aɪ stɪl ɡɛt tʃɑɹd təˈdeɪ/",
+        "zh": "不緊急是指？今天還會不會扣錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, billing is the fourteenth, five days away.",
+        "phonetic": "/noʊ ˈbɪ.lɪŋ ɪz ðə fɔɹˈtiːnθ faɪv deɪz əˈweɪ/",
+        "zh": "不會，帳單日是十四號，還有五天。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, thank you for noticing that detail.",
+        "phonetic": "/oʊ θæŋk ju fɚ ˈnoʊ.tɪ.sɪŋ ðæt ˈdi.teɪl/",
+        "zh": "噢，謝謝你留意到這個細節。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's my job, and honestly my favorite part.",
+        "phonetic": "/ɪts maɪ dʒɑb ænd ˈɑ.nəst.li maɪ ˈfeɪ.vɚ.ɪt pɑɹt/",
+        "zh": "這是我的工作，也是我最喜歡的環節。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, okay, so about that cancel button.",
+        "phonetic": "/hɑ oʊˈkeɪ soʊ əˈbaʊt ðæt ˈkæn.səl ˈbʌt.ən/",
+        "zh": "哈，好，來說說那個取消按鈕。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let me guess — you tapped it five times.",
+        "phonetic": "/ˈlɛt mi ˈɡɛs ju ˈtæpt ɪt ˈfaɪv ˈtaɪmz/",
+        "zh": "讓我猜——您已經按了它五次。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Seven. It just spins and laughs at me.",
+        "phonetic": "/ˈsɛv.ən ɪt dʒʌst spɪnz ænd læfs æt mi/",
+        "zh": "七次。它只會轉圈，像在笑我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, it's shy about leaving, we'll handle it here.",
+        "phonetic": "/hɑ ɪts ʃaɪ əˈbaʊt ˈli.vɪŋ wil ˈhæn.dəl ɪt hɪɹ/",
+        "zh": "哈，它捨不得走，我在這裡替您辦好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You can truly finish the cancellation right now?",
+        "phonetic": "/ju kæn ˈtɹuː.li ˈfɪn.ɪʃ ðə ˌkæn.səˈleɪ.ʃən raɪt naʊ/",
+        "zh": "你真的能現在就把取消處理完嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, one formality: do you want to pause instead?",
+        "phonetic": "/jɛs wʌn fɔɹˈmæl.ə.ti du ju wɑnt tə pɔz ɪnˈstɛd/",
+        "zh": "能，只有一個例行問題：要不要考慮暫停？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Pause? Like, the account just sleeps?",
+        "phonetic": "/pɔz laɪk ði əˈkaʊnt dʒʌst slips/",
+        "zh": "暫停？意思是帳號先去睡覺？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, zero charges, and it wakes up anytime.",
+        "phonetic": "/ɪɡˈzæk.li ˈzɪɹ.oʊ ˈtʃɑɹ.dʒəz ænd ɪt weɪks ʌp ˈɛn.iˌtaɪm/",
+        "zh": "沒錯，完全不收費，而且隨時能醒來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Huh. How long can I leave it asleep?",
+        "phonetic": "/hʌ haʊ lɔŋ kən aɪ liv ɪt əˈslip/",
+        "zh": "喔。它最多可以睡多久？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Up to three months, then we'd ask you to choose.",
+        "phonetic": "/ˈʌp tə θri ˈmʌn.θɪz ðɛn wɪd ˈæsk ju tə ˈtʃuz/",
+        "zh": "最多三個月，之後再請您做選擇。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So I could finish my show in April.",
+        "phonetic": "/soʊ aɪ kʊd ˈfɪn.ɪʃ maɪ ʃoʊ ɪn ˈeɪ.prəl/",
+        "zh": "這樣我就能四月把劇追完。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's the dream, yes, no guilt, no fee.",
+        "phonetic": "/ðæts ðə ˈdrim jɛs ˈnoʊ ˈɡɪlt ˈnoʊ ˈfi/",
+        "zh": "理想正是如此，不心懷愧疚，也不花錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, tempting, um, but what's the cheaper plan?",
+        "phonetic": "/oʊˈkeɪ ˈtɛmp.tɪŋ ʌm bʌt wʌts ðə ˈtʃi.pɚ plæn/",
+        "zh": "好吧，挺誘人，嗯，那便宜方案長怎樣？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Six fifty with ads on some shows.",
+        "phonetic": "/sɪks ˈfɪf.ti wɪð ædz ɑn sʌm ʃoʊz/",
+        "zh": "六塊五，部分節目帶有廣告。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ads in the middle of scenes? I'd rage.",
+        "phonetic": "/ædz ɪn ðə ˈmɪ.dəl əv sinz aɪd reɪdʒ/",
+        "zh": "廣告會插在劇情中間？我會抓狂。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Only between scenes, I promise, no mid-scene evil.",
+        "phonetic": "/ˈoʊn.li bɪˈtwin sinz aɪ ˈprɑm.ɪs noʊ mɪd sin ˈiː.vəl/",
+        "zh": "只在場次之間跳出來，我保證，劇情中途絕無廣告。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, downloads? My plane wifi is terrible.",
+        "phonetic": "/həm ˈdaʊn.loʊdz maɪ pleɪn ˈwaɪ.faɪ ɪz ˈtɛɹ.ə.bəl/",
+        "zh": "嗯，那離線下載呢？我飛機上的 wifi 超爛。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The ad plan keeps two downloads at a time.",
+        "phonetic": "/ði æd plæn kips tu ˈdaʊn.loʊdz æt ə taɪm/",
+        "zh": "含廣告方案可以同時存兩集離線看。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two is honestly plenty, I never use more.",
+        "phonetic": "/tu ɪz ˈɑ.nəst.li ˈplɛn.ti aɪ ˈnɛv.ɚ juz mɔɹ/",
+        "zh": "兩集其實就很夠，我從來用不完更多。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Most folks say that, then travel a lot.",
+        "phonetic": "/moʊst foʊks seɪ ðæt ðɛn ˈtræv.əl ə lɑt/",
+        "zh": "大多數人都是這麼講，然後到處飛。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, guilty. So, pause or downgrade, um...",
+        "phonetic": "/hɑ ˈɡɪl.ti soʊ pɔz ɔɹ ˈdaʊn.ɡreɪd ʌm/",
+        "zh": "哈，讓你說中了。那，暫停還是降級，嗯……"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Well, what does your calendar say for spring?",
+        "phonetic": "/wɛl wʌt dʌz jɔɹ ˈkæl.ən.dɚ seɪ fɚ sprɪŋ/",
+        "zh": "那麼，您春天的行程怎麼安排？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Busy, so busy, trips in March and May.",
+        "phonetic": "/ˈbɪ.zi soʊ ˈbɪ.zi trɪps ɪn mɑɹtʃ ænd meɪ/",
+        "zh": "超忙，三月跟五月都要出遠門。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then this month is quiet, right? Between shows.",
+        "phonetic": "/ðɛn ðɪs mʌnθ ɪz ˈkwaɪ.ət raɪt bɪˈtwin ʃoʊz/",
+        "zh": "那這個月反倒是空檔，對吧？劇與劇之間。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yeah... okay, pause it for three months, please.",
+        "phonetic": "/jɛ oʊˈkeɪ pɔz ɪt fɚ θri mʌn.θɪz pliz/",
+        "zh": "是啊……好，請先暫停三個月。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Done, um, confirmation email, is this inbox good?",
+        "phonetic": "/dʌn ʌm ˌkɑn.fɚˈmeɪ.ʃən ˈi.meɪl ɪs ðɪs ˈɪn.bɑks ɡʊd/",
+        "zh": "辦好了。嗯，確認郵件寄到這個信箱行嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, and can you repeat the reference number?",
+        "phonetic": "/jɛs ænd kæn ju ɹiˈpit ðə ˈrɛf.ɚ.əns ˈnʌm.bɚ/",
+        "zh": "可以，麻煩再報一次參考編號好嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "C-four, seven, two, X, that's the code.",
+        "phonetic": "/si fɔɹ ˈsɛv.ən tu ɛks ðæts ðə koʊd/",
+        "zh": "C 四、七、二、X，就是這組代碼。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Got it written. So nothing gets charged, ever?",
+        "phonetic": "/ɡɑɾ ɪt ˈrɪt.ən soʊ ˈnʌθ.ɪŋ ɡɛts tʃɑɹd ˈɛv.ɚ/",
+        "zh": "記下來了。所以這段時間完全不會扣錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Zero until March, then you choose again.",
+        "phonetic": "/ˈzɪɹ.oʊ ʌnˈtɪl mɑɹtʃ ðɛn ju tʃuz əˈɡɛn/",
+        "zh": "三月之前都是零費用，到時再由您決定。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You know, this call was weirdly pleasant.",
+        "phonetic": "/ju noʊ ðɪs kɔl wəz ˈwɪɾd.li ˈplɛz.ənt/",
+        "zh": "講真的，這通電話愉快得不太正常。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, I cancel things myself, I get the pain.",
+        "phonetic": "/hɑ aɪ ˈkæn.səl θɪŋz maɪˈsɛlf aɪ ɡɛt ðə peɪn/",
+        "zh": "哈，我自己平常也得退訂閱，懂那種心情。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Which service did you leave last?",
+        "phonetic": "/wɪtʃ ˈsɝ.vəs dɪd ju liv læst/",
+        "zh": "你上一次退掉的是哪一家？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A recipe box, my kitchen lost the war.",
+        "phonetic": "/ə ˈrɛs.ə.pi bɑks maɪ ˈkɪtʃ.ən lɔst ðə wɔɹ/",
+        "zh": "是訂閱寄到家的食譜盒，我的廚房打了敗仗。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, take care of that kitchen, agent.",
+        "phonetic": "/hɑ teɪk kɛɹ əv ðæt ˈkɪtʃ.ən ˈeɪ.dʒənt/",
+        "zh": "哈，好好照顧你的廚房吧，客服先生。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I will. Anything else for you today?",
+        "phonetic": "/aɪ ˈwɪl ˈɛn.i.θɪŋ ɛls fɚ ju təˈdeɪ/",
+        "zh": "我會的。今天還有其他要辦的嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nope, that's everything, you've been great, thank you.",
+        "phonetic": "/noʊp ðæts ˈɛv.ɹi.θɪŋ jun bɪn ɡɹeɪt θæŋk ju/",
+        "zh": "沒了，這樣就齊全，你幫了大忙，謝謝。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thank you for twelve years with us, truly.",
+        "phonetic": "/θæŋk ju fɚ twɛlv jɪɹz wɪð ʌs ˈtɹuː.li/",
+        "zh": "也謝謝您這十二年的相伴，真心的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Twelve years? Okay now I feel old, bye.",
+        "phonetic": "/twɛlv jɪɹz oʊˈkeɪ naʊ aɪ fil oʊld baɪ/",
+        "zh": "十二年？喔不，我瞬間覺得自己老了，再見。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bye Dana, the pause button never judges.",
+        "phonetic": "/baɪ ˈdeɪ.nə ðə pɔz ˈbʌt.ən ˈnɛv.ɚ ˈdʒʌdʒ.əz/",
+        "zh": "再見 Dana，暫停按鈕永遠不評判任何人。"
+      }
+    ],
+    "youtube_title": "【退訂找不到按鈕😤】「我整個三月只看過一部劇」退訂・暫停・降級全對話☎️📱💸｜聽完就能自己打｜60句沉浸式英語聽力｜Canceling a Subscription",
+    "youtube_title_en": "\"I Watched One Show in March\" — Calling to Cancel a Streaming Subscription",
+    "youtube_description": "「老實講，我整個三月只看過一部劇」——想取消訂閱，卻在 App 裡找不到那個取消按鈕？這一集用 60 句連續電話對話，完整重現一通美式客服退訂電話。\n\n你會聽到：撥通後的自我介紹與帳戶核對；得知漲價時的語氣與回應；帳單日與扣款時間的反覆確認；客服順口提出的隱藏版選項：暫停訂閱；含廣告低價方案的細節：廣告位置、離線下載數量；最後拿到確認郵件與參考編號的收尾問句。\n\n整段對話只用 A2 初級單字與十個詞以內的短句，重現電話兩端最真實的美式語感：um、well、so、huh、yeah。聽完你就會用：I'm calling to cancel...、May I ask...、Do I still get charged?、Can you repeat...?\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"I watched one show in March\" — so why keep paying for the whole library? This 60-line immersive listening practice is a full phone call to cancel a streaming subscription, retention pitch and all.\n\nYou will hear: account verification on the phone, reacting to a quiet price hike, confirming the billing date before you're charged, the pause option nobody tells you about, the ad-plan tradeoffs, and wrapping up with a confirmation email and reference code.\n\nEverything stays in A2-level words, with real phone small talk: um, well, so, huh, yeah. By the end you'll own phrases like I'm calling to cancel..., Do I still get charged?, and Can you repeat the reference number?\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧退訂電話英文｜帳戶核對・暫停選項・降級比較｜找不到取消按鈕怎麼辦｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n訂閱費悄悄漲了，你整個三月只看過一部劇，今天在 App 裡按了七次取消按鈕卻什麼都沒發生。這通客服電話，你到底該說什麼才不吃虧？\n\n這一集帶大家守著電話線，從核對帳戶、確認帳單日，一路聽到暫停訂閱、含廣告方案與確認編號，共 60 句連續真實對話。\n\n你會聽到：\n☎️ 開門見山：Hello, I'm calling to cancel my subscription.\n💳 扣款確認：Fine how? Do I still get charged today?\n⏸️ 隱藏版選項：Exactly, zero charges, and it wakes up anytime.\n📩 收尾問句：Yes, and can you repeat the reference number?\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、huh 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著打完這通電話，下次你再也不用對著轉圈的按鈕生氣。\n\n願你的訂閱清單越來越短、越來越對。",
+    "youtube_tags": [
+      "english listening practice",
+      "cancel subscription in english",
+      "customer service english dialogue",
+      "streaming service english",
+      "phone call english esl",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "客服英文",
+      "退訂英文",
+      "打電話英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "生活英文對話"
+    ],
+    "scene": "living room phone call",
+    "thumbnail_expression": "annoyed at a screen but half smiling",
+    "thumbnail_action": "holding a phone on speaker while jabbing at a spinning cancel button",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Pause Button",
+        "zh": "暫停按鈕"
+      },
+      {
+        "en": "Billing Date",
+        "zh": "帳單日期"
+      },
+      {
+        "en": "Ad Plan",
+        "zh": "含廣告方案"
+      },
+      {
+        "en": "Reference Code",
+        "zh": "參考代碼"
+      },
+      {
+        "en": "Confirmation Email",
+        "zh": "確認郵件"
+      }
+    ]
+  }
+}

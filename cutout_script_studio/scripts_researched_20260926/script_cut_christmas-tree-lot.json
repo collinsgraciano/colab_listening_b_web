@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_christmas-tree-lot",
+  "topic": "Picking a Real Christmas Tree at the Holiday Lot",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758844800.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "AT THE TREE LOT",
+    "title_zh": "挑聖誕樹",
+    "scene_zh": "節慶樹園 · 挑聖誕樹",
+    "story_hook": "One perfect tree, one hatchback, and some rope.",
+    "intro_zh": "一棵完美的樹、一輛掀背車，還有幾條繩子。",
+    "welcome_en": "Welcome to our holiday tree lot. Listen for picking a fresh tree.",
+    "welcome_zh": "歡迎來到今天的節慶樹園。留意挑樹的說法。",
+    "outro": "A fir rides home, strapped and jolly. Listen once more and repeat.",
+    "outro_zh": "冷杉綁好回家過節。再聽一遍，跟著開口。",
+    "practice_intro_en": "Let's repeat each line, nice and slow.",
+    "practice_intro_zh": "我們放慢速度逐句跟讀。",
+    "title_quote": "one tree, zero arguments",
+    "char_a_description": "a man in his late twenties with short wavy dark brown hair, no facial hair, an olive green puffer jacket over a grey hoodie, fingerless gloves, and an athletic build",
+    "char_b_description": "a young woman in her early twenties with long straight pink-dyed hair under a white knit beanie, freckles, a red plaid flannel shirt with a tree lot name tag, and a tall lanky build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "buyer",
+    "char_b_role": "tree lot staff",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, are all these trees fresh this week?",
+        "phonetic": "/haɪ ɔɹ ɔl ðiz triːz frɛʃ ðɪs wik/",
+        "zh": "嗨，這些樹都是本週新鮮的嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Most arrived Tuesday, the firs came today.",
+        "phonetic": "/moʊst əˈɹaɪvd ˈtuzdeɪ ðə fɜɹz keɪm təˈdeɪ/",
+        "zh": "大部分是星期二到的，冷杉今天才進貨。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, we want a fir, not a pine.",
+        "phonetic": "/ˈpɜɹfɪkt wi wɑnt ə fɜɹ nɑt ə paɪn/",
+        "zh": "太好了，我們想要冷杉，不要松樹。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great call, firs hold their needles longer.",
+        "phonetic": "/ɡɹeɪt kɔl fɜɹz hoʊd ðɛɹ ˈnidəlz ˈlɔŋɡɚ/",
+        "zh": "這個選擇很好，冷杉比較留得住針葉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, how tall is this one right here?",
+        "phonetic": "/ʌm haʊ tɔl ɪz ðɪs wʌn ɹaɪt hɪɹ/",
+        "zh": "嗯，這一棵大概多高？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Seven feet, maybe a hair over.",
+        "phonetic": "/ˈsɛvən fit ˈmeɪbi ə hɛɹ ˈoʊvɚ/",
+        "zh": "七呎，可能還多一點點。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Our ceiling's eight feet, that might rub.",
+        "phonetic": "/aʊɹ ˈsɪlɪŋz eɪt fit ðæt maɪt ɹʌb/",
+        "zh": "我們家天花板八呎，樹頂可能會擦到。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then grab six and a half, room for topper.",
+        "phonetic": "/ðɛn ɡɹæb sɪks ænd ə hæf ɹum fɚ ˈtɑpɚ/",
+        "zh": "那就選六呎半，給樹頂的星星留空間。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good point, the star adds a whole foot.",
+        "phonetic": "/ɡʊd pɔɪnt ðə stɑɹ ædz ə hoʊl fʊt/",
+        "zh": "說得是，那顆星至少會多佔一呎。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "See this row by the fence, all shorter?",
+        "phonetic": "/si ðɪs ɹoʊ baɪ ðə fɛns ɔl ˈʃɔɹtɚ/",
+        "zh": "看到圍欄邊那一排了嗎？全都比較矮。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, and this one is super straight.",
+        "phonetic": "/jɛs ænd ðɪs wʌn ɪz ˈsuːpɚ stɹeɪt/",
+        "zh": "看到了，這一棵特別筆直。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Straight is rare, most lean toward the sun.",
+        "phonetic": "/stɹeɪt ɪz ɹɛɹ moʊst lin təˈwɔɹd ðə sʌn/",
+        "zh": "筆直的樹很少見，多半都朝太陽傾斜。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can I shake it? My kid shakes everything.",
+        "phonetic": "/kæn aɪ ʃeɪk ɪt maɪ kɪd ʃeɪks ˈɛvɹiθɪŋ/",
+        "zh": "我可以搖一下嗎？我家小孩什麼都要搖。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, hold the trunk, shake once, count drops.",
+        "phonetic": "/ʃʊɹ hoʊld ðə trʌŋk ʃeɪk wʌns kaʊnt drɑps/",
+        "zh": "可以，扶住樹幹，搖一次，數掉了多少針。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Only a few needles fell, that's fresh.",
+        "phonetic": "/ˈoʊnli ə fju ˈnidəlz fɛl ðæts frɛʃ/",
+        "zh": "就掉了幾根針，這棵很新鮮。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A dropping tree tells you everything, honestly.",
+        "phonetic": "/ə ˈdrɑpɪŋ tri ˈtɛlz ju ˈɛvɹiθɪŋ ˈɑnəstli/",
+        "zh": "老實說，會掉針的樹已經說明一切。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Smell is the test nobody tells you about.",
+        "phonetic": "/smɛl ɪz ðə tɛst ˈnoʊbədi ˈtɛlz ju əˈbaʊt/",
+        "zh": "聞味道這招，沒人會事先提醒你。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "This fir smells like oranges, serious test.",
+        "phonetic": "/ðɪs fɜɹ smɛlz laɪk ˈɔɹɪndʒəz ˈsɪɹiəs tɛst/",
+        "zh": "這棵冷杉聞起來像柳丁，不信你試試。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No way, it does, a little citrusy.",
+        "phonetic": "/noʊ weɪ ɪt dʌz ə ˈlɪɾə ˈsɪɾəsi/",
+        "zh": "不會吧，真的耶，有點柑橘香。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sold already? We barely started tree shopping.",
+        "phonetic": "/sɑld ɔlˈɹɛdi wi ˈbɛɹli ˈstɑɹtɪd tri ˈʃɑpɪŋ/",
+        "zh": "就買定離手了？我們才剛開始挑樹。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "One tree, zero arguments, that's a record.",
+        "phonetic": "/wʌn tri ˈzɪɹoʊ ˈɑɹɡjumənts ðæts ə ˈɹɛkəɹd/",
+        "zh": "一棵樹、零爭執，已經是我們的紀錄了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Now the trunk, want a fresh saw cut?",
+        "phonetic": "/naʊ ðə trʌŋk wɑnt ə frɛʃ sɔ kʌt/",
+        "zh": "接著是樹幹，要重新鋸一個新鮮的切口嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Does that actually help it drink water?",
+        "phonetic": "/dʌz ðæt ˈæktʃuəli hɛlp ɪt drɪŋk ˈwɔɾɚ/",
+        "zh": "那樣真的比較能吸水嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It does, a clean cut drinks like crazy.",
+        "phonetic": "/ɪt dʌz ə klin kʌt drɪŋks laɪk ˈkɹeɪzi/",
+        "zh": "沒錯，平整的切口吸水吸得兇。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then yes, please cut it, where's the saw?",
+        "phonetic": "/ðɛn jɛs pliz kʌt ɪt wɛɹz ðə sɔ/",
+        "zh": "那就麻煩鋸一下，鋸子在哪裡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Station by the shed, two bucks per cut.",
+        "phonetic": "/ˈsteɪʃən baɪ ðə ʃɛd tu bʌkz pɜɹ kʌt/",
+        "zh": "棚屋旁有切割台，鋸一次兩塊錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cheap, do you trim the stand notch too?",
+        "phonetic": "/tʃip du ju tɹɪm ðə stænd nɑtʃ tu/",
+        "zh": "好便宜，支架卡榫的洞也會幫忙修嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We match every trunk to our stand bins.",
+        "phonetic": "/wi mætʃ ˈɛvɹi trʌŋk tə ɑɹ stænd bɪnz/",
+        "zh": "我們會把每根樹幹都配上店裡的支架。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Speaking of stands, I forgot the whole thing.",
+        "phonetic": "/ˈspɪkɪŋ ʌv stændz aɪ fɚˈɡɑt ðə hoʊl θɪŋ/",
+        "zh": "說到支架，我整個忘記還沒買。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Plastic stand aisle, right behind the shed.",
+        "phonetic": "/ˈplæstɪk stænd aɪl ɹaɪt bɪˈhaɪnd ðə ʃɛd/",
+        "zh": "塑膠支架區就在棚屋後面。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Metal or plastic for a big fir, then?",
+        "phonetic": "/ˈmɛɾəl ɔɹ ˈplæstɪk fɚ ə bɪɡ fɜɹ ðɛn/",
+        "zh": "大棵的冷杉，該選金屬的還是塑膠的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Metal grips harder, plastic spins when kids shove.",
+        "phonetic": "/ˈmɛɾəl ɡɹɪps ˈhɑɹdɚ ˈplæstɪk spɪnz wɛn kɪdz ʃʌv/",
+        "zh": "金屬夾得緊，小孩一推，塑膠的就會轉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Mine shove like tiny sumo wrestlers, daily.",
+        "phonetic": "/maɪn ʃʌv laɪk ˈtaɪni ˈsumoʊ ˈɹɛslɚz ˈdeɪli/",
+        "zh": "我家那小傢伙像小相撲選手，每天推來推去。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Metal it is, and take the wide base.",
+        "phonetic": "/ˈmɛɾəl ɪt ɪz ænd teɪk ðə waɪd beɪs/",
+        "zh": "那就選金屬的，底座挑寬一點。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much water does a big fir drink?",
+        "phonetic": "/haʊ mʌtʃ ˈwɔɾɚ dʌz ə bɪɡ fɜɹ drɪŋk/",
+        "zh": "大的冷杉一天要喝多少水？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "First week, up to a gallon a day.",
+        "phonetic": "/fɜɹst wik ʌp tə ə ˈɡælən ə deɪ/",
+        "zh": "第一週一天可能喝掉一加侖。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That explains my dad's bucket runs every morning.",
+        "phonetic": "/ðæt ɪkˈspleɪnz maɪ dædz ˈbʌkɪt ɹʌnz ˈɛvɹi ˈmɔɹnɪŋ/",
+        "zh": "難怪我爸爸每天早上都提桶來加水。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Watch the reservoir, refill keeps needles on.",
+        "phonetic": "/wɑtʃ ðə ˈɹɛzɚˌvɔɹ ɹiˈfɪl kips ˈnidəlz ɑn/",
+        "zh": "要留意底座的水箱，水補夠針葉才不掉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "One worry: will it fit my hatchback?",
+        "phonetic": "/wʌn ˈwɜɹi wɪl ɪt fɪt maɪ ˈhætʃbæk/",
+        "zh": "有個煩惱：我的掀背車裝得下嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Trees fit, we strap them on roofs, no charge.",
+        "phonetic": "/tɹiːz fɪt wi stɹæp ðɛm ɑn ɹufts noʊ tʃɑɹdʒ/",
+        "zh": "樹不難放，我們幫您綁上車頂，不收錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, really? Last year we tied it with scarves.",
+        "phonetic": "/weɪt ˈɹɪli læst jɪɹ wi taɪd ɪt wɪð skɑɹvz/",
+        "zh": "真的嗎？去年我們是用圍巾把它綁上去的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Holiday scarves, classic move, love that story.",
+        "phonetic": "/ˈhɑlədeɪ skɑɹvz ˈklæsɪk muːv lʌv ðæt ˈstɔɹi/",
+        "zh": "用節慶圍巾綁樹，經典又可愛，我喜歡這個故事。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It survived nine miles home, tree still perfect.",
+        "phonetic": "/ɪt sɚˈvaɪvd naɪn maɪlz hoʊm tri stɪl ˈpɜɹfɪkt/",
+        "zh": "九哩路開回家，樹還是很漂亮。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "This year: ropes, pads, and one strong helper.",
+        "phonetic": "/ðɪs jɪɹ roʊps pædz ænd wʌn stɹɔŋ ˈhɛlpɚ/",
+        "zh": "今年有繩子、軟墊，還有力氣大的幫手。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You'll strap it? That changes everything, thank goodness.",
+        "phonetic": "/jul stɹæp ɪt ðæt ˈtʃeɪndʒɪz ˈɛvɹiθɪŋ θæŋk ˈɡʊdnəs/",
+        "zh": "你們會幫忙綁？那就完全沒問題了，感謝。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We net it too, keeps branches tight for the drive.",
+        "phonetic": "/wi nɛt ɪt tu kips ˈbɹæntʃɪz taɪt fɚ ðə dɹaɪv/",
+        "zh": "也會幫您套網，讓枝條一路乖乖收攏。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "What's the damage for the tree and stand?",
+        "phonetic": "/wʌts ðə ˈdæmɪdʒ fɚ ðə tɹi ænd stænd/",
+        "zh": "樹加支架，一共多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sixty-eight, plus stand, say ninety all in.",
+        "phonetic": "/ˈsɪksti eɪt plʌz stænd seɪ ˈnaɪnti ɔl ɪn/",
+        "zh": "樹六十八，支架另算，全部大概九十。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fair, Christmas trees beat hotel prices, honestly.",
+        "phonetic": "/fɛɹ ˈkɹɪsməs triːz biːt hoʊˈtɛləz ˈpɹaɪsəz ˈɑnəstli/",
+        "zh": "很合理，聖誕樹比旅館便宜太多了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "True, and this one won't judge your décor.",
+        "phonetic": "/tɹu ænd ðɪs wʌn woʊnt dʒʌdʒ jɔɹ deɪˈkɔɹ/",
+        "zh": "是啊，而且這棵樹不會批評你的裝潢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Careful, my tree skirt hides many secrets.",
+        "phonetic": "/ˈkɛɹfəl maɪ tri skɜɹt haɪdz ˈmɛni ˈsikɹəts/",
+        "zh": "小心哦，我的樹裙底下藏著很多秘密。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Everyone's skirt does heavy lifting, don't worry.",
+        "phonetic": "/ˈɛvɹiwʌnz skɜɹt dʌz ˈhɛvi ˈlɪftɪŋ doʊnt ˈwɜɹi/",
+        "zh": "大家的樹裙都在撐場面，不用擔心。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Emailed receipt, please? Paper melts in my car.",
+        "phonetic": "/ˈimeɪld rɪˈsit pliz ˈpeɪpɚ mɛlts ɪn maɪ kɑɹ/",
+        "zh": "收據可以傳電子郵件嗎？紙本會在我車裡消失。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sent already, check spam, our email acts shy.",
+        "phonetic": "/sɛnt ɔlˈɹɛdi tʃɛk spæm ɑɹ ˈimeɪl ækts ʃaɪ/",
+        "zh": "已經發了，檢查垃圾郵件，我們的信箱有點害羞。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Found it, and one branch bent, is that okay?",
+        "phonetic": "/faʊnd ɪt ænd wʌn bɹæntʃ bɛnt ɪz ðæt oʊˈkeɪ/",
+        "zh": "找到了，另外有根枝條歪了，應該沒關係吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Normal, stand it upright overnight, it springs back.",
+        "phonetic": "/ˈnɔɹməl stænd ɪt ˈʌpɹaɪt ˌoʊvɚˈnaɪt ɪt sprɪŋz bæk/",
+        "zh": "很常見，立著放一晚，枝條自己會彈回來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're a Christmas miracle maker, seriously!",
+        "phonetic": "/jʊɹz ə ˈkɹɪsməs ˈmɪɹəkəl ˈmeɪkɚ ˈsɪɹiəsli/",
+        "zh": "說真的，你根本就是聖誕奇蹟製造機。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Just doing our job under the twinkling lights.",
+        "phonetic": "/dʒʌst duɪŋ ɑɹ dʒɑb ˈʌndɚ ðə ˈtwɪŋkɪŋ laɪts/",
+        "zh": "我們只是在閃閃的燈下認真工作。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Merry Christmas, I'll see you next December!",
+        "phonetic": "/ˈmɛɹi ˈkɹɪsməs aɪl si ju nɛkst dɪˈsɛmbɚ/",
+        "zh": "聖誕快樂，明年十二月再見！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Merry Christmas, drive slow, giant tree mode!",
+        "phonetic": "/ˈmɛɹi ˈkɹɪsməs dɹaɪv sloʊ ˈdʒaɪənt tri moʊd/",
+        "zh": "聖誕快樂，慢點開，巨樹模式上路！"
+      }
+    ],
+    "youtube_title": "【聖誕樹園🎄】「一棵樹零爭執」教你挑冷杉、驗掉針、綁上車頂🪚🚗🎧｜聽完就會挑樹｜60句沉浸式英語聽力｜Real Christmas Tree Lot Trip",
+    "youtube_title_en": "One Tree, Zero Arguments — Picking a Real Christmas Tree at the Holiday Lot",
+    "youtube_description": "「一棵樹、零爭執」——在週末的節慶樹園，怎麼挑一棵筆直、新鮮、還塞得進自己車的聖誕樹？這一集是 60 句沉浸式英語聽力練習，場景就在掛滿燈串的戶外樹園。\n\n你會聽到：問進貨日、選冷杉或松樹、用搖樹法檢查掉針；鋸樹幹切口、挑金屬支架、算一天喝多少水；還有請人員幫忙套網、綁上車頂、收據傳郵件的完整對話。\n\n全篇使用 A2 初級單字與短句，充滿美國人假日的真實語感：um、sure、really、no way、honestly。聽完你就會用：How tall is this one、Do you trim the stand notch、Will it fit my hatchback、What's the damage。\n\n後半段是逐句聽力＋跟讀練習，大聲跟著念，讓舌頭先跟上，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱並開啟小鈴鐺。",
+    "youtube_description_en": "\"One tree, zero arguments\" — how do you pick a straight, fresh Christmas tree that actually fits your hatchback? This is a 60-line immersive English listening practice set in a twinkling holiday tree lot.\n\nYou will hear: asking when trees arrived, choosing fir over pine, the shake test for needle drop; getting a fresh saw cut, matching a stand, and planning watering; plus netting, roof-strap help, and an emailed receipt.\n\nEverything stays in A2-level words, with real American holiday rhythm: um, sure, really, no way, honestly. By the end you'll own lines like How tall is this one, Do you trim the stand notch, Will it fit my hatchback, and What's the damage.\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new real-life scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧聖誕樹園挑樹英文｜搖樹驗針・鋸樹幹切口・綁上車頂｜六呎半冷杉進掀背車｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n聖誕節快到了，樹園裡幾十棵樹，你分得出哪棵新鮮、哪棵筆直嗎？一棵六呎半的冷杉，怎麼塞進一台小車，還完好開回家？\n\n這一集帶大家走進掛滿燈串的節慶樹園，從問進貨日、搖樹驗針，到鋸切口、挑支架、套網綁車頂，共 60 句連續真實對話。\n\n你會聽到：\n🎄 檢查新鮮度：Can I shake it? 搖樹數掉針。\n🪚 處理樹幹：Now the trunk, want a fresh saw cut?\n🚗 裝車煩惱：One worry: will it fit my hatchback?\n💳 結尾問價：What's the damage for the tree and stand?\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、sure、really、honestly 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著這趟挑樹之旅走一遍，明年走進樹園，話就會自己開口。\n\n祝你今年也找到那棵零爭執的完美樹。",
+    "youtube_tags": [
+      "english listening practice",
+      "christmas tree shopping english",
+      "holiday market english dialogue",
+      "tree lot conversation",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "seasonal english vocabulary",
+      "asking price in english",
+      "英語聽力練習",
+      "聖誕樹英文",
+      "節慶市場英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "日常英文對話"
+    ],
+    "scene": "outdoor holiday christmas tree lot",
+    "thumbnail_expression": "grinning while hugging an upright fir",
+    "thumbnail_action": "holding a tall fir tree straight with both arms",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Fraser Fir Tree",
+        "zh": "冷杉聖誕樹"
+      },
+      {
+        "en": "Tree Stand",
+        "zh": "樹支架"
+      },
+      {
+        "en": "Saw Station",
+        "zh": "鋸切台"
+      },
+      {
+        "en": "Rope Net",
+        "zh": "捆樹網繩"
+      },
+      {
+        "en": "Emailed Receipt",
+        "zh": "郵件收據"
+      }
+    ]
+  }
+}

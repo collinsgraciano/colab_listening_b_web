@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_oil-change-drop-off",
+  "topic": "Dropping the Car Off for an Oil Change",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "created": 1758878400.0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "THE OIL CHANGE WAIT",
+    "title_zh": "換機油",
+    "scene_zh": "修車店 · 保養櫃臺",
+    "story_hook": "One oil change, forty minutes, and a small lobby.",
+    "intro_zh": "一次換機油，四十分鐘，還有間小得可憐的休息廳。",
+    "welcome_en": "Hi, welcome to the service counter today. Listen for waiting-room small talk.",
+    "welcome_zh": "嗨，歡迎來到今天的維修站櫃臺。留意等待時的閒聊話語。",
+    "outro": "Sixty lines, one oil change, done. Listen again and repeat out loud.",
+    "outro_zh": "六十句對白，一次保養，完成。再聽一遍，大聲跟著說。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "It always feels fancy at first",
+    "char_a_description": "a heavyset man in his fifties with closely cropped salt-and-pepper hair, rectangular reading glasses, a navy fleece vest over a light blue oxford shirt, khaki pants, and work boots",
+    "char_b_description": "a lean young man in his twenties with a dark brown skin fade haircut, a thin beard, a grey shop polo with an orange name patch, a key ring at his belt, and scuffed sneakers",
+    "char_a_gender": "male",
+    "char_b_gender": "male",
+    "char_a_role": "driver",
+    "char_b_role": "service writer",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Morning. Do you still take walk-ins today?",
+        "phonetic": "/ˈmɔɹnɪŋ du ju stɪl teɪk ˈwɑk ɪnz təˈdeɪ/",
+        "zh": "早。請問今天還收不用預約的車嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We do, though the last slot just opened up.",
+        "phonetic": "/wi du ðoʊ ðə læst slɑt dʒʌst ˈoʊpənd ʌp/",
+        "zh": "收，不過最後一個時段剛剛才空出來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, it's just a plain oil change.",
+        "phonetic": "/ɡɹeɪt ɪts dʒʌst ə pleɪn ɔɪl tʃeɪndʒ/",
+        "zh": "太好了，就是最普通的那種換機油。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure thing. What do you drive?",
+        "phonetic": "/ˈʃʊɹ θɪŋ wʌt du ju dɹaɪv/",
+        "zh": "沒問題。您開的是什麼車？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "An older SUV, four cylinders, nothing fancy.",
+        "phonetic": "/ən ˈoʊldɚ ˌɛs ju ˈvi fɔɹ ˈsɪləndɚz ˈnʌθɪŋ ˈfænsi/",
+        "zh": "一輛有些年頭的休旅車，四缸，很普通的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "What mileage are we at these days?",
+        "phonetic": "/wʌt ˈmaɪlɪdʒ ɑɹ wi æt ðiz deɪz/",
+        "zh": "現在大概跑了多少里程了？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, one hundred forty thousand, sadly.",
+        "phonetic": "/ʌm wʌn ˈhʌndɚd ˈfɔɹti ˈθaʊzənd ˈsædli/",
+        "zh": "嗯，十四萬英里了，說起來有點傷心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Hey, that's honestly a good runner.",
+        "phonetic": "/heɪ ðæts ˈɑnəstli ə ɡʊd ˈɹʌnɚ/",
+        "zh": "嘿，說實話這車已經很爭氣了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, it starts every single morning.",
+        "phonetic": "/wɛl ɪt stɑɹts ˈɛvɹi ˈsɪŋɡəl ˈmɔɹnɪŋ/",
+        "zh": "也是，起碼每天早上都發動得起來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So, regular oil or the synthetic kind?",
+        "phonetic": "/soʊ ˈɹɛɡjəlɚ ɔɪl ɔɹ ðə sɪnˈθɛtɪk kaɪnd/",
+        "zh": "那，要用普通機油還是合成機油？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "To be honest, I don't know the difference.",
+        "phonetic": "/tə bi ˈɑnəst aɪ doʊnt noʊ ðə ˈdɪfɹəns/",
+        "zh": "老實說，我搞不懂兩者有什麼差別。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Synthetic lasts longer in bad weather.",
+        "phonetic": "/sɪnˈθɛtɪk lɑsts ˈlɔŋɡɚ ɪn bæd ˈwɛðɚ/",
+        "zh": "合成機油在天氣差的時候撐得更久。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, that matters, winter gets brutal here.",
+        "phonetic": "/oʊ ðæt ˈmæɾɚz ˈwɪnɚ ɡɛts ˈbɹuɾəl hɪɹ/",
+        "zh": "噢，那就有關係了，這邊的冬天很難熬。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then take synthetic, it's only nine dollars more.",
+        "phonetic": "/ðɛn teɪk sɪnˈθɛtɪk ɪts ˈoʊnli naɪn ˈdɑlɚz mɔɹ/",
+        "zh": "那就用合成的吧，只貴九塊錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Deal. Also, how much oil does it take?",
+        "phonetic": "/dil ˈɔlsoʊ haʊ mʌtʃ ɔɪl dʌz ɪt teɪk/",
+        "zh": "成交。對了，這車要加多少機油？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "About five quarts, so the price holds.",
+        "phonetic": "/əˈbaʊt faɪv kwɔɹts soʊ ðə pɹaɪs hoʊldz/",
+        "zh": "大約五夸脫，所以報價不變。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. Can you check the tires too?",
+        "phonetic": "/ˈpɝfɪkt kən ju tʃɛk ðə ˈtaɪɚz tu/",
+        "zh": "好極了。可以順便幫我看看輪胎嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, we add air for free with every oil change.",
+        "phonetic": "/ʃʊɹ wi æd ɛɹ fɚ fɹi wɪð ˈɛvɹi ɔɪl tʃeɪndʒ/",
+        "zh": "當然，每次換機油我們都免費補氣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nice, the left rear always looks a little low.",
+        "phonetic": "/naɪs ðə lɛft ɹɪɹ ˈɔlweɪz lʊks ə ˈlɪɾəl loʊ/",
+        "zh": "不錯，左後那條胎看起來總是有點扁。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll flag it, might be a slow leak.",
+        "phonetic": "/aɪl flæɡ ɪt maɪt bi ə sloʊ lik/",
+        "zh": "我會標記起來，說不定是慢漏氣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, when did you last patch that tire?",
+        "phonetic": "/həm wɛn dɪd ju læst pætʃ ðæt taɪɚ/",
+        "zh": "嗯，上次補那條胎是什麼時候？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Last spring, at this very counter.",
+        "phonetic": "/læst spɹɪŋ æt ðɪs ˈvɛɹi ˈkaʊɾɚ/",
+        "zh": "去年春天，就在這個櫃臺。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Right, I forgot, small world, ha.",
+        "phonetic": "/ɹaɪt aɪ fɚˈɡɑt smɔl wɝld hɑ/",
+        "zh": "想起來了，我差點忘了，世界真小，哈。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Also, your air filter looks pretty gray.",
+        "phonetic": "/ˈɔlsoʊ jɔɹ ɛɹ ˈfɪlɚ lʊks ˈpɹɪti ɡɹeɪ/",
+        "zh": "還有，您的空氣濾芯看起來已經挺髒了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Is that something I should worry about?",
+        "phonetic": "/ɪz ðæt ˈsʌmθɪŋ aɪ ʃʊd ˈwɝɹi əˈbaʊt/",
+        "zh": "這個問題嚴重到需要擔心嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Not an emergency, but replace it soon.",
+        "phonetic": "/nɑt ən ɪˈmɝdʒəns bʌt ɹɪˈpleɪs ɪt sun/",
+        "zh": "算不上緊急，不過很快要換。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much for a new filter installed?",
+        "phonetic": "/haʊ mʌtʃ fɚ ə nu ˈfɪlɚ ɪnˈstɔld/",
+        "zh": "換新濾芯連安裝要多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Twenty-four, and it takes two minutes.",
+        "phonetic": "/ˈtwɛnti fɔɹ ænd ɪt teɪks tu ˈmɪnəts/",
+        "zh": "二十四塊，而且兩分鐘就裝好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, um, not today, my budget says no.",
+        "phonetic": "/wɛl ʌm nɑt təˈdeɪ maɪ ˈbʌdʒɪt sɛz noʊ/",
+        "zh": "這個嘛，嗯，今天先不了，錢包說不行。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Totally fair, no rush at all.",
+        "phonetic": "/ˈtoʊɾəli fɛɹ noʊ ɹʌʃ æt ɔl/",
+        "zh": "完全合理，一點也不急。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, noted, now about today's timing.",
+        "phonetic": "/hɑ ˈnoʊtɪd naʊ əˈbaʊt təˈdeɪz ˈtaɪmɪŋ/",
+        "zh": "哈哈，記下了。先說說今天的時間。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Forty minutes, if the bay stays clear.",
+        "phonetic": "/ˈfɔɹti ˈmɪnəts ɪf ðə beɪ steɪz klɪɹ/",
+        "zh": "四十分鐘，假設工作區騰得開。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Should I wait, or come back later?",
+        "phonetic": "/ʃʊd aɪ weɪt ɔɹ kʌm bæk ˈleɪɚ/",
+        "zh": "我該留在這等，還是晚點再來？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Waiting's fine, we have coffee and magazines.",
+        "phonetic": "/ˈweɪtɪŋz faɪn wi hæv ˈkɔfi ænd ˌmæɡəˈziːnz/",
+        "zh": "等也挺好的，我們有咖啡和雜誌。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, is that coffee fresh or ancient?",
+        "phonetic": "/həm ɪz ðæt ˈkɔfɪ fɹɛʃ ɔɹ ˈeɪnʃənt/",
+        "zh": "嗯，那咖啡是新煮的還是泡了一輩子的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Honestly? Older than both of us combined.",
+        "phonetic": "/ˈɑnəstli ˈoʊldɚ ðæn boʊθ ʌv ʌs kəmˈbaɪnd/",
+        "zh": "老實說？比咱倆加起來還有年頭。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, then bring me a cup anyway, please.",
+        "phonetic": "/hɑ ðɛn brɪŋ mi ə kʌp ˈɛniˌweɪ pliz/",
+        "zh": "哈哈，那還是麻煩給我來一杯。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "On it. Keys, and a quick look outside?",
+        "phonetic": "/ɑn ɪt kiz ænd ə kwɪk lʊk ˌaʊtˈsaɪd/",
+        "zh": "好的。鑰匙給我，再快速看一眼車外？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Go ahead, scratch on the bumper's already there.",
+        "phonetic": "/ɡoʊ əˈhɛd skætʃ ɑn ðə ˈbʌmpɚz ɔlˈrɛdi ðɛɹ/",
+        "zh": "看吧，保險槓上那道刮痕本來就在。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yep, I'll note it, no surprises later.",
+        "phonetic": "/jɛp aɪl ˈnoʊt ɪt noʊ sɚˈpɹaɪsəz ˈleɪɚ/",
+        "zh": "好，我會記錄下來，省得事後有爭議。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You people are wiser than my cousin.",
+        "phonetic": "/ju ˈpipəl ɑɹ ˈwaɪzɚ ðæn maɪ ˈkʌzən/",
+        "zh": "你們做事比我表哥細心多了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bet he skipped the notes once, poor guy.",
+        "phonetic": "/bɛt hi skɪpt ðə ˈnoʊts wʌns pɔɹ ɡaɪ/",
+        "zh": "我猜他吃過沒記錄的虧，可憐。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Exactly that kind of story, sadly.",
+        "phonetic": "/ɪɡˈzæktli ðæt kaɪnd əv ˈstɔɹi ˈsædli/",
+        "zh": "可不是嘛，就是那種傷心的往事。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sir, your car is on the lift already.",
+        "phonetic": "/sɝ jɔɹ kɑɹ ɪz ɑn ðə lɪft ɔlˈrɛdi/",
+        "zh": "先生，您的車已經上舉升機了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That was fast, I didn't even finish coffee.",
+        "phonetic": "/ðæt wəz fæst aɪ ˈdɪdənt ˈiːvən ˈfɪnɪʃ ˈkɔfi/",
+        "zh": "好快，我咖啡都還沒喝完。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We're good, oil's in, tires topped up.",
+        "phonetic": "/wɪɹ ɡʊd ɔɪlz ɪn taɪɚz ˈtɑpt ʌp/",
+        "zh": "都弄好了，機油換好，胎壓也補滿了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Really? That's quicker than the barber.",
+        "phonetic": "/ˈɹɪli ðæts ˈkwɪkɚ ðæn ðə ˈbɑɹbɚ/",
+        "zh": "真的嗎？比理髮師還快。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Slow day, you got lucky, honestly.",
+        "phonetic": "/sloʊ deɪ ju ɡɑt ˈlʌki ˈɑnəstli/",
+        "zh": "今天生意淡，說實話您運氣好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much do I owe for all of this?",
+        "phonetic": "/haʊ mʌtʃ du aɪ oʊ fɔɹ ɔl əv ðɪs/",
+        "zh": "這一切總共要付多少？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sixty-two, tax is already included.",
+        "phonetic": "/ˈsɪksti tu ˈtæks ɪz ɔlˈrɛdi ɪnˈkluːdɪd/",
+        "zh": "六十二塊，稅已經算在裡面了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Card okay? The machine here judges me.",
+        "phonetic": "/kɑɹd ˈoʊkeɪ ðə məˈʃin hɪɹ dʒʌdʒɪz mi/",
+        "zh": "刷卡可以嗎？這臺機器總是為難我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It always feels fancy at first, then beeps.",
+        "phonetic": "/ɪt ˈɔlweɪz filz ˈfænsi æt fɝst ðɛn bips/",
+        "zh": "它一開始總裝得很高級，然後就嗶了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, look at that, it accepted me.",
+        "phonetic": "/hɑ lʊk æt ðæt ɪt ɛkˈsɛptɪd mi/",
+        "zh": "哈哈，你看，它居然肯收我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Receipt by text, or paper like old times?",
+        "phonetic": "/ɹɪˈsit baɪ tɛkst ɔɹ ˈpeɪpɚ laɪk oʊld taɪmz/",
+        "zh": "收據傳簡訊，還是像從前給紙本？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Text it, my glove box eats paper.",
+        "phonetic": "/tɛkst ɪt maɪ ɡlʌv bɑks its ˈpeɪpɚ/",
+        "zh": "傳簡訊吧，我的置物箱會吃掉紙。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Next service is three months out, easy.",
+        "phonetic": "/nɛkst ˈsɝvɪs ɪz θɹi mʌnts aʊt ˈizi/",
+        "zh": "下次保養在三個月後，不急。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Put me down, I trust this counter now.",
+        "phonetic": "/pʊt mi daʊn aɪ tɹʌst ðɪs ˈkaʊɾɪɹ naʊ/",
+        "zh": "那就預約吧，我現在信得過這個櫃臺。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Done. Drive safe, big customer.",
+        "phonetic": "/dʌn dɹaɪv seɪf bɪɡ ˈkʌstəməɚ/",
+        "zh": "搞定。路上慢開，大客戶。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks for the honest advice today.",
+        "phonetic": "/θæŋks fɚ ði ˈɑnəst ædˈvaɪs təˈdeɪ/",
+        "zh": "謝謝你今天誠懇的建議。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime, next round of coffee is better.",
+        "phonetic": "/ˈɛniˌtaɪm nɛkst raʊnd əv ˈkɔfi ɪz ˈbɛɾɚ/",
+        "zh": "不客氣，下次那壺咖啡會更新鮮。"
+      }
+    ],
+    "youtube_title": "【換機油喝咖啡☕】「它居然肯收我」完整保養對話🚗🔧🎧｜聽完就會自己進廠｜60句美語聽力練習｜Oil Change at the Garage",
+    "youtube_title_en": "\"It Always Feels Fancy at First\" — A Full Oil Change at the Garage",
+    "youtube_description": "「它居然肯收我」——把車開進保養廠，怎麼問價位、選機油、順便檢查輪胎？這一集是 60 句美式英語聽力練習，場景就在修車店的服務櫃臺前。\n\n你會聽到：從報里程數、普通機油與合成機油的選擇，到濾芯報價的婉拒話術；還有免費補氣、記錄舊刮痕、休息廳咖啡的玩笑，以及刷卡機鬧脾氣時的實用回應。\n\n整段對話維持 A2 初級程度的短句與高頻單字，充滿美國人日常的真實語感：um、well、so、ha、honestly。聽完你就會用：How much do I owe?、Should I wait, or come back later?、Put me down、Anytime。\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著念，讓舌頭先跟上，腦袋自然就會了。\n\n不用背單字，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡請訂閱並開啟小鈴鐺。",
+    "youtube_description_en": "\"It always feels fancy at first\" — how do you actually talk at the oil change counter? This 60-line English listening practice takes you inside a real American garage service desk.\n\nYou will hear: reporting mileage, choosing regular versus synthetic oil, politely declining a filter upsell, free tire air, scratch notes on the bumper, and the moody card machine that finally beeps.\n\nEvery line stays at A2 level with the fillers Americans really use: um, well, so, ha, honestly. By the end you'll own phrases like How much do I owe?, Should I wait, or come back later?, Put me down, and Anytime.\n\nThe final chapter is a line-by-line listen-and-repeat workout, so speak out loud while the oil drains.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧汽車保養英文｜選合成機油・問里程・刷卡機鬧脾氣｜聽完就會自己進廠｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n車開進保養廠，機油要選普通的還是合成的？師傅問里程數，你聽得懂嗎？店家推銷濾芯時，怎麼禮貌地說不？\n\n這一集帶大家來到美式修車店的服務櫃臺，從報名單、選機油、檢查輪胎，一路聽到結帳與道別，共 60 句連續真實對話。\n\n你會聽到：\n🚗 報里程：Um, one hundred forty thousand, sadly.\n🛢️ 選機油：So, regular oil or the synthetic kind?\n💳 刷卡句：Card okay? The machine here judges me.\n📝 約下次：Put me down, I trust this counter now.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這四十分鐘的等待走完一趟，下次你的車進廠，你也能從容對話。\n\n祝你下次保養，咖啡是新鮮的。",
+    "youtube_tags": [
+      "english listening practice",
+      "oil change conversation english",
+      "car repair shop english",
+      "auto service dialogue",
+      "esl listening a2",
+      "synthetic oil english",
+      "paying at the mechanic",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "汽車保養英文",
+      "修車廠對話",
+      "英語聽力練習",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "日常英文對話"
+    ],
+    "scene": "auto repair shop counter",
+    "thumbnail_expression": "relieved with a skeptical smile",
+    "thumbnail_action": "handing over car keys across the counter",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Oil Bottle",
+        "zh": "機油壺"
+      },
+      {
+        "en": "Car Keys",
+        "zh": "車鑰匙"
+      },
+      {
+        "en": "Coffee Cup",
+        "zh": "咖啡杯"
+      },
+      {
+        "en": "Card Reader",
+        "zh": "刷卡機"
+      },
+      {
+        "en": "Air Filter",
+        "zh": "空氣濾芯"
+      }
+    ]
+  }
+}

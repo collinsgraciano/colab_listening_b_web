@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_cracked-screen-repair",
+  "topic": "Fixing a Cracked Phone Screen at the Mall Kiosk",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758864000.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "DOCTOR SCREEN",
+    "title_zh": "手機急診",
+    "scene_zh": "商場小舖 · 修手機",
+    "story_hook": "One toilet swim, forty minutes to fix it.",
+    "intro_zh": "一次馬桶落水之旅，四十分鐘就能修好。",
+    "welcome_en": "Hi, welcome to the mall repair kiosk. Listen for quotes, warranties, and warnings.",
+    "welcome_zh": "嗨，歡迎來到商場的手機維修小舖。留意報價、保固與提醒的講法。",
+    "outro": "And that's a screen swapped like new. The cat has been told to behave.",
+    "outro_zh": "螢幕就這樣換得像新的一樣。那隻貓已經聽過勸告，今後會乖。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "it went for a swim last Tuesday",
+    "char_a_description": "a grandfatherly man in his sixties with a neatly trimmed white beard, thin gray hair under a brown flat cap, a green plaid flannel shirt, reading glasses on a cord, and a heavyset build",
+    "char_b_description": "a young woman in her early twenties with mint-green hair in a high ponytail, tiny silver hoop earrings, a black repair smock over a striped tee, and a slim quick-moving build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "customer",
+    "char_b_role": "repair tech",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, can you rescue a cracked phone?",
+        "phonetic": "/haɪ kæn ju ˈrɛs.kju ə krækt foʊn/",
+        "zh": "嗨，你們救得了摔裂的手機嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's our favorite kind of project.",
+        "phonetic": "/ðæts ɑɹ ˈfeɪ.vɚ.ɪt kaɪnd əv ˈprɑː.dʒɛkt/",
+        "zh": "那正是我們最愛的案子類型。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "See, my cat knocked it down the stairs.",
+        "phonetic": "/ˈsi maɪ ˈkæt ˈnɑkt ɪt ˈdaʊn ðə ˈstɛɹz/",
+        "zh": "你看，是那隻貓把它推下樓梯的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ouch. And that's the crack right there.",
+        "phonetic": "/ˈaʊtʃ ænd ðæts ðə ˈkræk ˈraɪt ˈðɛɹ/",
+        "zh": "哎唷。裂痕就在這兒，沒錯。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, and now half the screen ignores me.",
+        "phonetic": "/jɛs ænd naʊ hæf ðə skɪn ɪɡˈnɔɹz mi/",
+        "zh": "是啊，現在半個螢幕都不理我了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let's open it up, um, this way please.",
+        "phonetic": "/lɛts ˈoʊ.pən ɪt ʌm ðɪs weɪ pliz/",
+        "zh": "我們拆開看看，嗯，請跟我來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Should I sit somewhere? Take my hat off?",
+        "phonetic": "/ʃʊd aɪ sɪt ˈsʌm.wɛr teɪk maɪ hæt ɔf/",
+        "zh": "我要找地方坐嗎？帽子要不要摘下來？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Please sit down, sir, this takes two minutes.",
+        "phonetic": "/pliz sɪt daʊn sɝ ðɪs teɪks tu ˈmɪn.ɪts/",
+        "zh": "請坐，先生，檢查只要兩分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you. It still works, by the way.",
+        "phonetic": "/θæŋk ju ɪt ˈstɪl ˈwɝks baɪ ðə ˈweɪ/",
+        "zh": "謝謝。順帶一提，它還能用。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Mostly works is different from fully works.",
+        "phonetic": "/ˈmoʊst.li wɝks ɪz ˈdɪf.ɚ.ənt fɹəm ˈfʊl.li wɝks/",
+        "zh": "「勉強能用」跟「完全能用」是兩回事。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You young people and your exact words.",
+        "phonetic": "/ju jʌŋ ˈpiː.pəl ænd jɔɹ ɪɡˈzækt wɝdz/",
+        "zh": "你們年輕人吶，用字非要那麼準。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, watch this — see this little white dot?",
+        "phonetic": "/hɑ wɑtʃ ðɪs si ðɪs ˈlɪ.təl waɪt dɑt/",
+        "zh": "哈，看這裡——看到那顆小白點了嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The dot? Is that a beauty mark on my phone?",
+        "phonetic": "/ðə dɑt ɪz ðæt ə ˈbjuː.ti mɑɹk ɑn maɪ foʊn/",
+        "zh": "白點？那難道是我手機的美人痣？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's a water sticker. Any spills lately?",
+        "phonetic": "/ɪts ə ˈwɔːtɚ ˈstɪkɚ ˈɛni ˈspɪlz ˈleɪtli/",
+        "zh": "這是進水試紙。最近灑到過什麼嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well... it went for a swim last Tuesday.",
+        "phonetic": "/wɛl ɪt wɛnt fɚ ə swɪm læst ˈtuz.deɪ/",
+        "zh": "這個嘛……上週二它去游了一次泳。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha! Where exactly did it swim?",
+        "phonetic": "/hɑ wɛr ɪɡˈzækt.li dɪd ɪt swɪm/",
+        "zh": "哈！它到底在哪裡游的泳？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "In the toilet, don't judge, I was reading.",
+        "phonetic": "/ɪn ðə ˈtɔɪ.lət doʊnt dʒʌdʒ aɪ wəz ˈriː.dɪŋ/",
+        "zh": "掉進馬桶裡。別笑我，我當時在看書。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, the rice trick is a myth, sorry.",
+        "phonetic": "/oʊˈkeɪ ðə raɪs trɪk ɪz ə mɪθ ˈsɑːr.i/",
+        "zh": "好吧，埋米救機是民間傳說，抱歉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I did the rice thing for two whole days!",
+        "phonetic": "/aɪ dɪd ðə ˈraɪs θɪŋ fɚ ˈtu hoʊl ˈdeɪz/",
+        "zh": "我還真的把它埋進米裡整整兩天！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Brave attempt. Here's the real news now.",
+        "phonetic": "/breɪv əˈtɛmpt hɪɹz ðə ɹiːəl nuz naʊ/",
+        "zh": "很有勇氣的嘗試。現在說真正的消息。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The scary part, or the expensive part?",
+        "phonetic": "/ðə ˈskɛɹ.i pɑɹt ɔɹ ði ɪkˈspɛn.sɪv pɑɹt/",
+        "zh": "要先聽嚇人的，還是先聽費錢的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Scary first: water reached the screen, no deeper.",
+        "phonetic": "/ˈskɛɹ.i fɝst wɔː.tɚ riktʃt ðə skɪn noʊ ˈdiː.pɚ/",
+        "zh": "先說嚇人的：水碰到螢幕，但沒有滲到更深處。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, bless that little white sticker.",
+        "phonetic": "/oʊ blɛs ðæt ˈlɪ.təl waɪt ˈstɪk.ɚ/",
+        "zh": "噢，那張小白紙真爭氣。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So, screen swap only, forty minutes tops.",
+        "phonetic": "/soʊ skɪn swæp ˈoʊn.li fɔɹ.ti ˈmɪn.ɪts tɑps/",
+        "zh": "所以只要換螢幕，最多四十分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Forty minutes? Can I wait right here?",
+        "phonetic": "/fɔɹ.ti ˈmɪn.ɪts kæn aɪ weɪt raɪt hɪɹ/",
+        "zh": "四十分鐘？我就在旁邊等可以嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You can, there's a stool and free water.",
+        "phonetic": "/ju kæn ðɛrz ə stuːl ænd fri ˈwɔː.tɚ/",
+        "zh": "可以的，這邊有圓凳，還有免費的水。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You read my mind, I need both today.",
+        "phonetic": "/ju rɛd maɪ maɪnd aɪ nid boʊθ təˈdeɪ/",
+        "zh": "你猜中我的心了，今天我兩樣都要。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One warning before we start, though.",
+        "phonetic": "/wʌn wɔɹn.ɪŋ bɪˈfɔɹ wi stɑɹt ðoʊ/",
+        "zh": "不過動手之前，我有一句提醒。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Here it comes, the expensive word.",
+        "phonetic": "/hɪɹ ɪt kʌmz ði ɪkˈspɛn.sɪv wɝd/",
+        "zh": "要來了，那個跟錢有關的詞。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, data. Do you back up this phone?",
+        "phonetic": "/noʊ ˈdeɪ.tə du ju ˈbæk ʌp ðɪs ˈfoʊn/",
+        "zh": "不是，是資料。這支手機你有備份嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Backup? My family handles my phone, ha.",
+        "phonetic": "/ˈbæk.ʌp maɪ ˈfæm.ə.li ˈhæn.dəlz maɪ foʊn hɑ/",
+        "zh": "備份？手機都是我家人在幫我打理，哈。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, so before I swap it, one check.",
+        "phonetic": "/oʊˈkeɪ soʊ bɪˈfɔɹ aɪ swæp ɪt wʌn tʃɛk/",
+        "zh": "好，那換螢幕之前，我要先確認一件事。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're checking whether I know the passcode?",
+        "phonetic": "/jʊɹ ˈtʃɛk.ɪŋ wɛð.ɚ aɪ noʊ ðə ˈpæsˌkoʊd/",
+        "zh": "你在查我記不記得解鎖碼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and we never ask for passwords here.",
+        "phonetic": "/ɪɡˈzæk.li ænd wi ˈnɛv.ɚ æsk fɔɹ ˈpæsˌwɝ.dz hɪɹ/",
+        "zh": "沒錯，而且我們這裡絕不打聽密碼。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good rule. Mine is 1-9-5-0, my birthday.",
+        "phonetic": "/ɡʊd rul maɪn ɪz ˈwʌn naɪn faɪv ˈzɪ.ɹoʊ maɪ ˈbɝθ.deɪ/",
+        "zh": "規矩不錯。我的碼是 1950，我的出生年。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, it unlocks, and your data's safe.",
+        "phonetic": "/ˈpɝ.fɪkt ɪt ʌn.lɑkts ænd jɔɹ deɪ.təz seɪf/",
+        "zh": "太好了，解得開，你的資料也安全。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And if it hadn't unlocked? What then?",
+        "phonetic": "/ænd ɪf ɪt ˈhæd.ənt ʌn.lɑkt wʌt ðɛn/",
+        "zh": "那要是剛剛解不開呢？該怎麼處理？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We'd pause, restore from cloud, tiny fix.",
+        "phonetic": "/wid pɔz ɹiˈstɔɹ fɹəm klaʊd ˈtaɪ.ni fɪks/",
+        "zh": "我們會先暫停，從雲端還原，那就算小工程。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cloud. Right, the imaginary storage attic.",
+        "phonetic": "/klaʊd raɪt ði ɪˈmædʒ.ɪ.nə.ɹi ˈstɔɹ.ɪdʒ ˈæt.ɪk/",
+        "zh": "雲端。對喔，那個想像中的屋頂閣樓。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, it's as real as my toolbox, sir.",
+        "phonetic": "/hɑ ɪts æz ɹiːəl æz maɪ ˈtɑːl.bʊks sɝ/",
+        "zh": "哈，它跟我的工具箱一樣真實，先生。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, doctor, the phone is yours now.",
+        "phonetic": "/oʊˈkeɪ ˈdɑk.tɚ ðə foʊn ɪz jɔɹz naʊ/",
+        "zh": "好吧，醫生，手機現在交給你了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Doctor Screen, I like that title.",
+        "phonetic": "/ˈdɑk.tɚ skɪn aɪ laɪk ðæt ˈtaɪ.təl/",
+        "zh": "螢幕醫師，我喜歡這個稱號。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You work fast, like a tiny surgeon.",
+        "phonetic": "/ju wɝk fæst laɪk ə ˈtaɪ.ni ˈsɝː.dʒən/",
+        "zh": "你手腳真快，像一位小小的外科醫生。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Kiosk life: small, quick, no waiting rooms.",
+        "phonetic": "/ˈkiː.ɑsk laɪf smɔl kwɪk noʊ ˈweɪ.tɪŋ rumz/",
+        "zh": "商場小店的日子：小小、快速、不用排隊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much, before my face changes color?",
+        "phonetic": "/haʊ mʌtʃ bɪˈfɔɹ maɪ feɪs tʃeɪndʒz ˈkʌl.ɚ/",
+        "zh": "多少錢？先告訴我，免得我變臉色。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One-twenty, parts and labor, no surprises.",
+        "phonetic": "/wʌn ˈtwɛn.ti pɑɹts ænd ˈleɪ.bɚ noʊ sɚˈpraɪ.zəz/",
+        "zh": "一百二十，材料工資全包，不會有意外加錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Huh. That's half what the big store quoted.",
+        "phonetic": "/hʌ ðæts hæf wʌt ðə bɪɡ stɔːr ˈkwoʊ.tɪd/",
+        "zh": "喔。大店報的價剛好是這裡的兩倍。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Big stores, big carpets, big bills.",
+        "phonetic": "/ˈbɪɡ ˈstɔɹz ˈbɪɡ ˈkɑɹ.pɪts ˈbɪɡ ˈbɪlz/",
+        "zh": "大地毯的店，就有大帳單。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, sold. Do you take the little card machine?",
+        "phonetic": "/hɑ ˈsoʊld du ju ˈteɪk ðə ˈlɪ.təl ˈkɑɹd mə.ʃin/",
+        "zh": "哈，成交。你們這台小機器也能刷卡吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We do, tap away, and warranty — four weeks.",
+        "phonetic": "/wi du ˈtæp əˈweɪ ænd ˈwɔːrən.ti fɔɹ wiːks/",
+        "zh": "可以，輕觸就行。保固的話，四個星期。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Four weeks? What if the cat attacks again?",
+        "phonetic": "/fɔɹ wiːks wʌt ɪf ðə kæt əˈtæks əˈɡɛn/",
+        "zh": "四週？萬一那隻貓再次攻擊呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha! New cracks aren't covered, honest policy.",
+        "phonetic": "/hɑ nju kræks ɑɹnt ˈkʌv.ɚd ˈɑː.nəst ˈpɑː.lə.si/",
+        "zh": "哈！新的裂痕不在保固內，誠實的政策。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fair and clear. Will you call my number?",
+        "phonetic": "/fɛr ænd klɪr wɪl ju kɔl maɪ ˈnʌm.bɚ/",
+        "zh": "合理又清楚。做好了會打我電話嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll text, then wave you over, deal?",
+        "phonetic": "/aɪl tɛkst ðɛn waɪv ju ˈoʊ.vɚ dil/",
+        "zh": "我會傳簡訊，然後朝你招手，好嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Deal. Take care of it, Doctor Screen.",
+        "phonetic": "/dil teɪk kɛɹ əv ɪt ˈdɑk.tɚ skɪn/",
+        "zh": "成交。好好照顧它，螢幕醫師。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "In well under forty, it glows like new.",
+        "phonetic": "/ɪn wɛl ˈʌn.dɚ ˈfɔɹ.ti ɪt ɡloʊz laɪk nju/",
+        "zh": "不用四十分鐘，它就會亮得像新的一支。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're a wizard, and I'll tell my whole club.",
+        "phonetic": "/jʊɹz ə ˈwɪz.ɚd ænd aɪl ˈtɛl maɪ ˈhoʊl ˈklʌb/",
+        "zh": "你簡直是巫師，我會告訴整個讀書會。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bring the club, seniors get ten off.",
+        "phonetic": "/brɪŋ ðə klʌb ˈsin.jɚz ɡɛt tɛn ɔf/",
+        "zh": "歡迎帶俱樂部來，長輩一律折十塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ten off? Now I'll tell twice as many.",
+        "phonetic": "/tɛn ɔf naʊ aɪl tɛl twaɪs æz ˈmɛn.i/",
+        "zh": "折十塊？那我會告訴兩倍的人。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, stretch your legs, I'll wave when done.",
+        "phonetic": "/hɑ ˈstrɛtʃ jɔɹ ˈlɛɡz aɪl ˈwaɪv ˈwɛn ˈdʌn/",
+        "zh": "哈，去伸展一下腿吧，弄好我會揮手叫你。"
+      }
+    ],
+    "youtube_title": "【手機泡過馬桶又摔裂🚽】「上週二它去游了一次泳」四十分鐘商場維修全記錄🔧💳🛠️｜聽完就能自己去修｜60句沉浸式英語聽力｜Phone Screen Repair",
+    "youtube_title_en": "\"It Went for a Swim Last Tuesday\" — Fixing a Cracked Phone at the Mall Kiosk",
+    "youtube_description": "「上週二它去游了一次泳」——手機掉進馬桶、又滾下樓梯，在商場的小維修舖還有救嗎？這一集用 60 句連續對話，陪你坐進那不到四十分鐘的修理現場。 \n\n你會聽到：說明摔機經過的說法；進水試紙變色的警告；換螢幕與主機進水的差別；報價、工時與當場等待的確認句；保固週期與「新的裂痕不保」的條件；還有簡訊通知與招手取件收尾。\n\n整段對話只用 A2 初級單字與十個詞以內的短句，重現商場小舖裡最真實的美式語感：um、well、so、huh、ha。聽完你就會用：Can you rescue...?、Do you back up this phone?、Parts and labor、What if...?\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"It went for a swim last Tuesday\" — a toilet, a staircase, and one very brave phone. This 60-line immersive listening practice takes place at a mall repair kiosk, from diagnosis to the final tap-to-pay.\n\nYou will hear: describing how the damage happened, the little water sticker that tells the truth, screen swap versus deeper water damage, price and time quotes, warranty weeks and what they don't cover, and a friendly goodbye with a text on the way.\n\nEverything stays in A2-level words, with real counter small talk: um, well, so, huh, ha. By the end you'll own phrases like Can you rescue...?, Do you back up this phone?, and Parts and labor.\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧手機維修英文｜進水檢查・換螢幕・保固條款｜馬桶落水還有救嗎｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n手機先讓貓推下樓梯，上週二還掉進過馬桶，你把它埋在米裡兩天，奇蹟並沒有發生。商場裡那個小小維修攤，真的值得信賴嗎？報價、保固、資料安全，聽完這一集你全都有底。\n\n這一集帶大家走進商場的手機維修小舖，從說明傷情、辨識進水試紙，一路聽到備份確認、換螢幕報價、保固週期與取機方式，共 60 句連續真實對話。\n\n你會聽到：\n🚽 案發現場：In the toilet, don't judge, I was reading.\n💧 進水檢查：It's a water sticker. Any spills lately?\n🔧 報價句：One-twenty, parts and labor, no surprises.\n🛡️ 保固條件：New cracks aren't covered, honest policy.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、huh、so 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著坐完這不到四十分鐘，下次手機摔了，你知道該問哪幾句才不吃虧。\n\n願你的螢幕永遠完整，貓永遠乖。",
+    "youtube_tags": [
+      "english listening practice",
+      "phone repair english dialogue",
+      "cracked screen fix english",
+      "mall kiosk english",
+      "warranty english conversation",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "手機維修英文",
+      "商場英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "生活英文對話"
+    ],
+    "scene": "mall phone repair kiosk",
+    "thumbnail_expression": "wide-eyed and hopeful",
+    "thumbnail_action": "handing a cracked phone to the repair tech with both hands",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Cracked Screen",
+        "zh": "破裂螢幕"
+      },
+      {
+        "en": "Water Sticker",
+        "zh": "進水試紙"
+      },
+      {
+        "en": "Tiny Screwdriver",
+        "zh": "微型螺絲起子"
+      },
+      {
+        "en": "Screen Kit Box",
+        "zh": "螢幕配件盒"
+      },
+      {
+        "en": "Card Reader",
+        "zh": "刷卡機"
+      }
+    ]
+  }
+}

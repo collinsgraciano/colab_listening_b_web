@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_travel-agent-parents-trip",
+  "topic": "Asking the Travel Agent about a Tour for the Parents",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758855600.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A GIFT TRIP FOR PARENTS",
+    "title_zh": "旅行諮詢",
+    "scene_zh": "旅行社門市 · 替爸媽規畫行程",
+    "story_hook": "One surprise trip, two parents, zero stress.",
+    "intro_zh": "一趟驚喜旅行，兩位爸媽，零壓力。",
+    "welcome_en": "Welcome to today's travel agency desk. Listen for planning a trip.",
+    "welcome_zh": "歡迎來到今天的旅行社門市。留意規畫旅行的說法。",
+    "outro": "The plan is set, the tea is brewing. Listen once more and repeat.",
+    "outro_zh": "行程底定，茶也準備好了。再聽一遍，跟著說。",
+    "practice_intro_en": "Let's say each line again, together.",
+    "practice_intro_zh": "我們一起把每句再說一遍。",
+    "title_quote": "my dad snores like a chainsaw",
+    "char_a_description": "a well-dressed man in his mid thirties with a neat short fade haircut, thin wire glasses, a camel trench coat over a white shirt, leather gloves in hand, and a slim build",
+    "char_b_description": "a warm woman in her fifties with chin-length straight silver hair, cat-eye glasses, a deep teal blazer over a cream blouse, a printed silk scarf, and a soft curvy build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "son",
+    "char_b_role": "travel agent",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Good morning, I'd like to ask about tours.",
+        "phonetic": "/ɡʊd ˈmɔɹnɪŋ aɪd laɪk tə æsk əˈbaʊt taʊɚz/",
+        "zh": "早安，我想詢問旅行團的事。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course, have a seat. Who's traveling?",
+        "phonetic": "/ʌv kɔɹs hæv ə sit huz ˈtɹævlɪŋ/",
+        "zh": "當然，請坐。這次是誰要出門旅行？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My parents, a surprise gift from me.",
+        "phonetic": "/maɪ ˈpɛɹənts ə sɚˈpɹaɪz ɡɪft fɹʌm mi/",
+        "zh": "是我爸媽，我送他們的驚喜禮物。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's sweet. Any dream place they've mentioned?",
+        "phonetic": "/ðæts swit ˈɛni dɹim pleɪs ðeɪv ˈmɛnʃənd/",
+        "zh": "真貼心。他們有沒有提過想去哪裡？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My mom wants the coast, my dad likes cities.",
+        "phonetic": "/maɪ mɑm wɑnts ðə koʊst maɪ dæd laɪks ˈsɪtiz/",
+        "zh": "我媽媽想看海，我爸爸喜歡逛城市。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So, a coastal city tour, that's an easy match.",
+        "phonetic": "/soʊ ə ˈkoʊstəl ˈsɪti taʊɹ ðæts ən ˈizi mætʃ/",
+        "zh": "那海岸城市遊覽正好兩全其美。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, they're in their seventies, so, easy pace.",
+        "phonetic": "/ˈpɜɹfɪkt ðɛɹ ɪn ðɛɹ ˈsɛvəntiz soʊ ˈizi peɪs/",
+        "zh": "太好了，他們七十多歲，步調一定要輕鬆。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We have one: half-day tours, full-day rest.",
+        "phonetic": "/wi hæv wʌn hæf deɪ taʊɚz fʊl deɪ ɹɛst/",
+        "zh": "我們剛好有一團：半天遊覽，整天休息。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh good, no sunrise bus departures, please.",
+        "phonetic": "/oʊ ɡʊd noʊ ˈsʌnˌɹaɪz bʌs dɪˈpɑɹtʃɚz pliz/",
+        "zh": "太好了，拜託不要天沒亮就搭車出發。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "This one leaves at ten, coffee first, ha.",
+        "phonetic": "/ðɪs wʌn livz æt tɛn ˈkɑfi fɜɹst hɑ/",
+        "zh": "這一團十點才發車，先喝咖啡再走，哈。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's their speed exactly. How long's the trip?",
+        "phonetic": "/ðæts ðɛɹ spiːd ɪɡˈzæktli haʊ lɔŋz ðə tɹɪp/",
+        "zh": "這正是他們喜歡的步調。行程總共幾天？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Five days, two hotels, one overnight train.",
+        "phonetic": "/faɪv deɪz tu hoʊˈtɛlz wʌn ˌoʊvɚˈnaɪt tɹeɪn/",
+        "zh": "五天，住兩間旅館，另有一段過夜火車。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A train overnight? My dad talks about trains, um.",
+        "phonetic": "/ə tɹeɪn ˌoʊvɚˈnaɪt maɪ dæd tɔks əˈbaʊt tɹeɪnz ʌm/",
+        "zh": "過夜火車？我爸最愛聊火車了，嗯。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then he'll love the sleeper cabin, doors lock too.",
+        "phonetic": "/ðɛn hil lʌv ðə ˈsliːpəɹ ˈkæbən dɔɹz lɑk tu/",
+        "zh": "那他會愛上臥鋪廂房，門還能上鎖。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Is the walking distance small at every stop?",
+        "phonetic": "/ɪz ðə ˈwɔkɪŋ ˈdɪstəns smɔl æt ˈɛvɹi stɑp/",
+        "zh": "每個站點的步行距離都很短嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Under a half mile, benches every block, seriously.",
+        "phonetic": "/ˈʌndɚ ə hæf maɪl bɛntʃəz ˈɛvɹi blɑk ˈsɪɹiəsli/",
+        "zh": "半哩以內，街上處處有座椅，真的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You've met my mother's list, point by point.",
+        "phonetic": "/juv mɛt maɪ ˈmʌðəɹz lɪst pɔɪnt baɪ pɔɪnt/",
+        "zh": "您完全命中我媽媽的清單，一項不差。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, parents ask the best questions, you know.",
+        "phonetic": "/hɑ ˈpɛɹənts æsk ðə bɛst ˈkwɛstʃənz ju noʊ/",
+        "zh": "哈，問問題最仔細的就是爸爸媽媽了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Now, the guide question: do they speak Chinese?",
+        "phonetic": "/naʊ ðə ɡaɪd ˈkwɛstʃən du ðeɪ spiːk ˌtʃaɪˈniz/",
+        "zh": "再來是導遊，他們講中文嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The coast tour has a Mandarin-speaking guide, yes.",
+        "phonetic": "/ðə koʊst taʊɹ hæz ə ˈmændəɹin ˈspikɪŋ ɡaɪd jɛs/",
+        "zh": "海岸線這一團就有中文導遊，是的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Both languages? Or Chinese only on that bus?",
+        "phonetic": "/boʊθ ˈlæŋɡwɪdʒəz ɔɹ ˌtʃaɪˈniz ˈoʊli ɑn ðæt bʌs/",
+        "zh": "是雙語，還是那台車只講中文？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bilingual: day one English, day two Mandarin, switch.",
+        "phonetic": "/baɪˈlɪŋɡwəl deɪ wʌn ˈɪŋɡlɪʃ deɪ tu ˈmændəɹin swɪtʃ/",
+        "zh": "雙語團：第一天英文，第二天中文，輪流來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Their English is polite but quiet, ha.",
+        "phonetic": "/ðɛɹ ˈɪŋɡlɪʃ ɪz pəˈlaɪt bʌt ˈkwaɪət hɑ/",
+        "zh": "他們的英文很客氣，但也很安靜，哈。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The guide repeats, slowly, twice, sometimes three times.",
+        "phonetic": "/ðə ɡaɪd ɹiˈpits ˈsloʊli twaɪs ˈsʌmˌtaɪmz θɹi taɪmz/",
+        "zh": "導遊會重複，慢慢講，兩遍，有時三遍。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. Is there an extra fee for that?",
+        "phonetic": "/ˈpɜɹfɪkt ɪz ðɛɹ ən ˈɛkstɹə fi fɚ ðæt/",
+        "zh": "太好了，那要另外加錢嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nothing for the guide, but singles cost extra.",
+        "phonetic": "/ˈnʌθɪŋ fɚ ðə ɡaɪd bʌt ˈsɪŋɡəɹz kɔst ˈɛkstɹə/",
+        "zh": "導遊不加價，但單人房要補差額。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh right, my dad snores like a chainsaw.",
+        "phonetic": "/oʊ ɹaɪt maɪ dæd snɔɹz laɪk ə ˈtʃeɪnˌsɔ/",
+        "zh": "對了，我爸打鼾像電鋸。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Many single rooms start with that exact sentence.",
+        "phonetic": "/ˈmɛni ˈsɪŋɡəɹ ɹumz stɑɹt wɪð ðæt ɪɡˈzækt ˈsɛntəns/",
+        "zh": "很多單人房的要求，開頭就是這句。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much is the single supplement per night?",
+        "phonetic": "/haʊ mʌtʃ ɪz ðə ˈsɪŋɡəɹ ˈsʌpləmənt pɜɹ naɪt/",
+        "zh": "單人房每晚的差價是多少？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Forty dollars, so two hundred extra for the trip.",
+        "phonetic": "/ˈfɔɹti ˈdɑləɹz soʊ tu ˈhʌndɹəd ˈɛkstɹə fɚ ðə tɹɪp/",
+        "zh": "一晚四十元，整趟要多付二百元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My brother handles the money, I just book.",
+        "phonetic": "/maɪ ˈbɹʌðəɹ ˈhændəlz ðə ˈmʌni aɪ dʒʌst bʊk/",
+        "zh": "錢歸我哥管，我只負責報名。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then let's note it: twin beds, plus one single.",
+        "phonetic": "/ðɛn lɛts noʊt ɪt twɪn bɛdz plʌz wʌn ˈsɪŋɡəɹ/",
+        "zh": "那就寫清楚：媽媽跟別人住雙床房，爸爸自己一間單人房。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And insurance, is it included or separate?",
+        "phonetic": "/ænd ɪnˈʃʊɹəns ɪz ɪt ɪnˈkudɪd ɔɹ ˈsɛpəɹət/",
+        "zh": "那保險呢，包含在團費裡還是另買？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Separate, honestly, I always push it for parents.",
+        "phonetic": "/ˈsɛpəɹət ˈɑnəstli aɪ ˈɔlweɪz pʊʃ ɪt fɚ ˈpɛɹənts/",
+        "zh": "要另外買。老實說，替長輩我一定加保。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My mom takes blood pressure pills, does that matter?",
+        "phonetic": "/maɪ mɑm teɪks blʌd ˈpɹɛʃəɹ pɪlz dʌz ðæt ˈmæɾɚ/",
+        "zh": "我媽媽每天量血壓吃藥，這會影響投保嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Accidents, yes, routine care is not covered.",
+        "phonetic": "/ˈæksədənts jɛs ɹuˈtin kɛɹ ɪz nɑt ˈkʌvərd/",
+        "zh": "意外事故可以理賠，日常看診不行。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So she should carry extra pills, got it.",
+        "phonetic": "/soʊ ʃi ʃʊd ˈkæɹi ˈɛkstɹə pɪlz ɡɑɾ ɪt/",
+        "zh": "所以她要多帶一些藥，我記下了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And copies of prescriptions, customs loves paperwork.",
+        "phonetic": "/ænd ˈkɑpiz ʌv prɪˈskɹɪpʃənz ˈkʌstəmz lʌvz ˈpɛpəɹwæk/",
+        "zh": "處方箋也帶副本，海關很愛查文件。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Insurance price, roughly? It's per person?",
+        "phonetic": "/ɪnˈʃʊɹəns praɪs ˈɹʌfli ɪts pɜɹ ˈpɜɹsən/",
+        "zh": "保險大概多少？是按人計算嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sixty a person, plus ten for the age band.",
+        "phonetic": "/ˈsɪksti ə ˈpɜɹsən plʌz tɛn fɚ ði eɪdʒ bænd/",
+        "zh": "一人六十元，年滿七十再加十元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cheap money for big peace of mind.",
+        "phonetic": "/tʃip ˈmʌni fɚ bɪɡ pis ʌv maɪnd/",
+        "zh": "花小錢買大安心，很划算。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That line sells itself, I hear it weekly.",
+        "phonetic": "/ðæt laɪn sɛlz aɪtˈsɛlf aɪ hɪɹ ɪt ˈwikli/",
+        "zh": "這句話就是最佳廣告，我每個禮拜都聽到。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "When's the last day I can book?",
+        "phonetic": "/wɛnz ðə læst deɪ aɪ kæn bʊk/",
+        "zh": "最晚哪一天要完成報名？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "October ninth, but the good hotels fill fast.",
+        "phonetic": "/ɑkˈtoʊbɚ naɪnθ bʌt ðə ɡʊd hoʊˈtɛlz fɪl fæst/",
+        "zh": "十月九日截止，但好旅館一下就訂滿。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, send me the full itinerary by email?",
+        "phonetic": "/oʊˈkeɪ sɛnd mi ðə fʊl aɪˈtɪnəˌɹɛɹi baɪ ˈimeɪl/",
+        "zh": "好，可以把完整行程表傳給我嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, plus a packing list for senior travelers.",
+        "phonetic": "/jɛs plʌz ə ˈpækɪŋ lɪst fɚ ˈsinjɚ ˈtɹævləɹz/",
+        "zh": "可以，還附上一份長輩打包清單。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That list alone will calm my whole family.",
+        "phonetic": "/ðæt lɪst əˈloʊn wil kɑm maɪ hoʊl ˈfæməli/",
+        "zh": "光是那份清單就能讓全家安心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A deposit of one hundred each holds the seats.",
+        "phonetic": "/ə dɪˈpɑzɪt ʌv wʌn ˈhʌndɹəd itʃ hoʊldz ðə sits/",
+        "zh": "每人訂金一百元，就能留住位子。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Card, online, or should I come back here?",
+        "phonetic": "/kɑɹd ɑnˈlaɪn ɔɹ ʃʊd aɪ kʌm bæk hɪɹ/",
+        "zh": "刷卡、線上繳費，還是我再跑一趟？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The online link is easiest, I'll text it now.",
+        "phonetic": "/ði ɑnˈlaɪn lɪŋk ɪz ˈiziəst aɪl tɛkst ɪt naʊ/",
+        "zh": "線上連結最方便，我現在就傳給你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My parents will ask fifty more questions, sorry.",
+        "phonetic": "/maɪ ˈpɛɹənts wil æsk ˈfɪfti mɔɹ ˈkwɛstʃənz ˈsɑɹi/",
+        "zh": "我爸媽肯定還會再問五十個問題，先說抱歉。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bring them Tuesday, I'll brew a big pot.",
+        "phonetic": "/brɪŋ ðɛm ˈtuzdeɪ aɪl bɹu ə bɪɡ pɑt/",
+        "zh": "星期二帶他們過來，我煮一大壺茶。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "They'd love that, tea solves everything in our house.",
+        "phonetic": "/ðeɪd lʌv ðæt ti sɑlvz ˈɛvɹiθɪŋ ɪn ɑʊɹ haʊs/",
+        "zh": "他們會很開心，茶是我們家的萬靈丹。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And tell your dad the sleeper cabin rocks gently.",
+        "phonetic": "/ænd tɛl jɔɹ dæd ðə ˈsliːpəɹ ˈkæbən ɹɑks ˈdʒɛntli/",
+        "zh": "也告訴我爸爸，臥鋪會輕輕地搖。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "He'll sign up himself just for that, honestly.",
+        "phonetic": "/hil saɪn ʌp hɑɪmˈsɛlf dʒʌst fɚ ðæt ˈɑnəstli/",
+        "zh": "老實說，光這一點他就會自己報名。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "All men dream of trains at seventy, no joke.",
+        "phonetic": "/ɔl mɛn dɹim ʌv tɹeɪnz æt ˈsɛvənti noʊ dʒoʊk/",
+        "zh": "男人一到七十歲，個個都夢想搭火車，不騙你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you, you've turned my worry into a plan.",
+        "phonetic": "/θæŋk ju juv tɜrnd maɪ ˈwɜɹi ˈɪntu ə plæn/",
+        "zh": "謝謝你，你把我的擔心變成了一份計畫。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's the job, safe travels for mom and dad.",
+        "phonetic": "/ðæts ðə dʒɑb seɪf ˈtɹævəlz fɚ mɑm ænd dæd/",
+        "zh": "這就是我的工作，祝伯父伯母一路平安。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "See you Tuesday with them, coffee's on me.",
+        "phonetic": "/si ju ˈtuzdeɪ wɪð ðɛm ˈkɔfiz ɑn mi/",
+        "zh": "星期二我帶他們來，咖啡我請。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bring your parents, I'll bring the printed maps.",
+        "phonetic": "/brɪŋ jɔɹ ˈpɛɹənts aɪl brɪŋ ðə ˈpɹɪnɪtɪd mæps/",
+        "zh": "帶上爸媽，我來準備列印好的地圖。"
+      }
+    ],
+    "youtube_title": "【替爸媽訂旅行團🧳】「我爸打鼾像電鋸」教你問步調、中文導遊、保險加購🚌🎧｜聽完就會規畫旅行｜60句沉浸式英語聽力｜Booking a Tour for My Parents",
+    "youtube_title_en": "My Dad Snores Like a Chainsaw — Booking an Easy Pace Tour for My Parents",
+    "youtube_description": "「我爸打鼾像電鋸」——想替七十歲的爸媽報一個輕鬆的旅行團，該問的問題，你都想到了嗎？這一集是 60 句沉浸式英語聽力練習，場景就在週末的旅行社門市櫃台。\n\n你會聽到：描述長輩的需求、確認半天遊覽的輕鬆步調、追問中文導遊與雙語輪流；算清單人房差價、加購旅遊保險、確認處方藥與海關文件；還有訂金、線上繳費、約好帶爸媽來喝茶報名的完整對話。\n\n全篇使用 A2 初級單字與短句，充滿諮詢時的真實語感：um、oh、ha、you know、got it。聽完你就會用：Who's traveling、How much is the single supplement per night、Is it included or separate、When's the last day I can book。\n\n後半段是逐句聽力＋跟讀練習，大聲跟著念，先讓舌頭熟起來，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱並開啟小鈴鐺。",
+    "youtube_description_en": "\"My dad snores like a chainsaw\" — how do you book an easy-pace tour for parents in their seventies without missing a single detail? This is a 60-line immersive English listening practice at a travel agency desk.\n\nYou will hear: describing family needs, checking half-day schedules and easy morning starts, asking for a Mandarin-speaking guide; comparing the single-room supplement, adding travel insurance for blood-pressure meds, and customs paperwork; plus deposits, online links, and setting up a family visit.\n\nEverything stays in A2-level words, with real planning rhythm: um, oh, ha, you know, got it. By the end you'll own lines like Who's traveling, How much is the single supplement, Is it included or separate, and When's the last day I can book.\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new real-life scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧幫爸媽訂旅行團英文｜問步調・中文導遊・保險加購｜單人房差價一次聽懂｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n想送爸媽一趟旅行當驚喜，但七十歲的眼睛、腿和耳朵，該跟旅行社怎麼交代？步調、導遊、房間、保險，哪一個不能先問？\n\n這一集帶大家坐進旅行社門市，從說明父母需求、確認輕鬆行程，一路聽到中文導遊、單人房差價、旅遊保險與訂金繳費，共 60 句連續真實對話。\n\n你會聽到：\n🚌 步調確認：We have one: half-day tours, full-day rest.\n🗣️ 導遊安排：The coast tour has a Mandarin-speaking guide, yes.\n🛏️ 房間差價：How much is the single supplement per night?\n🛡️ 保險問題：And insurance, is it included or separate?\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、oh、ha、got it 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著這位兒子問完一趟，下次替家人規畫行程，你就知道該怎麼開口。\n\n祝你爸媽的下一趟旅行，一路輕鬆好眠。",
+    "youtube_tags": [
+      "english listening practice",
+      "travel agent dialogue english",
+      "booking a tour in english",
+      "esl listening a2",
+      "senior travel english vocabulary",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "asking about insurance travel english",
+      "hotel room english dialogue",
+      "英語聽力練習",
+      "旅行團英文",
+      "旅行社諮詢對話",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "日常英文對話"
+    ],
+    "scene": "travel agency office desk",
+    "thumbnail_expression": "warm reassuring smile, holding up a brochure",
+    "thumbnail_action": "handing a printed coastal itinerary across the desk",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Tour Bus",
+        "zh": "遊覽車"
+      },
+      {
+        "en": "Mandarin Guide Flag",
+        "zh": "中文導遊旗"
+      },
+      {
+        "en": "Hotel Room Key",
+        "zh": "飯店房卡"
+      },
+      {
+        "en": "Travel Insurance Form",
+        "zh": "旅遊保險單"
+      },
+      {
+        "en": "Packed Suitcase",
+        "zh": "行李衣箱"
+      }
+    ]
+  }
+}

@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_curtain-measuring-help",
+  "topic": "Asking the Home Store Staff to Help Measure Curtains",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1790391600.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "MEASURING THE CURTAINS",
+    "title_zh": "量窗簾",
+    "scene_zh": "家居店 · 量窗簾尺寸",
+    "story_hook": "The old curtains come down, the new ones wait.",
+    "intro_zh": "舊窗簾卸下了，新窗簾還在等一個尺寸。",
+    "welcome_en": "Hi, welcome to today's home store visit. Listen for smart measuring phrases.",
+    "welcome_zh": "嗨，歡迎來到今天的家居店場景。留意量尺寸的好用說法。",
+    "outro": "That's a window measured, styled, and sorted. Listen again, repeat every line.",
+    "outro_zh": "一扇窗就這樣量好、選好、安排好。再聽一次，逐句大聲跟讀。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "my living room is a cloud",
+    "char_a_description": "a woman in her sixties with short white hair, a soft lavender cardigan over a floral blouse, beige trousers, a small tape measure on her wrist loop, and a petite build",
+    "char_b_description": "a man in his early thirties with tight dark curls shaved short on the sides, a rust orange corduroy vest over a chambray shirt, a yellow tape measure around his neck, and a broad-shouldered build",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "decor staff",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse me, do you measure windows here?",
+        "phonetic": "/ɪkˈskjuz mi du ju ˈmɛʒɚ ˈwɪnˌdoʊz hɪɹ/",
+        "zh": "不好意思，請問你們這裡會幫人量窗簾尺寸嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We do, it's my favorite kind of math.",
+        "phonetic": "/wi du ɪts maɪ ˈfeɪvɚət kaɪnd əv mæθ/",
+        "zh": "會的，那是我最喜歡的一種數學。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, my old curtain rod finally gave up.",
+        "phonetic": "/hɑ maɪ oʊld ˈkɝtən ɹɑd ˈfaɪnəli ɡeɪv ʌp/",
+        "zh": "哈哈，我家舊窗簾桿終於撐不住，塌了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Classic Monday surprise, brand new project?",
+        "phonetic": "/ˈklæsɪk ˈmʌnˌdeɪ sɚˈpɹaɪz brænd nu ˈpɹɑdʒɛkt/",
+        "zh": "經典的週一驚喜，要全部換新嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, the living room, two big hungry windows.",
+        "phonetic": "/jɛs ðə ˈlɪvɪŋ ɹum tu bɪɡ ˈhʌŋɡɹi ˈwɪnˌdoʊz/",
+        "zh": "對，客廳有兩扇很大的窗，陽光特別貪心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Hungry windows, I love that phrase.",
+        "phonetic": "/ˈhʌŋɡɹi ˈwɪnˌdoʊz aɪ lʌv ðæt fɹeɪz/",
+        "zh": "貪心的窗，我很愛這種說法。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, what do you need from me first?",
+        "phonetic": "/soʊ wʌt du ju nid fɹʌm mi fɝst/",
+        "zh": "那你需要我先給你什麼資訊？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Stand here, I'll measure the width, hold still.",
+        "phonetic": "/stænd hɪɹ aɪl ˈmɛʒɚ ðə wɪdθ hoʊld stɪl/",
+        "zh": "請站在這裡，我先量寬度，先別動。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, it tickles, that tape is cold.",
+        "phonetic": "/ʌm ɪt ˈtɪkəlz ðæt teɪp ɪz koʊld/",
+        "zh": "嗯，好癢，那條捲尺冰冰涼涼的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sorry, but did you measure at home first?",
+        "phonetic": "/ˈsɑɹi bʌt dɪd ju ˈmɛʒɚ æt hoʊm fɝst/",
+        "zh": "抱歉，我們先確認一下：你在家量過了嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sixty-two inches, should the rod go wider?",
+        "phonetic": "/ˈsɪksti tu ˈɪntʃəz ʃʊd ðə ɹɑd ɡoʊ ˈwaɪdɚ/",
+        "zh": "六十二英寸，那窗簾桿要再長一點嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, add six inches, curtains need air.",
+        "phonetic": "/jɛs æd sɪks ˈɪntʃəz ˈkɝtənz nid ɛɹ/",
+        "zh": "對，再加六英寸，窗簾需要透氣的空間。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Curtains need air, noted, you're poetic.",
+        "phonetic": "/ˈkɝtənz nid ɛɹ ˈnoʊɾɪd jʊɹz poʊˈɛɾɪk/",
+        "zh": "「窗簾需要透氣」，我記下了，你真有詩意。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, now the drop, floor or puddle length?",
+        "phonetic": "/hɑ naʊ ðə dɹɑp floɹ ɔɹ ˈpʌdəl lɛŋθ/",
+        "zh": "哈哈，接下來是垂下的長度，要落地還是拖地？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "What's puddle length, exactly?",
+        "phonetic": "/wʌts ˈpʌdəl lɛŋθ ɪɡˈzæktli/",
+        "zh": "「拖地」到底是多長？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fabric pools three inches on the floor.",
+        "phonetic": "/ˈfæbɹɪk pʊlz θɹi ˈɪntʃəz ɑn ðə floɹ/",
+        "zh": "布料會在地板上多堆出三英寸。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh no, my mop would fight that fabric.",
+        "phonetic": "/oʊ noʊ maɪ mɑp wʊd faɪt ðæt ˈfæbɹɪk/",
+        "zh": "噢不行，我的拖把會跟那塊布吵架。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then floor length, one inch off the ground.",
+        "phonetic": "/ðɛn floɹ lɛŋθ wʌn ɪntʃ ɔf ðə ɡɹaʊnd/",
+        "zh": "那就落地長，離地一英寸剛剛好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, drop me a number for that.",
+        "phonetic": "/ˈpɝfɪkt dɹɑp mi ə ˈnʌmbɚ fɔɹ ðæt/",
+        "zh": "太好了，那個長度請給我一個數字。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ninety inches, floor length, from the rod.",
+        "phonetic": "/ˈnaɪnɾi ˈɪnˌtʃɪz floɹ lɛŋθ fɹʌm ðə ɹɑd/",
+        "zh": "從窗簾桿量到地面，九十英寸。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ninety, wow, those are serious curtains.",
+        "phonetic": "/ˈnaɪnɾi waʊ ðoʊz ɑɹ ˈsɪɹiəs ˈkɝtənz/",
+        "zh": "九十英寸，哇，這窗簾真氣派。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Serious windows deserve serious fabric.",
+        "phonetic": "/ˈsɪɹiəs ˈwɪnˌdoʊz dɪˈzɝv ˈsɪɹiəs ˈfæbɹɪk/",
+        "zh": "講究的窗，就得配講究的布。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, how many panels per window, though?",
+        "phonetic": "/hɑ haʊ ˈmɛni ˈpænəlz pɚ ˈwɪnˌdoʊ ðoʊ/",
+        "zh": "哈哈，那每扇窗要幾片簾呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two panels per window, four pieces total.",
+        "phonetic": "/tu ˈpænəlz pɚ ˈwɪnˌdoʊ fɔɹ ˈpiˌsɛz ˈtoʊɾəl/",
+        "zh": "每扇窗兩片，四片剛好湊齊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Four, and do they overlap when closed?",
+        "phonetic": "/fɔɹ ænd du ðeɪ ˌoʊvɚˈlæp wɛn kloʊzd/",
+        "zh": "四片，關起來的時候會重疊嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "They meet nicely, pleats hide the seam.",
+        "phonetic": "/ðeɪ mit ˈnaɪsli plits haɪd ðə sim/",
+        "zh": "會溫柔地合攏，褶子剛好藏住縫隙。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Pleated, hmm, or flat and simple?",
+        "phonetic": "/ˈplɪɾɪt həm ɔɹ flæt ænd ˈsɪmpəl/",
+        "zh": "打褶……嗯，還是平整簡約的款式？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Flat shows the fabric, pleated feels cozy.",
+        "phonetic": "/flæt ʃoʊz ðə ˈfæbɹɪk ˈplɪɾɪd filz ˈkoʊzi/",
+        "zh": "平整款看得出布的質感，打褶款更溫馨。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cozy wins, my living room is a cloud.",
+        "phonetic": "/ˈkoʊzi wɪnz maɪ ˈlɪvɪŋ ɹum ɪz ə ˈklaʊd/",
+        "zh": "那就選溫馨，我的客廳就是一朵雲。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A cloud with hungry windows, perfect.",
+        "phonetic": "/ə klaʊd wɪð ˈhʌŋɡɹi ˈwɪnˌdoʊz ˈpɝfɪkt/",
+        "zh": "一朵帶著貪心窗戶的雲，太完美了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, and I saw fabric shears by the door.",
+        "phonetic": "/oʊ ænd aɪ sɔ ˈfæbɹɪk ʃɪɹz baɪ ðə dɔɹ/",
+        "zh": "噢，我進門時看到旁邊有裁布的大剪刀。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great ones, nine dollars, they glide.",
+        "phonetic": "/ɡɹeɪt wʌnz naɪn ˈdɑləɹz ðeɪ ɡlaɪd/",
+        "zh": "那組很棒，九美元，剪起來滑溜溜。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do I need shears, or do you cut here?",
+        "phonetic": "/du aɪ nid ʃɪɹz ɔɹ du ju kʌt hɪɹ/",
+        "zh": "我需要自己拿剪刀，還是你們這裡能裁？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We hem for you, six dollars a panel.",
+        "phonetic": "/wi hɛm fɔɹ ju sɪks ˈdɑləɹz ə ˈpænəl/",
+        "zh": "我們能幫你縫好邊，一片六美元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Six times four, that's twenty-four dollars.",
+        "phonetic": "/sɪks taɪmz fɔɹ ðæts ˈtwɛnɾi fɔɹ ˈdɑləɹz/",
+        "zh": "六乘四，就是二十四美元，嗯。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Right, and four fresh hems beat frayed edges.",
+        "phonetic": "/ɹaɪt ænd fɔɹ fɹɛʃ hɛmz bit fɹeɪd ˈɛdʒəz/",
+        "zh": "沒錯，四道整齊的新邊，勝過毛邊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sold, you sew, I'll bring the coffee next time.",
+        "phonetic": "/sold ju soʊ aɪl brɪŋ ðə ˈkɔfi nɛkst taɪm/",
+        "zh": "成交，你負責縫，下次我帶咖啡來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, I'll hold the ladder, you bring sugar.",
+        "phonetic": "/hɑ aɪl hoʊld ðə ˈlæɾɚ ju brɪŋ ˈʃʊɡɚ/",
+        "zh": "哈哈，我幫你扶梯子，你帶糖來就好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Speaking of ladders, my rod is bent, oops.",
+        "phonetic": "/ˈspikɪŋ ʌv ˈlæɾɚz maɪ ɹɑd ɪz bɛnt ʊps/",
+        "zh": "說到梯子，我的舊窗簾桿其實歪了，糟糕。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bent rod, new project, that explains it.",
+        "phonetic": "/bɛnt ɹɑd nu ˈpɹɑdʒɛkt ðæt ɪkˈspleɪnz ɪt/",
+        "zh": "桿子歪了，又要全部換新，難怪呢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, guilty, does that change the length math?",
+        "phonetic": "/hɑ ˈɡɪɾɪ dʌz ðæt tʃeɪndʒ ðə lɛŋθ mæθ/",
+        "zh": "哈哈，瞞不過你，這會影響長度的計算嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Not much, new rods sit two inches higher.",
+        "phonetic": "/nɑt mʌtʃ nu ɹɑdz sɪt tu ˈɪnˌtʃəz ˈhaɪɪɚ/",
+        "zh": "影響不大，新桿會高出兩英寸而已。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good, do you sell rods here too?",
+        "phonetic": "/ɡʊd du ju sɛl ɹɑdz hɪɹ tu/",
+        "zh": "那就好，你們這裡也賣窗簾桿嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We do, aluminum or wood, both strong.",
+        "phonetic": "/wi du əˈluməˌnəm ɔɹ wʊd boʊθ stɹɔŋ/",
+        "zh": "有的，鋁製和木製兩種，都很結實。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wood, it matches a cloud, you think fast.",
+        "phonetic": "/wʊd ɪt ˈmætʃəz ə ˈklaʊd ju θɪŋk fæst/",
+        "zh": "木頭的，跟雲很相配，你反應真快。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sixteen dollars each, ninety-six inches long.",
+        "phonetic": "/ˌsɪksˈtin ˈdɑləɹz itʃ ˌnaɪnɾi ˈsɪks ˈɪnˌtʃəz lɔŋ/",
+        "zh": "一根十六美元，長度九十六英寸。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Does that cover the whole window then?",
+        "phonetic": "/dʌz ðæt ˈkʌvɚ ðə hoʊl ˈwɪnˌdoʊ ðɛn/",
+        "zh": "那這樣整扇窗都遮得住了吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It does, plus brackets, five bucks more.",
+        "phonetic": "/ɪt dʌz plʌs ˈbɹækəts faɪv bʌks mɔɹ/",
+        "zh": "遮得住，再加上支架，多五美元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My wallet sighs, but beauty costs, I know.",
+        "phonetic": "/maɪ ˈwʌlət saɪz bʌt ˈbjuti kɔsts aɪ noʊ/",
+        "zh": "我的錢包輕輕一嘆，可是美麗要有代價，我明白。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, philosopher with tape measures, my people.",
+        "phonetic": "/hɑ fəˈlɑsəfɚ wɪð teɪp ˈmɛʒɚz maɪ ˈpipəl/",
+        "zh": "哈哈，帶著捲尺的哲學家，真是我的同路人。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, when can all this be ready, roughly?",
+        "phonetic": "/soʊ wɛn kən ɔl ðɪs bi ˈɹɛdi ˈɹʌfli/",
+        "zh": "那這些大概何時能全部準備好？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Hems take two weeks, rods are in stock.",
+        "phonetic": "/hɛmz teɪk tu wɪks ɹɑdz ɑɹ ɪn stɑk/",
+        "zh": "縫邊要兩週，桿子現貨就能拿走。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two weeks, right before the rain, perfect timing.",
+        "phonetic": "/tu wɪks ɹaɪt bɪˈfɔɹ ðə ɹeɪn ˈpɝfɪkt ˈtaɪmɪŋ/",
+        "zh": "兩週，正好趕在雨季前，時間太剛好。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll note your number, text when they're pressed.",
+        "phonetic": "/aɪl noʊt jɔɹ ˈnʌmbɚ tɛkst wɛn ðɛɹ pɹɛst/",
+        "zh": "我記錄你的電話，窗簾整燙好就傳訊息通知你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, um, can I buy the shears today?",
+        "phonetic": "/jɛs ʌm kən aɪ baɪ ðə ʃɪɹz təˈdeɪ/",
+        "zh": "好，嗯，那我可以今天先把剪刀買起來嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course, they'll save you a crooked hem.",
+        "phonetic": "/ʌv kɔɹs ðeɪl seɪv ju ə ˈkɹʊkɪd hɛm/",
+        "zh": "當然，它們能幫你避開縫歪的邊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Honestly, shears, four panels, two straight rods.",
+        "phonetic": "/ˈɑnəstli ʃɪɹz fɔɹ ˈpænəlz tu stɹeɪt ɹɑdz/",
+        "zh": "說真的，剪刀、四片窗簾，外加兩根筆直的新桿。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's the whole dream, total two forty-nine.",
+        "phonetic": "/ðæts ðə hoʊl dɹim ˈtoʊɾəl tu ˈfɔɹɾi naɪn/",
+        "zh": "那就是一整套的美夢，總共兩百四十九美元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Worth every inch, can I pay by card?",
+        "phonetic": "/wɜɹθ ˈɛvɹi ɪntʃ kən aɪ peɪ baɪ kɑɹd/",
+        "zh": "每一英寸都值得，可以刷卡嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Tap here, next stop, your bedroom windows, bye!",
+        "phonetic": "/tæp hɪɹ nɛkst stɑp jɔɹ ˈbɛdˌɹum ˈwɪnˌdoʊz baɪ/",
+        "zh": "在這裡感應就好，下一站，你臥室的窗簾，再見！"
+      }
+    ],
+    "youtube_title": "【量窗簾尺寸📏】「我的客廳就是一朵雲」☁️寬度・長度・縫邊怎麼問🪟🎧｜聽完自己量｜60句沉浸式A2英文聽力｜Measuring Curtains",
+    "youtube_title_en": "\"My Living Room Is a Cloud\" — Measuring Curtains at the Home Store",
+    "youtube_description": "「我的客廳就是一朵雲」——窗簾桿塌了，走進家居店，該怎麼請店員幫你量尺寸？本集是 60 句沉浸式英文聽力練習，場景就在窗簾區的展示窗前。\n\n你會聽到：量寬度與垂墜長度的完整說法、落地與拖地的差別、要幾片簾、打褶還是平整、代客縫邊的計價，還有歪掉的窗簾桿如何影響計算，以及裁布剪刀與取貨時間。整段只用 A2 初級單字，搭配美國人自然的語感：um、so、ha、hmm、wow。\n\n聽完你就會用：Do you measure...、How many panels、Six dollars a panel、When can all this be ready。後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱，開啟小鈴鐺。",
+    "youtube_description_en": "\"My living room is a cloud\" — the curtain rod gave up, and now you stand in a home store facing a wall of fabric. This 60-line immersive English listening practice happens right in the curtain aisle.\n\nYou will hear: measuring width and drop, floor length versus puddle length, how many panels per window, pleated versus flat, the hem service price, a bent rod, fabric shears, pickup timing, and paying by card.\n\nEverything stays in A2 words with the natural American texture: um, so, ha, hmm, wow. By the end you'll own lines like Do you measure windows and When can all this be ready.\n\nThe last chapter is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🪟量窗簾尺寸英文｜量寬度・問長度・選打褶｜縫邊與歪掉的桿｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n窗簾桿在週一晚上突然塌了，隔天你站在家居店的布牆前，該從哪裡問起？寬度、垂下長度、要幾片簾，到底差在哪？縫邊的錢又怎麼算？\n\n這一集帶大家走進家居店的窗簾區，從請店家量尺寸、挑落地或拖地，一路聽到打褶與平整、代客縫邊、裁布剪刀、歪掉的窗簾桿與取貨時間，共 60 句連續真實對話。\n\n你會聽到：\n📏 量尺寸：Stand here, I'll measure the width, hold still.\n🪄 選長度：Ha, now the drop, floor or puddle length?\n🧵 縫邊：We hem for you, six dollars a panel.\n🛠️ 換桿：Bent rod, new project, that explains it.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、so 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著捲尺走一趟家居店，下次再面對一整面布牆，你也能淡定開口問。\n\n祝你家裡的窗，往後都有一朵剛好的雲。",
+    "youtube_tags": [
+      "english listening practice",
+      "home store english",
+      "measuring curtains dialogue",
+      "esl listening a2",
+      "curtain shopping english",
+      "home decor english",
+      "american english conversation",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "shopping for curtains english",
+      "英文聽力練習",
+      "家居店英文",
+      "量窗簾英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "布置新家英文"
+    ],
+    "scene": "home store curtain aisle",
+    "thumbnail_expression": "surprised while staring at a long tape measure",
+    "thumbnail_action": "holding a curtain panel up against a window display",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Curtain Rod",
+        "zh": "窗簾桿"
+      },
+      {
+        "en": "Tape Measure",
+        "zh": "捲尺"
+      },
+      {
+        "en": "Curtain Panels",
+        "zh": "窗簾布片"
+      },
+      {
+        "en": "Fabric Shears",
+        "zh": "裁布剪刀"
+      },
+      {
+        "en": "Pleated Curtain",
+        "zh": "打褶窗簾"
+      }
+    ]
+  }
+}

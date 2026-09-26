@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_coinstar-coin-machine",
+  "topic": "Using the Coin Counter Machine at the Grocery Store",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758902400.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "AT THE COIN MACHINE",
+    "title_zh": "硬幣機前",
+    "scene_zh": "超市門廳 · 數硬幣",
+    "story_hook": "One heavy jar of coins, one very tired machine.",
+    "intro_zh": "一整罐沉重的硬幣，和一台累壞的機器。",
+    "welcome_en": "Welcome to the coin corner of a grocery store. Listen for money talk and small favors.",
+    "welcome_zh": "歡迎來到超市門邊的硬幣角。留意關於錢的說法，還有小小的幫忙。",
+    "outro": "That's how a jammed machine turns into a story. Listen once more and count along.",
+    "outro_zh": "一台卡住的機器就這樣變成一段故事。再聽一次，跟著數一數。",
+    "practice_intro_en": "Now repeat each line after the two speakers.",
+    "practice_intro_zh": "現在跟著兩位說話者逐句跟讀。",
+    "title_quote": "I'm the backup plan",
+    "char_a_description": "a woman in her late fifties with short silver-grey hair, small reading glasses on a beaded chain, a rust orange quilted vest over a cream long sleeve shirt, and a roomy build",
+    "char_b_description": "a laid-back young man in his mid twenties with a low fade of dark brown hair, a navy store polo shirt, a green apron, one silver ear cuff, and a tall lanky build",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "store clerk",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse me, is the coin machine still working today?",
+        "phonetic": "/ɪkˈskjuːz mi ɪz ðə kɔɪn məˈʃin stɪl ˈwɝkɪŋ təˈdeɪ/",
+        "zh": "打擾一下，請問硬幣機今天還能用嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It mostly works, but it jammed twice this morning.",
+        "phonetic": "/ɪt ˈmoʊstli wɝks bʌt ɪt dʒæmd twaɪs ðɪs ˈmɔɹnɪŋ/",
+        "zh": "大致沒問題，不過今天早上卡住了兩次。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh no, I drove twenty minutes for this jar.",
+        "phonetic": "/oʊ noʊ aɪ dɹoʊv ˈtwɛnɪ ˈmɪnɪts fɚ ðɪs dʒɑɹ/",
+        "zh": "噢不，我開了二十分鐘的車，就是為了這一罐。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's a heavy jar, um, what's inside, pennies?",
+        "phonetic": "/ðæts ə ˈhɛvi dʒɑɹ ʌm wæts ɪnˈsaɪd ˈpɛniz/",
+        "zh": "這罐挺重的耶，嗯，裡面是什麼，一分銅板嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Mostly quarters, plus a pile of dimes, I think.",
+        "phonetic": "/ˈmoʊstli ˈkwɔɹtɚs plʌs ə paɪl əv daɪmz aɪ θɪŋk/",
+        "zh": "大部分是二十五分的，還有一堆十分的，我猜。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The machine is by the doors, on your left.",
+        "phonetic": "/ðə məˈʃin ɪz baɪ ðə dɔɹz ɑn jɔɹ lɛft/",
+        "zh": "機器就在門口那一邊，你的左手邊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, and does it take bills too or just coins?",
+        "phonetic": "/ˈɡɹeɪt ænd dʌz ɪt teɪk ˈbɪlz tu ɔɹ dʒʌst ˈkɔɪns/",
+        "zh": "太好了，那它也可以收紙鈔，還是只收硬幣？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Just coins now, they took the bill slot out.",
+        "phonetic": "/dʒʌst ˈkɔɪns naʊ ðeɪ ˈtʊk ðə ˈbɪl slɑt ˈaʊt/",
+        "zh": "現在只收硬幣，紙鈔那個入口拆掉了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Got it. Well, is there a fee for cashing out?",
+        "phonetic": "/ɡɑɾ ɪt wɛl ɪz ðɛɹ ə fi fɚ ˈkæʃɪŋ aʊt/",
+        "zh": "了解。那兌換成現金有手續費嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "There is, it's about ten percent of your total.",
+        "phonetic": "/ðɛr ɪz ɪts əˈbaʊt tɛn pɚˈsɛnt əv jɔɹ ˈtoʊɾəl/",
+        "zh": "有的，會從總額裡扣掉大約百分之十。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ten percent? Wow, that hurts a little.",
+        "phonetic": "/tɛn pɚˈsɛnt waʊ ðæt hɝts ə ˈlɪɾəl/",
+        "zh": "百分之十？哇，這樣扣有點痛耶。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It does, but the voucher works like store cash.",
+        "phonetic": "/ɪt dʌz bʌt ðə ˈvɑʊtʃɚ wɝks laɪk stɔɹ kæʃ/",
+        "zh": "是會扣，但那張代金券花起來就像店裡的現金。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So I can buy groceries with it, right?",
+        "phonetic": "/soʊ aɪ kæn baɪ ˈɡɹɑˌsəz wɪð ɪt ɹaɪt/",
+        "zh": "所以我可以用它買雜貨，對吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yep, groceries, lottery, even the bakery over there.",
+        "phonetic": "/jɛp ˈɡɹɑˌsəz ˈlɑtəɹi ˈivən ðə ˈbækəɹi ˈoʊvɚ ðɛɹ/",
+        "zh": "對，雜貨、彩券，連那邊的麵包店都行。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nice. Um, can I get real coins back instead?",
+        "phonetic": "/naɪs ʌm kæn aɪ ɡɛt ɹiəl kɔɪns bæk ɪnˈstɛd/",
+        "zh": "不錯。嗯，那我能不能拿回真的硬幣？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Not from this one, it only prints vouchers.",
+        "phonetic": "/nɑt fɹʌm ðɪs wʌn ɪt ˈoʊnli prɪnts ˈvɑʊtʃɚz/",
+        "zh": "這台不行，它只會列印代金券。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fair enough. Okay, I'm pouring these in now.",
+        "phonetic": "/fɛɹ ɪˈnʌf oʊˈkeɪ aɪm ˈpɔɹɪŋ ðiz ɪn naʊ/",
+        "zh": "也是。好，我要把硬幣倒進去了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Take your time, I'll watch the screen with you.",
+        "phonetic": "/ˈteɪk jɔɹ ˈtaɪm aɪl ˈwɑtʃ ðə ˈskɹin wɪð ju/",
+        "zh": "慢慢來，我陪你一起看螢幕。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, it's counting, ninety dollars already, no way.",
+        "phonetic": "/həm ɪts ˈkaʊɾɪŋ ˈnɪnɪ ˈdɑlɚz ɔlˈɹɛdi noʊ weɪ/",
+        "zh": "嗯，它在數了，已經九十塊，不會吧。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh wow, that's a serious pile of quarters.",
+        "phonetic": "/oʊ waʊ ðæts ə ˈsɪɹiəs paɪl əv ˈkwɔɹtɚz/",
+        "zh": "哇，那真的是一大堆二十五分硬幣耶。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, it stopped. The screen says machine jammed.",
+        "phonetic": "/weɪt ɪt stɑpt ðə skɹin sɛz məˈʃin dʒæmd/",
+        "zh": "等等，它停了。螢幕寫著機器卡住。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh man, third jam today, I'm so sorry.",
+        "phonetic": "/oʊ mæn θɝd dʒæmd təˈdeɪ aɪm soʊ ˈsɑɹi/",
+        "zh": "唉呀，今天第三次卡住，我真的很抱歉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, um, do I lose the coins stuck inside?",
+        "phonetic": "/wɛl ʌm du aɪ lus ðə kɔɪns stʌk ɪnˈsaɪd/",
+        "zh": "那，嗯，卡在裡面的硬幣會不見嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, they're safe in the bin, come back tomorrow.",
+        "phonetic": "/noʊ ðɛɹ seɪf ɪn ðə bɪn kʌm bæk təˈmɑɹoʊ/",
+        "zh": "不會，它們安全地在收集槽裡，明天再來吧。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tomorrow? I really need groceries today, honestly.",
+        "phonetic": "/təˈmɑɹoʊ aɪ ˈɹɪli nid ˈɡɹɑˌsəz təˈdeɪ ˈɑnəstli/",
+        "zh": "明天？老實說我今天就要買菜。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I get it, let me ask my manager, one second.",
+        "phonetic": "/aɪ ɡɛt ɪt lɛt mi æsk maɪ ˈmænɪdʒɚ wʌn ˈsɛkənd/",
+        "zh": "我懂，我問一下店長，請等我一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sure, thank you, I'll wait on that bench.",
+        "phonetic": "/ˈʃʊɹ ˈθæŋk ju aɪl ˈweɪt ɑn ðæt ˈbɛntʃ/",
+        "zh": "好，謝謝你，我先在那張長椅坐著。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, good news, we can hand count it here.",
+        "phonetic": "/oʊˈkeɪ ɡʊd njuːz wi kæn hænd kaʊnt ɪt hɪɹ/",
+        "zh": "好消息，我們可以在這裡用手幫你數。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Really? That beats the machine, and no fee either?",
+        "phonetic": "/ˈɹiəli ðæt bits ðə məˈʃin ænd noʊ fi ˈiɾɚ/",
+        "zh": "真的嗎？那比機器好，而且也不收手續費？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No fee, it takes ten minutes if you can wait.",
+        "phonetic": "/noʊ fi ɪt teɪks tɛn ˈmɪnɪts ɪf ju kæn weɪt/",
+        "zh": "不收，不過要花十分鐘，你可以等的話。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I can wait. Do you need me to help sort?",
+        "phonetic": "/aɪ kæn ˈweɪt du ju nid mi tə ˈhɛlp ˈsɔɹt/",
+        "zh": "我可以等。你需要我幫忙分類嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, you stack, I count, that's a good team.",
+        "phonetic": "/ˈʃʊɹ ju ˈstæk aɪ ˈkaʊnt ðæts ə ɡʊd ˈtim/",
+        "zh": "好啊，你堆好，我來數，我們配合得真好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "This is kind of fun, um, like a weird game.",
+        "phonetic": "/ˈðɪs ɪz kaɪnd əv ˈfʌn ʌm laɪk ə ˈwɪɹd ˈɡeɪm/",
+        "zh": "這還有點好玩耶，嗯，像一個怪怪的遊戲。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Everyone says that, then nobody wants to do it again.",
+        "phonetic": "/ˈɛvɹiˌwʌn sɛz ðæt ðɛn ˈnoʊˌbɑdi wɑnts tə du ɪt əˈɡɛn/",
+        "zh": "每個人都這樣說，但沒人想再數第二次。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, true. Is this about a hundred and thirty?",
+        "phonetic": "/hɑ tru ɪz ðɪs əˈbaʊt ə ˈhʌndɚd ænd ˈθɝɾi/",
+        "zh": "哈，也是。這大概有一百三十塊了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Looks like one thirty five, maybe a little more.",
+        "phonetic": "/lʊks laɪk wʌn ˈθɝɾi faɪv ˈmeɪbi ə ˈlɪɾəl mɔɹ/",
+        "zh": "看起來是一百三十五，也許再多一點。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wow, we beat that ten percent cut, small win.",
+        "phonetic": "/waʊ wi bit ðæt tɛn pɚˈsɛnt kʌt smɑl wɪn/",
+        "zh": "哇，那百分之十的費用等於省下來了，小贏一把。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here's your voucher, I signed it for you.",
+        "phonetic": "/hɪɹz jɔɹ ˈvɑʊtʃɚ aɪ saɪnd ɪt fɚ ju/",
+        "zh": "這是你的代金券，我幫你簽好名了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can I use this at the deli counter too?",
+        "phonetic": "/kæn aɪ juz ðɪs æt ðə ˈdɛli ˈkaʊɾɚ tu/",
+        "zh": "這個也能在熟食櫃台用嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It works for almost everything, even online.",
+        "phonetic": "/ɪt wɝks fɚ ˈoʊlmoʊst ˈɛvɹiˌθɪŋ ˈivən ˌɑnˈlaɪn/",
+        "zh": "基本上店裡什麼都能用，連網路下單也行。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Even online, okay, that's a nice surprise.",
+        "phonetic": "/ˈivən ˌɑnˈlaɪn oʊˈkeɪ ðæts ə naɪs sɚˈpɹaɪz/",
+        "zh": "連網路也行，好哇，那是個驚喜。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The code's at the bottom, just type it in.",
+        "phonetic": "/ðə koʊdz æt ðə ˈbɑtəm dʒʌst taɪp ɪt ɪn/",
+        "zh": "代碼在最下面那行，只要輸入就好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Got it saved in my notes, perfect, thank you.",
+        "phonetic": "/ɡɑɾ ɪt sævd ɪn maɪ noʊts ˈpɝfɪkt θæŋk ju/",
+        "zh": "我存進手機備忘錄了，太好了，謝謝。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Next time, um, call first, that jam repeats weekly.",
+        "phonetic": "/nɛkst taɪm ʌm kɔl fɝst ðæt dʒæm ɹɪˈpits ˈwikli/",
+        "zh": "下次，嗯，記得先打電話，這台每個禮拜都會卡住。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Will do, and maybe I'll bring a smaller jar.",
+        "phonetic": "/wɪl du ænd ˈmeɪbi aɪl brɪŋ ə ˈsmɑlɚ dʒɑɹ/",
+        "zh": "我會的，也許我只帶一個小罐子來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, please do, my fingers need a break now.",
+        "phonetic": "/hɑ pliz du maɪ ˈfɪŋɡɚz nid ə bɹeɪk naʊ/",
+        "zh": "哈，拜託了，我的手指現在需要休息一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks for not letting me drive home empty handed.",
+        "phonetic": "/θæŋks fɔɹ nɑt ˈlɛɾɪŋ mi dɹaɪv hoʊm ˈɛmpi ˈhændɪd/",
+        "zh": "謝謝你，沒讓我空手開車回家。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime. Oh, we sell coin wrappers by register two.",
+        "phonetic": "/ˈɛniˌtaɪm oʊ wi sɛl kɔɪn ˈɹæpɚz baɪ ˈɹɛdʒəstɚ tu/",
+        "zh": "不客氣。喔，我們賣硬幣紙套，在二號收銀台旁邊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'd rather not buy wrappers, to be honest with you.",
+        "phonetic": "/aɪd ˈɹæðɚ nɑt baɪ ˈɹæpɚz tə bi ˈɑnəst wɪð ju/",
+        "zh": "老實跟你說，我不太想再買紙套。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fair, your bank rolls them free, if you have time.",
+        "phonetic": "/fɛɹ jɔɹ ˈbæŋk ˈɹoʊlz ðɛm ˈfri ɪf ju hæv ˈtaɪm/",
+        "zh": "也對，銀行會幫你免費捲好，只要你有時間。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's my other option, but they close at four.",
+        "phonetic": "/ðæts maɪ ˈʌðɚ ˈɑpʃən bʌt ðeɪ kloʊz æt fɔɹ/",
+        "zh": "那是我另一個選擇，但他們四點就關門。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Right, and the drive is worse at that hour.",
+        "phonetic": "/ɹaɪt ænd ðə dɹaɪv ɪz wɝs æt ðæt ˈaʊɚ/",
+        "zh": "沒錯，而且那個時段開車會更塞。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So today it was really you or the broken machine.",
+        "phonetic": "/soʊ təˈdeɪ ɪt wəz ˈɹɪli ju ɔɹ ðə ˈbɹoʊkən məˈʃin/",
+        "zh": "所以今天其實就是靠你，或是那台壞掉的機器。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, yeah, the machine quit, I'm the backup plan.",
+        "phonetic": "/hɑ jɛ ðə məˈʃin kwɪt aɪm ðə ˈbækˌʌp plæn/",
+        "zh": "哈，是啊，機器罷工了，我就是備援方案。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Best backup plan I've met all week, seriously.",
+        "phonetic": "/bɛst ˈbækˌʌp plæn aɪv mɛt ɔl wik ˈsɪɹiəsli/",
+        "zh": "說真的，你是我這週遇過最好的備援。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're sweet. Do you want a bag for your jar?",
+        "phonetic": "/jʊɹz ˈswit du ju ˈwɑnt ə ˈbæɡ fɚ jɔɹ ˈdʒɑɹ/",
+        "zh": "你真好。要不要一個袋子裝你那罐硬幣？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes please, my trunk is full of loose change already.",
+        "phonetic": "/jɛs pliz maɪ tɹʌŋk ɪz fʊl əv lus tʃeɪndʒ ɔlˈɹɛdi/",
+        "zh": "要的，我的後車廂已經塞滿散硬幣了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here's a bag, and a coffee, it's on the house.",
+        "phonetic": "/hɪɹz ə bæɡ ænd ə ˈkɔfi ɪts ɑn ðə haʊs/",
+        "zh": "給你袋子，還有一杯咖啡，這杯店裡招待。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You know what, yes, I'll take that, thank you!",
+        "phonetic": "/ju noʊ wʌt ˈjɛs aɪl ˈteɪk ðæt ˈθæŋk ju/",
+        "zh": "欸，好啊，那我收下，真的謝謝！"
+      },
+      {
+        "speaker": "char_b",
+        "text": "See you next coin day, drive safe out there.",
+        "phonetic": "/ˈsi ju ˈnɛkst kɔɪn ˈdeɪ dɹaɪv ˈseɪf aʊt ðɛɹ/",
+        "zh": "下次帶硬幣來囉，路上小心。"
+      }
+    ],
+    "youtube_title": "【超市硬幣機卡住🪙】「我就是備援方案」教你把一罐硬幣換成現金💵🎧｜聽完敢問手續費｜60句沉浸式英文聽力｜At the Coin Machine",
+    "youtube_title_en": "\"I'm the Backup Plan\" — Cashing a Jar of Coins at the Grocery Store",
+    "youtube_description": "超市的硬幣機卡住了，一整罐硬幣該怎麼辦？這一集是 60 句沉浸式英文聽力練習，場景就在超市門邊的硬幣機前，從問機器能不能用、問手續費，一路聽到機器卡住、店員用手幫你數完。\n\n你會聽到：怎麼開口問 Is the coin machine still working today、怎麼問手續費 is there a fee for cashing out；機器當機時怎麼問硬幣會不會丟失、能不能請人人工清點；還有代金券能不能用在熟食櫃台、能不能上網下單的實用問句。\n\n整段只用 A2 初級單字與短句，反覆出現的是美國人每天在店裡說的真實語感：um、well、so、ha、no way、fair enough。聽完你就會用：Got it、Take your time、I get it、Here's your voucher、Anytime。\n\n後半段是逐句聽力加跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "The coin machine at the grocery store just jammed, and you are holding a giant jar of quarters. What now? This is a 60-line immersive English listening practice set in the little coin corner right by the doors.\n\nYou will hear: asking if the machine works, asking about the cash fee, and finding out it takes about ten percent; the jam, the panic about coins stuck inside, and the hand-count rescue with no fee; plus questions about using the paper voucher at the deli counter or online.\n\nEverything stays in A2-level words, with the small talk Americans really use: um, well, so, ha, no way, fair enough. By the end you'll own phrases like Got it, Take your time, I get it, Here's your voucher, and Anytime.\n\nThe last chapter is a line-by-line listen and repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed, just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧超市硬幣機英文｜兌換一罐硬幣・問清手續費・機器卡住人工清點｜代金券能不能全店用｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n辛苦存了一整罐硬幣，開二十分鐘的車到超市，硬幣機卻當機了，你會怎麼開口請人幫忙？百分之十的手續費到底要不要付？卡在裡面的硬幣會不會就這樣消失？\n\n這一集帶大家走進超市門邊的硬幣機角落，從問機器能不能用、問手續費、倒硬幣開始數，一路聽到機器卡住、店長同意人工清點、一起數到一百三十五塊，最後拿到代金券與道別，共 60 句連續真實對話。\n\n你會聽到：\n🪙 開場問句：Excuse me, is the coin machine still working today?\n💵 問手續費：Well, is there a fee for cashing out?\n🧮 機器當機：Wait, it stopped. The screen says machine jammed.\n🎧 人工救援：Okay, good news, we can hand count it here.\n\n後半段是逐句聽力加跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so、ha 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這罐硬幣走一趟超市，下次你自己在機器前卡住，話就會自己從嘴邊冒出來。\n\n祝你下次數硬幣，也能遇到一位願意用手幫你數的店員。",
+    "youtube_tags": [
+      "english listening practice",
+      "coinstar machine english",
+      "coin counter conversation",
+      "grocery store english dialogue",
+      "esl listening a2",
+      "american english conversation",
+      "cash out coins in english",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "超市英文",
+      "硬幣機英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "日常英文對話",
+      "手續費英文怎麼問"
+    ],
+    "scene": "grocery store coin machine corner",
+    "thumbnail_expression": "half amused, half worried",
+    "thumbnail_action": "hugging a big glass jar of coins",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Jar of Coins",
+        "zh": "一罐硬幣"
+      },
+      {
+        "en": "Coin Machine",
+        "zh": "硬幣機"
+      },
+      {
+        "en": "Ten Percent Fee",
+        "zh": "百分之十手續費"
+      },
+      {
+        "en": "Paper Voucher",
+        "zh": "紙本代金券"
+      },
+      {
+        "en": "Coin Wrappers",
+        "zh": "硬幣紙套"
+      }
+    ]
+  }
+}

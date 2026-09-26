@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Install reviewed cutout docs into configs/script_library/ (file copy only).
 
-Usage: python install_to_library.py [--force]
+Usage: python install_to_library.py [--force] [--src <dir>]
 Runs validate_scripts.py AND deep_lint.py first; refuses on any error unless --force.
+--src points at an alternative source folder (default: cutout_script_studio/scripts).
 """
 import shutil
 import subprocess
@@ -15,11 +16,28 @@ SRC = ROOT / "cutout_script_studio" / "scripts"
 DST = ROOT / "configs" / "script_library"
 
 
+def _parse_src(argv):
+    if "--src" in argv:
+        i = argv.index("--src")
+        if i + 1 >= len(argv):
+            print("ERROR: --src needs a directory argument")
+            sys.exit(2)
+        p = Path(argv[i + 1])
+        if not p.is_absolute():
+            p = ROOT / p
+        if not p.is_dir():
+            print(f"ERROR: --src directory not found: {argv[i + 1]}")
+            sys.exit(2)
+        return p
+    return SRC
+
+
 def main() -> int:
     force = "--force" in sys.argv
+    src = _parse_src(sys.argv)
     if not force:
         for gate in ("validate_scripts.py", "deep_lint.py"):
-            r = subprocess.run([sys.executable, str(HERE / gate)],
+            r = subprocess.run([sys.executable, str(HERE / gate), str(src)],
                                capture_output=True, text=True, encoding="utf-8",
                                errors="replace")
             tail = "\n".join((r.stdout or "").splitlines()[-8:])
@@ -29,7 +47,7 @@ def main() -> int:
                 return 1
     DST.mkdir(parents=True, exist_ok=True)
     copied = skipped = 0
-    for f in sorted(SRC.glob("*.json")):
+    for f in sorted(src.glob("*.json")):
         if not f.stem.startswith("script_cut_"):
             print(f"skip (bad id): {f.name}")
             continue

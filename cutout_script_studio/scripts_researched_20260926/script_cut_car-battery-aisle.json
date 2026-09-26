@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_car-battery-aisle",
+  "topic": "Asking the Parts Counter about a New Car Battery",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758882000.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "THE BATTERY AISLE",
+    "title_zh": "換電池",
+    "scene_zh": "汽車材料行 · 電池貨架",
+    "story_hook": "A click-click car, and the battery aisle to the rescue.",
+    "intro_zh": "引擎只剩咔噠咔噠，靠電池貨架得救。",
+    "welcome_en": "Hi, today's scene is the parts store. Listen for shopping at the battery aisle.",
+    "welcome_zh": "嗨，今天的場景在汽車材料行。留意電池貨架前的購物對話。",
+    "outro": "That's one cold morning saved. Listen once more and say it out loud.",
+    "outro_zh": "一個寒冷的早晨就這樣得救。再聽一遍，大聲跟著說。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "I speak battery now",
+    "char_a_description": "a stocky man in his mid forties with a short black buzz cut, thick silver eyebrows, a red hooded sweatshirt under a black windbreaker, cargo shorts even in cold weather, and a chunky sports watch",
+    "char_b_description": "a tall slim woman in her twenties with a long blonde braid hanging over one shoulder, a black knit beanie, a red parts-store vest over a grey hoodie, round name badge, and clean sneakers",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "driver",
+    "char_b_role": "parts clerk",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Morning, um, my car refused to start today.",
+        "phonetic": "/ˈmɔɹnɪŋ ʌm maɪ kɑɹ ɹɪˈfjuzd tə stɑɹt təˈdeɪ/",
+        "zh": "早安，呃，我的車今天怎麼樣都發不動。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Classic. Does the engine turn over at all?",
+        "phonetic": "/ˈklæsɪk dʌz ði ˈɛndʒən tɝn ˈoʊvɚ æt ɔl/",
+        "zh": "經典症狀。轉鑰匙時引擎會稍微轉一下嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It just clicks, then nothing, sad little clicks.",
+        "phonetic": "/ɪt dʒʌst klɪks ðɛn ˈnʌθɪŋ sæd ˈlɪɾəl klɪks/",
+        "zh": "只有咔噠一聲，然後就沒了，可悲的小咔噠。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's usually the battery, we can fix that.",
+        "phonetic": "/ðæts ˈjuʒuəli ðə ˈbæɾəɹi wi kən fiks ðæt/",
+        "zh": "那通常是電池的問題，我們能解決。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much is a decent car battery these days?",
+        "phonetic": "/haʊ mʌtʃ ɪz ə ˈdisənt kɑɹ ˈbæɾəɹi ðiz deɪz/",
+        "zh": "如今一顆還算靠譜的汽車電池要多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ours run from ninety to a hundred fifty.",
+        "phonetic": "/aʊɹz ɹʌn fɹəm ˈnainti tə ə ˈhʌndɹəd ˈfɪfti/",
+        "zh": "我們的從九十到一百五十美元都有。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oof. My car is old, is that a problem?",
+        "phonetic": "/uːf maɪ kɑɹ ɪz oʊld ɪz ðæt ə ˈpɹɑbləm/",
+        "zh": "哎喲。我的車很舊了，這會有影響嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, but we need the right group size.",
+        "phonetic": "/noʊ bət wi nid ðə ɹaɪt ɡɹup saɪz/",
+        "zh": "不會，但要挑對正確的規格尺寸。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Group size? Um, honestly, no idea.",
+        "phonetic": "/ɡɹup saɪz ʌm ˈɑnəstli noʊ aɪˈdɪə/",
+        "zh": "規格尺寸？呃，老實說，我完全沒概念。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No worries, what's the year and model?",
+        "phonetic": "/noʊ ˈwɝɪz wæts ðə jɪɹ ænd ˈmɑdəl/",
+        "zh": "別擔心，你的車是哪一年、哪一款？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two thousand eight, a small silver hatchback.",
+        "phonetic": "/tu ˈθaʊzənd eɪt ə smɔl ˈsɪlvɚ ˈhætʃˌbæk/",
+        "zh": "二〇〇八年，一台銀色小掀背車。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, the system says group thirty-five.",
+        "phonetic": "/oʊˈkeɪ ðə ˈsɪstəm sɛz ɡɹup ˈθɝɾi faɪv/",
+        "zh": "好，系統顯示是三十五型。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, so the ninety-dollar one, I'll take it.",
+        "phonetic": "/ɡɹeɪt soʊ ðə ˈnainti ˈdɑləɹ wʌn aɪl teɪk ɪt/",
+        "zh": "太好了，那就九十塊那顆，我要了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Slow down, we test your old one first.",
+        "phonetic": "/sloʊ daʊn wi tɛst jɔɹ oʊld wʌn fɝst/",
+        "zh": "別急，我們先檢測你的舊電池。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Free test? Sure, it's in the parking lot.",
+        "phonetic": "/fɹi tɛst ʃʊɹ ɪts ɪn ðə ˈpɑɹkɪŋ ˈlɑt/",
+        "zh": "免費檢測？好啊，車就停在停車場。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "My manager can carry it in, it's heavy.",
+        "phonetic": "/maɪ ˈmænɪdʒɚ kən ˈkæɹi ɪt ɪn ɪts ˈhɛvi/",
+        "zh": "我的經理可以幫忙搬進來，那顆很重。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "He'd really do that? That's sweet of him.",
+        "phonetic": "/hid ˈɹɪli du ðæt ðæts swit əv hɪm/",
+        "zh": "他真的願意嗎？人真好。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's Tuesday, we're nice every day, mostly.",
+        "phonetic": "/ɪts ˈtuzdeɪ wɪɹ naɪs ˈɛvɹi deɪ ˈmoʊstli/",
+        "zh": "今天是星期二，我們天天都客氣，大概。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, I'll remember that when I'm grumpy.",
+        "phonetic": "/hɑ aɪl ɹɪˈmɛmbɚ ðæt wɛn aɪm ˈɡɹʌmpi/",
+        "zh": "哈，我發脾氣時會想起這句的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Back to it, the tester says forty percent.",
+        "phonetic": "/bæk tə ɪt ðə ˈtɛstɚ sɛz ˈfɔɹti pɚˈsɛnt/",
+        "zh": "回到正題，檢測儀顯示只剩四成電力。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Forty? No wonder it quits on cold days.",
+        "phonetic": "/ˈfɔɹti noʊ ˈwʌndɚ ɪt kwɪts ɑn kloʊd deɪz/",
+        "zh": "四成？難怪天氣一冷它就罷工。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Replace it now, don't wait until winter.",
+        "phonetic": "/ɹɪˈpleɪs ɪt naʊ doʊnt weɪt ənˈtɪl ˈwɪnɚ/",
+        "zh": "現在就換，別等到冬天。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Lesson learned, my sister got stranded once.",
+        "phonetic": "/ˈlɛsən lɝnd maɪ ˈsɪstɚ ɡɑt ˈstɹændɪd wʌns/",
+        "zh": "學到教訓了，有一次我妹在路上動不了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Poor her. The middle one has a longer warranty.",
+        "phonetic": "/pʊɹ hɚ ðə ˈmɪdəəl wʌn həz ə ˈlɔŋɡɚ ˈwɔɹənti/",
+        "zh": "她真可憐。中間價位那顆保固比較久。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much longer? I like boring reliability.",
+        "phonetic": "/haʊ mʌtʃ ˈlɔŋɡɚ aɪ laɪk ˈbɔɹɪŋ ɹɪˌlaɪəˈbɪləɾi/",
+        "zh": "能多多久？我喜歡無聊的可靠感。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two extra years, just nine dollars more.",
+        "phonetic": "/tu ˈɛkstrə jɪɹz dʒʌst naɪn ˈdɑləɹz mɔɹ/",
+        "zh": "多保固兩年，只要多九塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sold, boring and reliable is my whole personality.",
+        "phonetic": "/soʊld ˈbɔɹɪŋ ænd ɹɪˈlaɪəbəl ɪz maɪ hoʊl ˌpɝsəˈnæləɾi/",
+        "zh": "買了，無聊又可靠就是我全部的個性。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're getting the full package today, basically.",
+        "phonetic": "/jʊɹ ˈɡɛɾɪŋ ðə fʊl ˈpækɪdʒ ɪz təˈdeɪ ˈbæsɪkli/",
+        "zh": "你今天基本上把整套服務都買齊了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I speak battery now, thanks to you.",
+        "phonetic": "/aɪ spik ˈbæɾəɹi naʊ θæŋks tə ju/",
+        "zh": "多虧妳，我現在也講得一口電池行了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Flattery works, the price is ninety-nine.",
+        "phonetic": "/ˈflæɾəɹi wɝks ðə pɹaɪs ɪz ˈnainti naɪn/",
+        "zh": "馬屁有效，價格是九十九塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Plus a core charge, what's that about?",
+        "phonetic": "/plʌs ə kɔɹ tʃɑɹdʒ wæts ðæt əˈbaʊt/",
+        "zh": "外加一筆舊電池回收押金，那是什麼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Twenty-two, back if you leave the old one here.",
+        "phonetic": "/ˈtwɛnti tu bæk ɪf ju liv ði oʊld wʌn hɪɹ/",
+        "zh": "二十二塊，舊電池留在這兒就退給你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So the dead battery is worth money?",
+        "phonetic": "/soʊ ðə dɛd ˈbæɾəɹi ɪz wɝθ ˈmʌni/",
+        "zh": "所以那顆壞電池反而值錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We recycle them, nothing is wasted here.",
+        "phonetic": "/wi ɹɪˈsaɪkəl ðɛm ˈnʌθɪŋ ɪz ˈweɪstɪd hɪɹ/",
+        "zh": "我們回收再利用，這裡什麼都不浪費。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Even me, I feel useful already.",
+        "phonetic": "/ˈivən mi aɪ fil ˈjusfəl ɔlˈrɛdi/",
+        "zh": "連我也是，我已經覺得自己有用處了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Especially the old battery, it retires nicely.",
+        "phonetic": "/ɪˈspɛʃəli ði oʊld ˈbæɾəɹi ɪt ɹɪˈtaɪəɹz ˈnaɪsli/",
+        "zh": "舊電池更是光榮退休，死得其所。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Noted. Um, quick question about the receipt.",
+        "phonetic": "/ˈnoʊɾɪd ʌm kwɪk ˈkwɛsɪʃən əˈbaʊt ðə ɹɪˈsit/",
+        "zh": "記下了。呃，收據部分有個小問題。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, we email it, or paper like grandma.",
+        "phonetic": "/ʃʊɹ wi ˈimeɪl ɪt ɔɹ ˈpeɪpɚ laɪk ˈɡɹæmmɑ/",
+        "zh": "好，可以用郵件寄，或像阿嬤一樣拿紙本。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Paper, definitely, I trust things I can hold.",
+        "phonetic": "/ˈpeɪpɚ ˈdɛfənəɾli aɪ tɹʌst θɪŋz aɪ kən hoʊld/",
+        "zh": "紙本，毫無疑問，我信得過拿在手裡的東西。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Old school, the warranty lives on that paper.",
+        "phonetic": "/oʊld skuəl ðə ˈwɔɹənti lɪvz ɑn ðæt ˈpeɪpɚ/",
+        "zh": "老派作風，保固就寫在紙上。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So if it dies, I bring the paper, free swap?",
+        "phonetic": "/soʊ ɪf ɪt daɪz aɪ brɪŋ ðə ˈpeɪpɚ fɹi swæp/",
+        "zh": "那如果電池掛了，我帶收據來，免費換？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You walk in, grumpy, holding paper, free swap.",
+        "phonetic": "/ju wɔk ɪn ˈɡɹʌmpi ˈhoʊldɪŋ ˈpeɪpɚ fɹi swæp/",
+        "zh": "你走進門，板著臉，拿著紙，就免費換。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'll perfect my grumpy walk by then.",
+        "phonetic": "/aɪl ˈpɝfɪkt maɪ ˈɡɹʌmpi wɔk baɪ ðɛn/",
+        "zh": "到時候我一定會練好這張臭臉。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We can install it now, fifteen minutes.",
+        "phonetic": "/wi kən ˈɪnstɔl ɪt naʊ ˌfɪfˈtin ˈmɪnəts/",
+        "zh": "我們可以馬上安裝，十五分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can I sit near the heater while you work?",
+        "phonetic": "/kən aɪ sɪt nɪɹ ði ˈhitɚ waɪl ju wɝk/",
+        "zh": "你忙的時候，我可以坐在暖爐邊嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Chair by the heater, and the tea is free.",
+        "phonetic": "/tʃɛɹ baɪ ði ˈhitɚ ænd ðə ti ɪz fɹi/",
+        "zh": "暖爐邊有椅子，茶也是免費的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tea? Now you're speaking my second language.",
+        "phonetic": "/ti naʊ jʊɹ ˈspikɪŋ maɪ ˈsɛkənd ˈlæŋɡwɪdʒ/",
+        "zh": "茶？這下講到我的第二語言了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Jasmine or plain, we keep it simple.",
+        "phonetic": "/ˈdʒæzmən ɔɹ pleɪn wi kip ɪt ˈsɪmpəl/",
+        "zh": "茉莉味或原味，我們走簡單路線。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Plain suits me, like me and batteries.",
+        "phonetic": "/pleɪn suɪts mi laɪk mi ænd ˈbæɾəɹiz/",
+        "zh": "原味適合我，就像我和電池。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Coming up with tea, then the big lift.",
+        "phonetic": "/ˈkʌmɪŋ ʌp wɪð ti ðɛn ðə bɪɡ lɪft/",
+        "zh": "茶馬上來，接著就是舉車大工程。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "By the way, can you check my wiper fluid?",
+        "phonetic": "/baɪ ðə weɪ kən ju tʃɛk maɪ ˈwaɪpɚ ˈfluɪd/",
+        "zh": "對了，可以順便幫我檢查雨刷水嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We top that up free, sit tight, friend.",
+        "phonetic": "/wi tɑp ðæt ʌp fɹi sɪt taɪt frɛnd/",
+        "zh": "幫你免費加滿，坐著等吧，朋友。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You people are too kind to old men.",
+        "phonetic": "/ju ˈpipəl ɑɹ tu kaɪnd tə oʊld mɛnz/",
+        "zh": "你們對老人家也太過客氣了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Old man with a fresh battery, that's you now.",
+        "phonetic": "/oʊld mænwɪð ə fɹɛʃ ˈbæɾəɹi ðæts ju naʊ/",
+        "zh": "從現在起，你是擁有新電池的男人。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "True, and nobody jumped my car today.",
+        "phonetic": "/tɹu ænd ˈnoʊmbɑdi dʒʌmpt maɪ kɑɹ təˈdeɪ/",
+        "zh": "說得是，今天不用拜托任何人幫我接電。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No jumper cables, no favors, no awkward thanks.",
+        "phonetic": "/noʊ ˈdʒʌmpɚ ˈkeɪbəlz noʊ ˈfeɪvɚz noʊ əˈkwɝd θæŋks/",
+        "zh": "不用過橋線，不用欠人情，也不用彆扭地說謝謝。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Next winter, I'm coming straight here first.",
+        "phonetic": "/nɛkst ˈwɪnɚ aɪm ˈkʌmɪŋ stɹeɪt hɪɹ fɝst/",
+        "zh": "到了冬天，我第一個就來這裡。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We'll save you a seat right by the heater.",
+        "phonetic": "/wil ˈseɪv ju ə sit ɹaɪt baɪ ði ˈhitɚ/",
+        "zh": "我們會先幫你留好暖爐邊的位子。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks for rescuing my whole week, honestly.",
+        "phonetic": "/θæŋks fɚ ɹɪˈskjuɪŋ maɪ hoʊl wik ˈɑnəstli/",
+        "zh": "老實說，謝謝你救了我整週的心情。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime, drive warm out there, battery friend.",
+        "phonetic": "/ˈɛniˌtaɪm dɹaɪv wɔɹm aʊt ðɛɹ ˈbæɾəɹi frɛnd/",
+        "zh": "不客氣，路上暖暖地開，電池朋友。"
+      }
+    ],
+    "youtube_title": "【早上發動不了車🥶】「我現在也講得一口電池行」換汽車電池全程🔋🚗🎧｜聽完就敢自己去換｜60句英語聽力練習｜Buying a Car Battery",
+    "youtube_title_en": "\"I Speak Battery Now\" — Picking and Installing a Car Battery",
+    "youtube_description": "「多虧妳，我現在也講得一口電池行」——車子早上發不動，走進汽車材料行該問什麼？這一集是 60 句沉浸式英語聽力練習，場景就在電池貨架與免費檢測儀旁邊。\n\n你會聽到：報年份車型查規格、免費檢測舊電池剩餘電力；保固等級與價差的比較句、舊電池回收押金怎麼退；要紙本收據的說法，還有邊喝免費茶邊等安裝的聊天語感。\n\n整段對話只用 A2 初級單字與短句，充滿美國店員每天掛在嘴邊的真實語感：um、sure、ha、by the way、honestly。聽完你就會用：How much is...、What's the year and model、No worries、Anytime。\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"I speak battery now\" — your car refuses to start, and the parts store is your only hope. This is a 60-line immersive English listening practice at the battery aisle and the free testing machine.\n\nYou will hear: giving the year and model to find the right group size, a free battery test reading forty percent, comparing warranties and price gaps, the core charge you get back later, and small talk over free tea while the car is lifted.\n\nEverything stays at A2 level with the rhythm Americans actually use: um, sure, ha, by the way, honestly. By the end you'll own phrases like How much is..., What's the year and model, No worries, and Anytime.\n\nThe final chapter is a line-by-line listen-and-repeat workout, so say every line out loud.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧汽車電池英文｜免費檢測・保固比較・回收押金｜邊喝茶邊等安裝｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n寒冷的早晨，引擎只有咔噠一聲，怎麼辦？一顆汽車電池要多少錢、規格怎麼報、舊電池去哪了？\n\n這一集帶大家走進汽車材料行的電池貨架，從報車型、免費檢測、選保固，一路聽到安裝完成與道別，共 60 句連續真實對話。\n\n你會聽到：\n🔋 問價句：How much is a decent car battery these days?\n🧪 看檢測：Back to it, the tester says forty percent.\n💵 回收費：So the dead battery is worth money?\n🍵 等安裝：Tea? Now you're speaking my second language.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、ha、by the way 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這趟電池危機走一回，下次車子有任何動靜，你都聽得懂、問得出。\n\n祝你每個早晨，鑰匙一轉就發動。",
+    "youtube_tags": [
+      "english listening practice",
+      "car battery shopping english",
+      "auto parts store dialogue",
+      "battery replacement english",
+      "esl listening a2",
+      "core charge explained",
+      "free battery test english",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "汽車電池英文",
+      "材料行對話",
+      "英語聽力練習",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "生活英語情景"
+    ],
+    "scene": "auto parts store",
+    "thumbnail_expression": "surprised and hopeful, mouth open",
+    "thumbnail_action": "holding up a car battery with both hands",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Car Battery",
+        "zh": "汽車電池"
+      },
+      {
+        "en": "Battery Tester",
+        "zh": "電池檢測儀"
+      },
+      {
+        "en": "Cup of Tea",
+        "zh": "杯裝茶"
+      },
+      {
+        "en": "Paper Receipt",
+        "zh": "紙本收據"
+      },
+      {
+        "en": "Jumper Cables",
+        "zh": "過橋線"
+      }
+    ]
+  }
+}

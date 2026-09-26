@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_school-sports-physical-form",
+  "topic": "Asking the Doctor to Sign a School Sports Form",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758909600.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "SIGNING THE SPORTS FORM",
+    "title_zh": "簽檢查表",
+    "scene_zh": "診所櫃台 · 簽體育表",
+    "story_hook": "Four pages, one signature, and a Friday deadline.",
+    "intro_zh": "四頁表格、一個簽名，還有一個週五的期限。",
+    "welcome_en": "Welcome to a clinic desk on a busy Friday. Listen for form words made friendly.",
+    "welcome_zh": "歡迎來到週五忙碌的診所櫃台。留意那些把表格話說得親切的說法。",
+    "outro": "And that's one form, saved for the afternoon. Listen once more, then try it yourself.",
+    "outro_zh": "一張表格，就這樣留到下午簽好。再聽一次，然後自己試試看。",
+    "practice_intro_en": "Now let's read each line out loud.",
+    "practice_intro_zh": "現在我們逐句大聲讀出來。",
+    "title_quote": "One signature, four pages",
+    "char_a_description": "a bright-eyed woman in her early thirties with long blonde braids, a soft grey cardigan, a canvas tote on one shoulder, and a slim build",
+    "char_b_description": "a gentle man in his fifties with curly steel-grey hair, a thick moustache, a pale blue nurse uniform, reading glasses on a chain, and a heavy build",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "parent",
+    "char_b_role": "nurse",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, I brought the school sports form for my son.",
+        "phonetic": "/haɪ aɪ ˈbrɔt ðə skuːl ˈspɔrts ˈfɔrm fɚ ˈmaɪ sʌn/",
+        "zh": "嗨，我帶我兒子的學校體育檢查表過來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, I have his file right here, nine years old.",
+        "phonetic": "/ˈpɝfɪkt aɪ hæv hɪz ˈfaɪl ɹaɪt hɪɹ naɪn jɪɹz oʊld/",
+        "zh": "正好，他的資料就在我這裡，九歲對吧。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, Leo, and PE starts Monday, so this is urgent.",
+        "phonetic": "/jɛs ˈlioʊ ænd ˌpi ˈi ˈstɑɹts ˈmʌndeɪ soʊ ðɪs ɪz ˈɜɹdʒənt/",
+        "zh": "對，他叫 Leo，星期一就有體育課，所以很急。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Urgent forms are my favorite kind, let's look together.",
+        "phonetic": "/ˈɜɹdʒənt fɔɹmz ɑɹ maɪ ˈfeɪvɹɪt kaɪnd lɛts lʊk təˈɡɛðɚ/",
+        "zh": "急件是我最喜歡的那種，我們一起看。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, section one is names, I filled that part.",
+        "phonetic": "/oʊˈkeɪ ˈsɛkʃən wʌn ɪz ˈneɪmz aɪ fɪld ðæt pɑɹt/",
+        "zh": "好，第一部分是姓名，那一欄我填好了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good, section two is history, like allergies or asthma.",
+        "phonetic": "/ɡʊd ˈsɛkʃən tu ɪz ˈhɪstɹi laɪk əˈlɜɹdʒiz ɔɹ æzmə/",
+        "zh": "很好，第二部分是病史，像是過敏或氣喘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, um, he uses an inhaler before soccer games.",
+        "phonetic": "/wɛl ʌm hi ˈjuzɪz æn ɪnˈheɪlɚ bɪˈfɔɹ ˈsɑkɚ ɡeɪmz/",
+        "zh": "嗯，他踢足球之前會用吸入劑。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, I'll note that here, it comes from sports, right?",
+        "phonetic": "/oʊˈkeɪ aɪl noʊt ðæt hɪɹ ɪt ˈkʌmz fɹʌm ˈspɔɹts ɹaɪt/",
+        "zh": "好，我在這裡註明，是運動引起的，對吧？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Only when it's cold, the coach said to mention it.",
+        "phonetic": "/ˈoʊnli wɛn ɪts koʊld ðə koʊtʃ sɛd tə ˈmɛnʃən ɪt/",
+        "zh": "只有天氣冷的時候會，教練說要寫上去。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Smart coach, cold air triggers kids a lot.",
+        "phonetic": "/smɑɹt koʊtʃ koʊld ɛɹ ˈtɹɪɡɚz kɪdz ə lɑt/",
+        "zh": "這教練真細心，冷空氣常常會讓小孩發作。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So I should list the inhaler on the form?",
+        "phonetic": "/soʊ aɪ ʃʊd lɪst ði ɪnˈheɪlɚ ɑn ðə fɔɹm/",
+        "zh": "所以我應該把吸入劑寫在表格上？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, that way school keeps one in the nurse bag.",
+        "phonetic": "/ˈjɛs ðæt weɪ ˈskuːl ˈkips wʌn ɪn ðə ˈnɝs bæɡ/",
+        "zh": "對，那樣學校就會在護理包裡備一支。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, you keep a spare there? That's a relief.",
+        "phonetic": "/oʊ ju kip ə spɛɹ ðɛɹ ðæts ə ɹiˈlif/",
+        "zh": "噢，你們會放備用的？那我就安心了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We do, labeled with his name and the dose.",
+        "phonetic": "/wi du ˈleɪbəld wɪð hɪz neɪm ænd ðə doʊs/",
+        "zh": "會的，上面貼他的名字和劑量。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, he leaves his at the field every single time.",
+        "phonetic": "/ɡɹeɪt hi livz hɪz æt ðə filld ˈɛvɹi ˈsɪŋɡəl taɪm/",
+        "zh": "好，他每次都把吸入劑落在球場。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nine-year-olds and fields, that's a classic pair, ha.",
+        "phonetic": "/naɪn ˈjɪɹˌoʊldz ænd filldz ðæts ə ˈklæsɪk pɛɹ hɑ/",
+        "zh": "哈，九歲的小孩和球場，這對組合很經典。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Very true. Now, what about these blank boxes here?",
+        "phonetic": "/ˈvɛɹi tru naʊ wɑt əˈbaʊt ðiz blæŋ ˈbɑkˌsɪz hɪɹ/",
+        "zh": "真的。那這幾個空白的格子該怎麼辦？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Those are mine, height, weight, vision, and blood pressure.",
+        "phonetic": "/ðoʊz ɑɹ maɪn haɪt weɪt ˈvɪʒən ænd blʌd ˈpɹɛʃɚ/",
+        "zh": "那些是我的部分，身高、體重、視力、血壓。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do I stand him on the scale right now?",
+        "phonetic": "/du aɪ ˈstænd hɪm ɑn ðə skeɪl ˈɹaɪt ˈnaʊ/",
+        "zh": "現在要請他站上秤嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No need today, last check is still on file.",
+        "phonetic": "/noʊ nid təˈdeɪ læst tʃɛk ɪz stɪl ɑn faɪl/",
+        "zh": "今天不用，上次檢查的資料還在檔案裡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's from March, is that old enough for school?",
+        "phonetic": "/ɪts fɹʌm mɑɹtʃ ɪz ðæt oʊld ɪˈnʌf fɚ skuːl/",
+        "zh": "那是三月留的資料，學校還接受嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "School wants one year, so March is fine.",
+        "phonetic": "/skuːl ˈwɑnts wʌn jɪɹ soʊ ˈmɑɹtʃ ɪz ˈfaɪn/",
+        "zh": "學校要一年以內的，所以三月剛好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nice, one less thing to measure, honestly.",
+        "phonetic": "/naɪs wʌn lɛs θɪŋ tə ˈmɛʒɚ ˈɑnəstli/",
+        "zh": "太好了，老實說，又少一項要量。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, I hear that one a lot, trust me.",
+        "phonetic": "/ˈhɑ aɪ ˈhiɹ ðæt wʌn ə ˈlɑt ˈtɹʌst mi/",
+        "zh": "哈，這句話我常聽到，真的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So where does the doctor actually sign this?",
+        "phonetic": "/soʊ wɛɹ dʌz ðə ˈdɑkɾɚ ˈæktʃuəli saɪn ðɪs/",
+        "zh": "那醫生到底要簽在哪裡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Page four, one signature, four pages, that's the routine.",
+        "phonetic": "/peɪdʒ fɔɹ wʌn ˈsɪɡnətʃɚ fɔɹ ˈpeɪdʒɪz ðæts ðə ruˈtin/",
+        "zh": "第四頁，一個簽名、四頁表格，這就是流程。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "One signature, four pages, and I thought vaccines were slow.",
+        "phonetic": "/wʌn ˈsɪɡnətʃɚ fɔɹ ˈpeɪdʒɪz ænd aɪ θɔt vækˈsɪnz wɚ sloʊ/",
+        "zh": "一個簽名、四頁表格，我原本以為打疫苗最慢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Paperwork is our hometown sport, we're all champions.",
+        "phonetic": "/ˈpeɪpɚˌwɝk ɪz ɑɹ ˈhaʊmˌtaʊn spɔɹt wiɹ ɔl ˈtʃæmpiənz/",
+        "zh": "文件是我們這裡的強項，個個都是冠軍。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, that should go on a poster here.",
+        "phonetic": "/hɑ ðæt ʃʊd ɡoʊ ɑn ə ˈpoʊstɚ hɪɹ/",
+        "zh": "哈，這句話應該貼在牆上的海報。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll tell my boss, she loves signs like that.",
+        "phonetic": "/aɪl tɛl maɪ ˈbɑs ʃi ˈlʌvz ˈsaɪnz laɪk ðæt/",
+        "zh": "我會告訴我們主管，她最喜歡那種標語。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, is the doctor around, or is this your part?",
+        "phonetic": "/soʊ ɪz ðə ˈdɑkɾɚ əˈɹaʊnd ɔɹ ɪz ðɪs jɔɹ pɑɹt/",
+        "zh": "那醫生現在人在這裡嗎，還是這部分歸你簽？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's mostly mine, he just signs the medical line.",
+        "phonetic": "/ɪts ˈmoʊstli maɪn hi dʒʌst saɪnz ðə ˈmɛdɪkəl laɪn/",
+        "zh": "大部分是我，他只要簽醫療那一行。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And where is he right now, if you don't mind?",
+        "phonetic": "/ænd ˈwɛɹ ɪz hi ˈɹaɪt naʊ ɪf ju ˈdoʊnt maɪnd/",
+        "zh": "請問他現在去哪裡了，問一下應該不麻煩吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "He's at lunch, and he's back at two thirty.",
+        "phonetic": "/hiːz æt lʌntʃ ænd hiːz bæk æt tu ˈθɜɾi/",
+        "zh": "他吃午飯去了，要兩點半才回來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two thirty? I have pickup at two, um, actually.",
+        "phonetic": "/tu ˈθɜɾi aɪ hæv ˈpɪkˌʌp æt tu ʌm ˈæktʃuəli/",
+        "zh": "兩點半？我兩點得去接小孩，嗯。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two is tight, but I have a better option.",
+        "phonetic": "/tu ɪz taɪt bʌt aɪ hæv ə ˈbɛɾɚ ˈɑpʃən/",
+        "zh": "兩點有點趕，但我有個更好的辦法。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Please, I'll take the better option, seriously.",
+        "phonetic": "/pliz aɪl teɪk ðə ˈbɛɾɚ ˈɑpʃən ˈsɪɹiəsli/",
+        "zh": "拜託，我就要那個更好的辦法，說真的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Leave the form here, pick it up after three.",
+        "phonetic": "/liv ðə fɔɹm hɪɹ pɪk ɪt ʌp ˈæɾɚ θɹi/",
+        "zh": "把表格留在這裡，三點以後來拿。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "After three, so he signs it while I'm gone?",
+        "phonetic": "/ˈæɾɚ θɹi soʊ hi saɪnz ɪt waɪl aɪm ɡɑn/",
+        "zh": "三點以後，那趁我不在的時候他會簽好？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and I'll text you when it's ready.",
+        "phonetic": "/ɪɡˈzæktli ænd aɪl tɛkst ju wɛn ɪts ˈɹɛdi/",
+        "zh": "就是這樣，我會傳訊息告訴你表格簽好了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Text confirmation, I love that part, no phone tag.",
+        "phonetic": "/tɛkst ˌkɑnəˈfeɪʃən aɪ lʌv ðæt pɑɹt noʊ foʊn tæɡ/",
+        "zh": "會傳訊息給我，我最愛這種，不用來回找電話。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No phone tag, my life motto, um, honestly.",
+        "phonetic": "/noʊ foʊn tæɡ maɪ laɪf ˈmɑtoʊ ʌm ˈɑnəstli/",
+        "zh": "不用來回找電話，這是我的人生座右銘，老實說。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, one worry, the form says due today, Friday.",
+        "phonetic": "/oʊˈkeɪ wʌn ˈwɜɹi ðə fɔɹm sɛz du təˈdeɪ ˈfɹaɪdeɪ/",
+        "zh": "好，還有一個擔心，表上寫著今天週五到期。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Friday, yes, school gave you the whole week, huh.",
+        "phonetic": "/ˈfɹaɪdeɪ jɛs skuːl ɡeɪv ju ðə hoʊl wik hʌh/",
+        "zh": "週五，對啊，學校給了你們整整一週，哈。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The whole week I kept meaning to walk in here.",
+        "phonetic": "/ðə hoʊl wik aɪ kɛpt ˈminɪŋ tə wɔk ɪn hɪɹ/",
+        "zh": "整整一週，我一直想著要跑這一趟。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're in here now, and I've got the pen.",
+        "phonetic": "/ˈjʊɹz ɪn hɪɹ ˈnaʊ ænd aɪv ˈɡɑt ðə ˈpɛn/",
+        "zh": "你現在不就來了，我手上也剛好有筆。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can I also add a note about his knee?",
+        "phonetic": "/kæn aɪ ˈɔlsoʊ æd ə noʊt əˈbaʊt hɪz ni/",
+        "zh": "我可以在上面加註他膝蓋的事嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, does it ache now, was it ever checked?",
+        "phonetic": "/ˈʃʊɹ dʊz ɪt ətʃ naʊ wəz ɪt ˈɛvɚ tʃɛkt/",
+        "zh": "可以，他現在還會痛嗎？之前有檢查過嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No, just sore after long runs, I think he's fine.",
+        "phonetic": "/noʊ dʒʌst sɔɹ ˈæɾɚ lɔŋ ɹʌnz aɪ θɪŋk hiz faɪn/",
+        "zh": "沒有，只是跑久之後會痠，我覺得還好。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll write that, watch it if it swells, okay?",
+        "phonetic": "/aɪl ɹaɪt ðæt wɑtʃ ɪt ɪf ɪt swɛlz oʊˈkeɪ/",
+        "zh": "我寫上去，如果腫起來就要看診，好嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Any fee for a copy of the signed page?",
+        "phonetic": "/ˈɛni fi fɚ ə ˈkɑpi ʌv ðə saɪnd peɪdʒ/",
+        "zh": "簽好的那頁要複製的話，有費用嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No fee, we email a PDF, the school likes that.",
+        "phonetic": "/noʊ fi wi ˈimel ə ˌpidaɪˈɛf ðə skuːl laɪks ðæt/",
+        "zh": "沒有，我們用電子郵件傳 PDF，學校喜歡那樣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, my email is the one on the file?",
+        "phonetic": "/ˈpɝfɪkt maɪ ˈimel ɪz ði wʌn ɑn ðə faɪl/",
+        "zh": "太好了，我的信箱就是檔案裡那一個嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It is, and I'll copy the coach, if that's fine.",
+        "phonetic": "/ɪt ɪz ænd aɪl ˈkɑpi ðə koʊtʃ ɪf ðæts faɪn/",
+        "zh": "就是那個，我也會抄送給教練，可以嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes please, the coach keeps asking me, poor man.",
+        "phonetic": "/jɛs pliz ðə koʊtʃ kips ˈæskɪŋ mi pʊɹ mæn/",
+        "zh": "拜託，教練一直問我，也滿可憐的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Don't worry, Leo's fine, he just needs a signed page.",
+        "phonetic": "/ˈdoʊnt ˈwɝi ˈlioʊz faɪn hi dʒʌst nidz ə saɪnd ˈpeɪdʒ/",
+        "zh": "放心吧，Leo 沒事，他只需要一張簽好的表。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That is the nicest thing I've heard all week.",
+        "phonetic": "/ðæt ɪz ðə ˈnaɪsɪst θɪŋ aɪv hɜɹd ɔl wik/",
+        "zh": "這是我這一週聽到最溫暖的一句話。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, I'll sign that compliment, it goes on the wall.",
+        "phonetic": "/hɑ aɪl saɪn ðæt ˈkɑmpləmənt ɪt ɡoʊz ɑn ðə wɔl/",
+        "zh": "哈，我要在那句話上簽名，貼上牆。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you, I'll be back at three fifteen, maybe sooner.",
+        "phonetic": "/θæŋk ju aɪl bi bæk æt θɹi ˌfɪfˈtin ˈmeɪbi ˈsuːnɚ/",
+        "zh": "謝謝你，我三點十五分回來，也許更早。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Three fifteen, door's open, um, bring that Friday energy.",
+        "phonetic": "/θɹi ˌfɪfˈtin dɔɹz ˈoʊpən ʌm brɪŋ ðæt ˈfɹaɪdeɪ ˈɛnɚdʒi/",
+        "zh": "三點十五分，門會開著，嗯，帶著週五的元氣來。"
+      }
+    ],
+    "youtube_title": "【週五要交的體育檢查表📄】「一個簽名四頁表格」教你請診所簽好蓋章✍️🩺🎧｜聽完不怕追表格｜60句沉浸式英文聽力｜School Sports Form",
+    "youtube_title_en": "\"One Signature, Four Pages\" — Getting a School Sports Form Signed at the Clinic",
+    "youtube_description": "週五要交的學校體育檢查表，怎麼在診所一個下午就搞定？這一集是 60 句沉浸式英文聽力練習，場景就在診所櫃台，從交表格、填病史，一路聽到醫生去吃午飯、改用留下表格再回來拿的辦法。\n\n你會聽到：怎麼開口交表格 I brought the school sports form for my son；怎麼講清楚吸入劑和氣喘這一段病史；表格哪一欄是護理師簽、哪一行要醫生簽；還有身高體重視力血壓欄位、一年以內的舊檢查能不能用、今天到期怎麼辦的實用問句。\n\n整段只用 A2 初級單字與短句，反覆出現的是美國人在診所前後櫃的真實語感：um、well、so、ha、honestly、trust me。聽完你就會用：Let's look together、On file、Pick it up after three、I'll text you、Don't worry。\n\n後半段是逐句聽力加跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "A school sports form is due today, Friday, and the doctor just walked out to lunch. Can one clinic desk still save the day? This is a 60-line immersive English listening practice set at the front counter of a busy clinic.\n\nYou will hear: handing over the form, filling in the health history, saying he uses an inhaler before soccer games; figuring out which boxes the nurse signs and which line needs the doctor; and the classic Friday scramble, with height, weight, vision, blood pressure, and a March check that is still on file.\n\nEverything stays in A2-level words, with the small talk Americans actually use: um, well, so, ha, honestly, trust me. By the end you'll own lines like Let's look together, On file, Pick it up after three, and I'll text you.\n\nThe last chapter is a line-by-line listen and repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed, just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧診所簽表格英文｜交體育檢查表・寫清氣喘病史・分誰簽哪一欄｜留下表格再回來拿｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n孩子的學校體育檢查表四頁，週五就要交，醫生卻剛走去吃午飯，這種情況你該怎麼開口？哪一欄是護理師簽，哪一行一定要醫生簽？吸入劑這種事，到底要寫在哪一段？\n\n這一集帶大家走進診所的前櫃，從交表格、聊病史、確認哪些欄位已經有檔案，一路聽到醫生去午餐、改用留下表格三點再來拿的辦法，最後還加註了膝蓋的小事，共 60 句連續真實對話。\n\n你會聽到：\n📄 交表格：Hi, I brought the school sports form for my son.\n🩺 說病史：Well, um, he uses an inhaler before soccer games.\n✍️ 分工簽名：It's mostly mine, he just signs the medical line.\n🎧 換辦法：Leave the form here, pick it up after three.\n\n後半段是逐句聽力加跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so、ha 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這張四頁的表格走一趟診所，下次你拿著學校的表站在櫃台前，要問的欄位、要講的病史，話就會自己冒出來。\n\n祝你下次交表格，都能在放學之前拿到那個簽名。",
+    "youtube_tags": [
+      "english listening practice",
+      "school form english dialogue",
+      "clinic front desk english",
+      "doctor signature english",
+      "esl listening a2",
+      "american english conversation",
+      "nurse english phrases",
+      "sports physical english",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "診所英文",
+      "填表格英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "開學季英文對話"
+    ],
+    "scene": "clinic front desk",
+    "thumbnail_expression": "relieved and grinning widely",
+    "thumbnail_action": "holding up a four-page form with a pen",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Sports Form",
+        "zh": "體育檢查表"
+      },
+      {
+        "en": "Inhaler",
+        "zh": "吸入劑"
+      },
+      {
+        "en": "Stethoscope",
+        "zh": "聽診器"
+      },
+      {
+        "en": "Doctor's Signature",
+        "zh": "醫生的簽名"
+      },
+      {
+        "en": "Friday Stamp",
+        "zh": "週五日期章"
+      }
+    ]
+  }
+}

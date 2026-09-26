@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_po-box-monthly-rental",
+  "topic": "Renting a PO Box for Mail While Between Homes",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758856800.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A MAILBOX TO CALL HOME",
+    "title_zh": "租個信箱",
+    "scene_zh": "郵局 · 租用信箱",
+    "story_hook": "No home address yet, but the mail must land.",
+    "intro_zh": "暫時沒有住址，但郵件一定要收得到。",
+    "welcome_en": "Hi, welcome to the post office counter. Today we rent a mailbox between homes.",
+    "welcome_zh": "嗨，歡迎來到郵局櫃台。今天的主題是搬家空檔怎麼租信箱。",
+    "outro": "And that's a mailbox, a card, and a plan. New towns get easier line by line.",
+    "outro_zh": "一個信箱、一張卡、一個安排都就緒了。新的城市會一句一句變得輕鬆。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "so my address is now this box",
+    "char_a_description": "a middle-aged man in his forties with cropped dark hair, a short trimmed beard, a rust orange flannel shirt under a brown canvas work jacket, and a broad sturdy build",
+    "char_b_description": "a friendly woman in her fifties with dark brown hair in a tight low bun, gold-rimmed glasses, a blue postal polo shirt with a name tag, and a plump brisk build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "new resident",
+    "char_b_role": "postal clerk",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, I just moved here, need a mailing address.",
+        "phonetic": "/haɪ aɪ dʒʌst muːvd hɪɹ nid ə ˈmeɪ.lɪŋ əˈdɹɛs/",
+        "zh": "嗨，我剛搬來這裡，需要一個收信地址。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "You're in the right line, boxes or forms?",
+        "phonetic": "/jʊɹz ɪn ðə raɪt laɪn ˈbɑk.səz ɔɹ fɔɹmz/",
+        "zh": "你排對隊了，要租信箱還是填表格？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A box, my old address stopped existing, um, basically.",
+        "phonetic": "/ə bɑks maɪ oʊld əˈdɹɛs stɑpt ɪɡˈzɪs.tɪŋ ʌm ˈbeɪ.sɪ.kli/",
+        "zh": "租信箱，我舊的地址基本上已經作廢了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it, between houses? It happens a lot.",
+        "phonetic": "/ɡɑɾ ɪt bɪˈtwin ˈhaʊ.zəz ɪt hə.pənz ə lɑt/",
+        "zh": "了解，舊家賣了、新家還沒到位是吧？這種情況很常見。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Exactly. Sold mine, new place opens in November.",
+        "phonetic": "/ɪɡˈzæk.li soʊld maɪn nju pleɪs ˈoʊ.pənz ɪn noʊˈvɛm.bɚ/",
+        "zh": "沒錯，舊屋賣了，新家十一月才入住。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So a six-month rental could cover the gap.",
+        "phonetic": "/soʊ ə sɪks mʌnθ ˈrɛn.təl kʊd ˈkʌv.ɚ ðə ɡæp/",
+        "zh": "那租六個月的信箱，剛好接上這段空檔。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Six months is an option? What sizes do you have?",
+        "phonetic": "/sɪks ˈmʌn.θɪz ɪz æn ˈɑp.ʃən wʌt ˈsaɪ.zəz du ju hæv/",
+        "zh": "六個月也可以選嗎？你們有幾種尺寸？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Small, medium, large, and the quirky corner ones.",
+        "phonetic": "/smɔl ˈmi.di.əm lɑɹdʒ ænd ðə ˈkwɪr.ki ˈkɔɹ.nɚ wʌnz/",
+        "zh": "小、中、大，還有一些角落裡的不規則尺寸。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Corner ones? What's quirky about them?",
+        "phonetic": "/ˈkɔɹ.nɚ wʌnz wʌts ˈkwɪr.ki əˈbaʊt ðɛm/",
+        "zh": "角落的？那些有什麼特別的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Odd shapes, but fine for regular mail.",
+        "phonetic": "/ɑd ʃeɪps bʌt faɪn fɚ ˈrɛɡ.jə.lɚ meɪl/",
+        "zh": "形狀比較怪，不過收一般信件完全沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Medium, please, I get big envelopes too.",
+        "phonetic": "/ˈmi.di.əm pliz aɪ ɡɛt bɪɡ ˈɛn.ə.loʊpz tu/",
+        "zh": "請給我中號的，我也會收到大信封。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Smart. Medium is fourteen fifty a month.",
+        "phonetic": "/smɑɹt ˈmi.di.əm ɪz ˌfɔɹˈtin ˈfɪf.ti ə mʌnθ/",
+        "zh": "聰明。中號一個月十四塊五。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, how much is the small one?",
+        "phonetic": "/həm ˈhaʊ ˈmʌtʃ ɪz ðə ˈsmɔl ˈwʌn/",
+        "zh": "嗯，那小號多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ten ninety-nine, but it fills up fast.",
+        "phonetic": "/tɛn ˈnɪn.ti naɪn bʌt ɪt fɪlz ʌp fæst/",
+        "zh": "十塊九毛九，不過一下就會塞滿。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then medium, no contest there honestly.",
+        "phonetic": "/ðɛn ˈmi.di.əm noʊ kənˈtɛst ðɛr ˈɑ.nəst.li/",
+        "zh": "那就中號吧，這真的不用猶豫。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good pick. Six months comes to eighty-seven.",
+        "phonetic": "/ɡʊd pɪk sɪks ˈmʌn.θɪz kʌmz tu ˈeɪ.ti ˈsɛv.ən/",
+        "zh": "選得好。六個月的話是八十七塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Is a year cheaper per month though?",
+        "phonetic": "/ɪz ə jɪɹ ˈtʃi.pɚ pɚ mʌnθ ðoʊ/",
+        "zh": "那租一年每月會不會便宜一些？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, twelve months drops it to thirteen twenty.",
+        "phonetic": "/jɛs twɛlv mʌn.θɪz drɑps ɪt tə ˌθɝˈtin ˈtwɛn.ti/",
+        "zh": "會，租一年可以降到十三塊二。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tough call, but I like staying free to move.",
+        "phonetic": "/tʌf kɔl bʌt aɪ laɪk ˈsteɪ.ɪŋ fri tə muːv/",
+        "zh": "難選，但我喜歡來去自由。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fair, six months it is. Name, please?",
+        "phonetic": "/fɛr sɪks ˈmʌn.θɪz ɪt ɪz neɪm pliz/",
+        "zh": "也對，那就六個月。請問大名？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's Marcus Webb, W-E-B-B.",
+        "phonetic": "/ɪts ˈmɑɹ.kəs wɛb ˈdʌb.əl.ju i bi bi/",
+        "zh": "馬克斯．衛伯，衛是 W-E-B-B。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nice to meet you, Marcus. Any ID with you?",
+        "phonetic": "/naɪs tə miːt ju ˈmɑɹ.kəs ˈɛ.ni aɪˈdi wɪð ju/",
+        "zh": "很高興認識你，馬克斯。隨身帶身份證明嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, driver's license, here you go.",
+        "phonetic": "/jɛs ˈdɹaɪ.vɚz ˈlaɪ.səns hɪɹ ju ɡoʊ/",
+        "zh": "有，駕照，給你。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, and a phone number for notices?",
+        "phonetic": "/ˈpɝ.fɪkt ænd ə foʊn ˈnʌm.bɚ fɚ ˈnoʊ.tɪ.sɪz/",
+        "zh": "太好了。再留一個電話號碼收通知？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sure, it's my cell, I'll dictate it.",
+        "phonetic": "/ʃʊɹ ɪts maɪ sɛl aɪl ˈdɪk.teɪt ɪt/",
+        "zh": "好啊，是我的手機號碼，我唸你抄。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. Now this form, sign at the bottom.",
+        "phonetic": "/ɡɑɾ ɪt naʊ ðɪs fɔɹm saɪn æt ðə ˈbɑ.təm/",
+        "zh": "記下了。這張表格在底端簽名。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Done. Oh wait, how do I actually open the box?",
+        "phonetic": "/dʌn oʊ weɪt haʊ du aɪ ˈæk.tʃu.ə.li ˈoʊ.pən ðə bɑks/",
+        "zh": "簽好了。噢等等，信箱到底怎麼開？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Key card, tap it, the green light means go.",
+        "phonetic": "/ki kɑɹd ˈtæp ɪt ðə ˈɡrin ˈlaɪt ˈminz ˈɡoʊ/",
+        "zh": "鑰匙卡，輕觸一下，綠燈亮就可以開。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cool, is the card an extra fee?",
+        "phonetic": "/kul ɪz ðə kɑɹd ən ˈæk.strə fi/",
+        "zh": "好酷。這張卡要另外收費嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Five dollars deposit, back when you return it.",
+        "phonetic": "/faɪv ˈdɑ.lɚz dɪˈpɑ.zɪt bæk wɛn ju ɹiˈtɝn ɪt/",
+        "zh": "押金五塊，退卡的時候會還你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fair. What if the card takes a vacation with me?",
+        "phonetic": "/fɛɹ wʌt ɪf ðə kɑɹd teɪks ə veɪˈʃən wɪð mi/",
+        "zh": "合理。萬一卡片跟著我去度假了呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, replacement is ten, keep it close.",
+        "phonetic": "/hɑ ɹɪˈpleɪs.mənt ɪz tɛn kip ɪt kloʊs/",
+        "zh": "哈，補辦要十塊，收好它。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Will do. Quick question about packages.",
+        "phonetic": "/wɪl du kwɪk ˈkwɛs.tʃən əˈbaʊt ˈpæk.ɪ.dʒəz/",
+        "zh": "記下了。想快問一件事，包裹怎麼收？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Boxes hold letters, packages wait up front.",
+        "phonetic": "/ˈbɑk.səz hoʊld ˈlɛ.tɚz ˈpæk.ɪ.dʒəz weɪt ʌp frʌnt/",
+        "zh": "信箱只放得下信件，包裹會暫放在櫃台。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So I get a note when a box is waiting?",
+        "phonetic": "/soʊ aɪ ɡɛt ə noʊt wɛn ə bɑks ɪz ˈweɪ.tɪŋ/",
+        "zh": "所以有包裹時，我會收到一張通知單？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and you have fifteen days to grab it.",
+        "phonetic": "/ɪɡˈzæk.li ænd ju hæv ˌfɪfˈtin deɪz tə ɡɹæb ɪt/",
+        "zh": "沒錯，你有十五天時間來取件。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "After fifteen days, does it sail back?",
+        "phonetic": "/ˈæk.fɚ ˌfɪfˈtin deɪz dʌz ɪt seɪl bæk/",
+        "zh": "過了十五天，包裹會自己回到寄件人那裡嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yep, return to sender, nice and tidy.",
+        "phonetic": "/jɛp ɹɪˈtɝn tə ˈsɛn.dɚ naɪs ænd ˈtaɪ.di/",
+        "zh": "對，退回原地，乾乾淨淨。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. One worry, is my box ready today?",
+        "phonetic": "/ˈpɝ.fɪkt wʌn ˈwɝ.i ɪz maɪ bɑks ˈrɛ.di təˈdeɪ/",
+        "zh": "太好了。我還擔心一件事：信箱今天就緒了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let me check the board... medium, number twelve.",
+        "phonetic": "/lɛt mi tʃɛk ðə bɔɹd ˈmi.di.əm ˈnʌm.bɚ twɛlv/",
+        "zh": "我看一下看板……中號，十二號。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Twelve, nice. When can I start using it?",
+        "phonetic": "/twɛlv naɪs wɛn kən aɪ stɑɹt ˈju.zɪŋ ɪt/",
+        "zh": "十二號，不錯。我什麼時候開始能用？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Right now, the card activates in one minute.",
+        "phonetic": "/raɪt naʊ ðə kɑɹd ˈæk.təˌveɪts ɪn wʌn ˈmɪ.nət/",
+        "zh": "現在就能用，卡片一分鐘後生效。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wow, so my address is now this box.",
+        "phonetic": "/waʊ soʊ maɪ əˈdɹɛs ɪz naʊ ðɪs bɑks/",
+        "zh": "哇，所以我現在的地址就是這個箱子了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It is, welcome to mailbox country, ha.",
+        "phonetic": "/ɪt ɪz ˈwɛl.kəm tə ˈmeɪl.bæks ˈkʌn.tri hɑ/",
+        "zh": "就是這樣，歡迎來到信箱王國，哈。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha. Can I give this address to my boss?",
+        "phonetic": "/hɑ kæn aɪ ɡɪv ðɪs əˈdɹɛs tə maɪ bɔs/",
+        "zh": "哈。我可以把這個地址報給公司嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, copy it from this little white card.",
+        "phonetic": "/jɛs ˈkɑ.pi ɪt fɹʌm ðɪs ˈlɪ.ɾəl waɪt kɑɹd/",
+        "zh": "可以，照著這張小白卡抄就好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, the exact format is already on here?",
+        "phonetic": "/oʊ ði ɪɡˈzækt ˈfɔɹ.mæt ɪz ɔlˈrɛ.di ɑn hɪɹ/",
+        "zh": "噢，正確的寫法已經印在上面了？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Mm-hm, take two, they're free, don't be shy.",
+        "phonetic": "/əm ˈhəm teɪk tu ðeɪz fri doʊnt bi ʃaɪ/",
+        "zh": "嗯哼，影本免費，多拿兩張，別客氣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Taking three, my printer hates me lately.",
+        "phonetic": "/ˈteɪk.ɪŋ θri maɪ ˈprɪn.tɚ heɪts mi ˈleɪt.li/",
+        "zh": "那我拿三張，印表機最近老跟我作對。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, fair. Today it's ninety-two with deposit.",
+        "phonetic": "/hɑ fɛr təˈdeɪ ɪts ˈnɪn.ti tu wɪð dɪˈpɑ.zɪt/",
+        "zh": "哈，合理。今天連押金總共九十二塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "An even total, I love round numbers.",
+        "phonetic": "/ən ˈiː.vən ˈtoʊ.təl aɪ lʌv raʊnd ˈnʌm.bɚz/",
+        "zh": "總數剛好是整數，我喜歡這樣的數字。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Card or cash today?",
+        "phonetic": "/kɑɹd ɔɹ kæʃ təˈdeɪ/",
+        "zh": "今天刷卡還是付現金？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Card, tap, um, did it print the receipt?",
+        "phonetic": "/kɑɹd tæp ʌm dɪd ɪt prɪnt ðə ɹɪˈsit/",
+        "zh": "刷卡，嗯，收據有印出來嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It did, keep it with your new card.",
+        "phonetic": "/ɪt dɪd ˈkip ɪt wɪð jɔɹ ˈnju kɑɹd/",
+        "zh": "有，請把收據和新卡收在一起。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks. Honestly, this whole thing felt scary.",
+        "phonetic": "/θæŋks ˈɑ.nəst.li ðɪs hoʊl θɪŋ fɛlt ˈskɛɹ.i/",
+        "zh": "謝謝。老實講，我來之前心裡很慌。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "New town? The mail is easier than it looks.",
+        "phonetic": "/nju taʊn ðə meɪl ɪz ˈiː.zi.ɚ ðæn ɪt lʊks/",
+        "zh": "換到新城市了吧？收信其實比想像簡單。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yeah, first solo move at my age, ha.",
+        "phonetic": "/je fɝst ˈsoʊ.loʊ muːv æt maɪ eɪdʒ hɑ/",
+        "zh": "是啊，到我這把年紀還第一次獨自搬家，哈。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Respect. Boxes, forms, feelings, all handled.",
+        "phonetic": "/ɹɪˈspɛkt ˈbɑk.səz fɔɹmz ˈfil.ɪŋz ɔl ˈhæn.dəld/",
+        "zh": "厲害。信箱、表格、還有心情，通通搞定了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're kind. See you at box twelve.",
+        "phonetic": "/jʊɹz ˈkaɪnd ˈsi ju æt ˈbɑks ˈtwɛlv/",
+        "zh": "你人真好。十二號信箱見。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bye Marcus, may the letters keep coming.",
+        "phonetic": "/baɪ ˈmɑɹ.kəs meɪ ðə ˈlɛ.tɚz kip ˈkʌm.ɪŋ/",
+        "zh": "再見馬克斯，願你的信件源源不絕。"
+      }
+    ],
+    "youtube_title": "【搬家空檔去哪收信📮】「我現在住址就是這信箱」租信箱全流程🔑🗂️💳｜聽完就能自己辦｜60句沉浸式英語聽力｜Renting a PO Box",
+    "youtube_title_en": "\"So My Address Is Now This Box\" — Renting a PO Box Between Homes",
+    "youtube_description": "「所以我現在的地址就是這個箱子了」——舊家賣了、新家還沒交屋，這段沒有住址的空檔，信要往哪收？這一集用 60 句連續對話，帶你在一間郵局裡把信箱租好、卡辦好、包裹規則聽懂。\n\n你會聽到：說明自己正搬家在兩個家之間；大小尺寸與月租差價；六個月對一年合約怎麼比較；填表、證件、電話通知的順序；門禁卡押金與補辦費用；包裹不放信箱而是櫃台暫存、十五天取件規則；還有怎麼把新地址報給公司與朋友。\n\n整段對話只用 A2 初級單字與十分鐘內聽得懂的短句，重現在郵局櫃檯最真實的美式語感：um、oh、so、ha、yeah。聽完你就會用：What sizes do you have?、Five dollars deposit、Return to sender、Card or cash?\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"So my address is now this box\" — sold the old house, waiting on the new one, and meanwhile the mail has to go somewhere. This 60-line immersive listening practice covers renting a PO box from the size question to the very first delivery.\n\nYou will hear: explaining a between-homes move, comparing box sizes and rental lengths, the ID and form routine, key card deposits, the package shelf and its fifteen-day rule, and how to hand out your temporary address.\n\nEverything stays in A2-level words, with real counter small talk: um, oh, so, ha, yeah. By the end you'll own phrases like What sizes do you have?, Return to sender, and Card or cash?\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧郵局租信箱英文｜尺寸比較・門禁押金・包裹代管｜搬家空檔信去哪收｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n舊房子賣掉了，新家要到十一月才能住進去，可銀行的信、公司的表格、線上買的包裹，全都還在路上。這段沒有住址的日子，該怎麼辦？\n\n這一集帶大家走進郵局大廳，從說明來意、比較信箱尺寸與合約月份，一路聽到門禁卡押金、包裹暫存規則、與怎麼把新地址報給所有人，共 60 句連續真實對話。\n\n你會聽到：\n📮 說明來意：Hi, I just moved here, need a mailing address.\n🗂️ 選尺寸：Six months is an option? What sizes do you have?\n🔑 門禁卡：Key card, tap it, the green light means go.\n📦 包裹規則：Boxes hold letters, packages wait up front.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、so、yeah 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著辦完這趟信箱，下次你搬家到任何城市，都知道第一件事該去哪裡問。\n\n祝你的每一封信都找得到你。",
+    "youtube_tags": [
+      "english listening practice",
+      "rent a po box in english",
+      "post office english dialogue",
+      "mailbox rental english",
+      "key card deposit english",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "郵局英文",
+      "租信箱英文",
+      "搬家英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "生活英文對話"
+    ],
+    "scene": "post office lobby",
+    "thumbnail_expression": "surprised and grinning",
+    "thumbnail_action": "tapping a key card on a tiny numbered mailbox",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "PO Box Door",
+        "zh": "郵政信箱"
+      },
+      {
+        "en": "Key Card",
+        "zh": "門禁卡"
+      },
+      {
+        "en": "Package Shelf",
+        "zh": "包裹貨架"
+      },
+      {
+        "en": "Rental Form",
+        "zh": "租用表格"
+      },
+      {
+        "en": "Hold Notice",
+        "zh": "取件通知單"
+      }
+    ]
+  }
+}

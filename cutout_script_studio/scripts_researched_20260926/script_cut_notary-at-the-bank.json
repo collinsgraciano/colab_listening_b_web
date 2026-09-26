@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_notary-at-the-bank",
+  "topic": "Getting a Document Notarized at the Bank",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758853200.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "SIGN IT HERE",
+    "title_zh": "銀行公證",
+    "scene_zh": "銀行 · 櫃台公證",
+    "story_hook": "One signature, one stamp, and a small scare.",
+    "intro_zh": "一個簽名、一顆印章，外加一場小虛驚。",
+    "welcome_en": "Hi, welcome to today's bank errand. Listen for rules about signing and ID.",
+    "welcome_zh": "嗨，歡迎來到今天的銀行跑腿任務。請留意簽名與證明的相關規則。",
+    "outro": "And that's a document notarized on time. Remember, the signature happens in person.",
+    "outro_zh": "一份文件就這樣準時完成公證。記住，簽名一定要當場進行。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "did I ruin it",
+    "char_a_description": "a young woman in her early twenties with long straight black hair in a low braid, round wire glasses, a beige trench coat over a gray sweater, a canvas shoulder bag, and a petite build",
+    "char_b_description": "a tall older man in his sixties with short white hair combed to the side, thick rectangular glasses, a navy bank vest over a light blue shirt with a striped tie, clean-shaven, and a tidy thin build",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "customer",
+    "char_b_role": "notary clerk",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, where can I find a notary?",
+        "phonetic": "/haɪ wɛɹ kæn aɪ faɪnd ə ˈnoʊtəˌrɛɹi/",
+        "zh": "打擾一下，請問公證要在哪裡辦？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's me, at window two, after this line.",
+        "phonetic": "/ðæts mi æt ˈwɪndoʊ tu ˈæftɚ ðɪs laɪn/",
+        "zh": "就是我，輪完這隊就到二號窗口找你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, thank goodness. Is it busy today?",
+        "phonetic": "/oʊ θæŋk ˈɡʊdnəs ɪz ɪt ˈbizi təˈdeɪ/",
+        "zh": "謝天謝地。今天人多嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A little, it's payday, everyone deposits checks.",
+        "phonetic": "/ə ˈlɪɾəl ɪts ˈpeɪˌdeɪ ˈɛvɹiˌwʌn dɪˈpɑzəts tʃɛks/",
+        "zh": "有一點多，今天是發薪日，大家都來存支票。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good to know. Do I need an appointment?",
+        "phonetic": "/ɡʊd tə noʊ du aɪ nid əˈpɔɪntmənt/",
+        "zh": "了解。需要提前預約嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Not for one signature, just grab a seat.",
+        "phonetic": "/nɑt fɚ wʌn ˈsɪɡnətʃɚ dʒʌst ɡɹæb ə sit/",
+        "zh": "只簽一個名不用預約，請先坐一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, it's a trip form for my brother.",
+        "phonetic": "/soʊ ɪts ə tɹɪp fɔɹm fɚ maɪ ˈbrʌðɚ/",
+        "zh": "是弟弟畢業旅行要簽的文件。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, and who's signing the form?",
+        "phonetic": "/oʊˈkeɪ ænd huz ˈsaɪnɪŋ ðə fɔɹm/",
+        "zh": "好，誰要在表格上簽名？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My mom, she's the guardian on paper.",
+        "phonetic": "/maɪ mɑm ʃiːz ðə ˈɡɑɹdiən ɑn ˈpeɪpɚ/",
+        "zh": "我媽媽，文件上的監護人是她。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. Did she sign it already?",
+        "phonetic": "/ɡɑɾ ɪt dɪd ʃi saɪn ɪt ɔˈlɛdi/",
+        "zh": "明白了。她已經先簽好了嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, she signed it at home, did I ruin it?",
+        "phonetic": "/weɪt ʃi saɪnd ɪt æt hoʊm dɪd aɪ ˈɹu.ɪn ɪt/",
+        "zh": "等等，她在家就簽了，我是不是搞砸了？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No panic, the page is still usable.",
+        "phonetic": "/noʊ ˈpænɪk ðə peɪdʒ ɪz stɪl ˈjuzəbl/",
+        "zh": "先別慌，這一頁還用得上。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Really? I felt sick for a second.",
+        "phonetic": "/ˈɹiɚli aɪ fɛlt sɪk fɚ ə ˈsɛkənd/",
+        "zh": "真的嗎？我那一下心都涼了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here's the rule: she signs it in front of me.",
+        "phonetic": "/hɪɹz ðə ˈɹul ʃi saɪnz ɪt ɪn ˈfɹʌnt əv mi/",
+        "zh": "規矩是：她得當著我的面簽名。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, the signature has to happen here.",
+        "phonetic": "/oʊ ðə ˈsɪɡnətʃɚ həz tə ˈhæpən hɪɹ/",
+        "zh": "噢，簽名非得在現場完成不行。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, that's the whole job of a notary.",
+        "phonetic": "/ɪɡˈzæktli ðæts ðə hoʊl dʒɑb əv ə ˈnoʊtəˌrɛɹi/",
+        "zh": "沒錯，這就是公證人的全部工作。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, she's right outside, should I grab her?",
+        "phonetic": "/wɛl ʃiːz ɹaɪt ˈaʊtsaɪd ʃʊd aɪ ɡɹæb hɚ/",
+        "zh": "她就在外面，要我去叫她嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, the signer must appear in person.",
+        "phonetic": "/jɛs ðə ˈsaɪnɚ məst əˈpɪɹ ɪn ˈpɝsən/",
+        "zh": "對，簽名的本人一定要親自到場。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Back in two minutes, she's super close.",
+        "phonetic": "/bæk ɪn tu ˈmɪnəts ʃiːz ˈsuːpɚ kloʊs/",
+        "zh": "她就在附近，兩分鐘回來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Take your time, this line's not moving anyway.",
+        "phonetic": "/teɪk jɔɹ taɪm ðɪs laɪnz nɑt ˈmuvɪŋ ˈɛniˌweɪ/",
+        "zh": "不急，反正這條隊也沒在動。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, true. Also, um, what ID do we need?",
+        "phonetic": "/hɑ tru ˈɔlsoʊ ʌm wʌt aɪˈdi du wi nid/",
+        "zh": "哈，真的。還有，嗯，需要什麼證件？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A current photo ID, that's the main one.",
+        "phonetic": "/ə ˈkɝɚənt ˈfoʊoʊ aɪˈdi ðæts ðə meɪn wʌn/",
+        "zh": "效期內附照片的身份證明，那個最要緊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "She has her state license, we're good then.",
+        "phonetic": "/ʃi hæz hɚ steɪt ˈlaɪsəns wɪɹ ɡʊd ðɛn/",
+        "zh": "她有州駕照，那就齊全了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good, and the name must match exactly.",
+        "phonetic": "/ɡʊd ænd ðə neɪm məst mætʃ ɪɡˈzæktli/",
+        "zh": "很好，而且簽的名字要跟證件完全一致。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Match how? Like, if she changed her name?",
+        "phonetic": "/mætʃ ˈhaʊ laɪk ɪf ʃi ˈtʃeɪndʒd hɚ ˈneɪm/",
+        "zh": "一致是指什麼？假如她換過姓呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The form has her current name, so she's fine.",
+        "phonetic": "/ðə fɔɹm hæz hɚ ˈkɝɚənt neɪm soʊ ʃiːz faɪn/",
+        "zh": "表格上寫的就是她現在的名字，那沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, and does the school need copies?",
+        "phonetic": "/oʊˈkeɪ ænd dʌz ðə skul nid ˈkɑpiz/",
+        "zh": "好，那學校需要影本嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll stamp each page, you keep the original.",
+        "phonetic": "/aɪl stæmp itʃ peɪdʒ ju kip ði əˈɹɪdʒənəl/",
+        "zh": "我會每頁都蓋章，你們留正本。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Stamps on every page? That's kind of cool.",
+        "phonetic": "/stæmps ɑn ˈɛvɹi peɪdʒ ðæts kaɪnd əv kul/",
+        "zh": "每一頁都要蓋章？感覺有點酷。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The seal stops people swapping pages later.",
+        "phonetic": "/ðə sil stɑps ˈpipəl ˈswæpɪŋ ˈpeɪdʒɪz ˈleɪɾɚ/",
+        "zh": "蓋了騎縫章，之後就沒人能把頁抽換。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Neat. Is notarizing free, or does it cost?",
+        "phonetic": "/nit ɪz ˈnoʊtəˌraɪzɪŋ fri ɔɹ dʌz ɪt kɔst/",
+        "zh": "高明。公證是免費的，還是要收費？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Free for account holders, are you one?",
+        "phonetic": "/fri fɚ əˈkaʊnt ˈhoʊldɚz ɑɹ ju wʌn/",
+        "zh": "對本行帳戶持有者是免費的，你們是嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "We are, she's had an account for years.",
+        "phonetic": "/wi ɑɹ ʃiːz hæd əˈkaʊnt fɚ jɪɹz/",
+        "zh": "是啊，她的帳戶都開了好幾年了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then it's free, nice perk of banking here.",
+        "phonetic": "/ðɛn ɪts fri naɪs pɝk əv ˈbæŋkɪŋ hɪɹ/",
+        "zh": "那就免費，在這邊往來的一個小好處。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, I never knew that perk existed.",
+        "phonetic": "/hɑ aɪ ˈnɛvɚ nu ðæt pɝk ɪɡˈzɪstɪd/",
+        "zh": "哈，我以前都不知道有這種好處。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Most people don't, they pay ten bucks elsewhere.",
+        "phonetic": "/moʊst ˈpipəl doʊnt ðeɪ peɪ tɛn bʌks ˌɛlsˈhwɛɹ/",
+        "zh": "多數人都不清楚，都在外面花十塊錢辦。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, today it costs us exactly nothing.",
+        "phonetic": "/wɛl təˈdeɪ ɪt kɔsts ʌs ɪɡˈzæktli ˈnʌθɪŋ/",
+        "zh": "那今天我們花的錢剛好是零。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here she comes, perfect timing, come on in.",
+        "phonetic": "/hɪɹ ʃi kʌmz ˈpɝfɪkt ˈtaɪmɪŋ kʌm ɑn ɪn/",
+        "zh": "她來了，時機剛好，請進來坐。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Mom, this is the notary, just sign here.",
+        "phonetic": "/mɑm ðɪs ɪz ðə ˈnoʊtəˌrɛɹi dʒʌst saɪn hɪɹ/",
+        "zh": "媽，這位是公證人，就在這裡簽名。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One thing first, ID, if you don't mind.",
+        "phonetic": "/wʌn θɪŋ fɝst aɪˈdi ɪf ju doʊnt maɪnd/",
+        "zh": "先確認一件事，不好意思，請出示證件。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "All set, her license is current and valid.",
+        "phonetic": "/ɔl sɛt hɚ ˈlaɪsəns ɪz ˈkɝɚənt ænd ˈvælɪd/",
+        "zh": "都備好了，她的駕照還在效期內。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great. Now sign the line, take your time.",
+        "phonetic": "/ɡɹeɪt ˈnaʊ ˈsaɪn ðə ˈlaɪn ˈteɪk jɔɹ ˈtaɪm/",
+        "zh": "很好。現在請在簽名欄下筆，慢慢來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "She's done, um, now what, the stamp thing?",
+        "phonetic": "/ʃiːz dʌn ʌm ˈnaʊ ˈwʌt ðə ˈstæmp θɪŋ/",
+        "zh": "她簽好了，嗯，接著呢，那個印章？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The stamp thing is my favorite part.",
+        "phonetic": "/ðə stæmp θɪŋ ɪz maɪ ˈfeɪvɚɪt pɑɹt/",
+        "zh": "那個印章環節正是我最愛的部分。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, it does look like a video-game seal.",
+        "phonetic": "/hɑ ɪt dʊz lʊk laɪk ə ˈvɪdiˌɡeɪm sil/",
+        "zh": "哈，那顆章看起來像遊戲裡的封印。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Embossed, pressed, dated, and we're almost done.",
+        "phonetic": "/ɪmˈbɔst prɛst ˈdeɪɪd ænd wɪɹ ˈɔlmoʊst dʌn/",
+        "zh": "壓紋、蓋印、填日期，就快搞定了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That was fast, honestly I expected all day.",
+        "phonetic": "/ðæt wəz fæst ˈɑnəstli aɪ ɪkˈspɛktɪd ɔl deɪ/",
+        "zh": "好快，老實講我以為要耗上一整天。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two minutes, three pages, all sealed and dated.",
+        "phonetic": "/tu ˈmɪnəts θri ˈpeɪdʒɪz ɔl sil ænd ˈdeɪɪd/",
+        "zh": "兩分鐘，三頁，全部蓋好章註好日期。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do we need anything else for the school?",
+        "phonetic": "/du wi ˈniːd ˈɛnɪθɪŋ ɛls fɚ ðə skul/",
+        "zh": "學校那邊還需要別的東西嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nope, just hand them the original today.",
+        "phonetic": "/noʊp dʒʌst hænd ðɛm ði əˈɹɪdʒənəl təˈdeɪ/",
+        "zh": "不用了，今天把正本交出去就好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And if the school calls to check the seal?",
+        "phonetic": "/ænd ɪf ðə ˈskul ˈkɔlz tə ˈtʃɛk ðə ˈsil/",
+        "zh": "要是學校打電話來核對印章呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "They can call us, the number's on the stamp.",
+        "phonetic": "/ðeɪ kæn kɔl ʌs ðə ˈnʌmbɚz ɑn ðə stæmp/",
+        "zh": "他們可以直接打來，電話就刻在印章上。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. Can we get a copy for our files?",
+        "phonetic": "/ˈpɝfɪkt kən wi ɡɛt ə ˈkɑpi fɚ ɑɹ faɪlz/",
+        "zh": "太好了。我們可以留一份影本嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I'll scan it now, check your email tonight.",
+        "phonetic": "/aɪl skæn ɪt naʊ tʃɛk jɔɹ ˈimeɪl təˈnaɪt/",
+        "zh": "我現在掃描一份，今晚傳到你們信箱。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You made a scary errand feel tiny.",
+        "phonetic": "/ju meɪd ə ˈskɛri ˈɛɹənd fil ˈtaɪni/",
+        "zh": "你讓這趟嚇人的差事變得好小一件事。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Notarizing is easy when folks ask first.",
+        "phonetic": "/ˈnoʊtəˌraɪzɪŋ ɪz ˈizi wɛn folks æsk fɝst/",
+        "zh": "只要事先問清楚，公證一點都不難。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Lesson learned, never sign before the notary.",
+        "phonetic": "/ˈlɛsən lɝnd ˈnɛvɚ saɪn bɪˈfɔɹ ðə ˈnoʊtəˌrɛɹi/",
+        "zh": "學到了，公證前千萬別簽名。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Tell everyone, that mistake costs a reprint.",
+        "phonetic": "/tɛl ˈɛvɹiˌwʌn ðæt mɪsˈteɪk kɔsts ə ˈriˌprɪnt/",
+        "zh": "這可要跟親友說，這種錯誤得重新印一份。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks for patience, and the free service.",
+        "phonetic": "/θæŋks fɚ ˈpeɪʃənz ænd ðə fri ˈsɝvɪs/",
+        "zh": "謝謝你的耐心，還有這次免費的服務。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime, enjoy the field trip talk at home.",
+        "phonetic": "/ˈɛnɪˌtaɪm ɛnˈdʒɔɪ ðə ˈfild trɪp tɔk æt hoʊm/",
+        "zh": "不客氣，回家好好聊畢業旅行吧。"
+      }
+    ],
+    "youtube_title": "【銀行公證全流程🏦】「我是不是搞砸了」簽名蓋章一次聽懂🪪🖋️💸｜聽完自己也會辦｜60句沉浸式英語聽力｜Document Notarization",
+    "youtube_title_en": "\"Did I Ruin It?\" — Getting a Document Notarized at the Bank",
+    "youtube_description": "「我是不是搞砸了」——好不容易把弟弟的畢業旅行文件帶到銀行，卻發現簽名早就在家裡寫好了，怎麼辦？這一集用 60 句連續對話，帶你走完美國銀行公證的完整流程。\n\n你會聽到：詢問公證窗口與是否需要預約；得知簽名必須當著公證人的面完成；把媽媽叫進場前要準備的身份證明；名字與證件要怎麼對照；每頁蓋騎縫章的原因；本行客戶免費這個隱藏版好處；還有正本、影本與掃描檔怎麼分工。\n\n整段對話只用 A2 初級單字與十分鐘內聽得懂的短句，重現在銀行櫃檯最真實的美式語感：um、well、so、ha、nope。聽完你就會用：Where can I find...、Do I need an appointment?、sign it in front of me、It's free for account holders。\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"Did I ruin it?\" — the form was already signed at home, and the notary needs it fresh. This 60-line immersive listening practice walks you through a bank notarization from the waiting line to the final stamp.\n\nYou will hear: asking where the notary is, learning the signer must appear in person, the photo-ID requirement, matching names on documents, why every page gets sealed, and the free-notarization perk for account holders.\n\nEverything stays in A2-level words, with real counter small talk: um, well, so, ha, nope. By the end you'll own phrases like Do I need an appointment?, sign it in front of me, and Can we get a copy for our files?.\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧銀行公證英文｜本人到場・證件核對・每頁蓋章｜簽錯位置還有救嗎｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n弟弟要出遠門參加畢業旅行，學校說同意書得先公證。到了銀行你才想起來：媽媽在家就把名字簽好了，這樣算無效嗎？要帶什麼證件、收多少錢、會花多久？\n\n這一集帶大家走進銀行公證窗口，從排隊詢問、當面重新簽名、核對駕照姓名，一路聽到騎縫章、正本影本與免費客戶禮遇，共 60 句連續真實對話。\n\n你會聽到：\n🏦 找窗口：Hi, where can I find a notary?\n🪪 證件句：A current photo ID, that's the main one.\n🖋️ 關鍵規則：Here's the rule: she signs it in front of me.\n💸 隱藏版好處：Free for account holders, are you one?\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、nope 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著辦完這趟公證，下次手上有文件要蓋章，你就知道該先問哪幾句。\n\n祝你的每份文件都準時完成。",
+    "youtube_tags": [
+      "english listening practice",
+      "notary in english",
+      "bank english dialogue",
+      "notarize a document",
+      "signer must appear in person",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "銀行英文",
+      "公證英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "生活英文對話"
+    ],
+    "scene": "bank notary window",
+    "thumbnail_expression": "worried and holding up a form",
+    "thumbnail_action": "showing a pre-signed paper to the bank clerk",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Notary Stamp",
+        "zh": "公證印章"
+      },
+      {
+        "en": "Photo ID",
+        "zh": "附照片證件"
+      },
+      {
+        "en": "Consent Form",
+        "zh": "簽名文件"
+      },
+      {
+        "en": "Bank Window",
+        "zh": "銀行窗口"
+      },
+      {
+        "en": "Scanned Copy",
+        "zh": "掃描影本"
+      }
+    ]
+  }
+}

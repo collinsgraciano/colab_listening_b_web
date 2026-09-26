@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_return-rental-car-early",
+  "topic": "Returning a Rental Car Early and Asking for a Refund",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758887400.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "EARLY KEYS BACK",
+    "title_zh": "提早還車",
+    "scene_zh": "租車櫃檯 · 還車退費",
+    "story_hook": "Two days early, one flight, and a rental counter.",
+    "intro_zh": "提早兩天、一班飛機，還有租車還車櫃檯。",
+    "welcome_en": "Hi, today's scene is the rental return desk. Listen for refund and fuel talk.",
+    "welcome_zh": "嗨，今天的場景是租車還車櫃檯。留意退費與油量的對話。",
+    "outro": "Early keys, honest math, safe flight. Listen once more and repeat aloud.",
+    "outro_zh": "早歸的鑰匙、算得清楚的退費、平安的航班。再聽一遍，大聲跟著唸。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "halfway to a miracle",
+    "char_a_description": "a lean guy in his early twenties with shaggy dark brown hair under a red baseball cap, an oversized football jersey, khaki cargo shorts, a backpack on one shoulder, and muddy trail runners",
+    "char_b_description": "a plump woman in her fifties with a chin-length bob dyed wine red, cat-eye glasses, a lavender blouse with a rental-company name tag, a dark pencil skirt, and low heel shoes",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "renter",
+    "char_b_role": "rental agent",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, returning the compact early, if that's okay.",
+        "phonetic": "/haɪ rɪˈtɝnɪŋ ðə kəmˈpækt ˈɜɹli ɪf ðæts oʊˈkeɪ/",
+        "zh": "嗨，我想提早歸還這台小車，不知道可不可以。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Early is welcome, when did you get it?",
+        "phonetic": "/ˈɜɹli ɪz ˈwɛlkəm wɛn dɪd ju ɡɛt ɪt/",
+        "zh": "提早歸還我們很歡迎，你是什麼時候取的車？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Saturday morning, so that's four days.",
+        "phonetic": "/ˈsætɚˌdeɪ ˈmɔɹnɪŋ soʊ ðæts fɔɹ deɪz/",
+        "zh": "星期六早上，所以今天是第四天。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And today you're handing it back, just like that?",
+        "phonetic": "/ænd təˈdeɪ jʊɹ ˈhændɪŋ ɪt bæk dʒʌst laɪk ðæt/",
+        "zh": "你今天說還就還，就這樣？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, yes? The plan was six days.",
+        "phonetic": "/ʌm jɛs ðə plæn wəz sɪks deɪz/",
+        "zh": "呃，對呀？原計畫是租六天。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Six, seven, we're not picky here.",
+        "phonetic": "/sɪks ˈsɛvən wɪɹ nɑt ˈpɪki hɪɹ/",
+        "zh": "六天、七天，我們這邊不講究。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Honestly, my cousin texted me a better offer.",
+        "phonetic": "/ˈɑnəstli maɪ ˈkʌzən ˈtɛkstɪd mi ə ˈbɛɾɚ ˈɑfɚ/",
+        "zh": "老實說，我表哥傳了個更好的提議給我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The cousin with the RV up in Seattle?",
+        "phonetic": "/ðə ˈkʌzən wɪð ði ɑɹˈviː ʌp ɪn siˈæɾəl/",
+        "zh": "那個在西雅圖開房車的表哥？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That one, now he's offering the ride home.",
+        "phonetic": "/ðæt wʌn naʊ hiz ˈɑfɚɪŋ ðə ɹaɪd hoʊm/",
+        "zh": "就是他，現在他讓我搭他的車一起回去。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So you're leaving two days early.",
+        "phonetic": "/soʊ jʊɹ ˈlivɪŋ tu deɪz ˈɜɹli/",
+        "zh": "所以你要早兩天離開。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tonight's flight, um, is that okay?",
+        "phonetic": "/tənaɪts flaɪt ʌm ɪz ðæts oʊˈkeɪ/",
+        "zh": "今晚的班機，呃，可以嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Flights are always okay here.",
+        "phonetic": "/flaɪts ɑɹ ˈɔlweɪz oʊˈkeɪ hɪɹ/",
+        "zh": "在這裡，班機永遠沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's the spirit, I'll take that energy.",
+        "phonetic": "/ðæts ðə ˈspɪɹɪt aɪl teɪk ðæt ˈɛnɚdʒi/",
+        "zh": "這就是我要的態度，這幹勁我收下了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We see last-minute plans often, no shame.",
+        "phonetic": "/wi si læstˈmɪnɪt plænz ˈɔfən noʊ ʃeɪm/",
+        "zh": "我們常看到最後關頭的計畫，這不丟人。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Will my wallet see the same mercy?",
+        "phonetic": "/wɪl maɪ ˈwɑlət si ðə seɪm ˈmɝsi/",
+        "zh": "那我的錢包還會有溫柔的待遇嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, the refund is the answer to that.",
+        "phonetic": "/hɑ ðə ɹiˈfʌnd ɪz ði ˈænsɚ tə ðæt/",
+        "zh": "哈，你問退費，答案就有啦。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Refund? I thought it was all gone.",
+        "phonetic": "/ɹiˈfʌnd aɪ θɔt ɪt wəz ɔl ɡɑn/",
+        "zh": "退費？我以為錢全部押下去了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two days come back to you, ninety-four.",
+        "phonetic": "/tu deɪz kʌm bæk tə ju ˈnɪnti fɔɹ/",
+        "zh": "兩天的錢會退回給你，九十四塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ninety-four, I'm listening closer now.",
+        "phonetic": "/ˈnɪnti fɔɹ aɪm ˈlɪsənɪŋ ˈkloʊzɚ naʊ/",
+        "zh": "九十四塊，我現在聽得認真多了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The math is public, ask me anything.",
+        "phonetic": "/ðə mæθ ɪz ˈpʌblɪk æsk mi ˈɛniθɪŋ/",
+        "zh": "算法都公開，隨便問。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, the daily versus the weekly thing?",
+        "phonetic": "/oʊˈkeɪ ðə ˈdeɪli ˈvɜːzəs ðə ˈwikli θɪŋ/",
+        "zh": "好，日租跟週租是怎麼換算的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The weekly rate divided by seven days.",
+        "phonetic": "/ðə ˈwikli reɪt dɪˈvaɪdəd baɪ ˈsɛvən deɪz/",
+        "zh": "把週租的價錢除以七天。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So I paid six, and get two back?",
+        "phonetic": "/soʊ aɪ peɪd sɪks ænd ɡɛt tu bæk/",
+        "zh": "所以我付了六天，退兩天回來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's how it looks from this side.",
+        "phonetic": "/ðæts haʊ ɪt lʊks fɹəm ðɪs saɪd/",
+        "zh": "從我這邊看就是這樣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Whoa, wait, where's the catch hiding?",
+        "phonetic": "/waʊ weɪt wɛɹz ðə kætʃ haɪdɪŋ/",
+        "zh": "哇，等等，陷阱藏在哪裡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The catch is fuel, how's the tank?",
+        "phonetic": "/ðə kætʃ ɪz ˈfjuəəl haʊz ðə tæŋk/",
+        "zh": "陷阱就是油量，油箱現在怎樣？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The tank? Um, halfway to a miracle.",
+        "phonetic": "/ðə tæŋk ʌm ˈhæfˌweɪ tə ə ˈmɪɾəkəl/",
+        "zh": "油箱？呃，距離奇蹟還有一半。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Halfway means you'll buy the other half.",
+        "phonetic": "/ˈhæfˌweɪ minz jul baɪ ði ˈʌðɚ hæf/",
+        "zh": "一半的意思，就是你要買另一半。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How much is the magic fuel here?",
+        "phonetic": "/haʊ mʌtʃ ɪz ðə ˈmædʒɪk ˈfjuəəl hɪɹ/",
+        "zh": "你們這裡的「奇蹟油」多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thirty-two for a full tank from us.",
+        "phonetic": "/ˈθɜɹɾi tu fɔɹ ə fʊl tæŋk fɹəm ʌs/",
+        "zh": "在我們這裡加滿，三十二塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The gas station across the street charges less.",
+        "phonetic": "/ðə ɡæs ˈsteɪʃən əˈkɹɑs ðə stiɹt ˈtʃɑɹdʒɪz lɛs/",
+        "zh": "對面那家加油站好像便宜一點。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It does, but your flight is at nine.",
+        "phonetic": "/ɪt dʌz bət jɔɹ flaɪt ɪz æt naɪn/",
+        "zh": "是便宜，但你的飛機九點起飛。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fine, fill it here, run the meter.",
+        "phonetic": "/faɪn fɪl ɪt hɪɹ ɹʌn ðə ˈmitɚ/",
+        "zh": "好吧，就在這裡加滿，計費吧。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Smart, we'll top it off while you wait.",
+        "phonetic": "/smɑɹt wil tɑp ɪt ˈɔf waɪl ju weɪt/",
+        "zh": "聰明，我們幫你加滿，你旁邊稍等。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, anything hiding in the fine print?",
+        "phonetic": "/oʊˈkeɪ ˈɛniθɪŋ ˈhaɪdɪŋ ɪn ðə faɪn prɪnt/",
+        "zh": "好，小字裡面還藏了什麼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The toll transponder, did it come with you?",
+        "phonetic": "/ðə toʊl ˈtɹɑnsˌpɑndɚ dɪd ɪt kʌm wɪθ ju/",
+        "zh": "過路費感應器，有沒有跟著你回來？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The toll thing? Um, it's in the cup holder.",
+        "phonetic": "/ðə toʊl θɪŋ ʌm ɪts ɪn ðə kʌp ˈhoʊldɚ/",
+        "zh": "那個過路費的小東西？呃，它在杯架裡。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good, hand it over and paperwork is done.",
+        "phonetic": "/ɡʊd hænd ɪt ˈoʊvɚ ænd ˈpeɪpɚˌwɜːk ɪz dʌn/",
+        "zh": "很好，交給我們，手續就結清了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It beeped at me constantly, is that normal?",
+        "phonetic": "/ɪt bipɪd æt mi ˈkɑnstəntli ɪz ðæts ˈnɔɹməl/",
+        "zh": "它一路都在嗶我，這正常嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Loud means working, quiet means trouble.",
+        "phonetic": "/laʊd minz ˈwɜːkɪŋ ˈkwaɪət minz ˈtɹʌbəl/",
+        "zh": "嗶聲大代表運作正常，安靜才是麻煩。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then it was very hardworking this week.",
+        "phonetic": "/ðɛn ɪt wəz ˈvɛɹi hɑɹdˈwɜːkɪŋ ðɪs wik/",
+        "zh": "那這一週它工作得非常賣力。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Did the tolls go through, or just beeps?",
+        "phonetic": "/dɪd ðə toʊlz ɡoʊ θɹu ɔɹ dʒʌst bips/",
+        "zh": "過路費有扣款成功，還是只有嗶聲？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The bills arrived already, two of them.",
+        "phonetic": "/ðə bɪlz əˈɹaɪvd ɔlˈrɛdi tu əv ðɛm/",
+        "zh": "帳單都寄到了，一共兩張。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Attach the receipt, they mail you the rest.",
+        "phonetic": "/əˈtætʃ ðə ɹɪˈsit ðeɪ meɪl ju ðə rɛst/",
+        "zh": "把收據附在單據上，他們會補發其餘的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I will tonight, I promise on this pen.",
+        "phonetic": "/aɪ wɪl təˈnaɪt aɪ ˈpɹɑməs ɑn ðɪs pɛn/",
+        "zh": "我今晚就補上，用這支筆跟你保證。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We believe you, no notarizing needed.",
+        "phonetic": "/wi bɪˈliv ju noʊ ˈnɑɹəˌtaɪzɪŋ ˈnidəd/",
+        "zh": "我們相信你，不用特別公證。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, so the refund goes back to the card?",
+        "phonetic": "/hɑ soʊ ðə ɹiˈfʌnd ɡoʊz bæk tə ðə kɑɹd/",
+        "zh": "哈，所以退款會回到原本那張卡？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Same card, three to five business days.",
+        "phonetic": "/seɪm kɑɹd θɹi tə faɪv ˈbɪznəs deɪz/",
+        "zh": "同一張卡，三到五個工作天入帳。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can I email my dad the total for proof?",
+        "phonetic": "/kən aɪ ˈimeɪl maɪ dæd ðə ˈtoʊɾəl fɔɹ pruf/",
+        "zh": "我可以把總金額寄給老爸當證據嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We'll print it, then ask me about the tire.",
+        "phonetic": "/wil prɪnt ɪt ðɛn æsk ˈɑfɚ ðə ˈtaɪɚ/",
+        "zh": "我們先印收據，然後問問我輪胎的事。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The tire got a small bubble, is that mine?",
+        "phonetic": "/ðə ˈtaɪɚ ɡɑt ə smɔːl ˈbʊbəl ɪz ðæt maɪn/",
+        "zh": "輪胎鼓了一小塊，那個算我的嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It was there Saturday, I checked twice.",
+        "phonetic": "/ɪt wəz ðɛɹ ˈsætɚˌdeɪ aɪ tʃɛkt twaɪs/",
+        "zh": "星期六取車時就在了，我檢查過兩次。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You checked? Nobody ever checks.",
+        "phonetic": "/ju tʃɛkt ˈnoʊbəˌdɪ ˈɛvɚ tʃɛks/",
+        "zh": "你有檢查？沒人會檢查的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We check, it protects everyone here.",
+        "phonetic": "/wi tʃɛk ɪt pɹəˈtɛkts ˈɛvɹiˌwʌn hɪɹ/",
+        "zh": "我們會，這樣保護在場的每一個人。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Any damage I should confess before I fly?",
+        "phonetic": "/ˈɛni ˈdæmɪdʒ aɪ ʃʊd kənˈfɛs bɪˈfɔɹ aɪ flaɪ/",
+        "zh": "搭飛機前，有什麼損壞要我主動承認的嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Just one coffee stain on the back seat.",
+        "phonetic": "/dʒʌst wʌn ˈkɔfi steɪn ɑn ðə bæk sit/",
+        "zh": "只剩後座上的一塊咖啡漬。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Coffee is my cousin's crime, not mine.",
+        "phonetic": "/ˈkɔfi ɪz maɪ ˈkʌzənz kraɪm nɑt maɪn/",
+        "zh": "咖啡是我表哥的罪行，不是我的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We'll blame the stain together, quiet agreement.",
+        "phonetic": "/wil bleɪm ðə steɪn təˈɡɛðɚ ˈkwaɪət əˈɡɹimənt/",
+        "zh": "那我們就一起把帳算給咖啡漬，心照不宣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Best rental return of my short life.",
+        "phonetic": "/bɛst ˈɹɛntəl ɹɪˈtɝn əv maɪ ʃɔɹt laɪf/",
+        "zh": "這是我短暫人生中最棒的一次還車。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fly safe, and text the cousin our thanks.",
+        "phonetic": "/flaɪ seɪf ænd tɛkst ðə ˈkʌzən aʊɹ θæŋks/",
+        "zh": "一路平安，替我們向表哥說聲謝謝。"
+      }
+    ],
+    "youtube_title": "【臨時改期航班✈️】「距離奇蹟還有一半」租車提前還車與退費全程🚗🧾🎧｜聽完就會自己辦還車｜60句英語聽力練習｜Returning a Rental Car Early",
+    "youtube_title_en": "\"Halfway to a Miracle\" — Returning a Rental Car Early",
+    "youtube_description": "「油箱？呃，距離奇蹟還有一半」——班機臨時提早，租來的車能不能早兩天還、把錢拿回來？這一集是 60 句沉浸式英語聽力練習，場景就在機場邊的租車還車櫃檯。\n\n你會聽到：日租與週租的換算邏輯、退費金額怎麼報；油量不足時的加錢選擇、過路費感應器的歸還與帳單流程；輪胎舊傷誰負責、咖啡漬怎麼心照不宣的細節問答。\n\n整段對話只用 A2 初級單字與短句，充滿美國人真實的口語節奏：um、well、so、ha、whoa。聽完你就會用：Is that okay?、Where's the catch hiding?、Run the meter、Fly safe。\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"The tank? Um, halfway to a miracle\" — your flight leaves early, and the rental car needs to go back two days sooner. This 60-line immersive English listening practice takes place right at the rental return counter.\n\nYou will hear: how the weekly rate turns into a refund, the fuel catch when the tank runs low, returning the toll transponder and handling its bills, and the small-print questions about old tire bubbles and coffee stains.\n\nEverything stays at A2 level with real American texture: um, well, so, ha, whoa. By the end you'll own lines like Is that okay?, Where's the catch hiding?, Run the meter, and Fly safe.\n\nThe final chapter is a line-by-line listen-and-repeat workout, so speak every refund out loud.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧租車還車英文｜退費算式・油量陷阱・過路費感應器｜提早兩天的班機｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n去程的計畫變了，班機提前了兩天，租的車可以早點還嗎？付過的錢還會退一部分嗎？油量差一半，來得及去加油嗎？\n\n這一集帶大家站在機場旁的租車還車櫃檯，從報取車日期、算退費金額、處理油量與過路費感應器，一路聽到印收據與道別，共 60 句連續真實對話。\n\n你會聽到：\n💰 退費句：Two days come back to you, ninety-four.\n⛽ 問油量：The tank? Um, halfway to a miracle.\n🛣️ 感應器：The toll thing? Um, it's in the cup holder.\n🧾 要收據：We'll print it, then ask me about the tire.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、so、ha 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這趟臨時改期的歸途走一回，下次你的班機再早，車也能還得從容。\n\n祝你每一次還車，都像這集一樣順利。",
+    "youtube_tags": [
+      "english listening practice",
+      "rental car return english",
+      "refund conversation english",
+      "airport rental counter dialogue",
+      "esl listening a2",
+      "toll transponder english",
+      "fuel level rental car",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "租車還車英文",
+      "退費對話",
+      "英語聽力練習",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "機場英文"
+    ],
+    "scene": "rental car return counter",
+    "thumbnail_expression": "nervous smile with raised eyebrows",
+    "thumbnail_action": "dropping car keys into the agent's hand across the counter",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Rental Keys",
+        "zh": "租車鑰匙"
+      },
+      {
+        "en": "Fuel Gauge",
+        "zh": "油量計"
+      },
+      {
+        "en": "Toll Transponder",
+        "zh": "過路費感應器"
+      },
+      {
+        "en": "Boarding Pass",
+        "zh": "登機證"
+      },
+      {
+        "en": "Receipt Printer",
+        "zh": "收據列印機"
+      }
+    ]
+  }
+}

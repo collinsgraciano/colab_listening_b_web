@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_get-well-flower-order",
+  "topic": "Ordering a Get-Well Flower Bouquet for a Friend",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758849600.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "GET-WELL FLOWERS",
+    "title_zh": "訂花探望",
+    "scene_zh": "花店 · 訂花探望",
+    "story_hook": "A friend is sick, and one bouquet says it all.",
+    "intro_zh": "朋友生病了，一束花就代表全部心意。",
+    "welcome_en": "Hi, welcome to a cheerful flower shop. Listen for ordering, cards, and delivery.",
+    "welcome_zh": "嗨，歡迎來到一間明亮的花店。請留意訂花、卡片與配送的說法。",
+    "outro": "And that's a get-well gift, all done. Her flowers are already on the road.",
+    "outro_zh": "探望的禮物就這樣搞定。她那束花已經在路上啦。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "You're saving my friendship today",
+    "char_a_description": "a young man in his early twenties with short sandy blond hair swept to one side, a thin gold chain, a slate blue denim jacket over a plain white tee, and a lean build",
+    "char_b_description": "a warm smiling woman in her fifties with silver-gray hair in a loose low ponytail, tiny pearl earrings, a lavender smock over a cream blouse, a petal-stained apron, and a soft round build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "customer",
+    "char_b_role": "florist",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, I need flowers for a sick friend.",
+        "phonetic": "/haɪ aɪ niːd ˈflaʊɚz fɚ ə sɪk frɛnd/",
+        "zh": "嗨，我想買束花，送給生病的朋友。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh no, what happened to your friend?",
+        "phonetic": "/oʊ noʊ wʌt həˈpænd tə jɔɹ frɛnd/",
+        "zh": "噢不，你朋友怎麼了？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "She's home from the hospital, resting now.",
+        "phonetic": "/ʃiːz hoʊm fɹəm ðə ˈhɑspɪɾəl ˈɹɛstɪŋ naʊ/",
+        "zh": "她剛從醫院回家，正在休養。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's kind of you. Does she have favorites?",
+        "phonetic": "/ðæts kaɪnd əv ju dʌz ʃi hæv ˈfeɪvɚɪts/",
+        "zh": "你有心了。她有沒有特別偏好的花？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, she loves sunflowers, the big bright ones.",
+        "phonetic": "/ʌm ʃi lʌvz ˈsʌnˌflaʊɚz ðə bɪɡ bɹaɪt wʌnz/",
+        "zh": "嗯，她最愛向日葵，那種又大又亮眼的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bad news, sunflowers are back next Tuesday.",
+        "phonetic": "/bæd nuz ˈsʌnˌflaʊɚz ɑɹ bæk nɛkst ˈtuzdeɪ/",
+        "zh": "壞消息，向日葵要到下週二才進貨。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Aw, that was my entire plan right there.",
+        "phonetic": "/ɔ ðæt wəz maɪ ɛnˈtaɪɚ plæn ɹaɪt ðɛɹ/",
+        "zh": "唉，我的整個計畫就是它。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We could do yellow roses instead, though.",
+        "phonetic": "/wi kʊd du ˈjɛloʊ ˈɹoʊzɪz ɪnˈstɛd ðoʊ/",
+        "zh": "不過我們可以用黃玫瑰代替。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yellow roses work, she likes warm colors.",
+        "phonetic": "/ˈjɛloʊ ˈɹoʊzɪz wɝk ʃi laɪks wɔɹm ˈkʌlɚz/",
+        "zh": "黃玫瑰也不錯，她喜歡暖色調。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, how big should the bouquet be?",
+        "phonetic": "/oʊˈkeɪ haʊ bɪɡ ʃʊd ðə ˈboʊkeɪ bi/",
+        "zh": "好，那花束要多大？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Something medium, not too loud, you know.",
+        "phonetic": "/ˈsʌmθɪŋ ˈmidɪəm nɑt tu laʊd ju noʊ/",
+        "zh": "中等就好，別太招搖，你懂吧。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it. Is anyone around her allergic?",
+        "phonetic": "/ɡɑɾ ɪt ɪz ˈɛniˌwʌn əˈɹaʊnd hɚ əˈlɝdʒɪk/",
+        "zh": "了解。她身邊有過敏的人或寵物嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, yes, her cat stays home with her.",
+        "phonetic": "/wɛl jɛs hɚ kæt ˈsteɪz hoʊm wɪð hɚ/",
+        "zh": "嗯，有的，她家貓咪整天陪著她。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good thing you said, lilies hurt cats.",
+        "phonetic": "/ɡʊd θɪŋ ju sɛd ˈlɪlɪz hɝt kæts/",
+        "zh": "還好你有想到，百合會讓貓咪中毒。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Seriously? I had no clue about that.",
+        "phonetic": "/sɪˈɹɛnli aɪ hæd noʊ kluː əˈbaʊt ðæt/",
+        "zh": "真的假的？我完全不知道這件事。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So, no lilies, and no baby's breath.",
+        "phonetic": "/soʊ noʊ ˈlɪlɪz ænd noʊ ˈbeɪbiz bɹɛθ/",
+        "zh": "所以，不要百合，也不要滿天星。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "What flowers are safe then? Roses okay?",
+        "phonetic": "/wʌt ˈflaʊɚz ɑɹ seɪf ðɛn ˈɹoʊzɪz ˈoʊkeɪ/",
+        "zh": "那哪些花安全？玫瑰應該沒事吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Roses, carnations, tulips, all cat-safe.",
+        "phonetic": "/roʊzɪz kɑɹˈneɪʃənz ˈtulɪps ɔl kæt seɪf/",
+        "zh": "玫瑰、康乃馨、鬱金香，對貓都安全。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tulips, please, mixed with the yellow roses.",
+        "phonetic": "/ˈtulɪps pliz mɪkst wɪð ðə ˈjɛloʊ ˈɹoʊzɪz/",
+        "zh": "請給我鬱金香，搭配黃玫瑰。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nice combo. Want a vase with that?",
+        "phonetic": "/naɪs kɑmˈboʊ wɑnt ə veɪz wɪð ðæt/",
+        "zh": "這個搭配很棒。要不要附一個花瓶？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, does the vase cost extra?",
+        "phonetic": "/həm dʌz ðə veɪz kɔst ˈɛkstrə/",
+        "zh": "嗯，花瓶要額外收費嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Twelve dollars for a simple glass one.",
+        "phonetic": "/twɛlv ˈdɑɾɚz fɚ ə ˈsɪmpəl ɡlæs wʌn/",
+        "zh": "簡單款玻璃花瓶要十二塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then yes please, she'll thank me twice.",
+        "phonetic": "/ðɛn jɛs pliz ʃi θæŋk mi ˈtwaɪs/",
+        "zh": "那就加吧，她一定會多謝我兩次。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "She'll thank you just for showing up.",
+        "phonetic": "/ʃi θæŋk ju dʒʌst fɚ ˈʃoʊɪŋ ʌp/",
+        "zh": "其實她只要看到你，就已經很感謝了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fair point. Can I write the card myself?",
+        "phonetic": "/fɛɹ pɔɪnt kən aɪ ɹaɪt ðə kɑɹd maɪˈsɛlf/",
+        "zh": "也對。卡片內容我想自己寫。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course, pens live right on this counter.",
+        "phonetic": "/ʌv kɔɹs pɛnz lɪv ɹaɪt ɑn ðɪs ˈkaʊɾɚ/",
+        "zh": "當然，筆就放在這個櫃台上。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'll start with, Rest now, you stubborn one.",
+        "phonetic": "/aɪl stɑɹt wɪð ɹɛst naʊ ju ˈstʌbɚn wʌn/",
+        "zh": "我要先寫：乖乖休息，固執鬼。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha! She sounds fun. Anything sillier too?",
+        "phonetic": "/hɑ ʃi ˈsaʊndz fʌn ˈɛniθɪŋ ˈsɪliɚ tu/",
+        "zh": "哈！光想就知道她很有趣。還要加點更搞笑的嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How about, soup can't beat these flowers.",
+        "phonetic": "/haʊ əˈbaʊt sup kænt bi ðiːz ˈflaʊɚz/",
+        "zh": "這句怎麼樣：湯可打不過這束花。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect joke material, I'll write it neatly.",
+        "phonetic": "/ˈpɝfɪkt dʒoʊk məˈtɪɹiəl aɪl ɹaɪt ɪt ˈnitli/",
+        "zh": "完美的笑料，我會工整地替你寫上去。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Please do, my handwriting looks like traffic.",
+        "phonetic": "/pliz du maɪ ˈhændˌraɪtɪŋ lʊks laɪk ˈtɹæfɪk/",
+        "zh": "拜託，我的字寫得像車禍現場。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's what assistants are famous for.",
+        "phonetic": "/ðæts wʌt əˈsɪstənts ɑɹ ˈfeɪməs fɚ/",
+        "zh": "這向來是我們店員的專長。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, delivery today, is that still possible?",
+        "phonetic": "/soʊ dɪˈlɪvɚi təˈdeɪ ɪz ðæt stɪl ˈpɑsəbl/",
+        "zh": "那今天配送還來得及嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "If you finish by two, we can try.",
+        "phonetic": "/ɪf ju ˈfɪnɪʃ baɪ tu wi kæn tɹaɪ/",
+        "zh": "兩點前搞定，我們就能試試。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's one twenty now, so we're lucky.",
+        "phonetic": "/ɪts wʌn ˈtwɛnti naʊ soʊ wɪɹ ˈlʌki/",
+        "zh": "現在一點二十，我們還挺幸運。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Where's the drop-off address exactly?",
+        "phonetic": "/wɛɹz ðə ˈdɹɑpˌɔf əˈdɹɛs ɪɡˈzæktli/",
+        "zh": "確切要送到哪個地址？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Elm Street, unit nine, right by the park.",
+        "phonetic": "/ɛm stiɹt ˈjunɪt naɪn ɹaɪt baɪ ðə pɑɹk/",
+        "zh": "榆樹街九號單元，就在公園旁邊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh, that route is our easiest one.",
+        "phonetic": "/oʊ ðæt ruːt ɪz ɑɹ ˈiːziəst wʌn/",
+        "zh": "噢，那條路線是我們最順的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "She's home all day, resting quietly.",
+        "phonetic": "/ʃiːz hoʊm ɔl deɪ ˈɹɛstɪŋ ˈkwaɪətli/",
+        "zh": "她整天都待在家裡安靜休息。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great, we'll land between one and four.",
+        "phonetic": "/ɡɹeɪt wil lænd bɪˈtwin wʌn ænd fɔɹ/",
+        "zh": "太好了，我們會在一點到四點之間送到。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can your driver text her before knocking?",
+        "phonetic": "/kæn jɔɹ ˈdɹaɪvɚ tɛkst hɚ bɪˈfɔɹ ˈnɑkɪŋ/",
+        "zh": "送貨前可以先傳簡訊給她嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, but we don't have her number.",
+        "phonetic": "/ʃʊɹ bʌt wi doʊnt hæv hɚ ˈnʌmbɚ/",
+        "zh": "可以，不過我們沒有她的電話號碼。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'll text her your number right now.",
+        "phonetic": "/aɪl tɛkst hɚ jɔɹ ˈnʌmbɚ ɹaɪt naʊ/",
+        "zh": "我現在就把你的號碼傳給她。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And if nobody answers the doorbell?",
+        "phonetic": "/ænd ɪf ˈnoʊˌbɑdi ˈænsɚz ðə ˈdɔɹˌbɛl/",
+        "zh": "要是按了電鈴沒人開呢？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then leave it with the front desk, um, safe?",
+        "phonetic": "/ðɛn lɪv ɪt wɪð ðə ˈfɹʌnt dɛsk ʌm ˈseɪf/",
+        "zh": "那就交給櫃台，嗯，會安全嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Front desk signs for us, totally fine.",
+        "phonetic": "/fɹʌnt dɛsk saɪnz fɚ ʌs ˈtɑɾli faɪn/",
+        "zh": "櫃台會幫我們代簽，完全沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect. So what's the total with everything?",
+        "phonetic": "/ˈpɝfɪkt soʊ wʌts ðə ˈtoʊɾəl wɪð ˈɛvɹiθɪŋ/",
+        "zh": "太好了。這樣總共多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Forty-six, with vase and delivery included.",
+        "phonetic": "/ˈfɔɹti sɪks wɪð veɪz ænd dɪˈlɪvɚi ɪnˈkludɪd/",
+        "zh": "四十六塊，含花瓶和運費。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's fair, honestly. Can I pay by card?",
+        "phonetic": "/ðæts fɛɹ ˈɑnəstli kən aɪ peɪ baɪ kɑɹd/",
+        "zh": "老實講很划算。可以刷卡嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, tap or insert, whichever you like.",
+        "phonetic": "/jɛs tæp ɔɹ ɪnˈsɚt wɪtˈɛvɚ ju laɪk/",
+        "zh": "可以，感應或插卡都歡迎。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tap, um, hold on, did it go through?",
+        "phonetic": "/tæp ʌm ˈhoʊld ɑn dɪd ɪt ˈɡoʊ θɹu/",
+        "zh": "感應，嗯，稍等，這筆進去了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It did, want the receipt emailed too?",
+        "phonetic": "/ɪt dɪd wɑnt ðə ɹɪˈsit ˈimeɪld tu/",
+        "zh": "成功了。收據也要用郵件傳給你嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes please, paper receipts vanish from my table.",
+        "phonetic": "/jɛs pliz ˈpeɪpɚ ˈɹɪsits ˈvænɪʃ fɹəm maɪ ˈteɪbəl/",
+        "zh": "好啊，紙本收據在我桌上總是不見。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Understood. Your flowers leave within twenty minutes.",
+        "phonetic": "/ˌʌndɚˈstʊd jɔɹ ˈflaʊɚz liv wɪˈðɪn ˈtwɛnti ˈmɪnəts/",
+        "zh": "知道了。你的花二十分鐘內就會出發。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're saving my friendship today, honestly.",
+        "phonetic": "/jʊɹz ˈseɪvɪŋ maɪ ˈfɹɛndʃɪp təˈdeɪ ˈɑnəstli/",
+        "zh": "老實講，你今天救回了我這段友情。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, flowers fix almost everything in this shop.",
+        "phonetic": "/hɑ ˈflaʊɚz fɪks ˈɔlmoʊst ˈɛvɹiθɪŋ ɪn ðɪs ʃɑp/",
+        "zh": "哈，在我們店裡，花幾乎能修好一切。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "She's going to love this, I'm sure.",
+        "phonetic": "/ʃiːz ˈɡoʊɪŋ tə lʌv ðɪs aɪm ʃʊɹ/",
+        "zh": "她一定會愛上這束花的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Wish her a fast recovery from us.",
+        "phonetic": "/wɪʃ hɚ ə fæst ɹɪˈkʌvɚi fɹəm ʌs/",
+        "zh": "我們也祝她早日康復。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you again, you've been so kind.",
+        "phonetic": "/θæŋk ju əˈɡɛn juv bɪn soʊ kaɪnd/",
+        "zh": "再一次謝謝你，你真的很體貼。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bye now, the courier's almost out the door.",
+        "phonetic": "/baɪ naʊ ðə ˈkʊɹɪɚz ˈɔlmoʊst aʊt ðə dɔɹ/",
+        "zh": "再見，送貨員快出門了。"
+      }
+    ],
+    "youtube_title": "【探望生病的朋友💐】「你今天救回了我這段友情」從選花到送貨💐🌷🚚💳｜聽完就能自己訂花｜60句沉浸式英語聽力｜Get-Well Flowers",
+    "youtube_title_en": "\"You're Saving My Friendship Today\" — Ordering Get-Well Flowers with Same-Day Delivery",
+    "youtube_description": "「你今天救回了我這段友情」——去探望生病的朋友，怎麼在花店挑一束對貓咪安全的花、把卡片寫好、再趕在當天送到？這是一支 60 句的沉浸式英語聽力練習，場景就在一間溫暖的花店櫃台前。\n\n你會聽到：跟店員開場並說明來意；向日葵剛好缺貨的小打擊；因為貓咪而避開百合的安全選花；卡片內容怎麼下筆、請店員代筆；當日配送的截止時間、地址確認、沒人在家時的代簽收；還有總價、刷卡與收據。\n\n整段對話只用 A2 初級單字與十個詞以內的短句，重現美國人走進花店的真實語感：um、well、so、ha、fair point。聽完你就會用：I need flowers for...、Is that still possible?、Can I pay by card?、What's the total with everything?。\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"You're saving my friendship today\" — sometimes the best medicine is a bouquet delivered before dinner. This is a 60-line immersive English listening practice set at a warm little flower shop counter.\n\nYou will hear: explaining why you need flowers, the small blow of sold-out sunflowers, picking cat-safe blooms after a lily warning, drafting (and delegating!) the card message, and locking down same-day delivery, drop-off backup, price, and payment.\n\nEverything stays in A2-level words, with the small talk Americans really use: um, well, so, ha, fair point. By the end you'll own phrases like I need flowers for..., Is that still possible?, and Can I pay by card?\n\nThe back half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧花店訂花英文｜缺貨換花・對貓安全選花・當日送貨｜探望朋友這一束剛好｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n朋友剛從醫院回家修養，你想送一束花，卻不知道哪種花對家有貓咪的人不安全？卡片上那句話該怎麼寫才顯得真心？當天還來得及送到嗎？\n\n這一集帶大家走進一間溫暖的花店，從說明來意、替換缺貨的向日葵、避開對貓危險的百合，一路聽到卡片代筆、當日配送、櫃台代收與結帳，共 60 句連續真實對話。\n\n你會聽到：\n💐 點明需求：I need flowers for a sick friend.\n🌷 安全選花：What flowers are safe then? Roses okay?\n✉️ 卡片金句：How about, soup can't beat these flowers.\n🚚 當日配送：So, delivery today, is that still possible?\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這趟買花之旅走一趟，下次你想替人帶份心意，話自己就會出口。\n\n祝你身邊的人早日康復。",
+    "youtube_tags": [
+      "english listening practice",
+      "ordering flowers in english",
+      "florist english dialogue",
+      "get well soon english message",
+      "same day delivery english",
+      "esl listening a2",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "花店英文",
+      "訂花英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "日常英文對話"
+    ],
+    "scene": "flower shop counter",
+    "thumbnail_expression": "hopeful and a little rushed",
+    "thumbnail_action": "holding a sunflower while the florist shakes her head",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Tulip Bouquet",
+        "zh": "鬱金香花束"
+      },
+      {
+        "en": "Yellow Roses",
+        "zh": "黃玫瑰"
+      },
+      {
+        "en": "Glass Vase",
+        "zh": "玻璃花瓶"
+      },
+      {
+        "en": "Get-Well Card",
+        "zh": "問候卡片"
+      },
+      {
+        "en": "Delivery Van",
+        "zh": "送貨車"
+      }
+    ]
+  }
+}

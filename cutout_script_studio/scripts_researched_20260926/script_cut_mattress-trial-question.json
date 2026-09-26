@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_mattress-trial-question",
+  "topic": "Buying a Mattress with a Hundred-Night Trial",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1790384400.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A HUNDRED-NIGHT TRIAL",
+    "title_zh": "試躺買床",
+    "scene_zh": "床墊店 · 試躺選購",
+    "story_hook": "A hundred nights to fall in love with a bed.",
+    "intro_zh": "一百個晚上，讓你慢慢愛上一張床。",
+    "welcome_en": "Hi, welcome to tonight's mattress store visit. Listen for smart shopping phrases.",
+    "welcome_zh": "嗨，歡迎來到今天的床墊店場景。留意聰明購物的實用說法。",
+    "outro": "That's a mattress bought with your eyes open. Play it again, echo every line.",
+    "outro_zh": "一張床就這樣買得明明白白。再撥一次，逐句大聲跟讀。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "sleep on it, literally",
+    "char_a_description": "a woman in her late twenties with dark brown hair in a single side braid, wearing a moss green wool sweater, black leggings, a small crossbody bag, and an athletic build",
+    "char_b_description": "a man in his fifties with short silver hair combed straight back, thin gold glasses, a navy blue store polo shirt with a name tag, khaki slacks, and a tall lean build",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "buyer",
+    "char_b_role": "mattress staff",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, I need a mattress that helps my back.",
+        "phonetic": "/haɪ aɪ nid ə ˈmætrəs ðæt hɛlps maɪ bæk/",
+        "zh": "嗨，我需要一張對背有幫助的床墊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Welcome in, you're in the right aisle.",
+        "phonetic": "/ˈwɛlkəm ɪn jʊɹz ðə ɹaɪt ˈaɪəl/",
+        "zh": "歡迎進來，您走對走道了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I slept badly, my old one is too soft.",
+        "phonetic": "/aɪ slɛpt ˈbædli maɪ oʊld wʌn ɪz tu sɔft/",
+        "zh": "我之前都睡不好，那張舊的太軟了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Got it, so we look at firmer beds.",
+        "phonetic": "/ɡɑɾ ɪt soʊ wi lʊk æt ˈfɚmɚ bɛdz/",
+        "zh": "了解，那我們來看看較硬的床。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So firmer means really hard?",
+        "phonetic": "/soʊ ˈfɚmɚ minz ˈɹɪəli hɑɹd/",
+        "zh": "較硬的意思……是很硬嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Firm, medium firm, or plush, three levels.",
+        "phonetic": "/fɝm ˈmidɪəm fɝm ɔɹ plʌʃ θɹi ˈlɛvəlz/",
+        "zh": "有硬、中硬、蓬軟三種等級。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, which one do most people pick?",
+        "phonetic": "/ʌm wɪtʃ wʌn du moʊst ˈpipəl pɪk/",
+        "zh": "嗯，大多數人都選哪一種？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Medium firm, good for back sleepers.",
+        "phonetic": "/ˈmidɪəm fɝm ɡʊd fɚ bæk ˈslipɚz/",
+        "zh": "中硬最通用，適合仰睡的人。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I sleep on my side mostly.",
+        "phonetic": "/aɪ slip ɑn maɪ saɪd ˈmoʊstli/",
+        "zh": "可我多半是側著睡的呀。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then plush, it hugs your shoulders.",
+        "phonetic": "/ðɛn plʌʃ ɪt hʌɡz jɔɹ ˈʃoʊldɚz/",
+        "zh": "那就蓬軟款，它會溫柔托住肩膀。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hugs, nice. Can I try this one?",
+        "phonetic": "/hʌɡz naɪs kən aɪ traɪ ðɪs wʌn/",
+        "zh": "會托住，真好。我可以試躺這張嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Please, lie down, take your time.",
+        "phonetic": "/pliz laɪ daʊn teɪk jɔɹ taɪm/",
+        "zh": "當然，請躺下，慢慢來不著急。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, this feels nicer than my bed.",
+        "phonetic": "/həm ðɪs filz ˈnaɪsɚ ðæn maɪ bɛd/",
+        "zh": "嗯，這張比我家那床還舒服。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Give it two minutes, still okay?",
+        "phonetic": "/ɡɪv ɪt tu ˈmɪnɪts stɪl oʊˈkeɪ/",
+        "zh": "再躺兩分鐘，還適應嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No complaints, my back approves.",
+        "phonetic": "/noʊ kəmˈpleɪts maɪ bæk əˈpɹuvz/",
+        "zh": "沒什麼意見，我的背在點頭稱許了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great sign, seriously.",
+        "phonetic": "/ɡɹeɪt saɪn ˈsɪɹiəsli/",
+        "zh": "這可是好兆頭，真的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Now, the price, how much are we talking?",
+        "phonetic": "/naʊ ðə praɪs haʊ mʌtʃ ɑɹ wi ˈtɔkɪŋ/",
+        "zh": "接下來是嚇人的價位，大概要多少？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Eight hundred, and that's on sale.",
+        "phonetic": "/eɪt ˈhʌndɹəd ænd ðæts ɑn seɪl/",
+        "zh": "八百美元，而且這已經是特價。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's a lot for a bed, honestly.",
+        "phonetic": "/ðæts ə lɑt fɔɹ ə bɛd ˈɑnəstli/",
+        "zh": "老實說，買張床這價有點貴。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It is, but you keep it for years.",
+        "phonetic": "/ɪt ɪz bʌt ju kip ɪt fɔɹ jɪɹz/",
+        "zh": "是有點貴，可這張床你要用上許多年。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "True. Hey, does it come with a trial?",
+        "phonetic": "/tru heɪ dʌz ɪt kʌm wɪð ə ˈtɹaɪəl/",
+        "zh": "也是。對了，它有附試睡期嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, one hundred nights to decide.",
+        "phonetic": "/jɛs wʌn ˈhʌndɹəd naɪts tə dɪˈsaɪd/",
+        "zh": "有，一百個晚上讓你慢慢決定。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "One hundred nights?",
+        "phonetic": "/wʌn ˈhʌndɹəd naɪts/",
+        "zh": "一百個晚上？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One hundred nights to change your mind.",
+        "phonetic": "/wʌn ˈhʌndɹəd naɪts tə tʃeɪndʒ jɔɹ maɪnd/",
+        "zh": "一百個晚上，隨時可以反悔。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, sleep on it, then return it?",
+        "phonetic": "/soʊ slip ɑn ɪt ðɛn ɹɪˈtɜɹn ɪt/",
+        "zh": "所以我能先睡睡看，不滿意再退掉？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here you sleep on it, literally, for free.",
+        "phonetic": "/hɪɹ ju slip ɑn ɪt ˈlɪɾɚəli fɔɹ fɹi/",
+        "zh": "在這張床上你真的能先睡，完全免費。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Free sounds risky, what's the catch?",
+        "phonetic": "/fɹi ˈsaʊndz ˈɹɪski wɑts ðə kætʃ/",
+        "zh": "「免費」聽來有陷阱，條件是什麼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A small return fee, ninety dollars.",
+        "phonetic": "/ə smɔl ɹɪˈtɜɹn fi ˈnaɪnti ˈdɑləɹz/",
+        "zh": "退貨要收一小筆費用，九十美元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ninety only if I give it back?",
+        "phonetic": "/ˈnaɪnti ˈoʊnli ɪf aɪ ɡɪv ɪt bæk/",
+        "zh": "九十美元只在我退回去時才收？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Right, if you keep it, zero.",
+        "phonetic": "/ɹaɪt ɪf ju kip ɪt ˈzɪɹoʊ/",
+        "zh": "沒錯，願意留下的話就一分不花。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, I can live with that.",
+        "phonetic": "/oʊˈkeɪ aɪ kən lɪv wɪð ðæt/",
+        "zh": "好，這個條件我能接受。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One more thing, the protector.",
+        "phonetic": "/wʌn mɔɹ θɪŋ ðə pɹəˈtɛktɚ/",
+        "zh": "還有件事，關於保護套。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The protector? I saw that box.",
+        "phonetic": "/ðə pɹəˈtɛktɚ aɪ sɔ ðæt ˈbɑks/",
+        "zh": "保護套嗎？我有看到那個紙箱。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, you must use one, every night.",
+        "phonetic": "/jɛs ju mʌst juz wʌn ˈɛvɹi naɪt/",
+        "zh": "對，你每晚都必須罩著一個。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Why every single night, though?",
+        "phonetic": "/waɪ ˈɛvɹi ˈsɪŋɡəl naɪt ðoʊ/",
+        "zh": "可為什麼每一晚都得罩著呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Stains void the trial, that's the rule.",
+        "phonetic": "/steɪnz vɔɪd ðə ˈtɹaɪəl ðæts ðə ɹul/",
+        "zh": "沾上污漬，試睡期就作廢，這是規矩。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So no protector, no refund later.",
+        "phonetic": "/soʊ noʊ pɹəˈtɛktɚ noʊ ɹɪˈfʌnd ˈleɪtɚ/",
+        "zh": "所以不罩保護套，到時就退不了錢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and mind the tag on the bed.",
+        "phonetic": "/ɪɡˈzæktli ænd maɪnd ðə tæɡ ɑn ðə bɛd/",
+        "zh": "就是這樣，還要注意床上的標籤。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The law tag? My mother warned me.",
+        "phonetic": "/ðə lɔ tæɡ maɪ ˈmʌðɚ wɔɹnd mi/",
+        "zh": "那個「法律標籤」嗎？我媽媽也提醒過我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, wise mother, never remove it.",
+        "phonetic": "/hɑ waɪz ˈmʌðɚ ˈnɛvɚ ɹɪˈmuv ɪt/",
+        "zh": "哈哈，令堂真有智慧，千萬別撕掉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fine, I'll add the protector then.",
+        "phonetic": "/faɪn aɪl æd ðə pɹəˈtɛktɚ ðɛn/",
+        "zh": "好吧，那我把保護套也一起買。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Forty bucks, waterproof, good quality.",
+        "phonetic": "/ˈfɔɹti bʌks ˈwɔɾɚˌpruːf ɡʊd ˈkwɑləti/",
+        "zh": "四十美元，防水，品質也不錯。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cheaper than I feared, I'll take it.",
+        "phonetic": "/ˈtʃipɚ ðæn aɪ fɪɹd aɪl teɪk ɪt/",
+        "zh": "比我擔心的便宜，我要了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Great choice. Now, delivery details?",
+        "phonetic": "/ɡɹeɪt tʃɔɪs naʊ dɪˈlɪvəɹi dɪˈteɪlz/",
+        "zh": "選得好。接著聊聊送貨的細節？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do you haul away my old bed?",
+        "phonetic": "/du ju hɔl əˈweɪ maɪ oʊld bɛd/",
+        "zh": "你們會幫我把舊床搬走嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We do, sixty dollars for that.",
+        "phonetic": "/wi du ˈsɪksti ˈdɑləɹz fɔɹ ðæt/",
+        "zh": "會的，那項服務要六十美元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sixty to take the old one out?",
+        "phonetic": "/ˈsɪksti tə teɪk ði oʊld wʌn aʊt/",
+        "zh": "六十美元只為搬走舊的那張？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, they swap it right at your door.",
+        "phonetic": "/jɛs ðeɪ swɑp ɪt ɹaɪt æt jɔɹ dɔɹ/",
+        "zh": "對，師傅直接在門口替你換新床。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So I never touch the old mattress?",
+        "phonetic": "/soʊ aɪ ˈnɛvɚ tʌtʃ ði oʊld ˈmætrəs/",
+        "zh": "那我連舊床墊都不用碰一下？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nope, they lift, you just point.",
+        "phonetic": "/noʊp ðeɪ lɪft ju dʒʌst pɔɪnt/",
+        "zh": "不用，他們出力搬，你只要指個方向。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, when can you deliver?",
+        "phonetic": "/ˈpɝfɪkt wɛn kən ju dɪˈlɪvɚ/",
+        "zh": "太好了，你們最快哪天能送？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Thursday, between nine and one.",
+        "phonetic": "/ˈθɜɹzdeɪ bɪˈtin naɪn ænd wʌn/",
+        "zh": "週四，上午九點到一點之間。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That works, I'll mention it at work.",
+        "phonetic": "/ðæt wɝks aɪl ˈmɛnʃən ɪt æt wɜɹk/",
+        "zh": "時間沒問題，我到公司跟主管提一聲。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Do you want us to text you?",
+        "phonetic": "/du ju wɑnt ʌs tə tɛkst ju/",
+        "zh": "到時要我們傳訊息提醒你嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, my phone dies by noon every day.",
+        "phonetic": "/jɛs maɪ foʊn daɪz baɪ nun ˈɛvɹi ˈdeɪ/",
+        "zh": "好，我手機每天沒到中午就沒電。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We'll text before the truck leaves.",
+        "phonetic": "/wil tɛkst bɪˈfɔɹ ðə tɹʌk livz/",
+        "zh": "貨車出發前我們會先傳訊息給你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, Thursday, plush plus protector, done.",
+        "phonetic": "/soʊ ˈθɜɹzdeɪ plʌʃ plʌs pɹəˈtɛktɚ dʌn/",
+        "zh": "所以是週四、蓬軟床墊，加保護套，搞定。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "All set, I'll print your paperwork now.",
+        "phonetic": "/ɔl sɛt aɪl prɪnt jɔɹ ˈpeɪpɚˌwɜɹk naʊ/",
+        "zh": "都辦好了，我這就列印你的單據。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thank you for the honest talk.",
+        "phonetic": "/θæŋk ju fɔɹ ðə ˈɑnəst tɔk/",
+        "zh": "謝謝你全程都這麼坦白地說明。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sleep well, and enjoy those hundred nights.",
+        "phonetic": "/slip wɛl ænd ɛnˈdʒɔɪ ðoʊz ˈhʌndɹəd naɪts/",
+        "zh": "好好睡吧，盡情享受那一百個夜晚。"
+      }
+    ],
+    "youtube_title": "【試躺買床墊🛏️】「你真能先睡一百晚」💰講解退貨費與保護套陷阱🏷️🎧｜聽完就敢買大件｜60句沉浸式A2英文聽力｜Mattress Trial",
+    "youtube_title_en": "\"Sleep On It, Literally\" — Buying a Mattress With a Hundred-Night Trial",
+    "youtube_description": "「你真能先睡一百晚」——買床墊最怕買錯，那一百晚的試睡體驗到底怎麼用？本集是 60 句沉浸式英文聽力練習，場景就在床墊專賣店的試躺區。\n\n你會聽到：從說明睡眠習慣、挑軟硬等級，到問清試睡期、退貨費、保護套如何讓體驗作廢，一路聽到搬舊床、約送貨與傳訊息確認。整段只用 A2 初級單字，加上美國人每天的自然語感：um、hmm、so、ha、okay。\n\n聽完你就會用：Does it come with...、What's the catch、Can I try this one、Sleep on it。後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱，開啟小鈴鐺。",
+    "youtube_description_en": "\"Sleep on it, literally\" — buying a mattress feels scary until you know the hundred-night trial rules. This 60-line immersive English listening practice takes place in a mattress store's trial corner.\n\nYou will hear: describing your sleep style, choosing firmness, asking about the trial, the return fee, the protector rule that can void the trial, old-bed haul-away, delivery windows, and text confirmations. All in A2 words with real American texture: um, hmm, so, ha, okay.\n\nBy the end you'll own lines like Does it come with..., What's the catch, Can I try this one, and sleep on it.\n\nThe second half is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🛏️床墊試睡期英文｜挑軟硬・問退貨費・保護套規則｜一百晚到底怎麼算｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n床墊動不動就幾百美元，萬一睡不習慣怎麼辦？所謂的試睡一百晚，到底是真免費還是行銷花樣？保護套又為什麼能左右你的退貨權？\n\n這一集帶大家走進床墊專賣店，從說明睡眠習慣、試躺挑軟硬，一路聽到試睡期、退貨費、保護套規則、搬舊床與預約送貨，共 60 句連續真實對話。\n\n你會聽到：\n🛏️ 挑軟硬：Firm, medium firm, or plush, three levels.\n🌙 試睡期：One hundred nights to change your mind.\n🏷️ 保護套：Stains void the trial, that's the rule.\n🚚 約送貨：We'll text before the truck leaves.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、hmm、so 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著這張床躺滿一百晚，下次自己進店，話就自己開口。\n\n祝你夜夜好眠，買得聰明。",
+    "youtube_tags": [
+      "english listening practice",
+      "mattress shopping english",
+      "hundred night trial dialogue",
+      "esl listening a2",
+      "shopping conversation english",
+      "return policy english",
+      "furniture store english",
+      "listen and repeat english",
+      "american english conversation",
+      "英文聽力練習",
+      "買床墊英文",
+      "試睡期英文對話",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "購物英文會話",
+      "退貨條款英文"
+    ],
+    "scene": "mattress store trial corner",
+    "thumbnail_expression": "lying on a mattress with a delighted face",
+    "thumbnail_action": "holding up a price tag while giving a thumbs up",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Firm Mattress",
+        "zh": "中硬床墊"
+      },
+      {
+        "en": "Hundred-Night Trial",
+        "zh": "百晚安睡體驗"
+      },
+      {
+        "en": "Mattress Protector",
+        "zh": "床墊保護套"
+      },
+      {
+        "en": "Law Tag",
+        "zh": "法律標籤"
+      },
+      {
+        "en": "Delivery Truck",
+        "zh": "送貨卡車"
+      }
+    ]
+  }
+}

@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_prescription-refill-travel",
+  "topic": "Requesting an Early Prescription Refill before Travel",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758913200.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "A REFILL BEFORE TRAVEL",
+    "title_zh": "出門前補藥",
+    "scene_zh": "藥局櫃台 · 提早補藥",
+    "story_hook": "Nine pills left, and a three-week trip ahead.",
+    "intro_zh": "剩下九顆藥，前面是三週的旅程。",
+    "welcome_en": "Welcome to a pharmacy counter before a long trip. Listen for refill talk and travel tips.",
+    "welcome_zh": "歡迎來到長途旅行前的藥局櫃台。留意補藥的說法，還有旅行的提醒。",
+    "outro": "That's how a refill becomes a travel plan. Listen again and pack your own words.",
+    "outro_zh": "一次補藥就這樣變成一份旅行計畫。再聽一次，把你的英文也收進行李。",
+    "practice_intro_en": "Now repeat after us, line by line.",
+    "practice_intro_zh": "現在跟著我們逐句重複。",
+    "title_quote": "I pack my pills first, always",
+    "char_a_description": "a retired man in his mid sixties with thinning white hair neatly combed, wire rim glasses, a navy zip sweater over a checked shirt, and a slim stooped build",
+    "char_b_description": "a quick-smiling woman in her late twenties with a chin-length jet black bob, purple scrubs under a white coat, a lanyard of enamel pins, and a petite build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "patient",
+    "char_b_role": "pharmacist",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Good morning, I need an early refill, if that's okay.",
+        "phonetic": "/ɡʊd ˈmɔɹnɪŋ aɪ nid ən ˈɜɹli ɹiˈfɪl ɪf ðæts oʊˈkeɪ/",
+        "zh": "早安，我想請你幫我提早補藥，可以嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sure, um, which medicine, and how are you feeling?",
+        "phonetic": "/ʃʊɹ ʌm wɪtʃ ˈmɛdəsɪn ænd haʊ ɑɹ ju ˈfilɪŋ/",
+        "zh": "好的，嗯，哪一種藥，你最近感覺怎麼樣？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My blood pressure pill, and I feel great, thanks.",
+        "phonetic": "/maɪ blʌd ˈpɹɛʃɚ pɪl ænd aɪ fil ɡɹeɪt θæŋks/",
+        "zh": "我的降血壓藥，我覺得很好，謝謝關心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good to hear, so what's the rush today?",
+        "phonetic": "/ɡʊd tə hɪɹ soʊ wæts ðə ɹʌʃ təˈdeɪ/",
+        "zh": "那就好，所以今天為什麼這麼急？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, I fly to Taiwan Thursday for three weeks.",
+        "phonetic": "/wɛl aɪ flai tə ˈtaɪˌwɑn ˈθɜɹzdeɪ fɚ θɹi wikz/",
+        "zh": "嗯，我週四要飛台灣，在那邊待三週。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Three weeks, that's a real trip, not a weekend.",
+        "phonetic": "/θɹi wikz ðæts ə ɹiəl trɪp nɑt ə ˈwikˌɛnd/",
+        "zh": "三週啊，那是真正的長途旅行，不是週末遊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, and I pack my pills first, always.",
+        "phonetic": "/jɛs ænd aɪ pæk maɪ pɪlz fɝst ˈɔlˌweɪz/",
+        "zh": "對，而且我收行李一定先收藥。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fair, let me pull your file, one second.",
+        "phonetic": "/fɛɹ lɛt mi pʊl jɔɹ faɪl wʌn ˈsɛkənd/",
+        "zh": "合理，我把你的資料調出來，稍等我一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Take your time, I'm in no real hurry now.",
+        "phonetic": "/teɪk jɔɹ taɪm aɪm ɪn noʊ ɹiəl ˈhɜɹi naʊ/",
+        "zh": "慢慢來，我現在其實一點也不著急。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here's the problem, um, the insurance window isn't open.",
+        "phonetic": "/hɪɹz ðə ˈpɹɑbləm ʌm ði ɪnˈʃʊɹəns ˈwɪndoʊ ɪzənt ˈoʊpən/",
+        "zh": "問題在這裡，嗯，保險的補藥時間還沒開。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The window? Meaning it's too soon, in their words.",
+        "phonetic": "/ðə ˈwɪndoʊ ˈminɪŋ ɪts tə suːn ɪn ðɛɹ wɜɹdz/",
+        "zh": "時間還沒開？也就是說太早了，用他們的說法。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, you're allowed a refill two days from now.",
+        "phonetic": "/ɪɡˈzæktli jʊɹz əˈlaʊd ə ɹiˈfɪl tu deɪz fɹʌm naʊ/",
+        "zh": "就是這樣，你要再等兩天才能補藥。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two days, but I leave in three, that's tight.",
+        "phonetic": "/tu ˈdeɪz bʌt aɪ liv ɪn θɹi ðæts taɪt/",
+        "zh": "兩天，可我三天後就要出發，那很緊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It is, let me look at what you have left.",
+        "phonetic": "/ɪt ɪz ˈlɛt mi ˈlʊk æt wʌt ju hæv ˈlɛft/",
+        "zh": "是很緊，我看看你手邊還剩下多少。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I counted, nine pills, so a little over a week.",
+        "phonetic": "/aɪ ˈkaʊnɪtɪd naɪn pɪlz soʊ ə ˈlɪɾəl ˈoʊvɚ ə wiːk/",
+        "zh": "我算過，剩下九顆，比一週多一點點。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nine here, plus three weeks away, that's a gap.",
+        "phonetic": "/naɪn hɪɹ plʌs θɹi wiːks əˈweɪ ðæts ə ɡæp/",
+        "zh": "這裡九顆，出門三週，那就會斷藥兩週。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's the fear, exactly, almost two weeks with none.",
+        "phonetic": "/ðæts ðə fɪɹ ɪɡˈzæktli ˈɔlmoʊst tu wiːks wɪθ nʌn/",
+        "zh": "我怕的就是這個，將近兩週沒有任何藥。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, I have three choices for you, ready?",
+        "phonetic": "/oʊˈkeɪ aɪ hæv θɹi ˈtʃɔɪsəz fɚ ju ˈɹɛdi/",
+        "zh": "好，我給你三個選擇，準備聽了嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Please, I'll take all three, um, honestly.",
+        "phonetic": "/pliz aɪl teɪk ɔl θɹi ʌm ˈɑnəstli/",
+        "zh": "拜託，三個我都要聽，老實說。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One, a partial fill, I can give you today.",
+        "phonetic": "/wʌn ə ˈpaɹʃəl fɪl aɪ kæn ɡɪv ju təˈdeɪ/",
+        "zh": "第一個，部分補藥，我今天就能給你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A partial? What does that one mean here?",
+        "phonetic": "/ə ˈpaɹʃəl wʌt dʊz ðʌt wʌn min hɪɹ/",
+        "zh": "部分補藥？那個在這裡是什麼意思？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A week's supply, so seven pills, no waiting.",
+        "phonetic": "/ə wiːkz səˈplai soʊ ˈsɛvən pɪlz noʊ ˈweɪɾɪŋ/",
+        "zh": "一週的量，就是七顆，不用等。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Seven helps, and choice two, if you don't mind.",
+        "phonetic": "/ˈsɛvən hɛlpz ænd tʃɔɪs tu ɪf ju doʊnt maɪnd/",
+        "zh": "七顆也有用。那第二個選擇呢，說一下應該不麻煩吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two, pay cash for the full bottle right now.",
+        "phonetic": "/tu peɪ kæʃ fɚ ðə fʊl ˈbɑɾəl ɹaɪt naʊ/",
+        "zh": "第二個，現在就用現金買完整的一瓶。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Cash? Um, what does that cost me in dollars?",
+        "phonetic": "/kæʃ ʌm wʌt dʌz ðæt kɔst mi ɪn ˈdɑlɚz/",
+        "zh": "現金？嗯，那樣要花我多少錢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "About eighteen, since the plan won't cover it early.",
+        "phonetic": "/əˈbaʊt eɪˈtin sɪnz ðə plæn woʊnt ˈkʌvɚ ɪt ˈɜɹli/",
+        "zh": "大約十八塊，因為保險不肯提早給付。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Eighteen, well, that's not a disaster, honestly.",
+        "phonetic": "/eɪˈtin wɛl ðæts nɑt ə dɪˈzæstɚ ˈɑnəstli/",
+        "zh": "十八塊，嗯，那不算災難，老實說。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, and choice three is my favorite, travel trick.",
+        "phonetic": "/noʊ ænd tʃɔɪs θɹi ɪz maɪ ˈfɛvɹɪt ˈtɹævl trɪk/",
+        "zh": "不算呀，第三個是我最喜歡的，一個旅行小撇步。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A travel trick, okay, I'm listening, tell me.",
+        "phonetic": "/ə ˈtɹævl trɪk oʊˈkeɪ aɪm ˈlɪsnɪŋ tɛl mi/",
+        "zh": "旅行小撇步，好，我在聽，你說吧。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fill part here, the rest at our other store, downtown.",
+        "phonetic": "/fɪl pɑɹt hɪɹ ðə ɹɛst æt ɑːɹ ˈʌðɚ stɔɹ ˈdaʊnˌtaʊm/",
+        "zh": "先在這裡拿一部分，剩下的到市中心那間分店拿。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The downtown one? Does that count as a second visit?",
+        "phonetic": "/ðə ˈdaʊnˌtaʊm wʌn dʌz ðæt kaʊnt əz ə ˈsɛkənd ˈvɪzɪt/",
+        "zh": "市中心那間？那會不會算第二次就診？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, the file follows you, just show your ID.",
+        "phonetic": "/noʊ ðə faɪl ˈfɑloʊz ju dʒʌst ʃoʊ jɔɹ ˈaɪˈdi/",
+        "zh": "不算，你的檔案會跟著你走，只要出示身分證。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nice. And um, swallowing pills is a worry too.",
+        "phonetic": "/naɪs ænd ʌm ˈswɑloʊɪŋ pɪlz ɪz ə ˈwɜɹi tu/",
+        "zh": "不錯。還有，嗯，吞藥也是我的一個擔心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Hard to swallow on trips, I hear that often.",
+        "phonetic": "/hɑɹd tə ˈswɑloʊ ɑn trɪps aɪ hɪɹ ðæt ˈɔfən/",
+        "zh": "在旅途中很難吞藥，我常聽到這種事。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes! On planes, dry mouth, everything sticks, you know.",
+        "phonetic": "/jɛs ɑn pleɪnz draɪ maʊθ ˈɛvɹiθɪŋ stɪks ju noʊ/",
+        "zh": "對！在飛機上嘴巴很乾，什麼都會卡住，你懂的那種。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "There's a liquid version of that same pill, actually.",
+        "phonetic": "/ðɛɹz ə ˈlɪkwɪd ˈvɜɹʒən əv ðæt seɪm pɪl ˈæktʃuəli/",
+        "zh": "其實同一種藥，有液體的版本。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Liquid? Wow, does it work the same as these?",
+        "phonetic": "/ˈlɪkwɪd waʊ dʌz ɪt wɝk ðə seɪm æz ðiz/",
+        "zh": "液體的？哇，效果跟這些一樣嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Same dose, it just tastes a bit like chalk.",
+        "phonetic": "/ˈseɪm ˈdoʊs ɪt dʒʌst ˈteɪsts ə bɪt laɪk ˈtʃɔk/",
+        "zh": "一樣的劑量，只是味道有一點像粉筆。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Chalk is fine, chalk doesn't get stuck in my throat.",
+        "phonetic": "/tʃɔk ɪz faɪn tʃɔk ˈdʌzənt ɡɛt stʌk ɪn maɪ θɹoʊt/",
+        "zh": "像粉筆沒關係，粉筆不會卡在我的喉嚨。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, true. I'll ask the doctor to approve it.",
+        "phonetic": "/hɑ tru aɪl æsk ðə ˈdɑkɾɚ tə əˈpɹuv ɪt/",
+        "zh": "哈，說得對。我會請醫生同意換成液體的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Will that take long, since I leave Thursday?",
+        "phonetic": "/wɪl ðæt teɪk lɔŋ sɪnz aɪ liv ˈθɜɹzdeɪ/",
+        "zh": "那會很久嗎，畢竟我週四就要出發？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, he answers fast, um, usually same day.",
+        "phonetic": "/noʊ hi ˈænsɚz fæst ʌm ˈjuʒəwəli seɪm deɪ/",
+        "zh": "不會，他回覆很快，嗯，通常當天就回。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then yes, please, the liquid sounds perfect to me.",
+        "phonetic": "/ðɛn jɛs pliz ðə ˈlɪkwɪd ˈsaʊndz ˈpɝfɪkt tə mi/",
+        "zh": "那就太好了，液體那個對我來說很完美。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Done. Also, want a travel letter for your bag?",
+        "phonetic": "/dʌn ˈɔlsoʊ wɑnt ə ˈtɹævl ˈlɛɾɚ fɚ jɔɹ bæɡ/",
+        "zh": "幫你辦。另外，你要不要一張旅行的說明信？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A letter saying the pills are mine? That's useful.",
+        "phonetic": "/ə ˈlɛɾɚ ˈseɪɪŋ ðə pɪlz ɑɹ maɪn ðæts ˈjusfəl/",
+        "zh": "說明那些藥是我自己的信？那真的有用。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It says your name, dose, and why you carry them.",
+        "phonetic": "/ɪt sɛz jɔɹ neɪm doʊs ænd waɪ ju ˈkæɹi ðɛm/",
+        "zh": "上面寫你的名字、劑量，還有為什麼要帶著它們。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Security people ask that, I got stopped last year.",
+        "phonetic": "/səˈkjʊɹəɾi ˈpipəl æsk ðæt aɪ ɡɑt stɑpt læst jɪɹ/",
+        "zh": "安檢人員會問這個，我去年在安檢站也遇過一次。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "They do, one printed page saves twenty minutes.",
+        "phonetic": "/ðeɪ du wʌn ˈpɹɪnɪd peɪdʒ ˈseɪvz ˈtwɛnɪ ˈmɪnɪts/",
+        "zh": "他們會問的，一張印好的紙就能省二十分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Print it, um, and do they stay in my carry-on?",
+        "phonetic": "/pɹɪnt ɪt ʌm ænd du ðeɪ steɪ ɪn maɪ ˈkæɹiˌɑn/",
+        "zh": "請印給我，嗯，那藥要放在我的手提行李嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Always in the carry-on, never the checked bag.",
+        "phonetic": "/ˈɔlweɪz ɪn ðə ˈkæɹiˌɑn ˈnɛvɚ ðə ˈtʃɛkt bæɡ/",
+        "zh": "一定要放手提行李，千萬不要放託運的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good rule, my friend lost a suitcase once, with meds.",
+        "phonetic": "/ɡʊd ɹul maɪ fɹɛnd lɑst ə ˈsuːtˌkeɪs wʌns wɪð mɛdz/",
+        "zh": "好的原則，我朋友有一次行李整個遺失，裡面全是藥。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oh no, that's why I say it every trip.",
+        "phonetic": "/oʊ noʊ ðæts waɪ aɪ seɪ ɪt ˈɛvɹi trɪp/",
+        "zh": "噢不，所以我每次旅行都要提醒這件事。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, seven today, the rest downtown, plus the liquid?",
+        "phonetic": "/soʊ ˈsɛvən təˈdeɪ ðə ɹɛst ˈdaʊnˌtaʊm plʌz ðə ˈlɪkwɪd/",
+        "zh": "所以，今天七顆，剩下的去市中心那間，還有液體的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, and I'll label each bottle, so no confusion.",
+        "phonetic": "/ɪɡˈzæktli ænd aɪl ˈleɪbəl itʃ ˈbɑɾəl soʊ noʊ kənˈfjuʒən/",
+        "zh": "就是這樣，我會每個瓶子都貼標籤，就不會搞混。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You've thought of everything, that's very kind, thank you.",
+        "phonetic": "/juv θɔt əv ˈɛvɹiθɪŋ ðæts ˈvɛɹi kaɪnd θæŋk ju/",
+        "zh": "你想得太周到了，真的很體貼，謝謝你。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's my job, but I like the puzzle part.",
+        "phonetic": "/ɪts maɪ dʒɑb bʌt aɪ laɪk ðə ˈpʌzəl pɑɹt/",
+        "zh": "這是我的工作，但我喜歡那種拼圖的感覺。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "A puzzle with pills, ha, that's the best kind.",
+        "phonetic": "/ə ˈpʌzəl wɪθ pɪlz hɑ ðæts ðə bɛst kaɪnd/",
+        "zh": "用藥拼圖，哈，那是最好的一種拼圖。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Here you go, your bag, and pay at that corner.",
+        "phonetic": "/hɪɹ ju ɡoʊ jɔɹ bæɡ ænd peɪ æt ðæt ˈkɔɹnɚ/",
+        "zh": "給你，你的袋子，然後在角落那邊付錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thursday, Taiwan, and three weeks of medicine, done.",
+        "phonetic": "/ˈθɜɹzdeɪ ˈtaɪˌwɑn ænd θɹi wiːkz əv ˈmɛdəsɪn dʌn/",
+        "zh": "週四、台灣、三週的藥都齊了，完成了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Safe flight, and come back with a story, please.",
+        "phonetic": "/seɪk flait ænd kʌm bæk wɪð ə ˈstɔɹi pliz/",
+        "zh": "一路順飛，回來記得跟我說一個旅途故事。"
+      }
+    ],
+    "youtube_title": "【出國前藥不夠吃💊】「我收行李一定先收藥」教你請藥局提早補藥🧳🎧｜聽完會問三個選擇｜60句沉浸式英文聽力｜Early Prescription Refill",
+    "youtube_title_en": "\"I Pack My Pills First, Always\" — An Early Prescription Refill Before a Trip",
+    "youtube_description": "要出國三週，藥卻只剩九顆，保險又不肯提早給付，這種事在藥局要怎麼開口？這一集是 60 句沉浸式英文聽力練習，場景就在藥局的領藥櫃台，從請求提早補藥、查出還剩幾天，一路聽到三個解決辦法與旅行的準備。\n\n你會聽到：怎麼說出 I need an early refill；怎麼聽懂保險窗口還沒開、你還要再等兩天；三個選項的完整說法，部分補藥、用現金買整瓶、到另一間分店領剩下的；還有吞藥困難換液體版本、開一張旅行說明信、藥要放手提行李的實用提醒。\n\n整段只用 A2 初級單字與短句，反覆出現的是美國人在藥局與機場都這樣說話的真實語感：um、well、so、ha、honestly。聽完你就會用：Let me pull your file、A week's supply、Pay cash、Show your ID、Safe flight。\n\n後半段是逐句聽力加跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "Three weeks abroad, nine pills left, and the insurance window not open yet. How do you even start that sentence at the pharmacy counter? This is a 60-line immersive English listening practice set right at the pickup window.\n\nYou will hear: asking for an early refill, learning your file says two more days, and doing the math on almost two weeks with none; then the three real options, a partial fill today, paying cash for the full bottle, or splitting the rest at the downtown branch; plus switching to a liquid version and a printed travel letter for security.\n\nEverything stays in A2-level words, with the fillers Americans really use: um, well, so, ha, honestly. By the end you'll own lines like Let me pull your file, A week's supply, Pay cash, Show your ID, and Safe flight.\n\nThe last chapter is a line-by-line listen and repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed, just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧藥局補藥英文｜請求提早補藥・聽懂保險窗口・三個解決選項｜換液體藥與旅行說明信｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n出發的日子一天一天逼近，藥瓶搖一搖只剩九顆，保險卻說時間還沒到，這時候走進藥局，你的第一句話要怎麼說？聽到「太早了」的時候，還有沒有別的辦法？\n\n這一集帶大家走進藥局的領藥櫃台，從請求提早補藥、查檔案、算出會斷藥兩週，一路聽到三個選擇、換成液體的藥、開一張給安檢看的說明信，最後連行李怎麼收都講好，共 60 句連續真實對話。\n\n你會聽到：\n💊 開口請求：Good morning, I need an early refill, if that's okay?\n🧮 聽懂限制：Here's the problem, um, the insurance window isn't open.\n🧳 三個選項：Okay, I have three choices for you, ready?\n🎧 旅行提醒：Always in the carry-on, never the checked bag.\n\n後半段是逐句聽力加跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so、ha 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這一瓶藥走一趟藥局，下次你要出國、藥卻不夠，該問的選項就會自己從嘴邊出來。\n\n祝你旅行順利，藥收進行李，回程時記得帶一個好故事。",
+    "youtube_tags": [
+      "english listening practice",
+      "pharmacy refill english",
+      "prescription english dialogue",
+      "travel medicine english",
+      "esl listening a2",
+      "american english conversation",
+      "early refill request english",
+      "carry on meds english",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "藥局領藥英文",
+      "出國備藥英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "旅行英文對話"
+    ],
+    "scene": "pharmacy pickup counter",
+    "thumbnail_expression": "worried, counting on his fingers",
+    "thumbnail_action": "holding up a pill bottle and a boarding pass",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Pill Bottle",
+        "zh": "藥瓶"
+      },
+      {
+        "en": "Boarding Pass",
+        "zh": "登機證"
+      },
+      {
+        "en": "Liquid Medicine",
+        "zh": "液體藥"
+      },
+      {
+        "en": "Travel Letter",
+        "zh": "旅行說明信"
+      },
+      {
+        "en": "Carry-On Bag",
+        "zh": "手提行李"
+      }
+    ]
+  }
+}

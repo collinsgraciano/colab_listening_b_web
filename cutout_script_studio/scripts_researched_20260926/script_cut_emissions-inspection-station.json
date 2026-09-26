@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_emissions-inspection-station",
+  "topic": "Scheduling the Car Emissions Inspection",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758885600.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "THE SMELLY TEST DAY",
+    "title_zh": "排氣年檢",
+    "scene_zh": "排氣檢測站 · 檢測線",
+    "story_hook": "Today is inspection day, and the car smells like toast.",
+    "intro_zh": "今天是驗車日，而車子聞起來像烤吐司。",
+    "welcome_en": "Hi, today we're at the inspection station. Listen for paperwork and pass-or-fail talk.",
+    "welcome_zh": "嗨，今天我們來到檢測站。留意文件與合格與否的對話。",
+    "outro": "A green light, a sticker, and a waffle coupon. Listen once more out loud.",
+    "outro_zh": "一盞綠燈、一張貼紙，還有鬆餅折價券。再聽一遍，大聲跟著說。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "It smells fishy",
+    "char_a_description": "a bright-eyed woman in her early forties with curly auburn hair tied in a high ponytail, gold hoop earrings, an olive green rain jacket, running sneakers, and a tote bag across her chest",
+    "char_b_description": "a lanky man in his thirties with sandy blond hair under a grey trucker cap, wire-frame glasses, a khaki work shirt with a station logo patch, dark jeans, and work gloves tucked in his pocket",
+    "char_a_gender": "female",
+    "char_b_gender": "male",
+    "char_a_role": "owner",
+    "char_b_role": "station clerk",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Excuse me, do I need a test today, or...?",
+        "phonetic": "/ɪkˈskjuːz mi du aɪ nid ə tɛst təˈdeɪ ɔɹ/",
+        "zh": "打擾一下，請問我的車今天需要驗車，還是…？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Look at the wall, your month is printed there.",
+        "phonetic": "/lʊk æt ðə wɔl jɔɹ ˈmʌnθ ɪz ˈprɪnɾɪd ðɛɹ/",
+        "zh": "看牆上，您該驗車的月份都印在那裡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Mine says this month, um, that's now.",
+        "phonetic": "/maɪnz sɛz ðɪs mʌnθ ʌm ðæts naʊ/",
+        "zh": "我那行寫的這個月，呃，就是現在。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's today, my friend, welcome in.",
+        "phonetic": "/ðæts təˈdeɪ maɪ frɛnd ˈwɛlˌkəm ɪn/",
+        "zh": "那就是今天，朋友，歡迎進來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, I'm Dale's neighbor, he sent me.",
+        "phonetic": "/ɡɹeɪt aɪm deɪlz ˈneɪbɚ hi sɛnt mi/",
+        "zh": "太好了，我是戴爾的鄰居，他介紹我來的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Dale sends everyone, he's our best billboard.",
+        "phonetic": "/deɪl sɛndz ˈɛvɹiˌwʌn hɪz aʊɹ bɛst ˈbɪlˌbɔɹd/",
+        "zh": "戴爾會介紹每一個人來，他是我們最好的招牌。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "He said you're quick, or he talks fast.",
+        "phonetic": "/hi sɛd jʊɹ kwɪk ɔɹ hi tɔks fæst/",
+        "zh": "他說你們動作很快，也可能是他嘴快。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Both, choose whichever you prefer.",
+        "phonetic": "/boʊtʃ tʃuz wɪtʃˈɛvɚ ju pɹɪˈfɝ/",
+        "zh": "兩者都對，您想信哪個就信哪個。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The quick one, please, I really hope.",
+        "phonetic": "/ðə kwɪk wʌn pliz aɪ ˈɹɪli hoʊp/",
+        "zh": "我賭「動作快」那個，真的拜託。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Usually, unless the line thinks otherwise.",
+        "phonetic": "/ˈjuʒuəli ənˈlɛs ðə laɪn θɪŋks ˈʌðɚˌwaɪz/",
+        "zh": "通常如此，除非排隊的車另有想法。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Only one car ahead, that's hope.",
+        "phonetic": "/ˈoʊnli wʌn kɑɹ əˈhɛd ðæts hoʊp/",
+        "zh": "前面只有一台車，這就有希望了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Big hope, each test takes ten minutes.",
+        "phonetic": "/bɪɡ hoʊp ɪtʃ tɛst teɪks tɛn ˈmɪnəts/",
+        "zh": "希望不小，每輛車檢測要十分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do I need paperwork, like registration?",
+        "phonetic": "/du aɪ nid ˈpeɪpɚˌwɝk laɪk ˌrɛdʒəsˈtreɪʃən/",
+        "zh": "需要帶文件嗎，像是行車證之類？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, your plate and registration, quick check.",
+        "phonetic": "/jɛz jɔɹ pleɪt ænd ˌrɛdʒəsˈtreɪʃən kwɪk tʃɛk/",
+        "zh": "要的，車牌和行車登記，我們快速核對。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Here it is, sticky from the cup holder.",
+        "phonetic": "/hɪɹ ɪts ɪz ˈstɪki fɹəm ðə kʌp ˈhoʊldɚ/",
+        "zh": "給你，從杯架拿出來的，黏黏的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, it matches, drive it around now.",
+        "phonetic": "/ˈpɝfɪkt ɪt ˈmætʃəz dɹaɪv ɪt əˈɹaʊnd naʊ/",
+        "zh": "完美，資料相符，現在把車開過去吧。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do I stay inside the car or leave it?",
+        "phonetic": "/du aɪ steɪ ɪnˈsaɪd ðə kɑɹ ɔɹ liv ɪt/",
+        "zh": "我要待在車上，還是可以先離開？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Stay put, seatbelt on, hands on the wheel.",
+        "phonetic": "/steɪ pʊt ˈsitˌbɛlt ɑn hændz ɑn ðə wil/",
+        "zh": "待在車裡，繫安全帶，雙手放在方向盤上。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Like a driving test all over again.",
+        "phonetic": "/laɪk ə ˈdɹaɪvɪŋ tɛst ɔl ˈoʊvɚ əˈɡɛn/",
+        "zh": "根本是再次考駕照。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Same nerves, but way easier, relax.",
+        "phonetic": "/seɪm nɝvz bət weɪ ˈizɪɚ ɹɪˈlæks/",
+        "zh": "一樣會緊張，但簡單多了，放輕鬆。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "My car smells like burnt toast today.",
+        "phonetic": "/maɪ kɑɹ smɛlz laɪk bɜɹnt toʊst təˈdeɪ/",
+        "zh": "我的車今天聞起來像烤焦的吐司。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Toast? Hmm, that could mean a rich mix.",
+        "phonetic": "/toʊst hʌm ðæt kʊd min ə ɹɪtʃ mɪks/",
+        "zh": "吐司？嗯，那可能是油氣太濃。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Is that a problem? It smells fishy.",
+        "phonetic": "/ɪz ðæt ə ˈpɹɑbləm ɪt smɛlz ˈfɪʃi/",
+        "zh": "這有問題嗎？它聞起來怪怪的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Might just mean your oil needs changing.",
+        "phonetic": "/maɪt dʒʌst min jɔɹ ɔɪl nidz ˈtʃeɪndʒɪŋ/",
+        "zh": "也許只是提醒你，機油該換了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, the oil light does blink sometimes.",
+        "phonetic": "/wɛl ði ɔɪl laɪt dʌz blɪŋk ˈsʌmˌtaɪmz/",
+        "zh": "說也對，機油燈偶爾會閃給我看。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Blinking lights can fail the computer scan.",
+        "phonetic": "/ˈblɪŋkɪŋ laɪts kən feɪl ðə kəmˈpjutɚ skæn/",
+        "zh": "閃爍的警示燈可能會讓電腦掃描過不了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's been fine since the drive here.",
+        "phonetic": "/ɪts bɪn faɪn sɪns ðə dɹaɪv hɪɹ/",
+        "zh": "從開來這裡，一路都好好的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Good, the machine decides in a minute.",
+        "phonetic": "/ɡʊd ðə məˈʃin dɪˈsaɪdz ɪn ə ˈmɪnɪt/",
+        "zh": "很好，再過一分鐘機器就會決定一切。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, what if my car fails today?",
+        "phonetic": "/ʌm wʌt ɪf maɪ kɑɹ feɪlz təˈdeɪ/",
+        "zh": "呃，如果我今天沒通過怎麼辦？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then fix it, and retest here free.",
+        "phonetic": "/ðɛn fɪks ɪt ænd ɹiˈtɛst hɪɹ fɹi/",
+        "zh": "那就修好再回來，重檢是免費的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Free retest? Oh, that calms me down.",
+        "phonetic": "/fɹi ɹiˈtɛst oʊ ðæt kɑmz mi daʊn/",
+        "zh": "免費重檢？噢，這讓我安心多了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Within thirty days, keep the receipt safe.",
+        "phonetic": "/wɪˈθɪn ˈθɝɾi deɪz kip ðə ɹɪˈsit seɪf/",
+        "zh": "三十天內回來，收據收好。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, my car, don't embarrass me now.",
+        "phonetic": "/oʊˈkeɪ maɪ kɑɹ doʊnt ˌɛmbəˈɹæs mi naʊ/",
+        "zh": "好啦，我的車，現在別讓我丟臉。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "She carries her toast well, that's character.",
+        "phonetic": "/ʃi ˈkæɹiz hɚ toʊst wɛl ðæts ˈkæɹəktɚ/",
+        "zh": "她自帶吐司味，那也叫個性。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're kind, that was almost a compliment.",
+        "phonetic": "/jʊɹ kaɪnd ðætz ˈɔlmoʊst ə ˈkɑmpləmənt/",
+        "zh": "你真溫柔，那幾乎算是讚美。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Take it, compliments are rare on this lot.",
+        "phonetic": "/teɪk ɪt ˈkɑmpləmənts ɑɹ rɛɹ ɑn ðɪs ˈlɑt/",
+        "zh": "收下吧，這個場地上的讚美很稀有。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The light's on already, what did it say?",
+        "phonetic": "/ðə ˈlaɪts ɑn ɔlˈrɛdi wʌt dɪd ɪt seɪ/",
+        "zh": "燈亮了，上面寫了什麼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Green light, congrats, you passed today.",
+        "phonetic": "/ɡɹin ˈlaɪt kənˈɡɹæts ju pæst təˈdeɪ/",
+        "zh": "綠燈，恭喜，你今天通過了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Passed? Read it again, the small print.",
+        "phonetic": "/pæst ɹid ɪt əˈɡɛn ðə smɔl prɪnt/",
+        "zh": "通過了？小字再唸一次給我聽。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Big print says PASS, right there.",
+        "phonetic": "/bɪɡ prɪnt sɛz pæs ɹaɪt ðɛɹ/",
+        "zh": "大字就寫著 PASS，就在這裡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's the prettiest word I've seen all week.",
+        "phonetic": "/ðæts ðə ˈpɹɪtɪəst wɝd aɪv sin ɔl wik/",
+        "zh": "這是我這週見過最好看的詞。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "And there's a free coupon for snacks.",
+        "phonetic": "/ænd ðɛɹz ə fɹi ˈkupɑn fɔɹ snæks/",
+        "zh": "還附了一張免費零食券。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, is this a coupon for the waffle place?",
+        "phonetic": "/weɪt ɪz ðɪs ə ˈkupɑn fɔɹ ðə ˈwɑfəl pleɪs/",
+        "zh": "等等，這是鬆餅店的折價券？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The snack shop's two steps to the left.",
+        "phonetic": "/ðə snæk ʃɑps tu stɛps tə ðə lɛft/",
+        "zh": "小吃間就在左邊兩步的地方。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Should I tell them who sent me?",
+        "phonetic": "/ʃʊd aɪ tɛl ðɛm hu sɛnt mi/",
+        "zh": "要不要說是誰介紹我來的？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Say 'Dale sent you', everyone knows it.",
+        "phonetic": "/seɪ deɪl sɛnt ju ˈɛvɹiˌwʌn noʊz ɪt/",
+        "zh": "就說「戴爾叫來的」，大家都懂。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, Dale works here? The story guy?",
+        "phonetic": "/weɪt deɪl wɝks hɪɹ ðə ˈstɔɹi ɡaɪ/",
+        "zh": "等等，戴爾在這裡上班？就是那個話多的戴爾？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Our best story department, believe it.",
+        "phonetic": "/aʊɹ bɛst ˈstɔɹi dɪˈpɑɹtmənt bɪˈliv ɪt/",
+        "zh": "我們最強的故事部門，你信就對了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "This town is smaller than my glove box.",
+        "phonetic": "/ðɪs taʊn ɪz ˈsmɔːləɹ ðæn maɪ ɡlʌv bɑks/",
+        "zh": "這個小鎮比我的置物箱還小。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Now we sticker the window, two minutes.",
+        "phonetic": "/naʊ wi ˈstɪkɚ ðə ˈwɪndoʊ tu ˈmɪnəts/",
+        "zh": "現在幫你的擋風玻璃貼貼紙，兩分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Can I wash the car right after?",
+        "phonetic": "/kən aɪ wɑʃ ðə kɑɹ ɹaɪt ˈæftɚ/",
+        "zh": "貼完馬上洗車沒問題吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Wash away, the sticker's weatherproof.",
+        "phonetic": "/wɑʃ əˈweɪ ðə ˈstɪkɚz ˈwɛðɚˌpɹuːf/",
+        "zh": "儘管洗，貼紙是防水的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You've thought of everything, it's annoying.",
+        "phonetic": "/jʊv θɑt əv ˈɛvɹiθɪŋ ɪts əˈnɔɪɪŋ/",
+        "zh": "你們什麼都想到了，氣死人了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's our tagline, printed on mugs.",
+        "phonetic": "/ðæts aʊɹ ˈtæɡˌlaɪn ˈprɪnɾɪd ɑn mʌɡz/",
+        "zh": "這就是我們的標語，還印在馬克杯上。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Thanks for turning this around so kindly.",
+        "phonetic": "/θæŋks fɚ ˈtɝnɪŋ ðɪs əˈɹaʊnd soʊ ˈkaɪndli/",
+        "zh": "謝謝你把這趟差事變得這麼暖心。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Come back in two years, we'll wave.",
+        "phonetic": "/kʌm bæk ɪn tu jɪɹz wil weɪv/",
+        "zh": "兩年後再來，我們會跟你揮手。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Two years, same gate, same nervous toast?",
+        "phonetic": "/tu jɪɹz seɪm ɡeɪt seɪm ˈnɝvəs toʊst/",
+        "zh": "兩年後，同個入口，同樣緊張的吐司車？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Same toast, better stories, see you then.",
+        "phonetic": "/seɪm toʊst ˈbɛɾɚ ˈstɔɹiz si ju ðɛn/",
+        "zh": "同樣的吐司味，更好的故事，到時見。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tell Dale thanks, and he owes me waffles.",
+        "phonetic": "/tɛl deɪl θæŋks ænd hi oz ˈwɑfəlz/",
+        "zh": "幫我謝戴爾，他還欠我鬆餅。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "He'll deny it, that's his other talent.",
+        "phonetic": "/hil dɪˈnaɪ ɪt ðæts hɪz ˈʌðɚ ˈtælənt/",
+        "zh": "他一定會賴帳，那是他的另一種才華。"
+      }
+    ],
+    "youtube_title": "【驗車驚魂日🚗】「它聞起來怪怪的」排氣檢測一次通過🔧🧇🎧｜聽完就懂檢測全流程｜60句英語聽力練習｜Car Emissions Inspection",
+    "youtube_title_en": "\"It Smells Fishy\" — Passing the Car Emissions Inspection",
+    "youtube_description": "「這有問題嗎？它聞起來怪怪的」——驗車當天，車子帶著一股烤吐司味上檢測線，撐得過去嗎？這一集是 60 句沉浸式英語聽力練習，場景就在汽車排氣檢測站的櫃臺與檢測線。\n\n你會聽到：看月份欄確認驗車期限、核對車牌與行車證、開上檢測線前的座位指示；沒通過時的免費重檢規則、閃爍警示燈與電腦掃描的關係；還有結尾的鬆餅折價券與鄰居戴爾的反轉笑點。\n\n整段對話只用 A2 初級單字與短句，充滿真實美式語感：um、well、so、wait、oh。聽完你就會用：Do I need paperwork?、What if my car fails today?、Keep the receipt safe、See you then。\n\n後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "\"Is that a problem? It smells fishy\" — inspection day, and your car carries a toast-like secret onto the test line. This 60-line immersive English listening practice happens at a real emissions station counter and bay.\n\nYou will hear: checking the due-month board, matching plate and registration paperwork, belt-and-hands instructions on the line, the free retest rules if you fail, and the small talk that ends with a waffle coupon.\n\nEverything stays at A2 level with natural American rhythm: um, well, so, wait, oh. By the end you'll own lines like Do I need paperwork?, What if my car fails today?, and Keep the receipt safe.\n\nThe final chapter is a line-by-line listen-and-repeat workout, so speak out loud with every pass and beep.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎧汽車排氣檢測英文｜查行車證・上檢測線・免費重檢｜綠燈通過與鬆餅券｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n牆上的月份欄寫著這個月，現在去驗車還來得及嗎？行車證黏在杯架上拿出來，還用嗎？沒通過的話，錢要重付一次嗎？\n\n這一集帶大家走進汽車排氣檢測站，從確認期限、核對文件、開上檢測線，一路聽到綠燈通過與貼紙上好，共 60 句連續真實對話。\n\n你會聽到：\n📅 看期限：Look at the wall, your month is printed there.\n🧾 交文件：Here it is, sticky from the cup holder.\n🔧 問規則：Um, what if my car fails today?\n🟢 通過了：Big print says PASS, right there.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、oh 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這趟驚魂驗車走一回，下次輪到你的月份，你就能從容開上檢測線。\n\n祝你的車，永遠只聞起來像吐司。",
+    "youtube_tags": [
+      "english listening practice",
+      "emissions test dialogue",
+      "car inspection english",
+      "vehicle registration english",
+      "esl listening a2",
+      "pass fail test conversation",
+      "inspection station english",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "汽車年檢英文",
+      "排氣檢測對話",
+      "英語聽力練習",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "生活英語情景"
+    ],
+    "scene": "emissions inspection station",
+    "thumbnail_expression": "nervous hope with a raised eyebrow",
+    "thumbnail_action": "handing a sticky registration card across the counter",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Emissions Sticker",
+        "zh": "檢驗貼紙"
+      },
+      {
+        "en": "Test Machine",
+        "zh": "檢測儀器"
+      },
+      {
+        "en": "Registration Card",
+        "zh": "行車證"
+      },
+      {
+        "en": "Waffle Coupon",
+        "zh": "鬆餅折價券"
+      },
+      {
+        "en": "Green Pass Light",
+        "zh": "綠燈通過"
+      }
+    ]
+  }
+}

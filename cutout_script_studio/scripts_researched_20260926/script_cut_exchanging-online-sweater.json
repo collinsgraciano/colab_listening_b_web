@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_exchanging-online-sweater",
+  "topic": "Exchanging a Sweater Bought Online at the Store",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1790395200.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "EXCHANGING A SWEATER",
+    "title_zh": "網購換貨",
+    "scene_zh": "門市收銀台 · 網購換貨",
+    "story_hook": "A sweater bought online now wants a new home.",
+    "intro_zh": "線上買的毛衣穿不了，現在想有個新家。",
+    "welcome_en": "Hi, welcome to today's return counter scene. Listen for exchange phrases.",
+    "welcome_zh": "嗨，歡迎來到今天的退貨櫃台場景。留意換貨與退款的說法。",
+    "outro": "That's a return desk handled like a pro. Play it again, echo every line.",
+    "outro_zh": "退貨櫃台這一回合處理得專業又漂亮。再撥一次，逐句大聲跟讀。",
+    "practice_intro_en": "Now let's repeat each line together.",
+    "practice_intro_zh": "現在我們一起逐句跟讀。",
+    "title_quote": "I liked the color, but it itches",
+    "char_a_description": "a man in his forties with a thick dark beard, closely cropped greying hair at the temples, an olive green field jacket over a striped rugby shirt, brown corduroy pants, and a heavyset build",
+    "char_b_description": "a woman in her early twenties with a chin-length bright red bob, a silver nose stud, a black store polo with rolled sleeves, a crimson apron with a name patch, and a small frame",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "customer",
+    "char_b_role": "register clerk",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, is this the counter for returns?",
+        "phonetic": "/haɪ ɪz ðɪs ðə ˈkaʊɾɚ fɚ ɹɪˈtɜɹnz/",
+        "zh": "嗨，退換貨是在這個櫃台辦嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It is, what did we buy, or un-buy?",
+        "phonetic": "/ɪt ɪz wʌt dɪd wi baɪ ɔɹ ˌʌnˈbaɪ/",
+        "zh": "沒錯，我們買了什麼，還是想退掉什麼？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, a sweater, online, size large, sadly.",
+        "phonetic": "/hɑ ə ˈswɛɾɚ ˌɑnˈaɪn saɪz lɑɹdʒ ˈsædli/",
+        "zh": "哈哈，一件毛衣，在線上買的，可惜買大了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The gray one with the little ducks?",
+        "phonetic": "/ðə ɡɹeɪ wʌn wɪð ðə ˈlɪɾəl dʌks/",
+        "zh": "是那件有小鴨圖案的灰色毛衣嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ducks yes, though they looked smarter online.",
+        "phonetic": "/dʌks jɛs ðoʊ ðeɪ lʊkt ˈsmɑɹtɚ ˌɑnˈaɪn/",
+        "zh": "對，小鴨子，不過在螢幕上牠們看起來聰明多了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, photos flatter, what's the real issue?",
+        "phonetic": "/hɑ ˈfoʊtoʊz ˈflætɚ wʌts ðə ɹiəl ˈɪʃu/",
+        "zh": "哈哈，照片總是會修圖，真正的問題是什麼？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, I liked the color, but it itches.",
+        "phonetic": "/wɛl aɪ laɪkt ðə ˈkʌlɚ bʌt ɪt ˈɪtʃəz/",
+        "zh": "嗯，我喜歡那個顏色，可是穿上很癢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Bummer, wool blend, it bites some folks.",
+        "phonetic": "/ˈbʌmɚ wʊl blɛnd ɪt baɪts sʌm foʊks/",
+        "zh": "真可惜，是羊毛混紡，有些人穿了會刺癢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Exactly, my neck started a small protest.",
+        "phonetic": "/ɪɡˈzæktli maɪ nɛk ˈstɑɹtəd ə smɔl ˈpɹoʊtɛst/",
+        "zh": "就是這樣，我的脖子當場發動了一場小抗爭。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fair protest, do you have the receipt?",
+        "phonetic": "/fɛɹ ˈpɹoʊtɛst du ju hæv ðə ɹɪˈsit/",
+        "zh": "抗爭有理。手上有收據或訂單資料嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Not paper, um, it was all online.",
+        "phonetic": "/nɑt ˈpeɪpɚ ʌm ɪt wɔz ɔl ˌɑnˈaɪn/",
+        "zh": "沒有紙本，嗯，全部都是線上完成的。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Okay, do you have the QR code?",
+        "phonetic": "/oʊˈkeɪ du ju hæv ðə ˌkjuˈɑɹ ˈkoʊd/",
+        "zh": "好的，那你有退貨用的 QR code 嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The what? My phone is right here, though.",
+        "phonetic": "/ðə wʌt maɪ foʊn ɪz ɹaɪt hɪɹ ðoʊ/",
+        "zh": "什麼？我手機就在我手上啊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect, open the email, tap return code.",
+        "phonetic": "/ˈpɝfɪkt ˈoʊpən ði ˈimeɪl tæp ɹɪˈtɜɹn koʊd/",
+        "zh": "太好了，打開那封電子郵件，點「退貨碼」。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, searching, um, subject, order seven...",
+        "phonetic": "/həm ˈsɜrtʃɪŋ ʌm ˈsʌbdʒɛk ˈɔɹdɚ ˈsɛvən/",
+        "zh": "嗯，我找找，主旨寫著訂單七……"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's at the top, with the little box.",
+        "phonetic": "/ɪts æt ðə tɑp wɪð ðə ˈlɪɾəl ˈbɑks/",
+        "zh": "它在最上面，旁邊還有個小方框。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Found it! Does this square thing work?",
+        "phonetic": "/faʊnd ɪt dʌz ðɪs skwɛɹ θɪŋ wɝk/",
+        "zh": "找到了！這個方方的東西有用嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's the one, hold it near my scanner.",
+        "phonetic": "/ðæts ðə wʌn hoʊld ɪt nɪɹ maɪ ˈskænɚ/",
+        "zh": "就是那個，拿到我的掃描機前面照一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, did it beep? I heard no beep.",
+        "phonetic": "/ʌm dɪd ɪt bip aɪ hɜɹd noʊ bip/",
+        "zh": "嗯，它嗶了一聲嗎？我完全沒聽見。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Almost, tilt it up, the light is shy.",
+        "phonetic": "/əˈloʊst tɪlt ɪt ʌp ðə laɪt ɪz ʃaɪ/",
+        "zh": "差一點，往上傾斜一些，它的光線有點害羞。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "There, one happy beep, you're good at this.",
+        "phonetic": "/ðɛɹ wʌn ˈhæpi bip jʊɹz ɡʊd æt ðɪs/",
+        "zh": "有了，開心的一聲嗶，你真熟悉這套流程。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ten years of tag reading, so, exchange?",
+        "phonetic": "/tɛn jɪɹz ʌv tæɡ ˈɹiɾɪŋ soʊ ɪksˈtʃeɪndʒ/",
+        "zh": "我做這行十年，最會看吊牌。所以，是要換貨？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Or refund, honestly, which is easier?",
+        "phonetic": "/ɔɹ ɹɪˈfʌnd ˈɑnəstli wɪtʃ ɪz ˈiziɚ/",
+        "zh": "還是退款，老實說，哪一種比較省事？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Refund is fast, it flies back to your card.",
+        "phonetic": "/ɹɪˈfʌnd ɪz fæst ɪt flaɪz bæk tə jɔɹ kɑɹd/",
+        "zh": "退款很快，錢會飛回你的信用卡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How fast, a day, a week, a season?",
+        "phonetic": "/haʊ fæst ə deɪ ə wik ə ˈsizən/",
+        "zh": "多快呢，一天、一週，還是一季？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Three days, maybe five, banks are mysterious.",
+        "phonetic": "/θɹi deɪz ˈmeɪbi faɪv bæŋkz ɑɹ məˈstɪɹiəs/",
+        "zh": "大概三天，也可能五天，銀行總愛演推理劇。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, banks, sure. What about store credit?",
+        "phonetic": "/hɑ bæŋks ʃʊɹ wʌt əˈbaʊt stɔɹ ˈkɹɛdɪt/",
+        "zh": "哈哈，銀行嘛，好吧。那店內購物金呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Instant, and you can spend it online today.",
+        "phonetic": "/ˈɪnstənt ænd ju kæn spɛnd ɪt ˌɑnˈaɪn təˈdeɪ/",
+        "zh": "這個馬上就到，今天就能在線上使用。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Tempting, but my neck has a long memory.",
+        "phonetic": "/ˈtɛmpɪŋ bʌt maɪ nɛk hæz ə lɔŋ ˈmɛməɹi/",
+        "zh": "好誘人，不過我的脖子記仇，還記得那次癢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, trauma, I get it. Want the medium?",
+        "phonetic": "/hɑ ˈtɹɑmə aɪ ɡɛt ɪt wɑnt ðə ˈmidiəm/",
+        "zh": "哈哈，算是一種陰影，我懂。要換中尺碼嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Medium, yes, does the gray come in medium?",
+        "phonetic": "/ˈmidiəm jɛs dʌz ðə ɡɹeɪ kʌm ɪn ˈmidiəm/",
+        "zh": "中尺碼，對了，灰色有中尺碼嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Let me check, um, back room, one sec.",
+        "phonetic": "/lɛt mi tʃɛk ʌm bæk ɹum wʌn sɛk/",
+        "zh": "我查一下，嗯，在倉庫裡，稍等我一下。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Take your time, I'll pet the display scarves.",
+        "phonetic": "/teɪk jɔɹ taɪm aɪl pɛt ðə dɪˈspleɪ skɑɹvz/",
+        "zh": "不急，我先摸摸展示用的圍巾。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "They never bite, yes, here's your gray medium.",
+        "phonetic": "/ðeɪ ˈnɛvɚ baɪt jɛs hɪɹz jɔɹ ɡɹeɪ ˈmidiəm/",
+        "zh": "圍巾都不會咬人。有了，你的灰色中尺碼。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, nice, and the tag is still attached.",
+        "phonetic": "/oʊ naɪs ænd ðə tæɡ ɪz stɪl əˈtætʃt/",
+        "zh": "噢，真好，標籤還好好地掛著呢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Fresh stock, that helps, is this your size?",
+        "phonetic": "/fɹæʃ stɑk ðæt hɛlps ɪz ðɪs jɔɹ ˈsaɪz/",
+        "zh": "全新庫存最好，這個尺碼是你穿的嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, my arms feel like windmill blades here.",
+        "phonetic": "/həm maɪ ɑɹmz fil laɪk ˈwɪndˌmɪl ˈbleɪdz hɪɹ/",
+        "zh": "嗯，我的手臂在裡面像風車的槳葉。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Try it on, the mirror is right behind you.",
+        "phonetic": "/tɹaɪ ɪt ɑn ðə ˈmɪɹɚ ɪz ɹaɪt bɪˈhaɪnd ju/",
+        "zh": "穿上試試，鏡子就在你身後。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I can't, um, is there a fitting room?",
+        "phonetic": "/aɪ kænt ʌm ɪz ðɛɹ ə ˈfɪɾɪŋ ɹum/",
+        "zh": "在這裡不太方便，嗯，有試衣間嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two steps, left, the curtain sticks, pull hard.",
+        "phonetic": "/tu stɛps lɛft ðə ˈkɝtən stɪks pʊl hɑɹd/",
+        "zh": "兩步路，左邊，試衣間的簾子愛卡住，要用力拉。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Charming, be right back, hold my coffee.",
+        "phonetic": "/ˈtʃɑɹmɪŋ bi ɹaɪt bæk hoʊd maɪ ˈkɔfi/",
+        "zh": "真有特色，等我一下，幫我拿一下咖啡。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One sec, your cup has a note on it.",
+        "phonetic": "/wʌn sɛk jɔɹ kʌp hæz ə noʊt ɑn ɪt/",
+        "zh": "稍等，你的杯子上貼了張字條。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, that's my son's school list, sorry.",
+        "phonetic": "/oʊ ðæts maɪ sʌnz skul lɪst ˈsɑɹi/",
+        "zh": "噢，那是我兒子的學校清單，抱歉。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, happens, the sweater fits, you look warm.",
+        "phonetic": "/hɑ ˈhæpənz ðə ˈswɛɾɚ fɪts ju lʊk wɔɹm/",
+        "zh": "哈哈，常有的事。毛衣很合身，你看起來暖暖的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It fits, and wow, this one doesn't itch.",
+        "phonetic": "/ɪt fɪts ænd waʊ ðɪs wʌn ˈdʌzənt ɪtʃ/",
+        "zh": "真的合身，而且哇，這件完全不癢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Cotton blend, our itch-free line, proud of it.",
+        "phonetic": "/ˈkɑtən blɛnd ˈaʊɚ ˈɪtʃˌfri laɪn pɹaʊd əv ɪt/",
+        "zh": "這是棉質混紡，我們的不癢系列，我挺自豪的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Proud is good, can I see the cotton scarves?",
+        "phonetic": "/pɹaʊd ɪz ɡʊd kən aɪ si ðə ˈkɑtən skɑɹvz/",
+        "zh": "自豪是好事，那我能看看棉質圍巾嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course, the blue ones match this gray.",
+        "phonetic": "/ʌv kɔɹs ðə blu wʌnz mætʃ ðɪs ɡɹeɪ/",
+        "zh": "當然，藍色那組跟這件灰色很相配。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Dangerous, my wallet already sighed today.",
+        "phonetic": "/ˈdeɪndʒɚəs maɪ ˈwʌlət ɔlˈɹɛdi saɪd təˈdeɪ/",
+        "zh": "好危險，我的錢包今天已經嘆過氣了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "The scarf is forty percent off, it's Friday.",
+        "phonetic": "/ðə skɑɹf ɪz ˈfɔɹti pɚˈsɛnt ɔf ɪts ˈfɹaɪdeɪ/",
+        "zh": "圍巾現在打六折，因為今天是週五。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, you're a sales wizard, fine, add one.",
+        "phonetic": "/hɑ jʊɹz ə seɪlz ˈwɪzɚd faɪn æd wʌn/",
+        "zh": "哈哈，你根本是銷售魔法師，好吧，再加一條。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One blue scarf, total sixty-eight dollars.",
+        "phonetic": "/wʌn blu skɑɹf ˈtoʊɾəl ˈsɪksti eɪt ˈdɑləɹz/",
+        "zh": "一條藍色圍巾，總共六十八美元。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's more than I planned, um, card works?",
+        "phonetic": "/ðæts mɔɹ ðæn aɪ plænd ʌm kɑɹd wɝks/",
+        "zh": "比我原本規劃的多了一點，刷卡可以吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Card works, the sweater refund is in motion.",
+        "phonetic": "/kɑɹd wɝks ðə ˈswɛɾɚ ɹɪˈfʌnd ɪz ɪn ˈmoʊʃən/",
+        "zh": "刷卡沒問題，毛衣的退款也已經在路上了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, and tell the ducks their shift is over.",
+        "phonetic": "/ˈpɝfɪkt ænd tɛl ðə dʌks ðɛɹ ʃɪft ɪz ˈoʊvɚ/",
+        "zh": "太好了，就跟小鴨說，你們下班了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, the ducks say goodbye, do you want a bag?",
+        "phonetic": "/hɑ ðə dʌks seɪ ˌɡʊdˈbaɪ du ju wɑnt ə bæɡ/",
+        "zh": "哈哈，跟小鴨說再見。要袋子裝嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes, paper, um, and a receipt for this.",
+        "phonetic": "/jɛs ˈpeɪpɚ ʌm ænd ə ɹɪˈsit fɔɹ ðɪs/",
+        "zh": "好，紙袋，嗯，再附上一張收據。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Done, next time feel the wool before buying.",
+        "phonetic": "/dʌn nɛkst taɪm fil ðə wʊl bɪˈfɔɹ ˈbaɪɪŋ/",
+        "zh": "搞定。下次記得先摸一摸羊毛再下手。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Lesson learned, thank you for the patient work.",
+        "phonetic": "/ˈlɛsən lɜɹnd θæŋk ju fɔɹ ðə ˈpeɪʃənt wɝk/",
+        "zh": "學到一課了，謝謝你這麼有耐心地幫我。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime, may your neck live in peace now.",
+        "phonetic": "/ˈɛnɪˌtaɪm meɪ jɔɹ nɛk lɪv ɪn pis naʊ/",
+        "zh": "不客氣，願你的頸部從此安寧無擾。"
+      }
+    ],
+    "youtube_title": "【網購毛衣換貨🧥】「我喜歡那個顏色，可是它會癢」🧣換貨、退款與購物金怎麼說🎧｜聽完就會退換｜60句沉浸式A2英文聽力｜Exchanging a Sweater",
+    "youtube_title_en": "\"I Liked the Color, but It Itches\" — Exchanging a Sweater Bought Online",
+    "youtube_description": "「我喜歡那個顏色，可是它會癢」——線上買的毛衣不合身，走進門市收銀台，換貨、退款、店內購物金該怎麼問？本集是 60 句沉浸式英文聽力練習，場景就在服飾店的退貨櫃台。\n\n你會聽到：在電子郵件裡找退貨 QR code、掃碼一直失敗的應變、換貨與退款的差別、購物金與信用卡退款的速度，還有標籤、試衣間、尺碼與附加購買的自然說法。整段只用 A2 初級單字，搭配美國人每天的自然語感：um、well、so、ha、hmm、wow。\n\n聽完你就會用：Is this the counter for returns、What about store credit、Does the gray come in medium、Try it on。後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱，開啟小鈴鐺。",
+    "youtube_description_en": "\"I liked the color, but it itches\" — the sweater arrived from online, looked great, and now your neck is filing a complaint. This 60-line immersive English listening practice happens at a clothing store's return counter.\n\nYou will hear: finding the QR return code in your email, the scanner that refuses to beep, exchange versus refund, store credit versus a card refund, tags, sizes, the fitting room, and one unplanned scarf.\n\nEverything stays in A2 words with the small talk Americans actually use: um, well, so, ha, hmm, wow. By the end you'll own lines like What about store credit and Does the gray come in medium.\n\nThe last chapter is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🧥門市換貨英文｜退貨碼・換貨與退款・購物金｜掃描機不配合怎麼辦｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n線上買的毛衣顏色漂亮，穿上卻渾身發癢，站在服飾店的退貨櫃台前，你該怎麼開口？退貨碼藏在電子郵件的哪個角落？換貨和退款，哪一種比較快拿到錢？\n\n這一集帶大家走進門市收銀台，從找退貨 QR code、掃碼失敗、比較換貨與退款，一路聽到尺碼、標籤、試衣間，最後還多帶一條圍巾回家，共 60 句連續真實對話。\n\n你會聽到：\n🧾 退貨開場：Hi, is this the counter for returns?\n📱 退貨碼：Perfect, open the email, tap return code.\n💳 退款比較：Or refund, honestly, which is easier?\n🧥 換尺碼：Medium, yes, does the gray come in medium?\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so、wow 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著這張退貨單走一趟櫃台，下次再遇到不合身的網購，你就能冷靜開口。\n\n祝你下次開箱，尺寸剛剛好，也一點都不癢。",
+    "youtube_tags": [
+      "english listening practice",
+      "exchanging a sweater english",
+      "store return dialogue",
+      "esl listening a2",
+      "online shopping return english",
+      "refund conversation english",
+      "clothing store english",
+      "listen and repeat english",
+      "american english conversation",
+      "60 sentence english practice",
+      "英文聽力練習",
+      "網購退貨英文",
+      "門市換貨對話",
+      "試衣間英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文"
+    ],
+    "scene": "clothing store return counter",
+    "thumbnail_expression": "touching a sweater sleeve with a skeptical face",
+    "thumbnail_action": "holding a gray sweater against his chest at the counter",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Gray Sweater",
+        "zh": "灰色毛衣"
+      },
+      {
+        "en": "QR Return Code",
+        "zh": "退貨條碼"
+      },
+      {
+        "en": "Price Tag",
+        "zh": "吊牌標籤"
+      },
+      {
+        "en": "Fitting Room",
+        "zh": "試衣間"
+      },
+      {
+        "en": "Blue Scarf",
+        "zh": "藍色圍巾"
+      }
+    ]
+  }
+}

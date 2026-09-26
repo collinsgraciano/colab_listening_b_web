@@ -1,0 +1,451 @@
+{
+  "id": "script_cut_braces-question-for-kid",
+  "topic": "Asking the Orthodontist about Braces for a Child",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1758916800.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "ASKING ABOUT BRACES",
+    "title_zh": "問牙套",
+    "scene_zh": "矯正診所 · 問牙套",
+    "story_hook": "Two rows of teeth, and one very big question.",
+    "intro_zh": "兩排牙齒，還有一個很大的問題。",
+    "welcome_en": "Welcome to an orthodontic clinic on a school day. Listen for teeth talk and money words.",
+    "welcome_zh": "歡迎來到上學日裡的矯正診所。留意關於牙齒的說法，還有講錢的用詞。",
+    "outro": "And that's a braces plan for a nine year old. Listen once more and answer out loud.",
+    "outro_zh": "九歲孩子的牙套計畫就這樣有了輪廓。再聽一次，大聲回答一次。",
+    "practice_intro_en": "Now say each line back to us.",
+    "practice_intro_zh": "現在把每一句跟著我們說回來。",
+    "title_quote": "He has two rows of teeth",
+    "char_a_description": "an easygoing man in his forties with a shaved head and a short salt-and-pepper beard, an olive flannel shirt, soft canvas shoes, and a broad build",
+    "char_b_description": "a warm woman in her mid thirties with a platinum blonde pixie cut, clear round glasses, a mint green scrub top under a white lab coat, and a tall build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "parent",
+    "char_b_role": "orthodontist",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Hi, thanks for fitting us in this afternoon, doctor.",
+        "phonetic": "/haɪ θæŋks fɚ ˈfɪɾɪŋ ʌs ɪn ðɪs ˈæftɚˌnuːn ˈdɑkɾɚ/",
+        "zh": "嗨，謝謝你今天下午還幫我們塞進來看診，醫師。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Please, call me Nora, and welcome to our little clinic.",
+        "phonetic": "/pliz kɔl mi ˈnɔɹə ænd ˈwɛlkəm tə ɑːɹ ˈlɪɾəl ˈklɪnɪk/",
+        "zh": "請叫我 Nora 就好，歡迎來我們的小診所。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So, um, Nora, is nine too early for braces?",
+        "phonetic": "/soʊ ʌm ˈnɔɹə ɪz naɪn tu ˈɜɹli fɚ bɹeɪsɪz/",
+        "zh": "那，嗯，Nora，九歲開始戴牙套會不會太早？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Nine is actually a good year, here's the reason.",
+        "phonetic": "/naɪn ɪz ˈæktʃuəli ə ɡʊd jɪɹ hɪɹz ðə ˈɹizən/",
+        "zh": "九歲其實是很適合的年齡，原因在這裡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Good year? He still has baby teeth, plenty left.",
+        "phonetic": "/ɡʊd jɪɹ hi stɪl hæz ˈbeɪbi tɪθ ˈplɛnɾi lɛft/",
+        "zh": "很好的年齡？他還有乳牙，好多還沒掉呢。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "That's normal, some fall out late, no rush there.",
+        "phonetic": "/ðæts ˈnɔɹməl sʌm fɔl aʊt leɪt noʊ ɹʌʃ ðɛɹ/",
+        "zh": "那很正常，有些牙齒掉得晚，這個不用急。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, right. He has two rows of teeth, somehow.",
+        "phonetic": "/hɑ ɹaɪt hi hæz tu ɹoʊz əv tɪθ ˈsʌmˌhaʊ/",
+        "zh": "哈，也是。他不知怎麼已經有兩排牙齒了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Shark teeth! I see that every month, it's fine.",
+        "phonetic": "/ʃɑɹk tɪθ aɪ si ðæt ˈɛvɹi mʌnθ ɪts faɪn/",
+        "zh": "鯊魚牙！我每個月都會看到，這沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Every month? That makes me feel much better, honestly.",
+        "phonetic": "/ˈɛvɹi mʌnθ ðæt meɪks mi fil mʌtʃ ˈbɛɾɚ ˈɑnəstli/",
+        "zh": "每個月都會看到？那老實說讓我安心多了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We look for room, not how many teeth show.",
+        "phonetic": "/wi lʊk fɚ ɹum nɑt haʊ ˈmɛni tɪθ ʃoʊ/",
+        "zh": "我們看的是空間，不是數他露出幾顆牙。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Room, okay, so if there's no room, teeth crowd?",
+        "phonetic": "/ɹum oʊˈkeɪ soʊ ɪf ðɛɹz noʊ ɹum tɪθ kɹaʊd/",
+        "zh": "空間，好，所以如果沒有空間，牙齒就會擠？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, they crowd, and then brushing becomes a battle.",
+        "phonetic": "/ɪɡˈzæktli ðeɪ kɹaʊd ænd ðɛn ˈbɹʌʃɪŋ bɪˈkʌmz ə ˈbæɾəl/",
+        "zh": "就是這樣，它們會擠，然後刷牙就變成一場戰爭。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's us every night, and he fights the toothbrush.",
+        "phonetic": "/ðæts ʌs ˈɛvɹi naɪt ænd hi faɪts ðə ˈtuθˌbɹʌʃ/",
+        "zh": "我們家每天晚上都這樣，他會跟牙刷對抗。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, parents always admit that part, all of them.",
+        "phonetic": "/hɑ ˈpɛɹənts ˈɔlweɪz ædˈmɪt ðæt pɑɹt ɔl əv ðɛm/",
+        "zh": "哈，爸媽都會承認這一段，每一個都是。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "So what happens first, do we start braces today?",
+        "phonetic": "/soʊ wʌt ˈhæpənz fɝst du wi stɑɹt ˈbɹeɪsɪz təˈdeɪ/",
+        "zh": "那首先要做什麼，我們今天就裝牙套嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Not yet, first an X-ray, it's quick, I promise.",
+        "phonetic": "/nɑt jɛt fɝst ən ˈɛksˌɹeɪ ɪts kwɪk aɪ pɹəˈmɪs/",
+        "zh": "還不用，先照一張 X 光，很快，我保證。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "An X-ray, sure. What does that show you exactly?",
+        "phonetic": "/ən ˈɛksˌɹeɪ ʃʊɹ wʌt dʌz ðæt ʃoʊ ju ɪɡˈzæktli/",
+        "zh": "照 X 光，好啊。那可以讓你看見什麼？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It shows the teeth still under the gum line.",
+        "phonetic": "/ɪt ʃoz ðə tɪθ stɪl ˈʌndɚ ðə ɡʌm laɪn/",
+        "zh": "它讓我看到還在牙齦下面的牙齒。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Under the gum, so you can plan the path.",
+        "phonetic": "/ˈʌndɚ ðə ɡʌm soʊ ju kæn plæn ðə pæθ/",
+        "zh": "在牙齦下面，所以你能規劃牙齒走的路。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, and I can see if any tooth is missing.",
+        "phonetic": "/jɛs ænd aɪ kæn si ɪf ˈɛni tuθ ɪz ˈmɪsɪŋ/",
+        "zh": "對，我也可以看有沒有缺牙。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Missing? Um, can teeth just not be there?",
+        "phonetic": "/ˈmɪsɪŋ ʌm kæn tɪθ dʒʌst nɑt bi ðɛɹ/",
+        "zh": "缺牙？嗯，牙齒會不會本來就沒有？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sometimes, then we open space or close it later.",
+        "phonetic": "/ˈsʌmˌtaɪmz ðɛn wi ˈoʊpən speɪs ɔɹ kloʊz ɪt ˈleɾɚ/",
+        "zh": "有時候會，那樣我們可以把空間撐開，或是之後再把它收起來。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay, that sounds smart. Does the X-ray hurt?",
+        "phonetic": "/oʊˈkeɪ ðæt ˈsaʊndz smɑɹt dʌz ði ˈɛksˌɹeɪ hɝt/",
+        "zh": "好，這聽起來挺聰明的。照 X 光會痛嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "No, just a still face, ten seconds, that's all.",
+        "phonetic": "/noʊ dʒʌst ə stɪl feɪs tɛn ˈsɛkəndz ðæts ɔl/",
+        "zh": "不會，只要臉保持不動，十秒，就這樣。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "He can hold still, he sits through movies fine.",
+        "phonetic": "/hi kæn hoʊld stɪl hi sɪts θɹu ˈmɔviz faɪn/",
+        "zh": "他可以不動，他看電影都坐得住。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Perfect test, movies are my secret tool here.",
+        "phonetic": "/ˈpɝfɪkt tɛst ˈmɔviz ɑɹ maɪ ˈsiːˌkɹɪt tuːl hɪɹ/",
+        "zh": "完美的測試，電影是我在這裡的秘密工具。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Secret tool, ha, I'll use that at home too.",
+        "phonetic": "/ˈsiːˌkɹɪt tuːl hɑ aɪl juz ðæt æt hoʊm tu/",
+        "zh": "秘密工具，哈，我在家裡也要用這招。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So, after the X-ray, we talk about choices.",
+        "phonetic": "/soʊ ˈæftɚ ði ˈɛksˌɹeɪ wi tɔk əˈbaʊt ˈtʃɔɪsəz/",
+        "zh": "所以，照完 X 光之後，我們來談選項。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Choices? I thought braces were just metal squares.",
+        "phonetic": "/ˈtʃɔɪsəz aɪ θɑt bɹeɪsɪz wɚ dʒʌst ˈmɛɾəl skwɛɹz/",
+        "zh": "選項？我以為牙套就是金屬的小方塊。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Metal is one, and it's still the best for many.",
+        "phonetic": "/ˈmɛɾəl ɪz wʌn ænd ɪts stɪl ðə bɛst fɚ ˈmɛni/",
+        "zh": "金屬是一種，而且對很多人來說它還是最好的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And the other choice is those clear plastic trays?",
+        "phonetic": "/ænd ði ˈʌðɚ tʃɔɪs ɪz ðoz klɪɹ ˈplæsɪk tɹeɪz/",
+        "zh": "另一種就是那些透明的塑膠托盤嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, trays, but at nine metal usually works faster.",
+        "phonetic": "/jɛs tɹeɪz bʌt æt naɪn ˈmɛɾəl ˈjuʒəwəli wɝks ˈfæstɚ/",
+        "zh": "對，透明托盤，但九歲通常金屬效果更快。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Faster is good, he forgets everything, honestly.",
+        "phonetic": "/ˈfæstɚ ɪz ɡʊd hi fɚˈɡɛts ˈɛvɹiθɪŋ ˈɑnəstli/",
+        "zh": "快比較好，老實說，他什麼都會忘。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then metal it is, um, unless you have a preference?",
+        "phonetic": "/ðɛn ˈmɛɾəl ɪt ɪz ʌm ʌnˈlɛs ju hæv ə ˈpɹɛfɚəns/",
+        "zh": "那就選金屬，嗯，除非你有偏好的款式？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No preference, only one worry, does it look loud?",
+        "phonetic": "/noʊ ˈpɹɛfɚəns ˈoʊnli wʌn ˈwɝi dʌz ɪt lʊk laʊd/",
+        "zh": "沒有偏好，只有一個擔心，它會不會看起來很張揚？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, loud! Kids don't care, their friends have them.",
+        "phonetic": "/hɑ ˈlaʊd ˈkɪdz doʊnt ˈkɛɹ ðɛɹ ˈfɹɛndz hæv ðɛm/",
+        "zh": "哈，很張揚！小孩才不在意，他的朋友都在戴。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "That's true, half his class has braces, I think.",
+        "phonetic": "/ðæts ˈtɹu hæf ɪz klæs hæz bɹeɪsɪz aɪ θɪŋk/",
+        "zh": "說得對，他們班上一半都有牙套，我想。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then he's normal there, and that's the biggest thing.",
+        "phonetic": "/ðɛn hɪz ˈnɔɹməl ðɛɹ ænd ðæts ðə ˈbɪɡəst θɪŋ/",
+        "zh": "那他在班上就是普通一個，這點才最重要。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Okay. Now the money part, is that monthly?",
+        "phonetic": "/oʊˈkeɪ naʊ ðə ˈmʌni pɑɹt ɪz ðæt ˈmʌnθli/",
+        "zh": "好。現在談錢的部分，那是按月付的嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Yes, monthly payments, and there's no interest at all.",
+        "phonetic": "/jɛs ˈmʌnθli ˈpeɪmənts ænd ðɛɹz noʊ ˈɪntɹəst ət ɔl/",
+        "zh": "是的，每月付一筆，而且完全沒有利息。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No interest, that helps, my plan covers part, I think.",
+        "phonetic": "/noʊ ˈɪntɹəst ðæt hɛlps maɪ plæn ˈkʌvɚz pɑɹt aɪ θɪŋk/",
+        "zh": "沒有利息，那很有幫助，我的保險應該有付一部分吧。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Send me your insurance card, I'll check it today.",
+        "phonetic": "/sɛnd mi jɔɹ ˈɪnʃɚəns kɑɹd aɪl tʃɛk ɪt təˈdeɪ/",
+        "zh": "把你的保險卡傳給我，我今天就會幫你查。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "It's in my car, well, can I bring it later?",
+        "phonetic": "/ɪts ɪn maɪ kɑɹ wɛl kæn aɪ brɪŋ ɪt ˈleɾɚ/",
+        "zh": "卡在我的車上，嗯，我晚一點拿來可以嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Of course, and I'll hold your X-ray slot.",
+        "phonetic": "/ʌv kɔɹs ænd aɪl hoʊld jɔɹ ˈɛksˌɹeɪ slɑt/",
+        "zh": "當然可以，我會先幫你保留 X 光的時段。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How long do braces stay on, roughly?",
+        "phonetic": "/haʊ lɔŋ du bɹeɪsɪz steɪ ɑn ˈɹʌfli/",
+        "zh": "牙套大概要戴多久？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Eighteen months is common, sometimes two years for kids.",
+        "phonetic": "/ˌeɪˈtin mʌnθs ɪz ˈkɑmən ˈsʌmˌtaɪmz tu jɪɹz fɚ kɪdz/",
+        "zh": "十八個月很常見，小孩有時候要兩年。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Eighteen months, okay, we can do eighteen months.",
+        "phonetic": "/ˌeɪˈtin ˈmʌnθs oʊˈkeɪ wi kæn du ˌeɪˈtin ˈmʌnθs/",
+        "zh": "十八個月，好，這我們做得到。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Food rules are small, no gum, no hard candy.",
+        "phonetic": "/fud ɹulz ɑɹ smɑl noʊ ɡʌm noʊ hɑɹd ˈkændi/",
+        "zh": "飲食規則很少，不能嚼口香糖，不能吃硬的糖。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "No gum? He chews that thing every single day.",
+        "phonetic": "/noʊ ɡʌm hi tʃuz ðæt θɪŋ ˈɛvɹi ˈsɪŋɡəl deɪ/",
+        "zh": "不能嚼口香糖？他每一天都在嚼那個東西。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Then we'll say goodbye to gum, sorry, ha.",
+        "phonetic": "/ðɛn wil seɪ ˌɡʊdˈbaɪ tu ɡʌm ˈsɑɹi hɑ/",
+        "zh": "那我們就跟口香糖說再見，抱歉，哈。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Accepted! What about after the braces come off?",
+        "phonetic": "/ækˈsɛptɪd wʌt əˈbaʊt ˈæftɚ ðə ˈbɹeɪsɪz kʌm ɔf/",
+        "zh": "我接受啦。那牙套拆掉之後呢？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "A retainer at night, that's the quiet final step.",
+        "phonetic": "/ə ɹɪˈteɪnɚ æt naɪt ðæts ðə ˈkwaɪət ˈfaɪnəl stɛp/",
+        "zh": "晚上戴維持器，那就是最後一步，很安靜的那種。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Night only, that's not so hard to remember.",
+        "phonetic": "/naɪt ˈoʊnli ðæts nɑt soʊ hɑɹd tə ɹɪˈmɛmbɚ/",
+        "zh": "只有晚上要戴，那應該不難記得。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Most kids forget twice, then they stop forgetting.",
+        "phonetic": "/moʊst kɪdz fɚˈɡɛt twaɪs ðɛn ðeɪ stɑp fɚˈɡɛɾɪŋ/",
+        "zh": "多數小孩會忘記兩次，然後就不再忘記。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Great, I'll put a sticky note on the mirror.",
+        "phonetic": "/ɡɹeɪt aɪl pʊt ə ˈstɪki noʊt ɑn ðə ˈmɪɾɚ/",
+        "zh": "太好了，我會貼一張便條在鏡子上。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Do that, and bring him Saturday for the X-ray.",
+        "phonetic": "/du ðæt ænd brɪŋ hɪm ˈsætɚˌdeɪ fɚ ði ˈɛksˌɹeɪ/",
+        "zh": "那樣做，然後週六帶他來照 X 光。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Saturday morning works. Is there a fee for that visit?",
+        "phonetic": "/ˈsætɚˌdeɪ ˈmɔɹnɪŋ wɝks ɪz ðɛɹ ə fi fɚ ðæt ˈvɪzɪt/",
+        "zh": "週六早上可以。那一次要收錢嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It's all included in the plan, so Saturday is free.",
+        "phonetic": "/ɪts ɔl ɪnˈkludɪd ɪn ðə plæn soʊ ˈsætɚˌdeɪ ɪz ˈfɹi/",
+        "zh": "這些都含在計畫裡，所以週六那趟不用付錢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Nothing to pay? That's an obvious yes, thank you.",
+        "phonetic": "/ˈnʌθɪŋ tə ˈpeɪ ðæts ən əbˈviəs jɛs θæŋk ju/",
+        "zh": "不用付錢？那答案很明顯，謝謝你。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Saturday then, and tell him shark teeth are cool.",
+        "phonetic": "/ˈsætɚˌdeɪ ðɛn ænd tɛl hɪm ʃɑɹk tɪθ ɑɹ kul/",
+        "zh": "那就週六見，記得跟他說鯊魚牙很酷。"
+      }
+    ],
+    "youtube_title": "【矯正診所問牙套🦷】「他怎麼有兩排牙齒」教你九歲開始矯正要問什麼🎧💳🩺｜聽完會問分期與維持器｜60句沉浸式英文聽力｜Asking About Braces",
+    "youtube_title_en": "\"He Has Two Rows of Teeth\" — Asking the Orthodontist About Braces at Nine",
+    "youtube_description": "孩子九歲，牙齒排成兩層，到底現在該不該戴牙套？這一集是 60 句沉浸式英文聽力練習，場景在矯正診所的診療椅旁，從問年齡、問 X 光，一路聽到金屬與透明托盤、每月分期、還有拆掉之後的維持器。\n\n你會聽到：怎麼問 is nine too early for braces；為什麼診所要先照 X 光，牙齦下面的牙能看出什麼；乳牙還沒掉完算不算問題；還有牙套要戴多久、能不能按月付、有沒有利息、保險卡怎麼交、口香糖為什麼要停的實用問句。\n\n整段只用 A2 初級單字與短句，反覆出現的是美國人坐在診所裡真實的語感：um、well、so、ha、honestly。聽完你就會用：Call me Nora、That sounds smart、No interest、I'll hold your X-ray slot、That's an obvious yes。\n\n後半段是逐句聽力加跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請按訂閱與小鈴鐺。",
+    "youtube_description_en": "Your nine year old has two rows of teeth, and nobody at home knows the next step, so what do you ask the orthodontist? This is a 60-line immersive English listening practice set beside the chair of a braces clinic.\n\nYou will hear: asking if nine is too early, finding out the clinic looks for room and not for a tooth count, and why an X-ray comes first, since some teeth hide under the gum; then the real choices, metal or clear trays, how long they stay on, monthly payments with no interest, and the quiet final step, a retainer at night.\n\nEverything stays in A2-level words, with the small talk Americans actually use: um, well, so, ha, honestly. By the end you'll own lines like That sounds smart, No interest, I'll hold your X-ray slot, and That's an obvious yes.\n\nThe last chapter is a line-by-line listen and repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed, just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🎦矯正診所英文｜九歲該不該戴牙套・先照 X 光再看空間・金屬與透明托盤｜每月分期與晚上的維持器｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n小朋友張開嘴，上面一排、下面也一排，牙齒好像長了兩倍。九歲到底是不是開始戴牙套的好時機？診所為什麼堅持要先照一張 X 光？\n\n這一集帶大家走進一間矯正診所，從問年齡、問兩排牙齒是否正常、先照 X 光看牙齦下面，一路聽到金屬牙套與透明托盤的差別、十八個月的時間、按月付錢與沒有利息的安排，最後還有拆掉之後的維持器，共 60 句連續真實對話。\n\n你會聽到：\n🦷 問年齡：So, um, Nora, is nine too early for braces?\n🩺 先照 X 光：Not yet, first an X-ray, it's quick, I promise.\n💳 談錢：Yes, monthly payments, and there's no interest at all.\n🎧 最後一步：A retainer at night, that's the quiet final step.\n\n後半段是逐句聽力加跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、so、ha 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用學文法，多聽就會用。跟著這位爸爸坐在診療椅邊聽一趟，下次你自己開口問診所，時間、價錢、選項，話就會自己出來。\n\n祝你的笑容有一天也整整齊齊，慢慢來也一定會到。",
+    "youtube_tags": [
+      "english listening practice",
+      "orthodontist english dialogue",
+      "braces english conversation",
+      "dentist clinic english",
+      "esl listening a2",
+      "american english conversation",
+      "kids braces english phrases",
+      "payment plan english",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "英語聽力練習",
+      "矯正牙科英文",
+      "看牙醫英文",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語會話",
+      "帶孩子看診英文"
+    ],
+    "scene": "orthodontic clinic chair",
+    "thumbnail_expression": "surprised, pointing at an X-ray",
+    "thumbnail_action": "showing a tooth model with tiny metal braces",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "Two Rows of Teeth",
+        "zh": "兩排牙齒"
+      },
+      {
+        "en": "Dental X-Ray",
+        "zh": "牙科 X 光片"
+      },
+      {
+        "en": "Metal Braces",
+        "zh": "金屬牙套"
+      },
+      {
+        "en": "Clear Trays",
+        "zh": "透明托盤"
+      },
+      {
+        "en": "Monthly Payment",
+        "zh": "每月分期"
+      }
+    ]
+  }
+}

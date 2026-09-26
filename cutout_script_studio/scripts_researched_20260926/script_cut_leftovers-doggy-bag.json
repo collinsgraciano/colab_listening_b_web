@@ -1,0 +1,450 @@
+{
+  "id": "script_cut_leftovers-doggy-bag",
+  "topic": "Asking for a Box for the Leftovers",
+  "cefr": "A2",
+  "structure": "original_cutout",
+  "llm_provider": "",
+  "llm_model": "",
+  "num_lines": 60,
+  "created": 1790380800.0,
+  "status": "draft",
+  "review": null,
+  "used_by": "",
+  "used_at": 0,
+  "script": {
+    "lesson_type": "listening",
+    "structure": "original_cutout",
+    "cefr": "A2",
+    "title": "LEFTOVERS TO GO",
+    "title_zh": "打包剩菜",
+    "scene_zh": "美式餐館 · 打包剩菜",
+    "story_hook": "The pie is half gone, but the night is young.",
+    "intro_zh": "派吃了一半，夜色還長，剩菜也要好好帶回家。",
+    "welcome_en": "Hi, welcome to tonight's diner scene. Listen for handy take-home phrases.",
+    "welcome_zh": "嗨，歡迎來到今晚的小餐館場景。留意打包剩菜時會用到的說法。",
+    "outro": "That's how you send a good meal home safe. Play it again, echo every line.",
+    "outro_zh": "一頓好餐就這樣安心帶回家。再撥一次，逐句大聲跟讀。",
+    "practice_intro_en": "Now, take each line and say it aloud.",
+    "practice_intro_zh": "接下來，我們一句一句大聲跟讀。",
+    "title_quote": "This crust is calling my name",
+    "char_a_description": "a man in his early thirties with short auburn hair swept to one side, wearing a faded blue flannel shirt open over a white tee, khaki trousers, and a medium build",
+    "char_b_description": "a woman in her forties with grey streaked hair in a low ponytail, thin wire glasses, a coral pink server shirt under a denim apron, and a sturdy build",
+    "char_a_gender": "male",
+    "char_b_gender": "female",
+    "char_a_role": "diner",
+    "char_b_role": "server",
+    "dialogue": [
+      {
+        "speaker": "char_a",
+        "text": "Evening! Is this chair still mine?",
+        "phonetic": "/ˈivnɪŋ ɪz ðɪs ˈtʃɛɹ stɪl maɪn/",
+        "zh": "晚上好！這個位子還是我的吧？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Ha, it's yours until close.",
+        "phonetic": "/hɑ ɪts ˈjʊɹz ʌnˈtɪl kloʊs/",
+        "zh": "哈哈，關門之前都算你的。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Perfect, because this pie is amazing.",
+        "phonetic": "/ˈpɝfɪkt bɪˈkəz ðɪs ˈpaɪ ɪz əˈmeɪzɪŋ/",
+        "zh": "太好了，因為這派真的太好吃了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Glad you like it, you left half.",
+        "phonetic": "/ɡlæd ju ˈlaɪk ɪt ju lɛft hæf/",
+        "zh": "你喜歡就好，不過你還剩一半呢。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "The half portion was already a big help.",
+        "phonetic": "/ðə hæf ˈpoɹʃən wəz ˈɔlɹɛdi ə ˈbɪɡ hɛlp/",
+        "zh": "半份的量其實就已經很實在。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Our pies are huge, no judgment here.",
+        "phonetic": "/ˈaʊɚ ˈpaɪz ɑɹ hjuːdʒ noʊ ˈdʒʌdʒmənt hɪɹ/",
+        "zh": "我們的派個頭都很大，這不怪你。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Well, this crust is calling my name.",
+        "phonetic": "/wɛl ðɪs ˈkrʌst ɪz ˈkɔlɪŋ maɪ ˈneɪm/",
+        "zh": "唉，這層酥皮一直在呼喚我耶。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "So, want a box for that?",
+        "phonetic": "/soʊ wɑnt ə ˈbɑks fɔɹ ðæt/",
+        "zh": "好，要幫你裝一盒帶走嗎？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Yes please, and a fork to go too.",
+        "phonetic": "/jɛs pliz ænd ə fɔɹk tu ˈɡoʊ tu/",
+        "zh": "好，請再給我一支可以帶走的叉子。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Paper or plastic? Both work fine.",
+        "phonetic": "/ˈpeɪpɚ ɔɹ ˈplæstɪk boʊθ wɝk faɪn/",
+        "zh": "紙盒還是塑膠盒？兩種都沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Hmm, which one keeps the crust crisp?",
+        "phonetic": "/həm wɪtʃ wʌn kipz ðə ˈkrʌst krɪsp/",
+        "zh": "嗯，哪一種比較能讓酥皮保持脆？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Paper, it breathes, the steam gets out.",
+        "phonetic": "/ˈpeɪpɚ ɪt bɹiðz ðə stim ɡɛts aʊt/",
+        "zh": "紙盒會透氣，熱氣不會悶在裡面。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Then paper, please, I like crunch.",
+        "phonetic": "/ðɛn ˈpeɪpɚ pliz aɪ laɪk krʌntʃ/",
+        "zh": "那我選紙盒，我愛脆脆的口感。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Done, how about the gravy?",
+        "phonetic": "/dʌn haʊ əˈbaʊt ðə ˈɡɹeɪvi/",
+        "zh": "好，那醬汁怎麼處理？"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Um, can the gravy ride separate?",
+        "phonetic": "/ʌm kən ðə ˈɡɹeɪvi ɹaɪdz ˈsɛpɚət/",
+        "zh": "嗯，醬汁可以分開裝嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It can, tiny cup, lid snaps tight.",
+        "phonetic": "/ɪt kæn ˈtaɪni kʌp lɪd snæps taɪt/",
+        "zh": "可以，用一個小杯子裝，蓋子會扣得很緊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Smart, the mash gets soft otherwise.",
+        "phonetic": "/smɑɹt ðə mæʃ ɡɛts sɔft ˈɔðɚˌwaɪz/",
+        "zh": "聰明，不然馬鈴薯泥會變軟。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Exactly, soggy is not a style.",
+        "phonetic": "/ɪɡˈzæktli ˈsɑɡi ɪz nɑt ə staɪl/",
+        "zh": "就是這個道理，軟爛可不是一種風格。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Haha, and the cornbread, still good?",
+        "phonetic": "/ˈhɑhɑ ænd ðə ˈkɔɹnˌbrɛd stɪl ɡʊd/",
+        "zh": "哈哈，那玉米麵包還適合帶走嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Two pieces left, they travel well.",
+        "phonetic": "/tu ˈpiˌsɛs lɛft ðeɪ ˈtɹævəl wɛl/",
+        "zh": "還剩兩塊，很耐放，帶走沒問題。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "I'll grab them, did the kitchen hear me?",
+        "phonetic": "/aɪl ɡɹæb ðəm dɪd ðə ˈkɪtʃən hɪɹ mi/",
+        "zh": "那我帶走，廚師聽見我剛說的話了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "She did, she's adding one free piece.",
+        "phonetic": "/ʃi dɪd ʃiz ˈædɪŋ wʌn fɹi pis/",
+        "zh": "聽見了，她還多送你一塊。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Oh, tell her I said superstar.",
+        "phonetic": "/oʊ tɛl ɚ ˈaɪ sɛd ˈsuːpɚˌstɑɹ/",
+        "zh": "噢，請轉告她，她是超級巨星。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "I will, box number two for you.",
+        "phonetic": "/aɪ wɪl bɑks ˈnʌmbɚ tu fɔɹ ju/",
+        "zh": "我會的，這是你的第二個盒子。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "How do I reheat all this at home?",
+        "phonetic": "/haʊ du aɪ ˌɹiˈhit ɔl ðɪs æt hoʊm/",
+        "zh": "回家後這一大袋要怎麼重新加熱？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Oven, ten minutes, medium heat.",
+        "phonetic": "/ˈʌvən tɛn ˈmɪnɪts ˈmidɪəm hit/",
+        "zh": "放烤箱，中火十分鐘。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "And the microwave, um, is that okay?",
+        "phonetic": "/ænd ðə ˈmeɪkɹəˌweɪv ʌm ɪz ðæt oʊˈkeɪ/",
+        "zh": "那微波爐呢，嗯，可以用嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "It works, though the crust goes soft.",
+        "phonetic": "/ɪt wɝks ðoʊ ðə ˈkrʌst ɡoʊz sɔft/",
+        "zh": "也可以，只是酥皮會變軟。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Soft is a sad word for crust.",
+        "phonetic": "/sɔft ɪz ə sæd wɝd fɔɹ ˈkrʌst/",
+        "zh": "對酥皮來說，「軟」是個悲傷的字。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Use a skillet, it wakes the crust up.",
+        "phonetic": "/juz ə ˈskɪlət ɪt weɪks ðə ˈkrʌst ʌp/",
+        "zh": "用平底鍋吧，能把酥皮喚醒。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Sold, you think of everything here.",
+        "phonetic": "/sɑld ju θɪŋk ʌv ˈɛvɹiθɪŋ hɪɹ/",
+        "zh": "成交，你們這裡什麼都想到了。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Years of feeding hungry humans.",
+        "phonetic": "/jɪɹz ʌv ˈfidɪŋ ˈhʌŋɡɹi ˈjumənz/",
+        "zh": "畢竟喂飽飢腸轆轆的人很多年了吧。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Do these boxes cost anything extra?",
+        "phonetic": "/du ðiz ˈbɑksɪz kɑst ˈɛnɪθɪŋ ˈɛkstɹə/",
+        "zh": "這些打包盒要額外收費嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One fifty for two, it's on the bill.",
+        "phonetic": "/wʌn ˈfɔɹti fɔɹ tu ɪts ɑn ðə bɪl/",
+        "zh": "兩個一共一塊五，會列進帳單裡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Fair, and could I get a receipt?",
+        "phonetic": "/fɛɹ ænd kʊd aɪ ɡɛt ə ɹɪˈsit/",
+        "zh": "合理，可以再給我一張收據嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Paper or email, your call.",
+        "phonetic": "/ˈpeɪpɚ ɔɹ ˈimeɪl jɔɹ kɔl/",
+        "zh": "紙本或電子郵件，由你決定。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Email, my printer hates ink cartridges.",
+        "phonetic": "/ˈimeɪl maɪ ˈpɹɪntɚ ˈheɪts ɪŋk ˈkɑɹdʒəz/",
+        "zh": "傳電子郵件吧，我的印表機很討厭墨水匣。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Mine too, it only works on Sundays.",
+        "phonetic": "/maɪ tu ɪt ˈoʊnli wɝks ɑn ˈsʌndeɪz/",
+        "zh": "我的也是，它只有週日願意上班。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, same. Can I have a cup of water?",
+        "phonetic": "/hɑ seɪm kən aɪ hæv ə kʌp ʌv ˈwɔɾɚ/",
+        "zh": "哈，我家那台也是。可以再給我一杯水嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "On the house, filling a to-go cup.",
+        "phonetic": "/ɑn ðə haʊz ˈfɪlɪŋ ə tu ˈɡoʊ kʌp/",
+        "zh": "這杯請客，我幫你裝一杯帶走的水。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "You're a legend, does the lid fit?",
+        "phonetic": "/jʊɹz ə ˈlɛdʒənd dʌz ðə lɪd fɪt/",
+        "zh": "你真是個傳奇，杯蓋蓋得上嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Almost, we'll double it, no drips.",
+        "phonetic": "/ˈɔlmoʊst wil ˈdʌbəl ɪt noʊ dɹɪps/",
+        "zh": "差不多，我們蓋兩個，就不會滴了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Teamwork, I also want two napkins.",
+        "phonetic": "/ˈtimˌwɝk aɪ ˈɔlsoʊ wɑnt tu ˈnæpkɪnz/",
+        "zh": "團隊合作真好。我再要兩張餐巾紙。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Four, because napkins deserve pairs.",
+        "phonetic": "/fɔɹ bɪˈkəz ˈnæpkɪnz dɪˈzɝv pɛɹz/",
+        "zh": "給你四張，餐巾紙向來成雙成對。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wait, the roll basket, can I take one?",
+        "phonetic": "/weɪt ðə ɹoʊl ˈbæskɪt kən aɪ teɪk wʌn/",
+        "zh": "等等，那一籃麵包，我可以拿一顆走嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Take two, they freeze like champs.",
+        "phonetic": "/teɪk tu ðeɪ ˈfriz laɪk tʃæmpz/",
+        "zh": "帶兩顆吧，它們冷凍後依舊很棒。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Like champs, I'll write that down.",
+        "phonetic": "/laɪk tʃæmpz aɪl ɹaɪt ðæt daʊn/",
+        "zh": "「依舊很棒」，我要把這句記下來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Say it when your toast behaves badly.",
+        "phonetic": "/seɪ ɪt wɛn jɔɹ toʊst bɪˈheɪvz ˈbædli/",
+        "zh": "等你的吐司不聽話時就說這句。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Ha, okay, total with the boxes?",
+        "phonetic": "/hɑ oʊˈkeɪ ˈtoʊtəl wɪð ðə ˈbɑksɪz/",
+        "zh": "哈，好，連盒子在內總共多少？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Eight twenty-five, tap whenever ready.",
+        "phonetic": "/eɪt ˈtwɛnti faɪv tæp wɛnˈɛvɚ ˈɹɛdi/",
+        "zh": "八塊二毛五，準備好就感應付款。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Done, um, did my receipt send?",
+        "phonetic": "/dʌn ʌm dɪd maɪ ɹɪˈsit sɛnd/",
+        "zh": "搞定。嗯，收據傳出去了嗎？"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Sent, check spam, it hides there.",
+        "phonetic": "/sɛnt tʃɛk spæm ɪt haɪdz ðɛɹ/",
+        "zh": "傳了，查一下垃圾信，收據愛躲在那裡。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Found it, you're good at this job.",
+        "phonetic": "/faʊnd ɪt jʊɹz ɡʊd æt ðɪs dʒɑb/",
+        "zh": "找到了，你真適合做這行。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "One secret: boxes beat waste every day.",
+        "phonetic": "/wʌn ˈsɪkɹət ˈbɑksɪz bit weɪst ˈɛvɹi deɪ/",
+        "zh": "秘訣就一個：打包永遠勝過浪費。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Wisdom in a denim apron, thank you.",
+        "phonetic": "/ˈwɪzdəm ɪn ə ˈdɛnɪm əˈpɹɑn θæŋk ju/",
+        "zh": "牛仔圍裙裡藏著智慧，真是謝謝你。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Anytime, the bag is yours.",
+        "phonetic": "/ˈɛniˌtaɪm ðə bæɡ ɪz ˈjʊɹz/",
+        "zh": "不客氣，這袋外帶就交給你了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "One last thing, the lid keeps slipping.",
+        "phonetic": "/wʌn læst θɪŋ ðə lɪd kipz ˈslɪpɪŋ/",
+        "zh": "最後一件事，餐盒蓋一直滑開。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "Tuck the napkin under, it holds tight now.",
+        "phonetic": "/tʌk ðə ˈnæpkɪn ˈʌndɚ ɪt hoʊldz taɪt naʊ/",
+        "zh": "把餐巾紙塞在蓋子下面壓著，這樣就穩了。"
+      },
+      {
+        "speaker": "char_a",
+        "text": "Genius, see you next Tuesday, maybe.",
+        "phonetic": "/ˈdʒinjəs si ju nɛkst ˈtʊzdeɪ ˈmeɪbi/",
+        "zh": "太厲害了，下週二再見，應該會來。"
+      },
+      {
+        "speaker": "char_b",
+        "text": "We save pies, you save that appetite. Bye!",
+        "phonetic": "/wi seɪv ˈpaɪz ju seɪv ðæt ˈæpɪˌtaɪt baɪ/",
+        "zh": "我們替你留派，你也要好好保留你的好胃口。再見！"
+      }
+    ],
+    "youtube_title": "【打包剩菜🥡】「這層酥皮在呼喚我」💬學用英文要打包盒🥧｜聽完就敢開口｜60句沉浸式A2英文聽力｜Leftovers To Go",
+    "youtube_title_en": "\"This Crust Is Calling My Name\" — Boxing Up Diner Leftovers",
+    "youtube_description": "「這層酥皮在呼喚我」——在美式餐館吃到一半，怎麼請服務生幫你打包剩菜？本集是 60 句沉浸式英文聽力練習，場景就在關門前的小餐館。\n\n你會聽到：要保鮮盒與紙盒的說法、醬汁分開裝、蓋子不聽話的應變、回爐加熱的叮嚀，還有打包費與外帶水的實用句子。整段對話只用 A2 初級單字，加上美國人每天的真實口吻：um、well、hmm、oh、ha。\n\n聽完你就會用：Want a box for that、to go、the gravy ride separate、did my receipt send。後半段是逐句聽力＋跟讀練習，請大聲跟著唸，讓舌頭先學會，腦袋自然就記住。\n\n不用背，多聽就會用。每天一集，把英文聽成直覺。\n\n#EnglishListening #ESL #LearnEnglish｜喜歡的話請訂閱，開啟小鈴鐺。",
+    "youtube_description_en": "\"This crust is calling my name\" — you're full, the pie is half gone, and you still want it home in one piece. This 60-line immersive listening practice happens at a US diner right before close.\n\nYou will hear: asking for a box, paper or plastic, keeping gravy separate, the lid that will not sit still, reheating advice, the small packing fee, and a to-go cup of water.\n\nEverything stays in A2-level words, with the small talk Americans actually use: um, well, hmm, oh, ha. By the end you'll own phrases like Want a box for that, to go, and How do I reheat all this at home.\n\nThe last chapter is a line-by-line listen-and-repeat workout, so speak out loud and let your mouth learn first.\n\nNo memorizing needed — just listen often and it sticks.\n\n#EnglishListening #ESL #LearnEnglish — subscribe for a new scene every day.",
+    "youtube_title_ref": "【🎬沉浸式英文動畫】🥡餐廳打包剩菜英文｜要盒・醬汁分開・加熱叮嚀｜蓋子不聽話怎麼辦｜🌱A2 初級英文｜💡不用背，多聽就會用｜🎧聽力口說練習｜後段逐句跟讀",
+    "youtube_description_ref": "📌 影片簡介：\n派吃到一半，肚子已經飽了，酥皮卻還在跟你招手，該怎麼請服務生幫你打包？醬汁要分開裝還是澆在上頭？盒子會不會另外收費？\n\n這一集帶大家走進關門前的小餐館，從要一個打包盒、挑紙盒或塑膠盒、醬汁獨立打包，一路聊到加熱方式、袋蓋糾紛與外帶水，共 60 句連續真實對話。\n\n你會聽到：\n🥡 要盒句子：So, want a box for that?\n🍲 分開裝醬：Um, can the gravy ride separate?\n🔥 加熱叮嚀：Oven, ten minutes, medium heat.\n🥤 外帶水：On the house, filling a to-go cup.\n\n後半段是逐句聽力＋跟讀練習：每一句先聽兩遍，再跟著大聲說一遍，把 um、well、hmm 這些自然語感唸進直覺裡。🎧\n\n🌱 適合 A2 初級英文學習者：不用背單字、不用啃文法，多聽就會用。跟著這頓晚飯走完一趟，下次打包時，話自然從嘴邊冒出來。\n\n祝你每次都吃得開心、帶得安心。",
+    "youtube_tags": [
+      "english listening practice",
+      "asking for a doggy bag",
+      "diner english conversation",
+      "leftovers to go english",
+      "esl listening a2",
+      "takeaway box english",
+      "american diner english",
+      "listen and repeat english",
+      "60 sentence english practice",
+      "英文聽力練習",
+      "餐廳打包英文",
+      "剩菜打包說法",
+      "沉浸式英文動畫",
+      "逐句跟讀英文",
+      "A2初級英文",
+      "美語日常會話",
+      "打包盒英文"
+    ],
+    "scene": "cozy American diner counter",
+    "thumbnail_expression": "eyeing the last pie slice with a grin",
+    "thumbnail_action": "holding up a to-go box with a fork tucked inside",
+    "thumbnail_subtitle": "60句聽力練習",
+    "thumbnail_icons": [
+      {
+        "en": "To-Go Box",
+        "zh": "打包盒"
+      },
+      {
+        "en": "Pot Pie",
+        "zh": "酥皮肉派"
+      },
+      {
+        "en": "Gravy Cup",
+        "zh": "醬汁小杯"
+      },
+      {
+        "en": "Cornbread",
+        "zh": "玉米麵包"
+      },
+      {
+        "en": "Paper Receipt",
+        "zh": "紙本收據"
+      }
+    ]
+  }
+}
